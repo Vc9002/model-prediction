@@ -1,0 +1,139 @@
+[
+ {
+  "id": 401523990,
+  "season": 2023,
+  "seasonType": "regular",
+  "week": 1,
+  "startDate": "2023-09-02T23:00:00.000Z",
+  "homeTeamId": 36,
+  "homeTeam": "Colorado State",
+  "homeConference": "Mountain West",
+  "homeClassification": "fbs",
+  "homeScore": 24,
+  "awayTeamId": 265,
+  "awayTeam": "Washington State",
+  "awayConference": "Pac-12",
+  "awayClassification": "fbs",
+  "awayScore": 50,
+  "lines": [
+   {
+    "provider": "teamrankings",
+    "spread": 12.5,
+    "formattedSpread": "Washington State -12.5",
+    "spreadOpen": null,
+    "overUnder": 58,
+    "overUnderOpen": null,
+    "homeMoneyline": null,
+    "awayMoneyline": null
+   },
+   {
+    "provider": "Bovada",
+    "spread": 8.5,
+    "formattedSpread": "Washington State -8.5",
+    "spreadOpen": 14.5,
+    "overUnder": 53.5,
+    "overUnderOpen": 54.5,
+    "homeMoneyline": 360,
+    "awayMoneyline": -500
+   },
+   {
+    "provider": "DraftKings",
+    "spread": 11,
+    "formattedSpread": "Washington State -11",
+    "spreadOpen": 14,
+    "overUnder": 55.5,
+    "overUnderOpen": 57.5,
+    "homeMoneyline": 295,
+    "awayMoneyline": -440
+   },
+   {
+    "provider": "Caesars Sportsbook (Colorado)",
+    "spread": 9.5,
+    "formattedSpread": "Washington State -9.5",
+    "spreadOpen": null,
+    "overUnder": 54,
+    "overUnderOpen": null,
+    "homeMoneyline": null,
+    "awayMoneyline": null
+   }
+  ]
+ },
+ {
+  "id": 400876049,
+  "season": 2016,
+  "seasonType": "postseason",
+  "week": 1,
+  "startDate": "2016-12-25T01:00:00.000Z",
+  "homeTeamId": 2393,
+  "homeTeam": "Middle Tennessee",
+  "homeConference": "Conference USA",
+  "homeClassification": "fbs",
+  "homeScore": 35,
+  "awayTeamId": 62,
+  "awayTeam": "Hawai'i",
+  "awayConference": "Mountain West",
+  "awayClassification": "fbs",
+  "awayScore": 52,
+  "lines": [
+   {
+    "provider": "teamrankings",
+    "spread": -7.5,
+    "formattedSpread": "Middle Tennessee -7.5",
+    "spreadOpen": null,
+    "overUnder": 70,
+    "overUnderOpen": null,
+    "homeMoneyline": null,
+    "awayMoneyline": null
+   },
+   {
+    "provider": "numberfire",
+    "spread": -7.5,
+    "formattedSpread": "Middle Tennessee -7.5",
+    "spreadOpen": null,
+    "overUnder": 70,
+    "overUnderOpen": null,
+    "homeMoneyline": null,
+    "awayMoneyline": null
+   },
+   {
+    "provider": "consensus",
+    "spread": -4.5,
+    "formattedSpread": "Middle Tennessee -4.5",
+    "spreadOpen": null,
+    "overUnder": null,
+    "overUnderOpen": null,
+    "homeMoneyline": null,
+    "awayMoneyline": null
+   }
+  ]
+ },
+ {
+  "id": 401856873,
+  "season": 2026,
+  "seasonType": "regular",
+  "week": 13,
+  "startDate": "2026-11-29T02:00:00.000Z",
+  "homeTeamId": 12,
+  "homeTeam": "Arizona",
+  "homeConference": "Big 12",
+  "homeClassification": "fbs",
+  "homeScore": null,
+  "awayTeamId": 9,
+  "awayTeam": "Arizona State",
+  "awayConference": "Big 12",
+  "awayClassification": "fbs",
+  "awayScore": null,
+  "lines": [
+   {
+    "provider": "DraftKings",
+    "spread": -4.5,
+    "formattedSpread": "Arizona -4.5",
+    "spreadOpen": -4.5,
+    "overUnder": 52.5,
+    "overUnderOpen": 52.5,
+    "homeMoneyline": -218,
+    "awayMoneyline": 180
+   }
+  ]
+ }
+]

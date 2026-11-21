@@ -1,0 +1,79 @@
+[
+ {
+  "year": 2022,
+  "team": "Georgia",
+  "conference": "SEC",
+  "rating": 35.3,
+  "ranking": 1,
+  "secondOrderWins": null,
+  "sos": null,
+  "offense": {
+   "ranking": 26,
+   "rating": 37.2,
+   "success": null,
+   "explosiveness": null,
+   "rushing": null,
+   "passing": null,
+   "standardDowns": null,
+   "passingDowns": null,
+   "runRate": null,
+   "pace": null
+  },
+  "defense": {
+   "ranking": 1,
+   "rating": 3.7,
+   "success": null,
+   "explosiveness": null,
+   "rushing": null,
+   "passing": null,
+   "standardDowns": null,
+   "passingDowns": null,
+   "havoc": {
+    "total": null,
+    "frontSeven": null,
+    "db": null
+   }
+  },
+  "specialTeams": {
+   "rating": 1.7
+  }
+ },
+ {
+  "year": 2022,
+  "team": "nationalAverages",
+  "rating": 0.8145038167938932,
+  "ranking": null,
+  "secondOrderWins": null,
+  "sos": null,
+  "offense": {
+   "ranking": null,
+   "rating": 27.76946564885496,
+   "success": null,
+   "explosiveness": null,
+   "rushing": null,
+   "passing": null,
+   "standardDowns": null,
+   "passingDowns": null,
+   "runRate": null,
+   "pace": null
+  },
+  "defense": {
+   "ranking": null,
+   "rating": 26.959541984732823,
+   "success": null,
+   "explosiveness": null,
+   "rushing": null,
+   "passing": null,
+   "standardDowns": null,
+   "passingDowns": null,
+   "havoc": {
+    "total": null,
+    "frontSeven": null,
+    "db": null
+   }
+  },
+  "specialTeams": {
+   "rating": 0.0007633587786259542
+  }
+ }
+]

@@ -1,0 +1,36 @@
+[
+ {
+  "season": 2023,
+  "team": "Colorado State",
+  "conference": "Mountain West",
+  "totalPPA": 159.2,
+  "totalPassingPPA": 28.8,
+  "totalReceivingPPA": 114.1,
+  "totalRushingPPA": 16.2,
+  "percentPPA": 0.92,
+  "percentPassingPPA": 1,
+  "percentReceivingPPA": 0.756,
+  "percentRushingPPA": -2.348,
+  "usage": 0.825,
+  "passingUsage": 1,
+  "receivingUsage": 0.69,
+  "rushingUsage": 0.722
+ },
+ {
+  "season": 2023,
+  "team": "Georgia",
+  "conference": "SEC",
+  "totalPPA": 300.2,
+  "totalPassingPPA": 44.4,
+  "totalReceivingPPA": 180.3,
+  "totalRushingPPA": 75.5,
+  "percentPPA": 0.43,
+  "percentPassingPPA": 0.178,
+  "percentReceivingPPA": 0.59,
+  "percentRushingPPA": 0.532,
+  "usage": 0.446,
+  "passingUsage": 0.084,
+  "receivingUsage": 0.647,
+  "rushingUsage": 0.622
+ }
+]

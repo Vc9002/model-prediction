@@ -1,0 +1,171 @@
+[
+ {
+  "id": 1001024,
+  "school": "Albany",
+  "mascot": null,
+  "abbreviation": null,
+  "alternateNames": [],
+  "conference": null,
+  "division": null,
+  "classification": null,
+  "color": "#null",
+  "alternateColor": "#null",
+  "twitter": null
+ },
+ {
+  "id": 1001026,
+  "school": "Albany",
+  "mascot": null,
+  "abbreviation": null,
+  "alternateNames": [],
+  "conference": null,
+  "division": null,
+  "classification": null,
+  "color": "#null",
+  "alternateColor": "#null",
+  "twitter": null
+ },
+ {
+  "id": 1001029,
+  "school": "Albany",
+  "mascot": null,
+  "abbreviation": null,
+  "alternateNames": [],
+  "conference": null,
+  "division": null,
+  "classification": null,
+  "color": "#null",
+  "alternateColor": "#null",
+  "twitter": null
+ },
+ {
+  "id": 3253,
+  "school": "Charlotte",
+  "mascot": "Saints",
+  "abbreviation": "COLLE",
+  "alternateNames": [
+   "COLLE",
+   "Faith NC"
+  ],
+  "conference": null,
+  "division": null,
+  "classification": null,
+  "color": "#null",
+  "alternateColor": "#null",
+  "twitter": null
+ },
+ {
+  "id": 2429,
+  "school": "Charlotte",
+  "mascot": "49ers",
+  "abbreviation": "CLT",
+  "alternateNames": [
+   "CLT",
+   "Charlotte"
+  ],
+  "conference": "American Athletic",
+  "division": null,
+  "classification": "fbs",
+  "color": "#005035",
+  "alternateColor": "#a49665",
+  "twitter": "@CharlotteFTBL"
+ },
+ {
+  "id": 36,
+  "school": "Colorado State",
+  "mascot": "Rams",
+  "abbreviation": "CSU",
+  "alternateNames": [
+   "CSU",
+   "Colorado St"
+  ],
+  "conference": "Pac-12",
+  "division": null,
+  "classification": "fbs",
+  "color": "#1e4d2b",
+  "alternateColor": "#c8c372",
+  "twitter": "@CSUFootball"
+ },
+ {
+  "id": 61,
+  "school": "Georgia",
+  "mascot": "Bulldogs",
+  "abbreviation": "UGA",
+  "alternateNames": [
+   "UGA",
+   "Georgia"
+  ],
+  "conference": "SEC",
+  "division": null,
+  "classification": "fbs",
+  "color": "#ba0c2f",
+  "alternateColor": "#2c2a29",
+  "twitter": "@GeorgiaFootball"
+ },
+ {
+  "id": 62,
+  "school": "Hawai'i",
+  "mascot": "Rainbow Warriors",
+  "abbreviation": "HAW",
+  "alternateNames": [
+   "HAW",
+   "Hawai'i"
+  ],
+  "conference": "Mountain West",
+  "division": null,
+  "classification": "fbs",
+  "color": "#024731",
+  "alternateColor": "#000000",
+  "twitter": "@HawaiiFootball"
+ },
+ {
+  "id": 2393,
+  "school": "Middle Tennessee",
+  "mascot": "Blue Raiders",
+  "abbreviation": "MTSU",
+  "alternateNames": [
+   "Middle Tennessee State",
+   "MTSU",
+   "MTSU"
+  ],
+  "conference": "Conference USA",
+  "division": null,
+  "classification": "fbs",
+  "color": "#036eb7",
+  "alternateColor": "#ffffff",
+  "twitter": "@MT_FB"
+ },
+ {
+  "id": 399,
+  "school": "UAlbany",
+  "mascot": "Great Danes",
+  "abbreviation": "UALB",
+  "alternateNames": [
+   "SUNY Albany",
+   "UALB",
+   "UAlbany"
+  ],
+  "conference": "Coastal Athletic",
+  "division": null,
+  "classification": "fcs",
+  "color": "#3D2777",
+  "alternateColor": "#ffffff",
+  "twitter": "@UAlbanyFootball"
+ },
+ {
+  "id": 265,
+  "school": "Washington State",
+  "mascot": "Cougars",
+  "abbreviation": "WSU",
+  "alternateNames": [
+   "WSU",
+   "Washington St"
+  ],
+  "conference": "Pac-12",
+  "division": null,
+  "classification": "fbs",
+  "color": "#a60f2d",
+  "alternateColor": "#4d4d4d",
+  "twitter": "@WSUCougarFB"
+ }
+]

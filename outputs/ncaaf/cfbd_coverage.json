@@ -1,0 +1,1097 @@
+{
+ "calls": {
+  "ledger_after": 89,
+  "ledger_before": 87,
+  "note": "/info does not consume quota (two back-to-back /info calls left remainingCalls unchanged)",
+  "remaining_after": 2749,
+  "remaining_before": 2749,
+  "this_run_http_attempts": 2
+ },
+ "datasets": {
+  "lines_2014": {
+   "fetched_at_utc": "2026-11-21T19:46:33.303440+00:00",
+   "rows": 868,
+   "status": "cached"
+  },
+  "lines_2015": {
+   "fetched_at_utc": "2026-11-21T19:46:34.131227+00:00",
+   "rows": 870,
+   "status": "cached"
+  },
+  "lines_2016": {
+   "fetched_at_utc": "2026-11-21T19:46:35.660132+00:00",
+   "rows": 873,
+   "status": "cached"
+  },
+  "lines_2017": {
+   "fetched_at_utc": "2026-11-21T19:46:36.377621+00:00",
+   "rows": 874,
+   "status": "cached"
+  },
+  "lines_2018": {
+   "fetched_at_utc": "2026-11-21T19:46:38.164214+00:00",
+   "rows": 884,
+   "status": "cached"
+  },
+  "lines_2019": {
+   "fetched_at_utc": "2026-11-21T19:46:39.454405+00:00",
+   "rows": 888,
+   "status": "cached"
+  },
+  "lines_2020": {
+   "fetched_at_utc": "2026-11-21T19:46:40.133308+00:00",
+   "rows": 570,
+   "status": "cached"
+  },
+  "lines_2021": {
+   "fetched_at_utc": "2026-11-21T19:46:41.502523+00:00",
+   "rows": 887,
+   "status": "cached"
+  },
+  "lines_2022": {
+   "fetched_at_utc": "2026-11-21T19:46:43.714539+00:00",
+   "rows": 1463,
+   "status": "cached"
+  },
+  "lines_2023": {
+   "fetched_at_utc": "2026-11-21T19:40:25.189377+00:00",
+   "rows": 1416,
+   "status": "cached"
+  },
+  "lines_2024": {
+   "fetched_at_utc": "2026-11-21T19:46:45.829349+00:00",
+   "rows": 1573,
+   "status": "cached"
+  },
+  "lines_2025": {
+   "fetched_at_utc": "2026-11-21T19:46:48.439944+00:00",
+   "rows": 1597,
+   "status": "cached"
+  },
+  "lines_2026": {
+   "fetched_at_utc": "2026-11-21T19:46:50.472602+00:00",
+   "rows": 1537,
+   "status": "cached"
+  },
+  "portal_2020": {
+   "fetched_at_utc": "2026-11-21T19:46:40.229080+00:00",
+   "rows": 0,
+   "status": "cached"
+  },
+  "portal_2021": {
+   "fetched_at_utc": "2026-11-21T19:46:41.716195+00:00",
+   "rows": 1770,
+   "status": "cached"
+  },
+  "portal_2022": {
+   "fetched_at_utc": "2026-11-21T19:46:43.921441+00:00",
+   "rows": 2273,
+   "status": "cached"
+  },
+  "portal_2023": {
+   "fetched_at_utc": "2026-11-21T19:41:15.315762+00:00",
+   "rows": 2502,
+   "status": "cached"
+  },
+  "portal_2024": {
+   "fetched_at_utc": "2026-11-21T19:46:46.158738+00:00",
+   "rows": 3378,
+   "status": "cached"
+  },
+  "portal_2025": {
+   "fetched_at_utc": "2026-11-21T19:46:48.750824+00:00",
+   "rows": 4499,
+   "status": "cached"
+  },
+  "portal_2026": {
+   "fetched_at_utc": "2026-11-21T19:46:50.729640+00:00",
+   "rows": 4484,
+   "status": "cached"
+  },
+  "rankings_2014": {
+   "fetched_at_utc": "2026-11-21T19:46:32.727333+00:00",
+   "rows": 17,
+   "status": "cached"
+  },
+  "rankings_2015": {
+   "fetched_at_utc": "2026-11-21T19:46:33.548026+00:00",
+   "rows": 16,
+   "status": "cached"
+  },
+  "rankings_2016": {
+   "fetched_at_utc": "2026-11-21T19:46:35.111585+00:00",
+   "rows": 16,
+   "status": "cached"
+  },
+  "rankings_2017": {
+   "fetched_at_utc": "2026-11-21T19:46:35.850147+00:00",
+   "rows": 16,
+   "status": "cached"
+  },
+  "rankings_2018": {
+   "fetched_at_utc": "2026-11-21T19:46:37.121192+00:00",
+   "rows": 16,
+   "status": "cached"
+  },
+  "rankings_2019": {
+   "fetched_at_utc": "2026-11-21T19:46:38.441690+00:00",
+   "rows": 17,
+   "status": "cached"
+  },
+  "rankings_2020": {
+   "fetched_at_utc": "2026-11-21T19:46:39.642686+00:00",
+   "rows": 16,
+   "status": "cached"
+  },
+  "rankings_2021": {
+   "fetched_at_utc": "2026-11-21T19:46:40.425815+00:00",
+   "rows": 16,
+   "status": "cached"
+  },
+  "rankings_2022": {
+   "fetched_at_utc": "2026-11-21T19:46:41.958025+00:00",
+   "rows": 16,
+   "status": "cached"
+  },
+  "rankings_2023": {
+   "fetched_at_utc": "2026-11-21T19:41:15.708789+00:00",
+   "rows": 16,
+   "status": "cached"
+  },
+  "rankings_2024": {
+   "fetched_at_utc": "2026-11-21T19:46:44.268778+00:00",
+   "rows": 17,
+   "status": "cached"
+  },
+  "rankings_2025": {
+   "fetched_at_utc": "2026-11-21T19:46:46.662676+00:00",
+   "rows": 17,
+   "status": "cached"
+  },
+  "rankings_2026": {
+   "fetched_at_utc": "2026-11-21T19:46:48.962184+00:00",
+   "rows": 12,
+   "status": "cached"
+  },
+  "recruiting_teams_all_years": {
+   "fetched_at_utc": "2026-11-21T19:41:07.361654+00:00",
+   "rows": 4577,
+   "status": "cached"
+  },
+  "returning_2014": {
+   "fetched_at_utc": "2026-11-21T19:46:32.297861+00:00",
+   "rows": 125,
+   "status": "cached"
+  },
+  "returning_2015": {
+   "fetched_at_utc": "2026-11-21T19:46:33.403427+00:00",
+   "rows": 128,
+   "status": "cached"
+  },
+  "returning_2016": {
+   "fetched_at_utc": "2026-11-21T19:46:34.204768+00:00",
+   "rows": 128,
+   "status": "cached"
+  },
+  "returning_2017": {
+   "fetched_at_utc": "2026-11-21T19:46:35.729904+00:00",
+   "rows": 128,
+   "status": "cached"
+  },
+  "returning_2018": {
+   "fetched_at_utc": "2026-11-21T19:46:36.475581+00:00",
+   "rows": 130,
+   "status": "cached"
+  },
+  "returning_2019": {
+   "fetched_at_utc": "2026-11-21T19:46:38.289338+00:00",
+   "rows": 130,
+   "status": "cached"
+  },
+  "returning_2020": {
+   "fetched_at_utc": "2026-11-21T19:46:39.547092+00:00",
+   "rows": 130,
+   "status": "cached"
+  },
+  "returning_2021": {
+   "fetched_at_utc": "2026-11-21T19:46:40.306995+00:00",
+   "rows": 128,
+   "status": "cached"
+  },
+  "returning_2022": {
+   "fetched_at_utc": "2026-11-21T19:46:41.834549+00:00",
+   "rows": 130,
+   "status": "cached"
+  },
+  "returning_2023": {
+   "fetched_at_utc": "2026-11-21T19:41:10.926803+00:00",
+   "rows": 131,
+   "status": "cached"
+  },
+  "returning_2024": {
+   "fetched_at_utc": "2026-11-21T19:46:44.148539+00:00",
+   "rows": 133,
+   "status": "cached"
+  },
+  "returning_2025": {
+   "fetched_at_utc": "2026-11-21T19:46:46.249968+00:00",
+   "rows": 134,
+   "status": "cached"
+  },
+  "returning_2026": {
+   "fetched_at_utc": "2026-11-21T19:46:48.827630+00:00",
+   "rows": 136,
+   "status": "cached"
+  },
+  "sp_2013": {
+   "fetched_at_utc": "2026-11-21T19:46:24.086592+00:00",
+   "rows": 126,
+   "status": "cached"
+  },
+  "sp_2014": {
+   "fetched_at_utc": "2026-11-21T19:46:24.547217+00:00",
+   "rows": 129,
+   "status": "cached"
+  },
+  "sp_2015": {
+   "fetched_at_utc": "2026-11-21T19:46:24.733318+00:00",
+   "rows": 129,
+   "status": "cached"
+  },
+  "sp_2016": {
+   "fetched_at_utc": "2026-11-21T19:46:24.943437+00:00",
+   "rows": 129,
+   "status": "cached"
+  },
+  "sp_2017": {
+   "fetched_at_utc": "2026-11-21T19:46:25.501194+00:00",
+   "rows": 129,
+   "status": "cached"
+  },
+  "sp_2018": {
+   "fetched_at_utc": "2026-11-21T19:46:25.712433+00:00",
+   "rows": 131,
+   "status": "cached"
+  },
+  "sp_2019": {
+   "fetched_at_utc": "2026-11-21T19:46:26.370827+00:00",
+   "rows": 131,
+   "status": "cached"
+  },
+  "sp_2020": {
+   "fetched_at_utc": "2026-11-21T19:46:28.967280+00:00",
+   "rows": 131,
+   "status": "cached"
+  },
+  "sp_2021": {
+   "fetched_at_utc": "2026-11-21T19:46:29.875554+00:00",
+   "rows": 131,
+   "status": "cached"
+  },
+  "sp_2022": {
+   "fetched_at_utc": "2026-11-21T19:41:17.841950+00:00",
+   "rows": 132,
+   "status": "cached"
+  },
+  "sp_2023": {
+   "fetched_at_utc": "2026-11-21T19:46:31.377289+00:00",
+   "rows": 134,
+   "status": "cached"
+  },
+  "sp_2024": {
+   "fetched_at_utc": "2026-11-21T19:46:31.543716+00:00",
+   "rows": 135,
+   "status": "cached"
+  },
+  "sp_2025": {
+   "fetched_at_utc": "2026-11-21T19:46:32.049101+00:00",
+   "rows": 137,
+   "status": "cached"
+  },
+  "talent_2013": {
+   "fetched_at_utc": "2026-11-21T19:46:23.930063+00:00",
+   "rows": 0,
+   "status": "cached"
+  },
+  "talent_2014": {
+   "fetched_at_utc": "2026-11-21T19:46:24.434794+00:00",
+   "rows": 0,
+   "status": "cached"
+  },
+  "talent_2015": {
+   "fetched_at_utc": "2026-11-21T19:46:24.626099+00:00",
+   "rows": 232,
+   "status": "cached"
+  },
+  "talent_2016": {
+   "fetched_at_utc": "2026-11-21T19:46:24.819381+00:00",
+   "rows": 237,
+   "status": "cached"
+  },
+  "talent_2017": {
+   "fetched_at_utc": "2026-11-21T19:46:25.404606+00:00",
+   "rows": 157,
+   "status": "cached"
+  },
+  "talent_2018": {
+   "fetched_at_utc": "2026-11-21T19:46:25.612486+00:00",
+   "rows": 236,
+   "status": "cached"
+  },
+  "talent_2019": {
+   "fetched_at_utc": "2026-11-21T19:46:26.289008+00:00",
+   "rows": 231,
+   "status": "cached"
+  },
+  "talent_2020": {
+   "fetched_at_utc": "2026-11-21T19:46:26.461493+00:00",
+   "rows": 219,
+   "status": "cached"
+  },
+  "talent_2021": {
+   "fetched_at_utc": "2026-11-21T19:46:29.075531+00:00",
+   "rows": 224,
+   "status": "cached"
+  },
+  "talent_2022": {
+   "fetched_at_utc": "2026-11-21T19:46:30.692223+00:00",
+   "rows": 233,
+   "status": "cached"
+  },
+  "talent_2023": {
+   "fetched_at_utc": "2026-11-21T19:41:11.354731+00:00",
+   "rows": 238,
+   "status": "cached"
+  },
+  "talent_2024": {
+   "fetched_at_utc": "2026-11-21T19:46:31.450382+00:00",
+   "rows": 134,
+   "status": "cached"
+  },
+  "talent_2025": {
+   "fetched_at_utc": "2026-11-21T19:46:31.611431+00:00",
+   "rows": 134,
+   "status": "cached"
+  },
+  "talent_2026": {
+   "fetched_at_utc": "2026-11-21T19:46:32.189090+00:00",
+   "rows": 138,
+   "status": "cached"
+  },
+  "teams": {
+   "fetched_at_utc": "2026-11-21T19:40:20.727393+00:00",
+   "rows": 1933,
+   "status": "cached"
+  }
+ },
+ "generated_at_utc": "2026-11-21T19:55:19Z",
+ "ledger": {
+  "attempts_by_endpoint": {
+   "lines": 13,
+   "player/portal": 7,
+   "player/returning": 14,
+   "rankings": 13,
+   "ratings/sp": 15,
+   "recruiting/teams": 1,
+   "talent": 15,
+   "teams": 1
+  },
+  "attempts_excluding_info": 79,
+  "attempts_total": 89,
+  "first_at_utc": "2026-11-21T19:40:15.305704+00:00",
+  "first_remaining_seen": 2824,
+  "last_at_utc": "2026-11-21T19:55:24.406852+00:00",
+  "last_remaining_seen": 2749,
+  "non_200_attempts": [
+   {
+    "at_utc": "2026-11-21T19:41:09.392882+00:00",
+    "endpoint": "talent",
+    "params": {},
+    "remaining_after": 2821,
+    "status": 400
+   },
+   {
+    "at_utc": "2026-11-21T19:41:10.250203+00:00",
+    "endpoint": "player/returning",
+    "params": {},
+    "remaining_after": 2821,
+    "status": 400
+   },
+   {
+    "at_utc": "2026-11-21T19:41:15.749403+00:00",
+    "endpoint": "ratings/sp",
+    "params": {
+     "year": 2022
+    },
+    "remaining_after": 2817,
+    "status": 503
+   },
+   {
+    "at_utc": "2026-11-21T19:46:26.528274+00:00",
+    "endpoint": "ratings/sp",
+    "params": {
+     "year": 2020
+    },
+    "remaining_after": 2801,
+    "status": 503
+   }
+  ]
+ },
+ "name_check": {
+  "agree": 265,
+  "disagree": [],
+  "pairs": 265
+ },
+ "outputs": {
+  "lines": "E:\\MP\\data\\research\\ncaaf_v7\\cfbd\\lines.jsonl",
+  "raw_cache": "E:\\MP\\data\\research\\ncaaf_v7\\cfbd\\raw",
+  "team_season_priors": "E:\\MP\\data\\research\\ncaaf_v7\\cfbd\\team_season_priors.jsonl"
+ },
+ "seasons": {
+  "2014": {
+   "espn_history_games": 0,
+   "lines_completed_rows": 2303,
+   "lines_game_espn_status": {
+    "NO_CALL_EVENT_UNSEEN": 868
+   },
+   "lines_games": 868,
+   "lines_games_with_any_line": 865,
+   "lines_providers": {
+    "consensus": 810,
+    "numberfire": 741,
+    "teamrankings": 752
+   },
+   "lines_rows": 2303,
+   "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_with_ml": 0,
+   "lines_rows_with_open_spread": 0,
+   "observed_at_utc": "2014-08-27T23:00:00Z",
+   "portal": null,
+   "portal_transfer_dates": null,
+   "priors_espn_matched": 231,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 231,
+   "priors_with": {
+    "portal": 0,
+    "preseason_ap": 25,
+    "recruiting_4yr": 171,
+    "returning": 125,
+    "sp_prev_season": 125,
+    "talent": 0,
+    "talent_prev_season": 0
+   },
+   "raw_rows": {
+    "lines_games": 868,
+    "rankings_weeks": 17,
+    "recruiting_classes": 231,
+    "returning": 125,
+    "sp_final": 129,
+    "talent": 0
+   }
+  },
+  "2015": {
+   "espn_history_games": 0,
+   "lines_completed_rows": 2320,
+   "lines_game_espn_status": {
+    "NO_CALL_EVENT_UNSEEN": 870
+   },
+   "lines_games": 870,
+   "lines_games_with_any_line": 832,
+   "lines_providers": {
+    "consensus": 795,
+    "numberfire": 765,
+    "teamrankings": 760
+   },
+   "lines_rows": 2320,
+   "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_with_ml": 0,
+   "lines_rows_with_open_spread": 0,
+   "observed_at_utc": "2015-09-03T22:00:00Z",
+   "portal": null,
+   "portal_transfer_dates": null,
+   "priors_espn_matched": 248,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 249,
+   "priors_with": {
+    "portal": 0,
+    "preseason_ap": 25,
+    "recruiting_4yr": 214,
+    "returning": 128,
+    "sp_prev_season": 128,
+    "talent": 232,
+    "talent_prev_season": 0
+   },
+   "raw_rows": {
+    "lines_games": 870,
+    "rankings_weeks": 16,
+    "recruiting_classes": 231,
+    "returning": 128,
+    "sp_final": 129,
+    "talent": 232
+   }
+  },
+  "2016": {
+   "espn_history_games": 1550,
+   "lines_completed_rows": 2347,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 2,
+    "MATCHED_SAME_ORIENTATION": 871
+   },
+   "lines_games": 873,
+   "lines_games_with_any_line": 866,
+   "lines_providers": {
+    "consensus": 842,
+    "numberfire": 749,
+    "teamrankings": 756
+   },
+   "lines_rows": 2347,
+   "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_with_ml": 0,
+   "lines_rows_with_open_spread": 0,
+   "observed_at_utc": "2016-08-27T02:00:00Z",
+   "portal": null,
+   "portal_transfer_dates": null,
+   "priors_espn_matched": 250,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 251,
+   "priors_with": {
+    "portal": 0,
+    "preseason_ap": 25,
+    "recruiting_4yr": 228,
+    "returning": 128,
+    "sp_prev_season": 128,
+    "talent": 237,
+    "talent_prev_season": 229
+   },
+   "raw_rows": {
+    "lines_games": 873,
+    "rankings_weeks": 16,
+    "recruiting_classes": 238,
+    "returning": 128,
+    "sp_final": 129,
+    "talent": 237
+   }
+  },
+  "2017": {
+   "espn_history_games": 1552,
+   "lines_completed_rows": 2400,
+   "lines_game_espn_status": {
+    "MATCHED_SAME_ORIENTATION": 874
+   },
+   "lines_games": 874,
+   "lines_games_with_any_line": 874,
+   "lines_providers": {
+    "consensus": 863,
+    "numberfire": 765,
+    "teamrankings": 772
+   },
+   "lines_rows": 2400,
+   "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_with_ml": 0,
+   "lines_rows_with_open_spread": 0,
+   "observed_at_utc": "2017-08-26T18:30:00Z",
+   "portal": null,
+   "portal_transfer_dates": null,
+   "priors_espn_matched": 234,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 235,
+   "priors_with": {
+    "portal": 0,
+    "preseason_ap": 25,
+    "recruiting_4yr": 228,
+    "returning": 128,
+    "sp_prev_season": 128,
+    "talent": 157,
+    "talent_prev_season": 221
+   },
+   "raw_rows": {
+    "lines_games": 874,
+    "rankings_weeks": 16,
+    "recruiting_classes": 233,
+    "returning": 128,
+    "sp_final": 129,
+    "talent": 157
+   }
+  },
+  "2018": {
+   "espn_history_games": 1559,
+   "lines_completed_rows": 3034,
+   "lines_game_espn_status": {
+    "MATCHED_SAME_ORIENTATION": 884
+   },
+   "lines_games": 884,
+   "lines_games_with_any_line": 869,
+   "lines_providers": {
+    "Caesars": 708,
+    "consensus": 802,
+    "numberfire": 764,
+    "teamrankings": 760
+   },
+   "lines_rows": 3034,
+   "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_with_ml": 0,
+   "lines_rows_with_open_spread": 0,
+   "observed_at_utc": "2018-08-25T21:30:00Z",
+   "portal": null,
+   "portal_transfer_dates": null,
+   "priors_espn_matched": 250,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 251,
+   "priors_with": {
+    "portal": 0,
+    "preseason_ap": 25,
+    "recruiting_4yr": 228,
+    "returning": 130,
+    "sp_prev_season": 128,
+    "talent": 236,
+    "talent_prev_season": 156
+   },
+   "raw_rows": {
+    "lines_games": 884,
+    "rankings_weeks": 16,
+    "recruiting_classes": 229,
+    "returning": 130,
+    "sp_final": 131,
+    "talent": 236
+   }
+  },
+  "2019": {
+   "espn_history_games": 1622,
+   "lines_completed_rows": 3506,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 1,
+    "MATCHED_SAME_ORIENTATION": 887
+   },
+   "lines_games": 888,
+   "lines_games_with_any_line": 881,
+   "lines_providers": {
+    "Bovada": 318,
+    "Caesars": 762,
+    "consensus": 881,
+    "numberfire": 771,
+    "teamrankings": 774
+   },
+   "lines_rows": 3506,
+   "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_with_ml": 0,
+   "lines_rows_with_open_spread": 0,
+   "observed_at_utc": "2019-08-24T23:00:00Z",
+   "portal": null,
+   "portal_transfer_dates": null,
+   "priors_espn_matched": 244,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 245,
+   "priors_with": {
+    "portal": 0,
+    "preseason_ap": 25,
+    "recruiting_4yr": 224,
+    "returning": 130,
+    "sp_prev_season": 130,
+    "talent": 231,
+    "talent_prev_season": 231
+   },
+   "raw_rows": {
+    "lines_games": 888,
+    "rankings_weeks": 17,
+    "recruiting_classes": 223,
+    "returning": 130,
+    "sp_final": 131,
+    "talent": 231
+   }
+  },
+  "2020": {
+   "espn_history_games": 592,
+   "lines_completed_rows": 2752,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 4,
+    "MATCHED_SAME_ORIENTATION": 564,
+    "NO_CALL_EVENT_UNSEEN": 2
+   },
+   "lines_games": 570,
+   "lines_games_with_any_line": 567,
+   "lines_providers": {
+    "Bovada": 515,
+    "Caesars": 439,
+    "Caesars (Pennsylvania)": 2,
+    "SugarHouse": 94,
+    "William Hill (New Jersey)": 80,
+    "consensus": 567,
+    "numberfire": 534,
+    "teamrankings": 521
+   },
+   "lines_rows": 2752,
+   "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_with_ml": 0,
+   "lines_rows_with_open_spread": 0,
+   "observed_at_utc": "2020-09-04T00:00:00Z",
+   "portal": null,
+   "portal_transfer_dates": null,
+   "priors_espn_matched": 239,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 239,
+   "priors_with": {
+    "portal": 0,
+    "preseason_ap": 25,
+    "recruiting_4yr": 215,
+    "returning": 130,
+    "sp_prev_season": 130,
+    "talent": 219,
+    "talent_prev_season": 222
+   },
+   "raw_rows": {
+    "lines_games": 570,
+    "portal": 0,
+    "rankings_weeks": 16,
+    "recruiting_classes": 206,
+    "returning": 130,
+    "sp_final": 131,
+    "talent": 219
+   }
+  },
+  "2021": {
+   "espn_history_games": 1569,
+   "lines_completed_rows": 3541,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 1,
+    "MATCHED_SAME_ORIENTATION": 886
+   },
+   "lines_games": 887,
+   "lines_games_with_any_line": 887,
+   "lines_providers": {
+    "Bovada": 879,
+    "Caesars (Pennsylvania)": 15,
+    "Caesars Sportsbook (Colorado)": 1,
+    "William Hill (New Jersey)": 862,
+    "consensus": 870,
+    "numberfire": 145,
+    "teamrankings": 769
+   },
+   "lines_rows": 3541,
+   "lines_rows_ml_spread_sign_conflict": 23,
+   "lines_rows_with_ml": 739,
+   "lines_rows_with_open_spread": 878,
+   "observed_at_utc": "2021-08-28T17:20:00Z",
+   "portal": {
+    "after_cutoff": 0,
+    "counted": 1770,
+    "counted_no_destination": 717,
+    "entries": 1770,
+    "undated": 0
+   },
+   "portal_transfer_dates": {
+    "first": "2020-08-01",
+    "last": "2021-07-31"
+   },
+   "priors_espn_matched": 236,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 236,
+   "priors_with": {
+    "portal": 236,
+    "preseason_ap": 25,
+    "recruiting_4yr": 208,
+    "returning": 128,
+    "sp_prev_season": 130,
+    "talent": 224,
+    "talent_prev_season": 214
+   },
+   "raw_rows": {
+    "lines_games": 887,
+    "portal": 1770,
+    "rankings_weeks": 16,
+    "recruiting_classes": 191,
+    "returning": 128,
+    "sp_final": 131,
+    "talent": 224
+   }
+  },
+  "2022": {
+   "espn_history_games": 1597,
+   "lines_completed_rows": 4310,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 4,
+    "MATCHED_SAME_ORIENTATION": 1459
+   },
+   "lines_games": 1463,
+   "lines_games_with_any_line": 1459,
+   "lines_providers": {
+    "Bovada": 859,
+    "Caesars Sportsbook (Colorado)": 33,
+    "William Hill (New Jersey)": 1408,
+    "consensus": 1244,
+    "teamrankings": 766
+   },
+   "lines_rows": 4310,
+   "lines_rows_ml_spread_sign_conflict": 32,
+   "lines_rows_with_ml": 728,
+   "lines_rows_with_open_spread": 852,
+   "observed_at_utc": "2022-08-27T16:00:00Z",
+   "portal": {
+    "after_cutoff": 1,
+    "counted": 2272,
+    "counted_no_destination": 906,
+    "entries": 2273,
+    "undated": 0
+   },
+   "portal_transfer_dates": {
+    "first": "2021-08-01",
+    "last": "2022-09-07"
+   },
+   "priors_espn_matched": 238,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 239,
+   "priors_with": {
+    "portal": 239,
+    "preseason_ap": 25,
+    "recruiting_4yr": 187,
+    "returning": 130,
+    "sp_prev_season": 130,
+    "talent": 233,
+    "talent_prev_season": 220
+   },
+   "raw_rows": {
+    "lines_games": 1463,
+    "portal": 2273,
+    "rankings_weeks": 16,
+    "recruiting_classes": 184,
+    "returning": 130,
+    "sp_final": 132,
+    "talent": 233
+   }
+  },
+  "2023": {
+   "espn_history_games": 1602,
+   "lines_completed_rows": 3072,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 7,
+    "MATCHED_SAME_ORIENTATION": 1409
+   },
+   "lines_games": 1416,
+   "lines_games_with_any_line": 1413,
+   "lines_providers": {
+    "Bovada": 854,
+    "Caesars Sportsbook (Colorado)": 76,
+    "DraftKings": 757,
+    "ESPN Bet": 469,
+    "William Hill (New Jersey)": 835,
+    "consensus": 29,
+    "teamrankings": 52
+   },
+   "lines_rows": 3072,
+   "lines_rows_ml_spread_sign_conflict": 50,
+   "lines_rows_with_ml": 1505,
+   "lines_rows_with_open_spread": 1605,
+   "observed_at_utc": "2023-08-26T18:30:00Z",
+   "portal": {
+    "after_cutoff": 0,
+    "counted": 2502,
+    "counted_no_destination": 895,
+    "entries": 2502,
+    "undated": 0
+   },
+   "portal_transfer_dates": {
+    "first": "2020-11-29",
+    "last": "2023-07-06"
+   },
+   "priors_espn_matched": 243,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 244,
+   "priors_with": {
+    "portal": 244,
+    "preseason_ap": 25,
+    "recruiting_4yr": 169,
+    "returning": 131,
+    "sp_prev_season": 131,
+    "talent": 238,
+    "talent_prev_season": 230
+   },
+   "raw_rows": {
+    "lines_games": 1416,
+    "portal": 2502,
+    "rankings_weeks": 16,
+    "recruiting_classes": 177,
+    "returning": 131,
+    "sp_final": 134,
+    "talent": 238
+   }
+  },
+  "2024": {
+   "espn_history_games": 1665,
+   "lines_completed_rows": 3172,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 6,
+    "MATCHED_SAME_ORIENTATION": 1566,
+    "NO_CALL_EVENT_UNSEEN": 1
+   },
+   "lines_games": 1573,
+   "lines_games_with_any_line": 1557,
+   "lines_providers": {
+    "Bovada": 804,
+    "DraftKings": 817,
+    "ESPN Bet": 1551
+   },
+   "lines_rows": 3172,
+   "lines_rows_ml_spread_sign_conflict": 61,
+   "lines_rows_with_ml": 2339,
+   "lines_rows_with_open_spread": 2334,
+   "observed_at_utc": "2024-08-24T16:00:00Z",
+   "portal": {
+    "after_cutoff": 0,
+    "counted": 3378,
+    "counted_no_destination": 724,
+    "entries": 3378,
+    "undated": 0
+   },
+   "portal_transfer_dates": {
+    "first": "2022-12-18",
+    "last": "2024-05-16"
+   },
+   "priors_espn_matched": 193,
+   "priors_fbs_espn_matched": 137,
+   "priors_fbs_rows": 137,
+   "priors_rows": 194,
+   "priors_with": {
+    "portal": 194,
+    "preseason_ap": 25,
+    "recruiting_4yr": 171,
+    "returning": 133,
+    "sp_prev_season": 133,
+    "talent": 134,
+    "talent_prev_season": 187
+   },
+   "raw_rows": {
+    "lines_games": 1573,
+    "portal": 3378,
+    "rankings_weeks": 17,
+    "recruiting_classes": 194,
+    "returning": 133,
+    "sp_final": 135,
+    "talent": 134
+   }
+  },
+  "2025": {
+   "espn_history_games": 1686,
+   "lines_completed_rows": 3289,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 4,
+    "MATCHED_SAME_ORIENTATION": 1593
+   },
+   "lines_games": 1597,
+   "lines_games_with_any_line": 1597,
+   "lines_providers": {
+    "Bovada": 934,
+    "DraftKings": 813,
+    "ESPN Bet": 1542
+   },
+   "lines_rows": 3289,
+   "lines_rows_ml_spread_sign_conflict": 40,
+   "lines_rows_with_ml": 2375,
+   "lines_rows_with_open_spread": 2495,
+   "observed_at_utc": "2025-08-23T16:00:00Z",
+   "portal": {
+    "after_cutoff": 0,
+    "counted": 4499,
+    "counted_no_destination": 729,
+    "entries": 4499,
+    "undated": 0
+   },
+   "portal_transfer_dates": {
+    "first": "2024-10-01",
+    "last": "2025-08-23"
+   },
+   "priors_espn_matched": 231,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 232,
+   "priors_with": {
+    "portal": 232,
+    "preseason_ap": 25,
+    "recruiting_4yr": 175,
+    "returning": 134,
+    "sp_prev_season": 134,
+    "talent": 134,
+    "talent_prev_season": 134
+   },
+   "raw_rows": {
+    "lines_games": 1597,
+    "portal": 4499,
+    "rankings_weeks": 17,
+    "recruiting_classes": 232,
+    "returning": 134,
+    "sp_final": 137,
+    "talent": 134
+   }
+  },
+  "2026": {
+   "espn_history_games": 1384,
+   "lines_completed_rows": 2110,
+   "lines_game_espn_status": {
+    "MATCHED_HOME_AWAY_SWAPPED": 2,
+    "MATCHED_SAME_ORIENTATION": 1313,
+    "NO_CALL_EVENT_UNSEEN": 222
+   },
+   "lines_games": 1537,
+   "lines_games_with_any_line": 1491,
+   "lines_providers": {
+    "Bovada": 813,
+    "DraftKings": 1491
+   },
+   "lines_rows": 2304,
+   "lines_rows_ml_spread_sign_conflict": 39,
+   "lines_rows_with_ml": 1886,
+   "lines_rows_with_open_spread": 2281,
+   "observed_at_utc": "2026-08-27T22:00:00Z",
+   "portal": {
+    "after_cutoff": 18,
+    "counted": 4466,
+    "counted_no_destination": 975,
+    "entries": 4484,
+    "undated": 0
+   },
+   "portal_transfer_dates": {
+    "first": "2025-09-25",
+    "last": "2026-10-14"
+   },
+   "priors_espn_matched": 220,
+   "priors_fbs_espn_matched": 138,
+   "priors_fbs_rows": 138,
+   "priors_rows": 221,
+   "priors_with": {
+    "portal": 221,
+    "preseason_ap": 25,
+    "recruiting_4yr": 182,
+    "returning": 136,
+    "sp_prev_season": 136,
+    "talent": 138,
+    "talent_prev_season": 134
+   },
+   "raw_rows": {
+    "lines_games": 1537,
+    "portal": 4484,
+    "rankings_weeks": 12,
+    "recruiting_classes": 221,
+    "returning": 136,
+    "talent": 138
+   }
+  }
+ },
+ "totals": {
+  "lines": 38350,
+  "team_season_priors": 3067
+ },
+ "unmatched_prior_names": [
+  [
+   "Grand Valley State",
+   "NO_CALL_ESPN_ID_UNSEEN"
+  ]
+ ]
+}
