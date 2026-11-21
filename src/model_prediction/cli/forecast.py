@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from functools import partial
@@ -1647,12 +1648,194 @@ def _forecast_wnba_total_sport(
     )
 
 
+# ESPN's NBA displayName is "LA Clippers"; Polymarket's spread/moneyline `team` field is
+# "Los Angeles Clippers", which the shared _team_matches rejects, so Clippers road spreads
+# were never priced (NBA review 2026-11-20, B3). Loosening the shared matcher is what
+# produced the NCAAB UConn/Central Connecticut collisions, so NBA canonicalises exact
+# Los Angeles strings at its own call sites only, and only inside the comparison: the
+# model keeps ESPN's name because history (Elo, trends) is keyed on it.
+_NBA_TEAM_ALIASES = {
+    "la clippers": "los angeles clippers",
+    "l.a. clippers": "los angeles clippers",
+    "la lakers": "los angeles lakers",
+    "l.a. lakers": "los angeles lakers",
+}
+
+
+def _nba_canonical_team(name: str) -> str:
+    key = " ".join(str(name).casefold().split())
+    return _NBA_TEAM_ALIASES.get(key, key)
+
+
+def _nba_team_matches(team_name: str, side_description: str) -> bool:
+    from ..learned_forward import _team_matches
+
+    return _team_matches(_nba_canonical_team(team_name), _nba_canonical_team(side_description))
+
+
+def _nba_same_start_minute(quote_start: str, event_date: str) -> bool:
+    """Same tip minute, compared as instants.
+
+    ESPN dates read ``...T01:00Z`` and Polymarket ``...T01:00:00Z``, so ``[:16]`` works
+    today; an offset-form string (moneyline ledger rows store ``-0500``) names the same
+    instant with different characters. Unparseable input keeps the old string compare.
+    """
+    try:
+        return parse_utc(quote_start).replace(second=0, microsecond=0) == parse_utc(event_date).replace(
+            second=0, microsecond=0
+        )
+    except (TypeError, ValueError):
+        return str(quote_start)[:16] == str(event_date)[:16]
+
+
+def _nba_trend_engine(artifact: dict, history):
+    from ..features.trends import TrendEngine
+
+    gap = artifact.get("offseason_gap_days")
+    return TrendEngine(
+        history,
+        offseason_gap_days=float(gap) if gap is not None else None,
+        offseason_retention=float(artifact.get("offseason_retention", 0.50)),
+        isolate_postseason=bool(artifact.get("isolate_postseason", False)),
+    )
+
+
+def _nba_schedule_components(
+    history, away_team: str, home_team: str, event_start_utc: str, *, trend, offseason_gap_days
+) -> dict[str, Any]:
+    """Rest, back-to-back and true current-season games per team, for the stored snapshot.
+
+    Rest and b2b mirror NBAStructuralV9Engine.predict_games exactly (unfiltered history,
+    prior games strictly before tip, 3.0 days when there is none, b2b at <= 1.25 days) so
+    the stored flags are the ones the engine used. The engine's own
+    ``current_season_games_min`` counts lifetime rows (B1); this count uses
+    TrendEngine.current_season_games_played plus the season-opener override from
+    _nba_volatility_sample (last game older than the offseason gap => 0), because the
+    trend engine alone returns last season's trailing run before a team's first game.
+    """
+    start = parse_utc(event_start_utc)
+    out: dict[str, Any] = {}
+    counts = []
+    for side, team in (("away", away_team), ("home", home_team)):
+        prior = [g for g in history if g.start < start and team in (g.home_team, g.away_team)]
+        last = max((g.start for g in prior), default=None)
+        rest = (start - last).total_seconds() / 86400.0 if last is not None else 3.0
+        out[f"rest_days_{side}"] = round(rest, 4)
+        out[f"b2b_{side}"] = bool(rest <= 1.25)
+        season_opener = last is None or (offseason_gap_days is not None and rest > float(offseason_gap_days))
+        games = 0 if season_opener else int(trend.team_trend(team).current_season_games_played)
+        out[f"current_season_games_{side}"] = games
+        counts.append(games)
+    out["current_season_games_played_min"] = min(counts)
+    return out
+
+
+def _nba_market_mid_components(market: dict, selection_side: str) -> dict[str, Any]:
+    """Decision-time Polymarket mid of the exact quote row the call was priced on."""
+
+    def _mid(side: Any) -> float | None:
+        if not isinstance(side, dict):
+            return None
+        try:
+            if side.get("midpoint") is not None:
+                mid = float(side["midpoint"])
+            else:
+                mid = (float(side["bid"]) + float(side["ask"])) / 2.0
+        except (KeyError, TypeError, ValueError):
+            return None
+        return round(mid, 6) if 0 < mid < 1 else None
+
+    out: dict[str, Any] = {}
+    for key, side_key in (("long", "long"), ("short", "short"), ("selection", selection_side)):
+        value = _mid(market.get(side_key))
+        if value is not None:
+            out[f"decision_market_mid_{key}"] = value
+    observed = market.get("observed_at_utc")
+    if observed:
+        out["decision_market_quote_observed_at_utc"] = str(observed)
+    return out
+
+
+def _nba_pre_availability_means(model_predict, history, upcoming: list) -> dict[str, float]:
+    """Engine mean per event rerun with availability zeroed (diagnostic only, never served).
+
+    Rerun rather than subtract: the totals OT bump keys off |margin| thresholds that the
+    availability gap can cross, so served-minus-gap is not the counterfactual.
+    """
+    zeroed = [replace(game, availability_points_gap=0.0, availability_total_loss=0.0) for game in upcoming]
+    means: dict[str, float] = {}
+    for prediction in model_predict(history, zeroed):
+        inputs = prediction.inference_inputs or {}
+        mean = inputs.get("mean")
+        if mean is not None and math.isfinite(float(mean)):
+            means[str(prediction.event_id)] = float(mean)
+    return means
+
+
+def _nba_decision_components(
+    *,
+    history,
+    prediction,
+    upcoming_game,
+    market: dict,
+    selection_side: str,
+    trend,
+    offseason_gap_days,
+    pre_availability_means: dict[str, float],
+    market_type: str,
+) -> dict[str, Any]:
+    """New snapshot keys for loss attribution (NBA review B10). Fail-soft: a failure here
+    omits the keys and logs; it must never block or alter the call."""
+    try:
+        components: dict[str, Any] = {}
+        components.update(
+            _nba_schedule_components(
+                history,
+                prediction.away_team,
+                prediction.home_team,
+                prediction.event_start_utc,
+                trend=trend,
+                offseason_gap_days=offseason_gap_days,
+            )
+        )
+        components.update(_nba_market_mid_components(market, selection_side))
+        if upcoming_game is not None:
+            components["availability_points_gap_input"] = round(
+                float(upcoming_game.availability_points_gap), 4
+            )
+            components["availability_total_loss_input"] = round(
+                float(upcoming_game.availability_total_loss), 4
+            )
+        served = (prediction.inference_inputs or {}).get("mean")
+        pre = pre_availability_means.get(str(prediction.event_id))
+        if served is not None and pre is not None and math.isfinite(float(served)):
+            name = "margin" if market_type == "spread" else "total"
+            components[f"expected_{name}_pre_availability"] = round(pre, 4)
+            components[f"availability_{name}_component"] = round(float(served) - pre, 4)
+        return {
+            key: value
+            for key, value in components.items()
+            if not (isinstance(value, float) and not math.isfinite(value))
+        }
+    except (AttributeError, KeyError, TypeError, ValueError):
+        logger.warning("NBA decision components unavailable for %s", prediction.event_id, exc_info=True)
+        return {}
+
+
+def _nba_with_components(features: dict, components: dict[str, Any]) -> dict:
+    """Add-only merge: an engine key is never overwritten."""
+    merged = dict(features)
+    for key, value in components.items():
+        merged.setdefault(key, value)
+    return merged
+
+
 def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     """Price NBA spreads with BasketballModel's normal-CDF margin approach
     (nba-spread-margin-v1), matched against the main (most-balanced)
     Polymarket alternate line per game.
     """
-    from ..learned_forward import _team_matches, _teams
+    from ..learned_forward import _teams
     from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
@@ -1769,8 +1952,8 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         candidates = [
             row
             for row in spread_rows
-            if _team_matches(away_team, str(row.get("team") or ""))
-            and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
+            if _nba_team_matches(away_team, str(row.get("team") or ""))
+            and _nba_same_start_minute(str(row.get("event_start_utc") or ""), str(event["date"]))
         ]
         market = _select_nba_spread_market(candidates, as_of=observed_at)
         if market is None:
@@ -1815,28 +1998,36 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     if model_version == "nba-spread-margin-v9":
         from ..models.nba_v9 import NBASpreadModelV9
 
-        spread_v9_model = NBASpreadModelV9.from_artifact(artifact)
-        predictions = [
-            p for p in spread_v9_model.predict_spreads(history, upcoming) if p.market_type == "spread"
-        ]
+        spread_predict = NBASpreadModelV9.from_artifact(artifact).predict_spreads
     elif model_version == "nba-spread-margin-v7":
         from ..models.nba_v7 import NBASpreadModelV7
 
-        spread_v7_model = NBASpreadModelV7.from_artifact(artifact)
-        predictions = [
-            p for p in spread_v7_model.predict_spreads(history, upcoming) if p.market_type == "spread"
-        ]
+        spread_predict = NBASpreadModelV7.from_artifact(artifact).predict_spreads
     elif model_version == "nba-spread-margin-v6":
         from ..models.nba_spread_v6 import NBASpreadModelV6
 
-        spread_v6_model = NBASpreadModelV6.from_artifact(artifact)
-        predictions = [
-            p for p in spread_v6_model.predict_spreads(history, upcoming) if p.market_type == "spread"
-        ]
+        spread_predict = NBASpreadModelV6.from_artifact(artifact).predict_spreads
     else:
-        predictions = [
-            p for p in legacy_model().predict_games(history, upcoming) if p.market_type == "spread"
-        ]
+        spread_predict = legacy_model().predict_games
+    predictions = [p for p in spread_predict(history, upcoming) if p.market_type == "spread"]
+
+    upcoming_by_event_id = {game.event_id: game for game in upcoming}
+    component_trend = None
+    pre_availability_means: dict[str, float] = {}
+    if predictions:
+        try:
+            component_trend = _nba_trend_engine(artifact, history)
+            if model_version in ("nba-spread-margin-v7", "nba-spread-margin-v9"):
+                pre_availability_means = _nba_pre_availability_means(spread_predict, history, upcoming)
+            else:
+                # Availability is not applied to these versions: the served mean is it.
+                pre_availability_means = {
+                    str(p.event_id): float(p.inference_inputs["mean"])
+                    for p in predictions
+                    if p.inference_inputs is not None
+                }
+        except (ArithmeticError, AttributeError, KeyError, TypeError, ValueError):
+            logger.warning("NBA spread decision components unavailable", exc_info=True)
 
     priced_contracts = []
     for prediction in predictions:
@@ -1855,10 +2046,21 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             continue
         from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
+        components = _nba_decision_components(
+            history=history,
+            prediction=prediction,
+            upcoming_game=upcoming_by_event_id.get(prediction.event_id),
+            market=market,
+            selection_side="long" if selection == "away" else "short",
+            trend=component_trend,
+            offseason_gap_days=offseason_gap_days,
+            pre_availability_means=pre_availability_means,
+            market_type="spread",
+        )
         model_snapshot = (
             build_scalar_snapshot(
                 artifact,
-                _nba_volatility_features(artifact, history, prediction),
+                _nba_with_components(_nba_volatility_features(artifact, history, prediction), components),
                 prediction.inference_inputs,
                 event_id=prediction.event_id,
                 event_start_utc=prediction.event_start_utc,
@@ -2083,7 +2285,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     (nba-total-margin-v2), matched against the main (most-balanced)
     Polymarket alternate line per game.
     """
-    from ..learned_forward import _team_matches, _teams
+    from ..learned_forward import _teams
     from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
@@ -2180,8 +2382,8 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             row
             for row in total_rows
             if (
-                _team_matches(away_team, str(row.get("team") or ""))
-                or _team_matches(home_team, str(row.get("team") or ""))
+                _nba_team_matches(away_team, str(row.get("team") or ""))
+                or _nba_team_matches(home_team, str(row.get("team") or ""))
                 or (
                     any(
                         w in str(row.get("event_title") or "").casefold()
@@ -2197,7 +2399,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                     )
                 )
             )
-            and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
+            and _nba_same_start_minute(str(row.get("event_start_utc") or ""), str(event["date"]))
         ]
         market = _select_nba_total_market(candidates, as_of=observed_at)
         if market is None:
@@ -2244,26 +2446,36 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     if model_version == "nba-total-margin-v9":
         from ..models.nba_v9 import NBATotalModelV9
 
-        total_v9_model = NBATotalModelV9.from_artifact(artifact)
-        predictions = [
-            p for p in total_v9_model.predict_totals(history, upcoming) if p.market_type == "total"
-        ]
+        total_predict = NBATotalModelV9.from_artifact(artifact).predict_totals
     elif model_version == "nba-total-margin-v7":
         from ..models.nba_v7 import NBATotalModelV7
 
-        total_v7_model = NBATotalModelV7.from_artifact(artifact)
-        predictions = [
-            p for p in total_v7_model.predict_totals(history, upcoming) if p.market_type == "total"
-        ]
+        total_predict = NBATotalModelV7.from_artifact(artifact).predict_totals
     elif model_version == "nba-total-margin-v6":
         from ..models.nba_total_v6 import NBATotalModelV6
 
-        total_v6_model = NBATotalModelV6.from_artifact(artifact)
-        predictions = [
-            p for p in total_v6_model.predict_totals(history, upcoming) if p.market_type == "total"
-        ]
+        total_predict = NBATotalModelV6.from_artifact(artifact).predict_totals
     else:
-        predictions = [p for p in legacy_model().predict_games(history, upcoming) if p.market_type == "total"]
+        total_predict = legacy_model().predict_games
+    predictions = [p for p in total_predict(history, upcoming) if p.market_type == "total"]
+
+    upcoming_by_event_id = {game.event_id: game for game in upcoming}
+    component_trend = None
+    pre_availability_means: dict[str, float] = {}
+    if predictions:
+        try:
+            component_trend = _nba_trend_engine(artifact, history)
+            if model_version in ("nba-total-margin-v7", "nba-total-margin-v9"):
+                pre_availability_means = _nba_pre_availability_means(total_predict, history, upcoming)
+            else:
+                # Availability is not applied to these versions: the served mean is it.
+                pre_availability_means = {
+                    str(p.event_id): float(p.inference_inputs["mean"])
+                    for p in predictions
+                    if p.inference_inputs is not None
+                }
+        except (ArithmeticError, AttributeError, KeyError, TypeError, ValueError):
+            logger.warning("NBA total decision components unavailable", exc_info=True)
 
     from ..calibration_pipeline import load_serving_calibrator
 
@@ -2307,10 +2519,21 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
 
         from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
+        components = _nba_decision_components(
+            history=history,
+            prediction=prediction,
+            upcoming_game=upcoming_by_event_id.get(prediction.event_id),
+            market=market,
+            selection_side="long" if selection == "over" else "short",
+            trend=component_trend,
+            offseason_gap_days=offseason_gap_days,
+            pre_availability_means=pre_availability_means,
+            market_type="total",
+        )
         model_snapshot = (
             build_scalar_snapshot(
                 artifact,
-                prediction.feature_basis,
+                _nba_with_components(prediction.feature_basis, components),
                 prediction.inference_inputs,
                 event_id=prediction.event_id,
                 event_start_utc=prediction.event_start_utc,
