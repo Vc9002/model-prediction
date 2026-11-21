@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from model_prediction.features.nba_player_ratings import HOLDOUT_START, STAT_KEYS
+from model_prediction.nba_v10_forward import summary_box_rows, team_minutes_ok
 
 RESEARCH = Path("E:/MP/data/research/nba_v10")
 CAPTURES = Path("E:/MP/data/availability/nba/espn_boxscores")
@@ -42,19 +43,6 @@ _RESEARCH_KEYS = {
     "blk": "blocks",
     "pf": "fouls",
 }
-_ESPN_KEYS = {
-    "pts": ("points", 0),
-    "fg3m": ("threePointFieldGoalsMade-threePointFieldGoalsAttempted", 0),
-    "fga": ("fieldGoalsMade-fieldGoalsAttempted", 1),
-    "fta": ("freeThrowsMade-freeThrowsAttempted", 1),
-    "ast": ("assists", 0),
-    "tov": ("turnovers", 0),
-    "oreb": ("offensiveRebounds", 0),
-    "dreb": ("defensiveRebounds", 0),
-    "stl": ("steals", 0),
-    "blk": ("blocks", 0),
-    "pf": ("fouls", 0),
-}
 
 
 def _num(value: Any) -> float:
@@ -62,17 +50,6 @@ def _num(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
-
-
-def _espn_stat(raw: list[Any], index: dict[str, int], key: str, part: int) -> float:
-    i = index.get(key)
-    if i is None or i >= len(raw):
-        return 0.0
-    text = str(raw[i])
-    if "-" in text and key.count("-") == 1:
-        pieces = text.split("-")
-        return _num(pieces[part]) if len(pieces) == 2 else 0.0
-    return _num(text)
 
 
 def _scoreboard() -> dict[str, dict[str, Any]]:
@@ -118,43 +95,8 @@ def _capture_players(path: Path, home_name: str, away_name: str) -> list[list[An
     payload = data.get("payload") if isinstance(data, dict) else None
     if not isinstance(payload, dict):
         return None
-    comp = ((payload.get("header") or {}).get("competitions") or [{}])[0]
-    if not ((comp.get("status") or {}).get("type") or {}).get("completed"):
-        return None
-    rows: list[list[Any]] = []
-    sides = 0
-    for team_entry in (payload.get("boxscore") or {}).get("players") or []:
-        team_name = (team_entry.get("team") or {}).get("displayName")
-        if team_name == home_name:
-            home = 1
-        elif team_name == away_name:
-            home = 0
-        else:
-            return None
-        sides += 1
-        group = (team_entry.get("statistics") or [{}])[0]
-        index = {name: i for i, name in enumerate(group.get("keys") or [])}
-        for athlete in group.get("athletes") or []:
-            meta = athlete.get("athlete") or {}
-            if meta.get("id") is None:
-                continue
-            raw = athlete.get("stats") or []
-            dnp = bool(athlete.get("didNotPlay")) or not raw
-            minutes = 0.0 if dnp else _espn_stat(raw, index, "minutes", 0)
-            stats = (
-                [0.0] * len(STAT_KEYS) if dnp else [_espn_stat(raw, index, *_ESPN_KEYS[k]) for k in STAT_KEYS]
-            )
-            rows.append(
-                [
-                    str(meta["id"]),
-                    meta.get("displayName") or "",
-                    home,
-                    minutes,
-                    1 if athlete.get("starter") else 0,
-                ]
-                + stats
-            )
-    return rows if sides == 2 else None
+    # One parser for the research file and the forward state (nba_v10_forward).
+    return summary_box_rows(payload, home_name, away_name)
 
 
 def _sha(path: Path) -> str:
@@ -166,12 +108,7 @@ def _sha(path: Path) -> str:
 
 
 def _team_minutes_ok(players: list[list[Any]]) -> bool:
-    # Rounded ESPN minutes can sum to 223-232 in regulation; 215 rejects partial captures.
-    for side in (0, 1):
-        total = sum(p[3] for p in players if p[2] == side)
-        if total < 215.0:
-            return False
-    return True
+    return team_minutes_ok(players)
 
 
 def cmd_box() -> None:

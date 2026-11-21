@@ -345,10 +345,11 @@ def test_worker_exit_codes(monkeypatch, tmp_path, capsys) -> None:
         return {"status": seen.get("next", "partial")}
 
     monkeypatch.setattr(worker, "capture_nba_pretip", fake_capture)
-    assert worker.main(["--window-minutes", "30"]) == 0
+    # --no-forward: the NBA v10 research extras (network) are covered in test_nba_v10_forward.py.
+    assert worker.main(["--window-minutes", "30", "--no-forward"]) == 0
     assert seen["root"] == tmp_path.resolve()
     seen["next"] = "error"
-    assert worker.main([]) == 1
+    assert worker.main(["--no-forward"]) == 1
     assert json.loads(capsys.readouterr().out.splitlines()[-1]) == {"status": "error"}
 
 
@@ -364,3 +365,17 @@ def test_worker_fails_closed_without_runtime_root(monkeypatch) -> None:
 def _raise_without_root(**kwargs):
     assert kwargs.get("require_external_runtime") is True
     raise RuntimeError("MODEL_PREDICTION_RUNTIME_ROOT is required")
+
+
+def test_forward_extras_stay_off_in_the_0030_memory_window(monkeypatch) -> None:
+    from zoneinfo import ZoneInfo
+
+    from model_prediction import nba_pretip_capture_worker as worker
+
+    et = ZoneInfo("America/New_York")
+    assert worker._in_memory_pressure_window(datetime(2026, 11, 22, 0, 15, tzinfo=et))
+    assert worker._in_memory_pressure_window(datetime(2026, 11, 22, 1, 19, tzinfo=et))
+    assert not worker._in_memory_pressure_window(datetime(2026, 11, 22, 1, 20, tzinfo=et))
+    assert not worker._in_memory_pressure_window(datetime(2026, 11, 22, 0, 14, tzinfo=et))
+    monkeypatch.setattr(worker, "_in_memory_pressure_window", lambda now: True)
+    assert worker.run_forward_extras(None, None) == {"status": "skipped_memory_window"}
