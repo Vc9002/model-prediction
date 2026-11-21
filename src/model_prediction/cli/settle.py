@@ -359,6 +359,7 @@ def _settle_all_unsettled(
                         row.get("home_team", ""),
                         row.get("away_team", ""),
                         row.get("selection", ""),
+                        line=row.get("line"),
                     )
                 except (OSError, ValueError):
                     logger.warning(
@@ -604,6 +605,8 @@ def _closing_probability_for_moneyline_pick(
     home_team: str,
     away_team: str,
     selection: str,
+    *,
+    line: Any = None,
 ) -> tuple[float | None, int | None]:
     """Best-effort closing (last pregame) probability for a pick, read from
     the same per-sport-date Polymarket snapshot history the forecast pipeline
@@ -612,8 +615,11 @@ def _closing_probability_for_moneyline_pick(
     spreads, and totals.
 
     Returns (raw_probability, american_odds) for the row's own selection, or
-    (None, None) if no matching pregame snapshot was ever captured for this
-    market -- CLV is then simply left blank for that row, same as today.
+    (None, None) when no quote qualifies as a close -- CLV is then left blank
+    and the reason is logged. A close is the latest quote of the row's own
+    contract observed before kickoff with an open book
+    (``PolymarketSnapshotStore.closing_snapshot``); when the caller passes the
+    row's ``line``, a spread/total close must also be quoted at that line.
     """
     from datetime import timedelta
 
@@ -643,7 +649,28 @@ def _closing_probability_for_moneyline_pick(
             break
 
     if snapshot is None:
+        logger.info("CLV left blank for %s (%s): no_pre_kickoff_open_quote", slug, event_start_utc)
         return None, None
+    if (
+        line not in (None, "")
+        and snapshot.get("market_type") in ("spread", "total")
+        and snapshot.get("line") is not None
+    ):
+        # Spread lines are stored relative to the contract's anchor team, so only the
+        # magnitude identifies the rung; the side is resolved below.
+        try:
+            same_line = abs(abs(float(snapshot["line"])) - abs(float(line))) < 1e-9
+        except (TypeError, ValueError):
+            same_line = False
+        if not same_line:
+            logger.info(
+                "CLV left blank for %s (%s): close_line_mismatch row=%s close=%s",
+                slug,
+                event_start_utc,
+                line,
+                snapshot.get("line"),
+            )
+            return None, None
     long_desc = str((snapshot.get("long") or {}).get("description", ""))
     short_desc = str((snapshot.get("short") or {}).get("description", ""))
     sel = str(selection).strip().lower()
@@ -670,24 +697,23 @@ def _closing_probability_for_moneyline_pick(
                 return round(float(ask), 6), probability_to_american(float(ask))
         return None, None
 
-    # 2. Binary Yes/No or Over/Under markets (common in soccer, totals, spreads)
-    if (
-        long_desc.strip().lower() in ("yes", "over")
-        or short_desc.strip().lower() in ("no", "under")
-        or "over" in long_desc.lower()
-        or "under" in short_desc.lower()
-    ):
-        if sel in ("under", "no", "away", "short") and (
-            short_desc.strip().lower() in ("no", "under") or "under" in short_desc.lower()
-        ):
+    # 2. Binary Yes/No or Over/Under markets (common in soccer, totals, spreads).
+    # Over/Under must be the description's leading word: a substring test read "Thundering
+    # Herd" (Marshall) and "Thunder" (Oklahoma City) as Under and gave an away moneyline
+    # pick the opponent's ask as its close.
+    long_word = long_desc.strip().lower()
+    short_word = short_desc.strip().lower()
+    long_is_yes_over = long_word == "yes" or re.match(r"over\b", long_word) is not None
+    short_is_no_under = short_word == "no" or re.match(r"under\b", short_word) is not None
+    if long_is_yes_over or short_is_no_under:
+        side = None
+        if sel in ("under", "no", "away", "short") and short_is_no_under:
             side = snapshot.get("short") or {}
-        elif sel in ("over", "yes", "home", "long") and (
-            long_desc.strip().lower() in ("yes", "over") or "over" in long_desc.lower()
-        ):
+        elif sel in ("over", "yes", "home", "long") and long_is_yes_over:
             side = snapshot.get("long") or {}
-        else:
-            side = snapshot.get("long") or {}
-        ask = side.get("ask")
+        # Any other pairing is unproven; fall through to the name match, which
+        # declines when it cannot tie the selection to one side.
+        ask = side.get("ask") if side is not None else None
         if ask is not None and 0 < float(ask) < 1:
             return round(float(ask), 6), probability_to_american(float(ask))
 
@@ -979,6 +1005,7 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
                 row.get("home_team", ""),
                 row.get("away_team", ""),
                 row.get("selection", ""),
+                line=row.get("line"),
             )
         except (OSError, ValueError):
             pass
