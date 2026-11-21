@@ -280,3 +280,35 @@ def test_failed_boxes_get_their_own_null_reasons() -> None:
     current = [tg("c0", "T", 2025, "2024-11-04", {"a0": 200}), tg("c1", "T", 2025, "2024-11-08", {"a0": 200})]
     c1 = row_for(pf.build_feature_rows(prior + current), "c1")
     assert c1["prior_null_reason"] == "prior_season_boxes_unusable"
+
+
+def _prior_t(n: int = 10) -> list[pf.TeamGame]:
+    return [tg(f"p{i}", "T", 2024, f"2024-01-{i + 10:02d}", {a: 25.0 for a in ROSTER[:8]}) for i in range(n)]
+
+
+def test_transfer_from_team_with_few_prior_boxes_is_outside_the_data() -> None:
+    small = [tg(f"s{i}", "S", 2024, f"2024-01-{i + 10:02d}", {"x": 100, "y": 100}) for i in range(2)]
+    current = [
+        tg("c0", "T", 2025, "2024-11-04", {"a0": 100, "x": 100}),
+        tg("c1", "T", 2025, "2024-11-08", {"a0": 100, "x": 100}),
+    ]
+    c1 = row_for(pf.build_feature_rows(_prior_t() + small + current), "c1")
+    assert c1["ret_min_share_transfer_in"] == 0
+    assert c1["continuity_any_team"] == pytest.approx(0.5)  # x's 2-game stint does not count
+
+
+def test_production_path_rows_ignore_same_day_and_later_boxes() -> None:
+    games = season_games()
+    schedule = {("T", 2025): sorted((g.game_date, g.event_id) for g in games)}
+    target_date = "2024-11-20"  # e4
+    base = row_for(pf.build_feature_rows(_prior_t() + games, schedule), "e4")
+    assert base["prior_null_reason"] is None and base["availability_null_reason"] is None
+
+    def scramble(g: pf.TeamGame) -> pf.TeamGame:
+        if g.season != 2025 or g.game_date < target_date:
+            return g
+        return dataclasses.replace(g, players=tuple(pf.PlayerLine(f"x{i}", 40.0, 99.0) for i in range(5)))
+
+    perturbed = [scramble(g) for g in _prior_t() + games]
+    perturbed.append(tg("same", "T", 2025, target_date, {"zz": 200.0}, start_utc="2024-11-20T15:00Z"))
+    assert row_for(pf.build_feature_rows(perturbed, schedule), "e4") == base

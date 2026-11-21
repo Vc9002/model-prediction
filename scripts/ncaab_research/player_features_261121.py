@@ -323,7 +323,11 @@ def prior_season_features(history: list[TeamGame], team_id: str, prior: PriorSea
     if prior is None:
         out["prior_null_reason"] = "no_prior_season_data"
         return out
-    if prior.team_games.get(team_id, 0) < MIN_PRIOR_TEAM_GAMES or prior.team_minutes.get(team_id, 0) <= 0:
+    if (
+        prior.team_games.get(team_id, 0) < MIN_PRIOR_TEAM_GAMES
+        or prior.team_minutes.get(team_id, 0) <= 0
+        or prior.team_gmsc.get(team_id, 0) <= 0
+    ):
         out["prior_null_reason"] = (
             "prior_season_boxes_unusable"
             if prior.team_games_any.get(team_id, 0) >= MIN_PRIOR_TEAM_GAMES
@@ -339,8 +343,21 @@ def prior_season_features(history: list[TeamGame], team_id: str, prior: PriorSea
             current[athlete] += minutes
     total_current = sum(current.values())
 
-    same_team = {a for a in current if prior.athlete_team_minutes.get(a, {}).get(team_id, 0) > 0}
-    any_team = {a for a in current if prior.athlete_team_minutes.get(a)}
+    # Only stints on teams with a full usable prior season count. Non-D1 schools appear in a few
+    # boxes per season and failed team-seasons have few usable ones; a share of a 2-game total is not
+    # on the scale of a 30-game share (one such ratio reached 6x a team's whole game-score total).
+    def eligible(team: str) -> bool:
+        return (
+            prior.team_games.get(team, 0) >= MIN_PRIOR_TEAM_GAMES
+            and prior.team_minutes.get(team, 0) > 0
+            and prior.team_gmsc.get(team, 0) > 0
+        )
+
+    stints = {
+        a: {t: m for t, m in prior.athlete_team_minutes.get(a, {}).items() if eligible(t)} for a in current
+    }
+    same_team = {a for a in current if stints[a].get(team_id, 0) > 0}
+    any_team = {a for a in current if stints[a]}
     out["continuity_same_team"] = _ratio(sum(current[a] for a in same_team), total_current)
     out["continuity_any_team"] = _ratio(sum(current[a] for a in any_team), total_current)
 
@@ -354,20 +371,18 @@ def prior_season_features(history: list[TeamGame], team_id: str, prior: PriorSea
     transfer_min = 0.0
     transfer_gmsc = 0.0
     for athlete in any_team:
-        for old_team, minutes in prior.athlete_team_minutes[athlete].items():
+        for old_team, minutes in stints[athlete].items():
             if old_team == team_id:
                 continue
             transfer_min += minutes / prior.team_minutes[old_team]
-            old_gmsc = prior.team_gmsc.get(old_team, 0.0)
-            if old_gmsc > 0:
-                transfer_gmsc += prior.athlete_team_gmsc[athlete][old_team] / old_gmsc
+            transfer_gmsc += prior.athlete_team_gmsc[athlete][old_team] / prior.team_gmsc[old_team]
     out["ret_min_share_transfer_in"] = transfer_min
     out["ret_gmsc_share_transfer_in"] = transfer_gmsc
 
     rated = {
-        a: 40.0 * sum(prior.athlete_team_gmsc[a].values()) / sum(prior.athlete_team_minutes[a].values())
+        a: 40.0 * sum(prior.athlete_team_gmsc[a][t] for t in stints[a]) / sum(stints[a].values())
         for a in any_team
-        if sum(prior.athlete_team_minutes[a].values()) >= MIN_PRIOR_MINUTES_RATE
+        if sum(stints[a].values()) >= MIN_PRIOR_MINUTES_RATE
     }
     rated_minutes = sum(current[a] for a in rated)
     out["prior_gmsc40_coverage"] = _ratio(rated_minutes, total_current)

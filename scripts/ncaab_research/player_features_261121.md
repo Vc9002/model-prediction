@@ -97,6 +97,11 @@ These fields are null when:
 Only athletes who have already logged minutes for T this season (before day d) are counted. A returner
 or transfer therefore enters on the day after his first appearance, never earlier.
 
+Only s-1 stints on **eligible** teams count: at least 10 usable s-1 boxes and positive minutes and
+game-score totals. Non-D1 schools appear in only a few boxes per season, and a share of a 2-game total
+is not on the scale of a 30-game share; before this floor, one transfer share reached 6x. An athlete
+whose s-1 stints are all on ineligible teams is outside the data, the same as a freshman.
+
 | field | definition |
 |---|---|
 | `continuity_same_team` | share of T's current-season minutes-to-date played by athletes who logged minutes for T in s-1 |
@@ -121,6 +126,12 @@ carries an inflated rate. Adjusting by the old team's PIT rating is a candidate 
 - **The top-7 rotation is a choice.** It is fixed here, before any outcome join, and is not tuned.
 - **The prior-season index uses only usable boxes.** For a team with some failed s-1 boxes, shares are
   computed within the usable ones. A player whose s-1 minutes all came in failed boxes is unseen.
+- **ESPN athlete ids mostly survive transfers, but not always.** 4,803 consecutive-season team changes
+  keep their id. 359 names held exactly two ids, one ending in season s and the other starting on a
+  different team in s+1; several are clearly one player (e.g. 924 then 665 minutes). That puts roughly
+  7% of transfers under a new id. Those transfers count as newcomers (no name fallback, by design). A
+  name-plus-adjacent-season crosswalk is a possible v4 refinement, but it must handle common-name
+  collisions.
 - **Mid-season departures** (dismissal, transfer) look like long absences. That is the intended signal:
   the player is not available.
 
