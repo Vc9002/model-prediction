@@ -408,6 +408,8 @@ class CFBStructuralV4Model:
             is_neutral_site=getattr(game, "is_neutral_site", False),
             qb_starter_prob_away=getattr(game, "qb_starter_prob_away", 1.0),
             qb_starter_prob_home=getattr(game, "qb_starter_prob_home", 1.0),
+            away_team_id=getattr(game, "away_team_id", None),
+            home_team_id=getattr(game, "home_team_id", None),
         )
         supplied_spread = getattr(game, "spread_home_line", None)
         if supplied_spread is None and getattr(game, "spread_away_line", None) is not None:

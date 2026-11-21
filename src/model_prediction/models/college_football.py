@@ -87,6 +87,9 @@ class UpcomingCFBGame:
     week: int = 1
     qb_starter_prob_away: float = 1.0
     qb_starter_prob_home: float = 1.0
+    # ESPN team ids from the scoreboard event: the identity of a slate name the history never used
+    away_team_id: str | None = None
+    home_team_id: str | None = None
 
 
 class CollegeFootballModel(CFBStructuralV4Model):
@@ -188,6 +191,8 @@ def cfb_serving_code_hash() -> str:
         digest.update(name.encode("utf-8"))
         digest.update((here / name).read_bytes())
     digest.update((here.parent / "features" / "cfb_features.py").read_bytes())
+    digest.update((here.parent / "features" / "cfb_team_identity.py").read_bytes())
+    digest.update((here.parent / "features" / "cfb_features_v6.py").read_bytes())  # TeamResolver
     digest.update((here.parent / "features" / "cfb_qb_availability.py").read_bytes())
     return digest.hexdigest()[:16]
 
@@ -240,6 +245,7 @@ def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> lis
                     home_team = g.get("home_team") or (g.get("home") or {}).get("team_name") or ""
                     if not away_team or not home_team:
                         continue
+                    feed_groups = g.get("feed_groups")
                     rec = CFBGameRecord(
                         event_id=eid,
                         event_start_utc=start_str,
@@ -252,6 +258,11 @@ def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> lis
                         season_year=g.get("season_year"),
                         competition_type=str(g.get("competition_type", "STD")),
                         possessions=float(g["possessions"]) if g.get("possessions") is not None else None,
+                        home_team_id=str(g["home_team_id"]) if g.get("home_team_id") else None,
+                        away_team_id=str(g["away_team_id"]) if g.get("away_team_id") else None,
+                        feed_groups=tuple(sorted(int(x) for x in feed_groups))
+                        if isinstance(feed_groups, list) and feed_groups
+                        else None,
                         home_epa_per_play=float(g["home_epa_per_play"])
                         if g.get("home_epa_per_play") is not None
                         else None,
@@ -968,6 +979,8 @@ def build_cfb_slate(
             week=ev_week,
             qb_starter_prob_away=away_qb.starter_prob,
             qb_starter_prob_home=home_qb.starter_prob,
+            away_team_id=str((away.get("team") or {}).get("id") or "") or None,
+            home_team_id=str((home.get("team") or {}).get("id") or "") or None,
         )
 
         preds = model.predict_matchup(history, upcoming, project_missing_lines=True)
