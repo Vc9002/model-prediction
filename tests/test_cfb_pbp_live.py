@@ -115,15 +115,25 @@ class FakeESPN:
         self.summary_calls: list[str] = []
         self.scoreboard_calls: list[tuple[str, int]] = []
 
+    clock: Now | None = None  # when set, every request takes a minute of wall time
+    served_at: dict[tuple[str, Any], datetime]
+
     def handler(self, request: httpx.Request) -> httpx.Response:
         url, params = str(request.url), request.url.params
+        if self.clock is not None:
+            self.clock.at += timedelta(minutes=1)
+            self.served_at = getattr(self, "served_at", {})
         if "/scoreboard" in url:
             key = (params["dates"], int(params["groups"]))
             self.scoreboard_calls.append(key)
+            if self.clock is not None:
+                self.served_at[("scoreboard", key)] = self.clock.at
             return httpx.Response(200, json={"events": self.boards.get(key, [])})
         if "/summary" in url:
             eid = params["event"]
             self.summary_calls.append(eid)
+            if self.clock is not None:
+                self.served_at[("summary", eid)] = self.clock.at
             if eid not in self.summaries:
                 return httpx.Response(404)
             return httpx.Response(200, content=json.dumps(self.summaries[eid]).encode())
@@ -240,6 +250,24 @@ def test_update_discovers_fcs_games_respects_the_buffer_and_is_incremental(tmp_p
     _update(paths, fake, now)
     assert fake.summary_calls == ["E"]
     assert {r["event_id"] for r in _pbp_rows(paths)} == {"A", "B", "E"}
+
+
+def test_observation_stamps_are_taken_after_the_response(tmp_path):
+    """The clock advances a minute per request: a stamp captured before the call would predate the data."""
+    paths = _seeded_paths(tmp_path)
+    fake = FakeESPN([FBS_A, FBS_B, *PAD_FBS])
+    _slate(fake)
+    now = Now(datetime(2030, 8, 24, 16, 0, tzinfo=UTC))
+    fake.clock = now
+    _update(paths, fake, now)
+    for row in _pbp_rows(paths):
+        assert row["observed_at_utc"] == live._iso(fake.served_at[("summary", row["event_id"])])
+    sched = live.read_schedule(live.store_for(paths))
+    scanned_0823 = max(fake.served_at[("scoreboard", ("20300823", g))] for g in (80, 81))
+    for eid in ("A", "B"):
+        assert sched[eid]["observed_at_utc"] == live._iso(scanned_0823)
+    ledger = live.read_scan_ledger(live.store_for(paths))
+    assert ledger["2030-08-23"]["first_scanned_at_utc"] == live._iso(scanned_0823)
 
 
 def test_no_plays_is_retried_until_a_day_after_kickoff(tmp_path):
@@ -585,6 +613,36 @@ def test_a_pbp_row_observed_after_the_decision_is_missing_at_the_decision(tmp_pa
     assert results[0]["status"] == "ok"
 
 
+def test_a_stale_scheduled_game_is_demanded_and_a_postponed_one_is_not(tmp_path, model, fixture):
+    """The update scanned a date before its games and then failed: the game still reads "scheduled" although its
+    kickoff + 5 h has passed. It must be demanded (no-call), while a postponed game is never demanded."""
+    built = _build_store(tmp_path, fixture)
+    case = fixture["cases"][-1]
+    decision = datetime.fromisoformat(case["decision_utc"])
+    base, _ = price_v7_slate(tmp_path, decision, [_game(case)], model=model)
+
+    def sched(eid: str, status: str, kickoff: datetime) -> dict:
+        return {
+            "event_id": eid,
+            "season": fixture["season"],
+            "kickoff_utc": live._iso(kickoff),
+            "home_id": case["home_id"],
+            "away_id": "77777",
+            "home_score": None,
+            "away_score": None,
+            "neutral_site": False,
+            "status": status,
+            "observed_at_utc": live._iso(kickoff - timedelta(hours=8)),
+        }
+
+    live._append_jsonl(built["store"].schedule, [sched("ppd", live.POSTPONED, decision - timedelta(days=2))])
+    results, _ = price_v7_slate(tmp_path, decision, [_game(case)], model=model)
+    assert results == base and results[0]["status"] == "ok"
+    live._append_jsonl(built["store"].schedule, [sched("stale", live.PENDING, decision - timedelta(hours=6))])
+    results, _ = price_v7_slate(tmp_path, decision, [_game(case)], model=model)
+    assert results[0]["reason"] == NO_CALL_PBP_MISSING and "stale" in results[0]["detail"]
+
+
 def test_live_history_game_without_pbp_fails_closed(tmp_path, model, fixture):
     _build_store(tmp_path, fixture)
     case = fixture["cases"][-1]
@@ -627,6 +685,18 @@ def test_scan_gap_and_missing_class_list_no_call_the_whole_slate(tmp_path, model
     built["store"].classes_path(fixture["season"] - 1).unlink()  # last season's labels feed the prior
     results, summary = price_v7_slate(tmp_path / "b", decision, [_game(case)], model=model)
     assert results[0]["reason"] == NO_CALL_NO_CLASS
+
+
+def test_sync_cfbd_adds_whole_new_seasons_only(tmp_path):
+    paths = _seeded_paths(tmp_path)
+    store = live.store_for(paths)
+    live._append_jsonl(store.cfbd_priors, _cfbd_rows(["1", "2"], 2026))
+    source = tmp_path / "source.jsonl"
+    live._append_jsonl(source, _cfbd_rows(["1", "2", "3"], 2026) + _cfbd_rows(["1", "2", "3"], 2027))
+    out = live.sync_cfbd(paths, source)
+    assert out["seasons_added"] == [2027] and out["rows"] == 3
+    assert len(live.read_cfbd_rows(store, 2026)) == 2 and len(live.read_cfbd_rows(store, 2027)) == 3
+    assert live.sync_cfbd(paths, source)["rows"] == 0
 
 
 def test_season_calendar():

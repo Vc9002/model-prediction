@@ -3,7 +3,7 @@ phase: quick-261121-v7l
 plan: 01
 status: complete
 branch: ncaaf-v7live-261121 (worktree E:\MP-wt\ncaaf-v7live)
-commits: 75627175, debcef98
+commits: 75627175, debcef98, 3190aca1, (this follow-up)
 ---
 
 # quick-261121-v7l summary: NCAAF v7 live data pipeline
@@ -46,11 +46,20 @@ including the load.
 
 ## Verification
 
-- Tests: `tests/test_cfb_pbp_live.py` has 13 tests and `tests/test_cfb_structural_v7.py` has 8; all 21 pass.
+- Tests: `tests/test_cfb_pbp_live.py` has 16 tests and `tests/test_cfb_structural_v7.py` has 8; all 24 pass.
   - The live tests cover incremental runs, FCS-vs-FCS discovery, the fetch buffer, no-plays retry, the time budget,
     the lock and unseeded root, network fail-soft, daily gating, `price_game` equality, PIT entry and observation
-    rules, missing pbp, the live-history witness, the scan gap and a missing class list.
-  - I mutated each of 12 guards and each mutation failed at least one test.
+    rules, missing pbp, the live-history witness, the scan gap, a missing class list and `sync-cfbd`.
+  - Two more cases are covered. A game still marked scheduled after kickoff + 5 h is demanded (no-call); a
+    postponed game is not.
+  - Fetch and scan time stamps are taken after the response. This is tested with a clock that advances one minute
+    per request.
+  - I mutated each of 16 guards and each mutation failed at least one test.
+- Discovery completeness: every 2026 event in the seeded v6 snapshot (1,384) also appears in a scoreboard-sourced
+  record. None is seed-only.
+- Production path: `data_root` = `Path(ledger_path(config)).parent` = `<repo>/data`. `v7_paths` maps it to
+  `<runtime>/research/ncaaf_v7` (checked with the env var set). An update result of `not_seeded` in
+  `step1o_ncaaf_v7_pbp` would mean the path did not resolve.
   - Also pass: `tests/research/test_cfb_pbp_features.py` (29), the daily wiring and day-ahead tests, and
     `test_runtime_paths`.
 - Parity on the seeded runtime store (`verify_seed.py`, scratch):
@@ -79,8 +88,15 @@ v7 store, and the live-history witness is read from `data_root/processed/ncaaf/g
 ## Caveats
 
 - The seeded raw files cover only 2025-26, so earlier seasons exist only as rows.
-- The `observed_at_utc` of seeded schedule records is the snapshot file's mtime. Seeded pbp rows use the research
-  fetch time. Replays before about 2026-11-14 therefore drop the seeded rows.
+- There is a decision-time floor at the seed time, 2026-11-21 about 21:50Z. The class lists and scan ledger are
+  stamped then, so any earlier decision no-calls the whole slate. The store serves live decisions, not replays;
+  refits and replays use the research copies.
+- `price_v7_slate` never raises `V7NoCall`, but a corrupt store file can raise. The routing hook must catch
+  exceptions and fall back.
+- Pool latency: the step usually takes about 4-12 s. A backlog can take up to the 180 s budget plus one 15 s
+  timeout, which delays the start of every forecast, but not its results.
+- Runtime writes beyond the seed: two `update` runs added 8 raw files, 16 rows and `locks/ncaaf_v7_pbp.lock`.
 - One ESPN play type, `fumble`, is unknown to the builder and is excluded and counted, as in research.
-- 2027 needs CFBD rows for that season in `cfbd/team_season_priors.jsonl`; without them v7 returns
-  NO_CALL_V7_NO_CFBD_PRIOR. The FBS lists are fetched automatically.
+- 2027 needs CFBD rows for that season; without them v7 returns NO_CALL_V7_NO_CFBD_PRIOR. Fetch them with
+  `scripts/cfbd_backfill.py`, then run `python -m model_prediction.data_sources.cfb_pbp_live sync-cfbd`, which
+  appends whole new seasons only. The FBS lists are fetched automatically.

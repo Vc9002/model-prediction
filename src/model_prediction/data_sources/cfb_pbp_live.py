@@ -31,6 +31,7 @@ Commands (``MODEL_PREDICTION_RUNTIME_ROOT`` must be set)::
     python -m model_prediction.data_sources.cfb_pbp_live seed             # one time, into an empty root
     python -m model_prediction.data_sources.cfb_pbp_live update [--budget-seconds 900]
     python -m model_prediction.data_sources.cfb_pbp_live status
+    python -m model_prediction.data_sources.cfb_pbp_live sync-cfbd [--source PATH]  # a new season's CFBD rows
 """
 
 from __future__ import annotations
@@ -1013,6 +1014,21 @@ def status(paths: RuntimePaths) -> dict[str, Any]:
     }
 
 
+def sync_cfbd(paths: RuntimePaths, source: Path) -> dict[str, Any]:
+    """Append CFBD prior rows of seasons the store does not hold yet, whole seasons only (covariates are z-scored
+    within a season, so a season is never merged or partially replaced). Run once a new season's rows exist in
+    ``source`` (``scripts/cfbd_backfill.py`` writes them), before that season's first v7 call."""
+    store = store_for(paths)
+    have = {int(r["season"]) for r in _iter_jsonl(store.cfbd_priors)}
+    new = [r for r in _iter_jsonl(source) if int(r["season"]) not in have]
+    _append_jsonl(store.cfbd_priors, new)
+    return {
+        "seasons_present": sorted(have),
+        "seasons_added": sorted({int(r["season"]) for r in new}),
+        "rows": len(new),
+    }
+
+
 # ------------------------------------------------------------------------------------------------ cli
 def _main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="NCAAF v7 live play-by-play store")
@@ -1030,6 +1046,12 @@ def _main(argv: Sequence[str] | None = None) -> int:
     p_up = sub.add_parser("update")
     p_up.add_argument("--budget-seconds", type=float, default=DEFAULT_BUDGET_S)
     sub.add_parser("status")
+    p_cfbd = sub.add_parser("sync-cfbd")
+    p_cfbd.add_argument(
+        "--source",
+        type=Path,
+        default=PROJECT_ROOT / "data" / "research" / "ncaaf_v7" / "cfbd" / "team_season_priors.jsonl",
+    )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if args.cmd == "seed" and args.dry_run:
@@ -1044,6 +1066,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
             report = seed(paths, args.research_dir, args.snapshot)
         elif args.cmd == "update":
             report = update(paths, budget_seconds=args.budget_seconds)
+        elif args.cmd == "sync-cfbd":
+            report = sync_cfbd(paths, args.source)
         else:
             report = status(paths)
     print(json.dumps(report, indent=2, sort_keys=True, default=str))
