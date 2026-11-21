@@ -701,8 +701,15 @@ def _closing_probability_for_moneyline_pick(
         else:
             ref_team = snapshot.get("team")
             if ref_team:
-                ref_is_home = _team_matches(home_team, ref_team)
-                ref_is_away = _team_matches(away_team, ref_team)
+                # NBA only: Polymarket anchors Clippers rungs on "Los Angeles Clippers" while the
+                # ledger row says "LA Clippers", so road Clippers spreads got no close (NBA review
+                # B3). The forecast's NBA alias is reused; the shared matcher stays strict.
+                if str(sport_dir).casefold() == "nba":
+                    from .forecast import _nba_team_matches as match
+                else:
+                    match = _team_matches
+                ref_is_home = match(home_team, ref_team)
+                ref_is_away = match(away_team, ref_team)
                 if ref_is_home:
                     side = snapshot.get("long") if sel in ("home", "1") else snapshot.get("short")
                 elif ref_is_away:
