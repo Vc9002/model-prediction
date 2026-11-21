@@ -350,11 +350,12 @@ def _settle_all_unsettled(
             slug = _extract_market_slug(str(row.get("rationale", "")), row)
             if slug is not None and data_root is not None:
                 sport_dir = str(row.get("league", "")).lower()
-                # NCAAB only for now: its decision quote is the last pre-tip snapshot unless
-                # the buyer's pre-tip capture wrote a later one, so without the bound every
-                # NCAAB close was the row's own price. Other sports keep their call unchanged.
+                # NCAAB and NCAAF only for now: NCAAB's decision quote is the last pre-tip snapshot
+                # unless the buyer's pre-tip capture wrote a later one, so without the bound every
+                # NCAAB close was the row's own price; NCAAF's day-ahead capture (261121-dac) files
+                # D+1/D+2 books observed before the decision. Other sports keep their call unchanged.
                 closing_kwargs: dict[str, Any] = {}
-                if sport_dir == "ncaab":
+                if sport_dir in ("ncaab", "ncaaf"):
                     decision_quote_at = row.get("market_quote_observed_at_utc") or row.get("observed_at_utc")
                     if decision_quote_at:
                         closing_kwargs["not_before_utc"] = str(decision_quote_at)
