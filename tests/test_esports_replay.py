@@ -157,3 +157,48 @@ def test_remove_open_rows_survives_stale_code_hash_under_sqlite_authority(tmp_pa
     with pytest.raises(ValueError, match="esports_replay_code_mismatch"):
         ledger.append_call(req, 0.25, 70)
     store.close()
+
+
+def test_archive_settled_rows_survives_stale_code_hash_under_sqlite_authority(tmp_path, monkeypatch):
+    """2026-11-21: archiving settled NCAAF v1-v4 rows (collided quotes) raised
+    cfb_replay_engine_identity_mismatch from the sqlite mirror because the
+    engine code changed after capture. Archive records the full row and asserts
+    nothing new, so it must succeed; a fresh append must still fail."""
+    evidence = snapshot()
+    req = replace(
+        request(),
+        league=League.LOL,
+        market_type=MarketType.MONEYLINE,
+        line=None,
+        home_team="Alpha",
+        away_team="Beta",
+        selection="home",
+        event_id=evidence["event_id"],
+        event_start_utc=evidence["event_start_utc"],
+        model_probability=evidence["probabilities"]["home"],
+        model_version=evidence["model_version"],
+        model_artifact_hash=evidence["artifact_hash"],
+        model_input_snapshot_json=json.dumps(evidence),
+    )
+    store = RuntimeLedgerStore(RuntimePaths.for_test(tmp_path))
+    ledger = PickLedger(tmp_path / "picks.xlsx", tier="flat", mirror=store, authority="sqlite", sport="lol")
+    logged = ledger.append_call(req, 0.25, 70)
+    ledger.settle(logged["pick_id"], away_score=1, home_score=2)
+
+    import model_prediction.esports_replay as esports_replay_module
+
+    monkeypatch.setattr(
+        esports_replay_module,
+        "code_hashes",
+        lambda: {"esports.py": "changed", "features/elo_ratings.py": "changed"},
+    )
+
+    archived = ledger.archive_settled_rows(
+        [logged["pick_id"]], reason="collided quote", archive_reference="test-archive.jsonl"
+    )
+    assert [row["pick_id"] for row in archived] == [logged["pick_id"]]
+    [record] = store.records(tier="flat", sport="lol")
+    assert record["status"] == "archived"
+    with pytest.raises(ValueError, match="esports_replay_code_mismatch"):
+        ledger.append_call(req, 0.25, 70)
+    store.close()

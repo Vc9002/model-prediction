@@ -1201,7 +1201,12 @@ class PickLedger:
             from .learned_replay import validate_decision_snapshot
 
             snapshot = json.loads(row["model_input_snapshot_json"])
-            if event_type in ("settle", "void", "update"):
+            # "archive" moves an already-settled row out with its full content
+            # in the audit event; like settle/void it asserts no new fact, so a
+            # later engine-code change must degrade to a warning, not block the
+            # operator-directed archive (2026-11-21: 29 NCAAF v1-v4 rows refused
+            # with cfb_replay_engine_identity_mismatch, after a stray audit event).
+            if event_type in ("settle", "void", "update", "archive"):
                 try:
                     validate_decision_snapshot(snapshot, row)
                 except ValueError as exc:
