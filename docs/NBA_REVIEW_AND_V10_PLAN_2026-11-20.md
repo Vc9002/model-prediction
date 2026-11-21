@@ -4,16 +4,20 @@ Status: PLAN. Nothing here changes serving. v9 spread/total and `nba-elo-trend-l
 keep serving and picking until a v10 component passes the gates below and is promoted through
 `model_promotion promote`. Prices are implied probability (%) or cents; no American odds.
 
-Working files (scripts, raw tables) from the four review workstreams are in the session
-scratchpad `nba_review/` folder: `01_code_audit.md`, `02_loss_forensics.md`,
-`03_diagnostics.md`, `04_research.md`. The numbers below were spot-checked against the code
+Reports and scripts from the four review workstreams are in `outputs/nba/review_2026-11-20/`:
+`01_code_audit.md`, `02_loss_forensics.md`, `03_diagnostics.md` (+ `02_tables.md`),
+`04_research.md`, and the replay/analysis scripts (`01_replay_v9.py`, `v9_retro*.py`, etc.).
+Intermediate data files (pkl/jsonl) were not kept; rerun the scripts to regenerate them. The numbers below were spot-checked against the code
 and the ledger where marked (verified).
 
 ## 1. Verdict
 
 The NBA models have no information beyond the market line. Two independent replays of the
-served v9 engine against real closing lines (2,572 and 2,811 games, 2024-01 to 2026-06,
-availability adjustment off) agree:
+served v9 engine against real closing lines agree (availability adjustment off in both):
+the diagnostics replay (2,811 games, 2024-01-29 to 2026-02-22, train + validation only) and the
+code-audit replay (2,572 games, 2024-11 to 2026-06). The code-audit replay runs into the
+2026-02-23+ NBA holdout, so its band hit rates and the B6 fatigue ablation include holdout games
+and are exploratory.
 
 | Check | Margin (spread) | Total |
 |---|---|---|
@@ -42,7 +46,8 @@ moneyline and are excluded.
 | Spread | 81-89 | -4.6% | 59.9% | 50.8% |
 | Total | 79-93 | -8.0% | 57.8% | 51.2% |
 | Moneyline | 92-46 | -2.5% | 67.1% | 67.2% |
-| v9 only (spread + total) | 92-89 | -2.3% | | |
+| v9 spread / v9 total | 43-42 / 39-46 | +0.3% / -8.3% | | |
+| v9 all markets incl. v9 moneyline | 92-89 | -2.3% | | |
 
 - Brier, model minus market mid on the same picks, game-clustered bootstrap: pooled +0.0127
   [+0.0026, +0.0221], so the market is significantly better. v9 alone is indistinguishable
@@ -53,7 +58,8 @@ moneyline and are excluded.
 - Edge-scaled sizing puts the largest stake on the largest fake edges: all top-12 losses were
   2U picks claiming 64-79% against 43-52% prices.
 - v9 totals are 68% unders, and those unders went 25-33 (-15.8%). Games finished +3.9 above
-  the v9 total and +3.7 above the Polymarket line (n=85, about 2 SE, suggestive).
+  the v9 total (n=85, SE 1.85) and +3.7 above the Polymarket line (n=82). The diagnostics agent
+  measured +3.0 above the line on its 85 served rows; either way about 2 SE, suggestive.
 - CLV cannot be measured properly: quotes are only captured at forecast runs (last capture a
   median 65 min before tip), so on 246 of 461 picks the decision quote is also the last quote.
   On the 215 with a later capture, mean CLV is +0.58c. The market did not move against our picks;
@@ -127,9 +133,11 @@ throughout.
 
 ### Phase 0: measurement and data (first, blocks everything else)
 
-1. **Pre-tip close capture.** Capture Polymarket NBA quotes at T-10 min, plus the ESPN
-   consensus close after the game, into the quote store with observed times. Gives real CLV
-   for every pick from that date on.
+1. **Pre-tip and consensus capture.** Capture Polymarket NBA quotes at T-10 min, and the
+   sportsbook consensus (ESPN odds) at every forecast run and at T-10 min, into the quote store
+   with observed times; keep the post-game ESPN close too. This gives real CLV against a liquid
+   benchmark for every pick from that date on, decision-time anchors for Phase 2, and the live
+   consensus feed track T-B needs.
 2. **Store components on every NBA row.** Pre-adjustment margin/total, availability component,
    rest/b2b flags, market mid at decision time (fixes B10).
 3. **Historical closing lines 2016-2024.** Extend `data/odds/nba/historical_closing_lines/`
@@ -141,7 +149,8 @@ throughout.
 5. **PIT injury history.** Archive the official NBA injury report PDFs
    (`ak-static.cms.nba.com/referee/injury/Injury-Report_<date>_<time>.pdf`, back to 2021-22;
    the filename time is the observed time). Box-score-inferred absences are hindsight and cannot
-   validate a player model.
+   validate a player model, so the player layer can only be validated point-in-time on
+   2021-22 onward, not on the full 2016-2026 window.
 
 Gate: datasets exist with provenance files, and a row-count / date-coverage check passes.
 Backfills write under `data/` and need operator go-ahead.
@@ -171,8 +180,12 @@ Bias fixes alone do not create edge.
 
 Gate G1 (validation only, 60/20/20 on 2016-2026 with the new data): lambda > 0 with 95% CI
 excluding 0, and corr(model - close, actual - close) > 0 with CI excluding 0 on at least 700
-validation games. A component that fails G1 ships with lambda = 0 and is not re-tuned on the
-same data.
+validation games. G1 against closing lines is a benchmark test only: the closes have no capture
+time and are never decision inputs. The serving lambda is fitted on decision-time lines (ESPN
+opening lines historically, forward Phase 0.1 captures going forward), and it must also come out
+above 0. A component that fails G1 ships with lambda = 0 and is not re-tuned on the same data.
+Note that every NBA game before 2026-11-20 has already been looked at in some form, so the last
+20% of a 2016-2026 split is not a clean holdout; the clean test is Phase 5.
 
 ### Phase 3: player layer (`nba-player-v10`, shadow feature)
 
@@ -200,8 +213,11 @@ Its output feeds Phase 2 as `model`; it only influences prices through a lambda 
 - Fresh forward-only holdout: every game after the v10 freeze date. The existing 2026-02-23+
   NBA holdout has been touched twice (availability ablations) and is exploratory only.
 - Gate G2 (pre-registered, games clustered across markets): at least 150 forward shadow picks,
-  mean CLV vs the T-10 min close at least +1.0c with 95% CI excluding 0, and Brier no worse than
-  the Polymarket mid on the same picks.
+  mean CLV against the devigged sportsbook consensus at T-10 min of at least +1.0c with 95% CI
+  excluding 0, CLV above v9's on the same games, and Brier no worse than the Polymarket mid on the
+  same picks. Polymarket-to-Polymarket CLV is not enough: v9 picks already average +0.58c
+  (totals +1.10c) against later Polymarket quotes while losing, so that benchmark passes a
+  no-skill model.
 - Kill: if G2 fails at 300 picks, stop that component; do not extend the window to fish for
   significance.
 - Promotion only through `python -m model_prediction.model_promotion promote` with the

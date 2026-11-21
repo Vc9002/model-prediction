@@ -1,0 +1,30 @@
+== all n=2572
+ margin: model RMSE 14.60 market RMSE 13.90; model mean +1.54 market mean +2.03 actual mean +1.86
+  actual~model slope 1.28 int -0.11; SD model 5.77 SD market 8.04
+  corr(model-market, actual-market) -0.018; SD(model-market) 4.23
+  residual SD actual-model 14.60; actual-market 13.90
+ total: model RMSE 18.94 market RMSE 17.91; model mean 227.58 market mean 228.06 actual mean 228.63
+  actual~model slope 1.44; SD model 4.87 SD market 9.11
+  corr(model-market, actual-market) -0.001; SD(model-market) 6.08; mean(model-market) -0.48
+  residual SD actual-model 18.91; actual-market 17.90
+  ATS hit vs close 1261/2562 = 0.492; O/U hit 1251/2562 = 0.488; under share 0.56
+== season 2024-2025 n=1250
+ margin: model RMSE 14.45 market RMSE 13.77; model mean +1.55 market mean +2.03 actual mean +1.95
+  actual~model slope 1.26 int -0.01; SD model 5.75 SD market 7.80
+  corr(model-market, actual-market) -0.018; SD(model-market) 4.12
+  residual SD actual-model 14.44; actual-market 13.77
+ total: model RMSE 18.62 market RMSE 17.61; model mean 226.71 market mean 226.24 actual mean 226.97
+  actual~model slope 1.50; SD model 5.06 SD market 9.27
+  corr(model-market, actual-market) -0.006; SD(model-market) 5.99; mean(model-market) +0.48
+  residual SD actual-model 18.62; actual-market 17.59
+  ATS hit vs close 623/1250 = 0.498; O/U hit 603/1250 = 0.482; under share 0.49
+== season 2025-2026 n=1322
+ margin: model RMSE 14.75 market RMSE 14.02; model mean +1.53 market mean +2.03 actual mean +1.78
+  actual~model slope 1.30 int -0.20; SD model 5.79 SD market 8.26
+  corr(model-market, actual-market) -0.019; SD(model-market) 4.33
+  residual SD actual-model 14.75; actual-market 14.01
+ total: model RMSE 19.23 market RMSE 18.19; model mean 228.40 market mean 229.78 actual mean 230.20
+  actual~model slope 1.34; SD model 4.54 SD market 8.61
+  corr(model-market, actual-market) +0.001; SD(model-market) 6.03; mean(model-market) -1.38
+  residual SD actual-model 19.15; actual-market 18.18
+  ATS hit vs close 638/1312 = 0.486; O/U hit 648/1312 = 0.494; under share 0.63
