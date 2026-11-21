@@ -59,3 +59,10 @@ Write-Output "registered: ModelPrediction-BackupOffsite ($LogonType)"
 # Auto-buyer: every 15 minutes (the buyer only buys games within 1h of start, so it needs several looks per game).
 $autoBuyerTriggers = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddMinutes(10) -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Days 3650)
 Register-WorkerTask 'ModelPrediction-AutoBuyer' 'auto-buyer' $autoBuyerTriggers 'model-prediction auto-buyer (paper unless saved state is live)'
+
+# NBA pre-tip capture: every 10 minutes from 11:00 to 02:00 local (this host runs on Eastern time),
+# so each game gets ESPN odds and Polymarket quotes about 20 and 10 minutes before tip (NBA v10
+# plan Phase 0.1). A daily trigger cannot take a repetition directly, so borrow one from a -Once trigger.
+$nbaPretipTrigger = New-ScheduledTaskTrigger -Daily -At '11:00'
+$nbaPretipTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At '11:00' -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Hours 15)).Repetition
+Register-WorkerTask 'ModelPrediction-NbaPretipCapture' 'nba-pretip-capture' $nbaPretipTrigger 'model-prediction NBA pre-tip ESPN odds and Polymarket quote capture'
