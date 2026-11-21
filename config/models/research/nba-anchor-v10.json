@@ -1,0 +1,53 @@
+{
+  "artifact_hash": "2bb069150528fe529f0e19f50562c99a7d7daaf11d9a0ec32ee8a8b6d1de9f85",
+  "engine": "model_prediction.models.nba_anchor_v10",
+  "fee_coefficient": 0.06,
+  "fee_source": "research_incumbent_evaluation.POLICY (Polymarket US taker fee c * p * (1 - p))",
+  "fit": {
+    "note": "lambda fit on train and clipped at 0; G1 failed, so lambda ships at 0. Serving lambda must be refit on decision-time anchors (captured consensus / Polymarket mid).",
+    "rows": "harness replay of the v9.1 artifacts vs 2024-26 closing lines",
+    "train": "< 2025-11-03",
+    "validation": "2025-11-03 .. < 2026-02-23"
+  },
+  "markets": {
+    "spread": {
+      "corr_val": -0.0155,
+      "corr_val_ci": [
+        -0.0849,
+        0.0525
+      ],
+      "g1": "FAIL",
+      "lambda": 0.0,
+      "lambda_train_ci": [
+        -0.1799,
+        0.0918
+      ],
+      "lambda_train_raw": -0.0478,
+      "main_min_edge": null,
+      "sigma": 13.792
+    },
+    "total": {
+      "corr_val": -0.0297,
+      "corr_val_ci": [
+        -0.1073,
+        0.0415
+      ],
+      "g1": "FAIL",
+      "lambda": 0.0,
+      "lambda_train_ci": [
+        -0.0885,
+        0.2051
+      ],
+      "lambda_train_raw": 0.0631,
+      "main_min_edge": null,
+      "sigma": 17.615
+    }
+  },
+  "model_version": "nba-anchor-v10",
+  "serving": "not registered, not whitelisted; wiring spec in outputs/nba/v10_harness/ANCHOR_WIRING.md",
+  "status": "research",
+  "underlying_model": {
+    "spread": "nba-spread-margin-v9-1",
+    "total": "nba-total-margin-v9-1"
+  }
+}

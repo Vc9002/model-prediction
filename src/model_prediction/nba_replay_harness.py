@@ -527,3 +527,72 @@ def diff_golden(golden: Sequence[Mapping[str, Any]], rows: Sequence[Mapping[str,
         "extra": len(c.keys() - g.keys()),
         "changed": changed,
     }
+
+
+# ---------------------------------------------------------------- anchor gate G1
+
+
+@dataclass
+class G1Result:
+    engine: str
+    market: str
+    n_train: int
+    n_val: int
+    lambda_train: Interval  # fit on train (the deployed lambda before clipping)
+    lambda_val: Interval  # refit on validation, for the CI check
+    corr_val: Interval
+    sigma_train: float  # RMS residual around the anchored prediction on train
+    rmse_val_line: float
+    rmse_val_anchored: float  # line + clip(lambda_train) * (model - line)
+    passed: bool
+    min_val_games: int
+
+
+def _market_arrays(rows: Sequence[Mapping[str, Any]], market: str) -> tuple[np.ndarray, ...]:
+    if market == "spread":
+        actual = np.array([r["home_score"] - r["away_score"] for r in rows], float)
+        model = np.array([r["model_margin"] for r in rows], float)
+        line = np.array([r["line_margin"] for r in rows], float)
+    else:
+        actual = np.array([r["home_score"] + r["away_score"] for r in rows], float)
+        model = np.array([r["model_total"] for r in rows], float)
+        line = np.array([r["line_total"] for r in rows], float)
+    return actual, model, line
+
+
+def gate_g1(
+    engine: str,
+    train: Sequence[Mapping[str, Any]],
+    val: Sequence[Mapping[str, Any]],
+    market: str,
+    *,
+    min_val_games: int = 700,
+    draws: int = 2000,
+) -> G1Result:
+    """Gate G1 against closing lines (benchmark only).
+
+    Pass needs: lambda fit on train with 95% CI above 0, lambda refit on validation with 95% CI
+    above 0, corr(model - close, actual - close) on validation with 95% CI above 0, and at least
+    ``min_val_games`` validation games. A component that fails ships with lambda = 0.
+    """
+    a_tr, m_tr, l_tr = _market_arrays(train, market)
+    a_va, m_va, l_va = _market_arrays(val, market)
+    _, lam_tr = gap_statistics(m_tr, l_tr, a_tr, [r["date"] for r in train], draws=draws)
+    corr_va, lam_va = gap_statistics(m_va, l_va, a_va, [r["date"] for r in val], draws=draws)
+    lam = max(0.0, lam_tr.estimate)
+    sigma = float(np.sqrt(np.mean((a_tr - (l_tr + lam * (m_tr - l_tr))) ** 2)))
+    passed = lam_tr.low > 0.0 and lam_va.low > 0.0 and corr_va.low > 0.0 and len(val) >= min_val_games
+    return G1Result(
+        engine=engine,
+        market=market,
+        n_train=len(train),
+        n_val=len(val),
+        lambda_train=lam_tr,
+        lambda_val=lam_va,
+        corr_val=corr_va,
+        sigma_train=sigma,
+        rmse_val_line=_rmse(l_va, a_va),
+        rmse_val_anchored=_rmse(l_va + lam * (m_va - l_va), a_va),
+        passed=passed,
+        min_val_games=min_val_games,
+    )

@@ -3,6 +3,9 @@
   python scripts/nba_v10/replay_harness.py golden          # replay v9, write/diff golden rows
   python scripts/nba_v10/replay_harness.py replay NAME...  # replay named engines, cache rows
   python scripts/nba_v10/replay_harness.py score NAME...   # scorecards from cached rows
+  python scripts/nba_v10/replay_harness.py ablate NAME...  # compact train/val table
+  python scripts/nba_v10/replay_harness.py fit NAME...     # B6/B7 fits on train rows
+  python scripts/nba_v10/replay_harness.py g1              # gate G1 + nba-anchor-v10 artifact
 
 Inputs are read from the main data root (--data-root, default E:/MP/data). Cached replay
 rows go to <data-root>/research/nba_v10/harness/ (untracked); the golden v9 rows and the
@@ -29,9 +32,11 @@ from model_prediction.models.nba_v91 import POSTSEASON_TYPES
 from model_prediction.nba_replay_harness import (
     DEFAULT_LINES_PATH,
     EngineSpec,
+    G1Result,
     assign_splits,
     diff_golden,
     file_sha256,
+    gate_g1,
     golden_rows,
     load_closing_lines,
     read_rows,
@@ -42,6 +47,7 @@ from model_prediction.nba_replay_harness import (
     split_boundaries,
     write_rows,
 )
+from model_prediction.research_incumbent_evaluation import POLICY
 
 REPO = Path(__file__).resolve().parents[2]
 OUT_DIR = REPO / "outputs" / "nba" / "v10_harness"
@@ -246,11 +252,95 @@ def cmd_fit(names: list[str], data_root: Path) -> None:
         fit_playoff_offset(train)
 
 
+# (engine label, cached rows per market). v9.1 serves spreads from the spread artifact and
+# totals from the total artifact, so each market is gated on the rows of its own artifact.
+G1_MODELS = {
+    "v9": {"spread": "v9", "total": "v9"},
+    "v9.1": {"spread": "v91_spread_final", "total": "v91_total_final"},
+}
+ANCHOR_ARTIFACT = REPO / "config" / "models" / "research" / "nba-anchor-v10.json"
+
+
+def cmd_g1(data_root: Path, draws: int) -> None:
+    """Gate G1 for v9 and v9.1 as ``model``; writes G1.md and the nba-anchor-v10 artifact
+    (lambda and sigma fitted on train with v9.1 as the model)."""
+    from model_prediction.production_registry import compute_artifact_hash
+
+    results: dict[tuple[str, str], G1Result] = {}
+    for label, per_market in G1_MODELS.items():
+        for market, rows_name in per_market.items():
+            split = _split_rows(rows_name, data_root)
+            results[(label, market)] = gate_g1(label, split["train"], split["val"], market, draws=draws)
+    lines = [
+        "# Gate G1 against 2024-26 closing lines (benchmark only, exploratory)",
+        "",
+        f"Split: train < {PINNED_VAL_START} <= validation < {PINNED_HOLDOUT_START} (holdout not replayed).",
+        "Closing lines carry no capture time: this is a benchmark, never a decision input. Validation",
+        "also selected the v9.1 fixes, so the v9.1 rows are doubly exploratory. CIs: 95% percentile,",
+        f"{draws} date-cluster bootstrap draws. Lambda is the through-origin OLS weight of",
+        "(actual - close) on (model - close); the anchored mean is close + max(0, lambda) * (model - close).",
+        "",
+        (
+            "| model | market | n train | n val | lambda train [95% CI] | lambda val [95% CI] | "
+            "corr val [95% CI] | sigma (train) | val RMSE close | val RMSE anchored | G1 |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for r in results.values():
+        lines.append(
+            f"| {r.engine} | {r.market} | {r.n_train} | {r.n_val} | {r.lambda_train.fmt()} | "
+            f"{r.lambda_val.fmt()} | {r.corr_val.fmt()} | {r.sigma_train:.2f} | {r.rmse_val_line:.3f} | "
+            f"{r.rmse_val_anchored:.3f} | {'PASS' if r.passed else 'FAIL'} |"
+        )
+    lines += [
+        "",
+        "G1 pass rule: lambda (train) CI > 0, lambda (validation refit) CI > 0, corr (validation) CI > 0,",
+        "n val >= 700. A failing component ships with lambda = 0 (anchored price = market) and is",
+        "not re-tuned on the same data.",
+    ]
+    out = OUT_DIR / "G1.md"
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines))
+
+    artifact: dict[str, Any] = {
+        "model_version": "nba-anchor-v10",
+        "status": "research",
+        "serving": "not registered, not whitelisted; wiring spec in outputs/nba/v10_harness/ANCHOR_WIRING.md",
+        "engine": "model_prediction.models.nba_anchor_v10",
+        "underlying_model": {"spread": "nba-spread-margin-v9-1", "total": "nba-total-margin-v9-1"},
+        "fee_coefficient": float(POLICY["fee_rate"]),
+        "fee_source": "research_incumbent_evaluation.POLICY (Polymarket US taker fee c * p * (1 - p))",
+        "fit": {
+            "rows": "harness replay of the v9.1 artifacts vs 2024-26 closing lines",
+            "train": f"< {PINNED_VAL_START}",
+            "validation": f"{PINNED_VAL_START} .. < {PINNED_HOLDOUT_START}",
+            "note": "lambda fit on train and clipped at 0; G1 failed, so lambda ships at 0. Serving "
+            "lambda must be refit on decision-time anchors (captured consensus / Polymarket mid).",
+        },
+        "markets": {},
+    }
+    for market in ("spread", "total"):
+        r = results[("v9.1", market)]
+        artifact["markets"][market] = {
+            "lambda": round(max(0.0, r.lambda_train.estimate), 4) if r.passed else 0.0,
+            "lambda_train_raw": round(r.lambda_train.estimate, 4),
+            "lambda_train_ci": [round(r.lambda_train.low, 4), round(r.lambda_train.high, 4)],
+            "corr_val": round(r.corr_val.estimate, 4),
+            "corr_val_ci": [round(r.corr_val.low, 4), round(r.corr_val.high, 4)],
+            "g1": "PASS" if r.passed else "FAIL",
+            "sigma": round(r.sigma_train, 3),
+            "main_min_edge": None,
+        }
+    artifact["artifact_hash"] = compute_artifact_hash(artifact)
+    ANCHOR_ARTIFACT.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"wrote {ANCHOR_ARTIFACT}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["golden", "replay", "diff", "score", "ablate", "fit"])
+    parser.add_argument("command", choices=["golden", "replay", "diff", "score", "ablate", "fit", "g1"])
     parser.add_argument("names", nargs="*")
     parser.add_argument("--data-root", type=Path, default=Path("E:/MP/data"))
     parser.add_argument("--draws", type=int, default=2000)
@@ -265,6 +355,8 @@ def main() -> None:
         cmd_ablate(args.names, args.data_root)
     elif args.command == "fit":
         cmd_fit(args.names, args.data_root)
+    elif args.command == "g1":
+        cmd_g1(args.data_root, args.draws)
     else:
         cmd_score(args.names, args.data_root, args.draws)
 
