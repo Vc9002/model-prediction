@@ -163,3 +163,41 @@ def test_fbs_fcs_feed_pair_labels_the_side_opposite_a_known_team() -> None:
     assert classes.classify(ident.key("Maine Black Bears"), 2026) == ("FCS", "feed")
     assert classes.classify(ident.key("Maine Black Bears"), 2027) == ("FCS", "previous_season_feed")
     assert classes.classify(ident.key("Foo A&M Rams"), 2026) == ("UNKNOWN", "no_class_evidence")
+
+
+def test_fcs_opponent_missing_from_team_table_is_priced_like_a_listed_fcs_team() -> None:
+    # One fallback: an FCS opponent the static table misses (Maine) must move Georgia's Elo and opponent-adjusted
+    # efficiency exactly as a listed FCS opponent (Montana) does. Before, Elo priced it Mid-American and the
+    # efficiency adjustment FBS Independents.
+    def state(opponent: str):
+        history = [
+            _game(
+                1,
+                "Georgia Bulldogs",
+                opponent,
+                days_before=21,
+                feed_groups=(80, 81),
+                home_score=45,
+                away_score=10,
+            ),
+            _game(2, opponent, "Towson Tigers", days_before=14, feed_groups=(81,)),
+            _game(
+                3,
+                "Georgia Bulldogs",
+                "Auburn Tigers",
+                days_before=7,
+                feed_groups=(80,),
+                home_score=24,
+                away_score=21,
+            ),
+        ]
+        return CFBFeatureExtractor()._compute_team_state(history, "Georgia Bulldogs", KICKOFF, 2026, 12)
+
+    maine, montana = state("Maine Black Bears"), state("Montana Grizzlies")
+    assert maine.games_played == montana.games_played == 2
+    # Each game's own score feeds the efficiency loop (45-10 and 24-21), not the last row the Elo loop saw.
+    assert maine.raw_offense_ppg == montana.raw_offense_ppg == 34.5
+    assert maine.raw_defense_ppg == montana.raw_defense_ppg == 15.5
+    assert maine.elo_rating == montana.elo_rating
+    assert maine.adj_offense_ppp == montana.adj_offense_ppp
+    assert maine.adj_defense_ppp == montana.adj_defense_ppp

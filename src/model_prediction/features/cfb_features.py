@@ -20,6 +20,7 @@ from datetime import datetime
 from typing import Any
 
 from ..data_sources.cfb_data import (
+    CFBTeam,
     calculate_haversine_distance,
     calculate_timezone_difference,
     resolve_team,
@@ -164,6 +165,22 @@ def _keyed_past_rows(history: Sequence[Any], as_of_dt: datetime) -> tuple[CFBTea
             past.append(g)
     identity = CFBTeamIdentity.from_rows(past)
     return identity, [(g, *identity.row_keys(g)) for g in past]
+
+
+def _class_conference(classes: CFBTeamClasses, key: str, season: int, team: CFBTeam | None) -> str:
+    """Conference whose tier offset prices a team in ``season``: one rule for the team, its Elo opponents and
+    its efficiency opponents.
+
+    The three call sites used to disagree on an unresolved team (Mid-American, Mid-American, FBS Independents
+    +2.0), so one FCS opponent was priced three ways. FCS or UNKNOWN class => FCS; an FBS team the static
+    table misses (or lists as FCS) => Mid-American, the long-standing team-side fallback.
+    """
+    label, _ = classes.classify(key, season)
+    if label != FBS:
+        return "FCS"
+    if team is not None and team.tier != "FCS":
+        return team.conference
+    return "Mid-American"
 
 
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
@@ -344,20 +361,20 @@ class CFBFeatureExtractor:
             tier = team_obj.tier if team_obj and team_obj.tier != "FCS" else "G6"
         else:
             tier = "FCS"
-        conf = team_obj.conference if team_obj else "Mid-American"
+        conf = _class_conference(classes, team_key, season_year, team_obj)
 
         # Prior power level from conference tier and historical baseline
         conf_offset = CONFERENCE_TIER_OFFSETS.get(conf, 0.0)
         base_elo = 1500.0 + (conf_offset * 25.0)
 
         # Strictly past games of this team (keyed_rows holds only rows before as_of_dt), in history order.
-        # Each entry is (row, is_home, opponent display name).
-        past_games: list[tuple[Any, bool, str]] = []
+        # Each entry is (row, is_home, opponent display name, opponent key).
+        past_games: list[tuple[Any, bool, str, str]] = []
         for g, h_key, a_key in keyed_rows:
             if h_key == team_key:
-                past_games.append((g, True, _get_val(g, "away_team", "")))
+                past_games.append((g, True, _get_val(g, "away_team", ""), a_key))
             elif a_key == team_key:
-                past_games.append((g, False, _get_val(g, "home_team", "")))
+                past_games.append((g, False, _get_val(g, "home_team", ""), h_key))
 
         # Current season games: resolve from attribute or timestamp to prevent cross-season leakage
         _resolve_game_season = row_season
@@ -370,7 +387,7 @@ class CFBFeatureExtractor:
         # Elo rating calculation with opponent adjustment and 35% offseason reversion
         current_elo = base_elo
         last_season = None
-        for g, is_home, opp_name in past_games[-20:]:  # Rolling 20 games
+        for g, is_home, opp_name, opp_key in past_games[-20:]:  # Rolling 20 games
             g_season = _resolve_game_season(g)
             if last_season is not None and g_season != last_season:
                 # 35% offseason regression toward conference baseline (reflects roster/portal turnover)
@@ -383,8 +400,9 @@ class CFBFeatureExtractor:
             margin = abs(team_score - opp_score)
 
             # Opponent-aware strength baseline
-            opp_obj = resolve_team(opp_name)
-            opp_conf = opp_obj.conference if opp_obj else "Mid-American"
+            opp_conf = _class_conference(
+                classes, opp_key, g_season if g_season is not None else season_year, resolve_team(opp_name)
+            )
             opp_base_elo = 1500.0 + (CONFERENCE_TIER_OFFSETS.get(opp_conf, 0.0) * 25.0)
 
             # Margin of victory multiplier for CFB
@@ -415,9 +433,8 @@ class CFBFeatureExtractor:
             pts_allowed = []
             adj_scored = []
             adj_allowed = []
-            for g, is_home, opp_name in curr_season_games:
-                opp_obj = resolve_team(opp_name)
-                opp_conf = opp_obj.conference if opp_obj else "FBS Independents"
+            for g, is_home, opp_name, opp_key in curr_season_games:
+                opp_conf = _class_conference(classes, opp_key, season_year, resolve_team(opp_name))
                 opp_offset = CONFERENCE_TIER_OFFSETS.get(opp_conf, 0.0)
 
                 s_pts = float(_get_val(g, "home_score", 0) if is_home else _get_val(g, "away_score", 0))
@@ -464,7 +481,7 @@ class CFBFeatureExtractor:
         # Rolling opponent-adjusted EPA from past games
         epas_off: list[float] = []
         epas_def: list[float] = []
-        for g, is_h, _opp in curr_season_games:
+        for g, is_h, _opp, _opp_key in curr_season_games:
             h_epa = _get_val(g, "home_epa_per_play")
             a_epa = _get_val(g, "away_epa_per_play")
             if h_epa is not None and a_epa is not None and (h_epa != 0.0 or a_epa != 0.0):
