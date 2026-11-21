@@ -8,7 +8,11 @@ Evaluates picks beyond nominal edge using:
    FIRST offered (its earliest ledger row, graded at that row's own line and price), and
    counted for verdicts only from first-sight rows whose own quote was a verified
    decision-time executable quote (Pillar 1). The old last-pre-game-run (settled row) record
-   is shown as context only.
+   is shown as context only. An open candidate is looked up on its own first-sight edge
+   (`bucket_edge`), not the edge it shows after reruns. A decision is verified evidence only
+   when its first row is verified. Rows created at/after their own event start (or with an
+   unparseable start) never become first sight, and a key with any archived or removed row
+   is excluded whole.
 2. Directional Asymmetry: a total candidate (over/under) is judged on its own direction's
    bucket, never the pooled over+under record (Pillar 2).
 
@@ -100,8 +104,9 @@ class BucketStats:
     """All first-sight decisions in a bucket, split by whether the row's own quote was verified.
 
     Only `.verified` counts toward any verdict; `.all_rows` is retained for context so a
-    report can show "0 verified of N graded" instead of silently dropping the bucket. The two
-    take their own first row per decision, so `.verified` can exceed `.all_rows` in a bucket.
+    report can show "0 verified of N graded" instead of silently dropping the bucket. A
+    decision counts in `.verified` only when its FIRST row is verified, so `.verified` is a
+    subset of `.all_rows` in every bucket.
     """
 
     all_rows: EdgeTierStats = field(default_factory=EdgeTierStats)
@@ -130,6 +135,20 @@ def _parse_created_at(value: Any) -> datetime:
         dt = datetime.fromisoformat(str(value))
     except (TypeError, ValueError):
         return _UTC_MAX
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
+def _parse_utc(value: Any) -> datetime | None:
+    # Point-in-time comparisons need a real instant: event_start_utc is stored as `...Z`,
+    # `...T21:00Z` (no seconds) and `...-0400`, so strings cannot be compared. None means
+    # missing or unparseable, which callers treat as "cannot be shown pre-start". A naive
+    # value is read as UTC.
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
@@ -211,7 +230,28 @@ class HistoricalAuditEngine:
         # First-sight keys whose row could not be graded at its own line (no result, no
         # scores, no same-line settled sibling); skipped, never filled from a later row.
         self.ungraded_first_sight_keys: int = 0
+        # Edge each decision key had when first offered, graded or not: an open pick has no
+        # result yet but must still be bucketed on the edge it was first sighted at.
+        self._first_sight_edge_by_key: dict[tuple[str, str, str, str, str], float] = {}
         self._load_historical_settlements()
+
+    def first_sight_edge(
+        self, sport: str, event_id: str, market_type: str, selection: str, model_id: str
+    ) -> float | None:
+        """Edge this decision had when first offered, or None when it has no eligible first row.
+
+        None covers keys never seen and keys dropped from first-sight evidence (rows created
+        at/after their own start, archived/removed keys); the caller then falls back to the
+        current edge.
+        """
+        key = (
+            str(sport or "").lower(),
+            str(event_id or ""),
+            str(market_type or "").lower(),
+            str(selection or "").lower(),
+            str(model_id or "").lower(),
+        )
+        return self._first_sight_edge_by_key.get(key)
 
     @staticmethod
     def _decision_key(r: sqlite3.Row) -> tuple[str, str, str, str, str]:
@@ -275,12 +315,13 @@ class HistoricalAuditEngine:
         if not self.db_path.exists():
             return
         conn = _connect_ro(self.db_path)
-        # Archived and removed rows are operator-removed bad rows and are never read.
+        # Archived and removed rows are never read as evidence themselves; their KEYS are read
+        # below only so the first-sight pass can exclude the whole decision.
         rows = conn.execute(
             """
             SELECT sport, market_type, model_probability, market_probability,
                    selection, line, pnl_units, result, units, event_id, model_id,
-                   status, created_at_utc, ledger_tier,
+                   status, created_at_utc, event_start_utc, ledger_tier,
                    CASE WHEN json_valid(decision_payload_json)
                         THEN json_extract(decision_payload_json, '$.market_quote_provenance')
                    END AS quote_provenance,
@@ -294,6 +335,16 @@ class HistoricalAuditEngine:
             WHERE status IN ('open', 'superseded', 'settled')
             """
         ).fetchall()
+        removed_keys = {
+            self._decision_key(r)
+            for r in conn.execute(
+                """
+                SELECT sport, event_id, market_type, selection, model_id
+                FROM ledger_records
+                WHERE status IN ('archived', 'removed')
+                """
+            ).fetchall()
+        }
         conn.close()
 
         def tier_rank(r: sqlite3.Row) -> int:
@@ -313,6 +364,10 @@ class HistoricalAuditEngine:
         for r in settled:
             home = _parse_score(r["home_score"])
             away = _parse_score(r["away_score"])
+            # nrfi rows store first-inning runs in home_score/away_score, so a final-score
+            # grade read from them is wrong.
+            if str(r["market_type"] or "").lower() == "nrfi":
+                home = away = None
             if home is not None and away is not None:
                 scores_by_event.setdefault(
                     (str(r["sport"] or "").lower(), str(r["event_id"] or "")), (home, away)
@@ -347,8 +402,20 @@ class HistoricalAuditEngine:
         # conditions on line movement AFTER the pick was first offered: winners whose edge
         # grew and losers whose edge shrank migrate between buckets and inflate the band.
         first_any: dict[tuple[str, str, str, str, str], sqlite3.Row] = {}
-        first_verified: dict[tuple[str, str, str, str, str], sqlite3.Row] = {}
-        for r in sorted(rows, key=lambda r: (_parse_created_at(r["created_at_utc"]), tier_rank(r))):
+
+        def eligible(r: sqlite3.Row) -> bool:
+            # Point-in-time: a row created at/after its own event start is an in-game decision,
+            # and a row whose start or created stamp cannot be parsed cannot be shown pre-start,
+            # so it fails closed. Score sources and the same-key settled fallback still read
+            # every settled row; they are outcomes, not decisions.
+            created = _parse_utc(r["created_at_utc"])
+            start = _parse_utc(r["event_start_utc"])
+            return created is not None and start is not None and created < start
+
+        for r in sorted(
+            (r for r in rows if eligible(r)),
+            key=lambda r: (_parse_created_at(r["created_at_utc"]), tier_rank(r)),
+        ):
             if not r["event_id"]:
                 # No stable identity to dedup on: keep the old per-row behaviour for settled
                 # rows (own result, own pnl); an unsettled row has nothing to grade.
@@ -364,29 +431,26 @@ class HistoricalAuditEngine:
                     )
                 continue
             key = self._decision_key(r)
+            if key in removed_keys:
+                # An operator archived or removed part of this decision, and its surviving
+                # superseded rows are the same bad decision (16 of 22 such keys have live rows).
+                continue
             first_any.setdefault(key, r)
-            if r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE:
-                first_verified.setdefault(key, r)
 
-        # The two dicts are deliberately uncoupled: a key's verified evidence is its earliest
-        # verified row, which can sit in a different bucket than its earliest row overall.
-        graded_cache: dict[int, tuple[str, float, float] | None] = {}
-
-        def graded(r: sqlite3.Row, key: tuple[str, str, str, str, str]) -> tuple[str, float, float] | None:
-            if id(r) not in graded_cache:
-                graded_cache[id(r)] = self._grade_first_sight(r, key, scores_by_event, settled_by_key)
-            return graded_cache[id(r)]
-
+        # The verified record must be the same decision population as all_rows: a key counts
+        # as verified only when its FIRST row is verified. Letting the earliest verified row
+        # stand in moved 104 keys into a later rerun's bucket.
         for key, r in first_any.items():
-            g = graded(r, key)
+            self._first_sight_edge_by_key[key] = float(r["model_probability"] or 0.0) - float(
+                r["market_probability"] or 0.0
+            )
+            g = self._grade_first_sight(r, key, scores_by_event, settled_by_key)
             if g is None:
                 self.ungraded_first_sight_keys += 1
                 continue
-            self._count_first_sight(r, *g, to_all=True, to_verified=False)
-        for key, r in first_verified.items():
-            g = graded(r, key)
-            if g is not None:
-                self._count_first_sight(r, *g, to_all=False, to_verified=True)
+            self._count_first_sight(
+                r, *g, to_all=True, to_verified=r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE
+            )
 
     @staticmethod
     def _grade_first_sight(
@@ -430,11 +494,17 @@ class HistoricalAuditEngine:
         market_prob: float,
         model_id: str | None = None,
         quote_provenance: str | None = None,
+        *,
+        bucket_edge: float | None = None,
     ) -> dict[str, Any]:
         sp = sport.lower()
         mkt = market_type.lower()
         sel = selection.lower()
-        bucket = get_edge_bucket(edge)
+        # Evidence buckets are keyed on first-sight edge, so an open pick that has since
+        # drifted must be looked up on the edge it was first offered at. Keyword-only so the
+        # external widget's positional call keeps working; the negative-edge trap below still
+        # reads the CURRENT edge, because that is the edge being bought now.
+        bucket = get_edge_bucket(edge if bucket_edge is None else bucket_edge)
         mid = (model_id or "").lower()
         prov = quote_provenance or ""
         quote_verified = prov == VERIFIED_QUOTE_PROVENANCE
@@ -504,6 +574,13 @@ class HistoricalAuditEngine:
                 f"Context, all models pooled: verified {pooled.verified.win_rate:.1f}% WR, {pooled.verified.roi:+.1f}% ROI ({pooled.verified.wins}W-{pooled.verified.losses}L)."
             )
 
+        current_bucket = get_edge_bucket(edge)
+        if bucket_edge is not None and bucket != current_bucket:
+            flags.append(
+                f"Bucketed on first-sight edge {bucket_edge * 100:+.1f}% ({bucket}); "
+                f"current edge {edge * 100:+.1f}% ({current_bucket})."
+            )
+
         lr = last_run_evidence.verified
         if lr.total_graded > 0:
             flags.append(
@@ -532,6 +609,7 @@ class HistoricalAuditEngine:
             "model": model,
             "quote_provenance": prov,
             "quote_verified": quote_verified,
+            "bucket_edge": edge if bucket_edge is None else bucket_edge,
         }
 
 
@@ -574,7 +652,7 @@ def collect_open_pick_audits(
         """
         SELECT pick_id, sport, ledger_tier, market_type, selection, line,
                model_probability, market_probability, units, event_start_utc, decision_payload_json,
-               model_id
+               model_id, event_id
         FROM ledger_records
         WHERE status = 'open'
         ORDER BY event_start_utc, sport, market_type
@@ -605,6 +683,9 @@ def collect_open_pick_audits(
         mod_p = float(r["model_probability"] or 0.0)
         mkt_p = float(r["market_probability"] or 0.0)
         edge = mod_p - mkt_p
+        fs = engine.first_sight_edge(
+            r["sport"], r["event_id"], r["market_type"], r["selection"], r["model_id"]
+        )
 
         audit = engine.audit_candidate(
             sport=r["sport"],
@@ -615,6 +696,7 @@ def collect_open_pick_audits(
             market_prob=mkt_p,
             model_id=r["model_id"],
             quote_provenance=quote_provenance,
+            bucket_edge=fs,
         )
 
         dt_et = dt_utc.astimezone(ET_TZ)
@@ -632,6 +714,7 @@ def collect_open_pick_audits(
                 "model_prob": mod_p,
                 "market_prob": mkt_p,
                 "edge": edge,
+                "bucket_edge": fs if fs is not None else edge,
                 "units": float(r["units"] or 1.0),
                 "verdict": audit["verdict"],
                 "bucket_verdict": audit["bucket_verdict"],

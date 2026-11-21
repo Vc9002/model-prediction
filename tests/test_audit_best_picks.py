@@ -18,6 +18,8 @@ abp = importlib.util.module_from_spec(spec)
 sys.modules["audit_best_picks"] = abp
 spec.loader.exec_module(abp)
 
+VERIFIED = abp.VERIFIED_QUOTE_PROVENANCE
+
 
 SCHEMA = """
 CREATE TABLE ledger_records (
@@ -77,13 +79,15 @@ def _add(
     home_team="Home Team",
     away_team="Away Team",
     payload_extra=None,
+    market_prob=0.5,
+    event_start=None,
 ):
     _counter["n"] += 1
     n = _counter["n"]
     pick_id = pick_id or f"pick-{n}"
     event_id = event_id or f"event-{n}"
-    model_probability = 0.5 + edge
-    market_probability = 0.5
+    model_probability = market_prob + edge
+    market_probability = market_prob
     if pnl is None:
         pnl = 0.9 if result == "win" else (-1.0 if result == "loss" else 0.0)
     if raw_payload is not None:
@@ -101,9 +105,14 @@ def _add(
         status = "open"
         result = None
         pnl = None
-        event_start = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+        start = (datetime.now(UTC) + timedelta(days=1)).isoformat()
     else:
-        event_start = created_at
+        # The audit drops rows created at/after their own event start (they are in-game
+        # decisions), so the old start == created_at default would erase every fixture row.
+        # This constant is later than every created_at these tests use.
+        start = "2026-01-02T00:00:00Z"
+    if event_start is not None:
+        start = event_start
 
     conn = sqlite3.connect(db_path)
     conn.execute(
@@ -130,7 +139,7 @@ def _add(
             result,
             pnl,
             created_at,
-            event_start,
+            start,
             payload,
         ),
     )
@@ -636,12 +645,39 @@ def test_archived_and_removed_rows_never_counted(db):
         created_at="2026-01-01T10:00:00Z",
         **common,
     )
+    # A live row of a removed key: the operator removed part of this decision, so the whole
+    # key is excluded from first-sight evidence (quick-261120-w6i D5), not just the bad row.
+    _add(
+        db,
+        event_id="evt-c-removed",
+        edge=0.09,
+        result="win",
+        status="settled",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        created_at="2026-01-01T12:00:00Z",
+        **common,
+    )
+    _add(
+        db,
+        event_id="evt-c-clean",
+        edge=0.09,
+        result="win",
+        status="settled",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        created_at="2026-01-01T12:00:00Z",
+        **common,
+    )
     engine = abp.HistoricalAuditEngine(db)
     low = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "5.0% - 7.9%")]
     assert low.all_rows.total_graded == 0
     assert low.verified.total_graded == 0
     mid = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")]
     assert (mid.verified.wins, mid.verified.losses) == (1, 0)
+    assert mid.all_rows.total_graded == 1
+    assert engine.first_sight_edge("mlb", "evt-c", "moneyline", "home", "m1") is None
+    # The old-basis context map is deliberately unchanged: it still counts all three settled rows.
+    lr = engine.last_run_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")]
+    assert lr.verified.wins == 3
 
 
 def test_last_run_evidence_keeps_settled_row_basis(db):
@@ -707,3 +743,143 @@ def test_first_sight_spread_graded_from_selected_side(db):
     v = res["pooled"].verified
     assert (v.wins, v.losses) == (1, 0)
     assert v.pnl == pytest.approx(1.0)
+
+
+# --- quick-261120-w6i: first-sight candidate bucketing and population fixes ---------------
+
+
+def _future_start():
+    return (datetime.now(UTC) + timedelta(days=1)).isoformat()
+
+
+def test_open_pick_bucketed_on_first_sight_edge(db):
+    # 30 verified wins at 9% edge make the 8-12% bucket confirmable.
+    _bucket_rows(db, 30, provenance=abp.VERIFIED_QUOTE_PROVENANCE, edge=0.09)
+    start = _future_start()
+    common = {
+        "event_id": "evt-open",
+        "model_id": "m1",
+        "provenance": abp.VERIFIED_QUOTE_PROVENANCE,
+        "event_start": start,
+    }
+    # First offered at +9%, but the open row (the latest rerun) now shows only +3%.
+    _add(db, edge=0.09, result=None, status="superseded", created_at="2026-01-01T10:00:00Z", **common)
+    _add(db, edge=0.03, pick_id="open-1", open_pick=True, created_at="2026-01-01T12:00:00Z", **common)
+    engine = abp.HistoricalAuditEngine(db)
+    # Lookup lowercases like _decision_key, so widget-style mixed-case inputs still resolve.
+    assert engine.first_sight_edge("MLB", "evt-open", "Moneyline", "HOME", "M1") == pytest.approx(0.09)
+    assert engine.first_sight_edge("mlb", "never-seen", "moneyline", "home", "m1") is None
+
+    picks = abp.collect_open_pick_audits(db)
+    assert len(picks) == 1
+    pick = picks[0]
+    assert pick["bucket"] == "8.0% - 11.9%"
+    assert pick["bucket_edge"] == pytest.approx(0.09)
+    assert pick["verdict"] == "CONFIRMED_BEST"
+
+    # The widget's 8-positional call has no bucket_edge, so it keeps bucketing on current edge.
+    widget = engine.audit_candidate("mlb", "moneyline", "home", 0.03, 0.53, 0.5, "m1", VERIFIED)
+    assert widget["bucket"] == "2.0% - 4.9%"
+    assert widget["verdict"] == "QUALIFIED_MODERATE"
+    # The negative-edge trap still reads the current edge, whatever bucket_edge says.
+    neg = engine.audit_candidate(
+        "mlb", "moneyline", "home", -0.02, 0.48, 0.5, "m1", VERIFIED, bucket_edge=0.09
+    )
+    assert neg["bucket"] == "8.0% - 11.9%"
+    assert neg["verdict"] == "DOWNGRADE_TRAP"
+
+
+def test_verified_record_requires_verified_first_row(db):
+    common = {"sport": "mlb", "market_type": "moneyline", "selection": "home", "event_id": "evt-v"}
+    _add(
+        db,
+        edge=0.065,
+        result=None,
+        status="superseded",
+        provenance="",
+        created_at="2026-01-01T14:00:00Z",
+        **common,
+    )
+    _add(
+        db,
+        edge=0.13,
+        result="win",
+        provenance=abp.VERIFIED_QUOTE_PROVENANCE,
+        created_at="2026-01-01T22:00:00Z",
+        **common,
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    mid = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "5.0% - 7.9%")]
+    assert (mid.all_rows.wins, mid.all_rows.losses) == (1, 0)
+    assert mid.verified.total_graded == 0
+    # HEAD let the later verified rerun stand in for the key and counted it here instead.
+    high = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", ">= 12.0%")]
+    assert high.all_rows.total_graded == 0
+    assert high.verified.total_graded == 0
+
+
+def test_nrfi_rows_never_score_an_event(db):
+    # nrfi rows store first-inning runs in home_score/away_score; reading them as a final
+    # score graded this total over as a loss from a 1-0 first inning.
+    _add(
+        db,
+        sport="mlb",
+        market_type="nrfi",
+        selection="nrfi",
+        event_id="evt-n",
+        created_at="2026-01-01T10:00:00Z",
+        payload_extra={"home_score": "1", "away_score": "0"},
+    )
+    _superseded_then_settled(
+        db,
+        event_id="evt-n",
+        model_id="m1",
+        sport="mlb",
+        market_type="total",
+        selection="over",
+        first_edge=0.065,
+        first_line=8.5,
+        last_edge=0.13,
+        last_line=9.5,
+        last_result="win",
+        scores=(6, 4),
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    v = engine.stats_by_sport_dir_bucket[("mlb", "over", "5.0% - 7.9%")].verified
+    assert (v.wins, v.losses) == (1, 0)
+
+
+def test_rows_created_at_or_after_start_never_first_sight(db):
+    common = {
+        "sport": "mlb",
+        "market_type": "moneyline",
+        "selection": "home",
+        "edge": 0.09,
+        "provenance": abp.VERIFIED_QUOTE_PROVENANCE,
+    }
+    # No-seconds start form, created two hours after it.
+    _add(
+        db, event_id="evt-late", created_at="2026-01-01T22:00:00Z", event_start="2026-01-01T20:00Z", **common
+    )
+    # Created exactly at start: not strictly before, so an in-game decision.
+    _add(
+        db,
+        event_id="evt-at",
+        created_at="2026-01-01T20:00:00Z",
+        event_start="2026-01-01T20:00:00Z",
+        **common,
+    )
+    # 15:00-0500 is 20:00Z, so created 19:00Z is pre-start; a string compare would drop it.
+    _add(
+        db,
+        event_id="evt-ok",
+        created_at="2026-01-01T19:00:00Z",
+        event_start="2026-01-01T15:00:00-0500",
+        **common,
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    bucket = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")]
+    assert bucket.all_rows.total_graded == 1
+    assert bucket.verified.total_graded == 1
+    assert engine.first_sight_edge("mlb", "evt-late", "moneyline", "home", "m1") is None
+    assert engine.first_sight_edge("mlb", "evt-ok", "moneyline", "home", "m1") == pytest.approx(0.09)
