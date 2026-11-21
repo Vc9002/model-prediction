@@ -234,16 +234,27 @@ Its output feeds Phase 2 as `model`; it only influences prices through a lambda 
 5. Track T-B (cheapest real edge candidate), then Phase 3 player layer, then T-C tracks.
 6. Phase 5 forward shadow from the freeze date.
 
-## 8. Open operator decisions
+## 8. Operator decisions (answered 2026-11-20)
 
-1. Fix B1/B5/B6/B7 as a v9.1 challenger (recommended) or accept them in place.
-2. Interim v9 sizing: keep edge-scaled sizing (puts 2U on noise) or flat 1U until v10. This is
-   a sizing change, not a gate; v9 keeps picking either way.
-3. Data: free sources only (ESPN, nba_api, official PDFs), or pay for EPM history or a
-   timestamped odds archive.
-4. Go-ahead for backfills that write under `data/` (lines 2016-2024, box scores 2016+, injury
-   PDFs 2021+).
-5. Whether a v10 whose fitted lambda is near 0 (so it emits few picks) may replace v9 in
-   serving, given the standing rule that paper needs picks. If not, v10 runs alongside v9 as a
-   Flat challenger.
-6. Whether track T-B (Polymarket vs sportsbook consensus) is in scope.
+1. v9.1: build as a challenger with a new version id; v9's engine file stays untouched
+   (its source hash is verified at replay).
+2. v9 keeps edge-based sizing until v10 replaces it.
+3. Free data sources only (no paid data was authorized).
+4. Backfills approved. They write only under `data/research/nba_v10/`, never into the live
+   history files v9 reads (its baseline and Elo are computed from all loaded history).
+5. Fewer Main picks are acceptable if they win: v10 may replace v9 in Main once it passes G2.
+   **The Flat ledger keeps calling everything**: v10 always emits a side and probability for
+   every priced game, and only Main eligibility depends on the blended edge.
+6. Track T-B (Polymarket vs sportsbook consensus) is in scope.
+
+## 9. Pinned test parameters (fixed before any test runs)
+
+- **T-B:** a pick fires when the devigged sportsbook consensus probability for a side minus the
+  Polymarket ask for that side is at least 3.0 percentage points (about a 2c half-spread plus a
+  1-point margin). Evaluated forward only, from the first captured slate.
+- **T-C1 early-season totals:** games where either team has played fewer than 15 current-season
+  games.
+- **T-C2 injury latency:** decisions within 30 minutes after an official injury report changes
+  the status of a player averaging at least 20 minutes, measured against the Polymarket mid
+  before and after.
+- **G1 / G2:** as written in section 6; not re-tuned after results are seen.

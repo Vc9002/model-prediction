@@ -281,3 +281,17 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
   Polymarket asks. The daily job now runs it once a day for the next seven days (`_nfl_early_task`).
 - Purpose: clean prospective test of section 10 (model vs early line predicts the move). Score each row
   against the closing line and the result once the games settle.
+
+## 13. NBA v10 overhaul (started 2026-11-20)
+
+- **Plan and decisions:** `docs/NBA_REVIEW_AND_V10_PLAN_2026-11-20.md` (sections 6, 8, 9). v9
+  keeps serving with edge-based sizing; the Flat ledger keeps calling everything; v10 replaces
+  v9 in Main only after gate G2 (forward CLV against the devigged consensus).
+- **In flight (worktrees `E:\MP-wt\{plumbing,harness,capture,backfill}`, branches `nba-v10/*`):**
+  plumbing fixes B2/B3/B10 and start-time compare; replay harness + v9.1 challenger + anchor
+  scaffold with G1; NBA pre-tip and consensus capture worker (task registration pending);
+  backfills to `data/research/nba_v10/` (lines 2007-2024, box scores 2016-2024, injury PDFs
+  2021+). Merge each branch into `refactor/cleanup-2026-11-11` by path, outside the :30/:05
+  run windows.
+- **Leftover:** four empty, locked worktrees under `.claude/worktrees/agent-*` from a failed
+  isolation attempt; safe to remove with `git worktree remove --force`.
