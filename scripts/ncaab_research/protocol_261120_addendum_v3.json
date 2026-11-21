@@ -1,0 +1,113 @@
+{
+  "id": "ncaab-research-protocol-261120-addendum-v3",
+  "amends": "ncaab-research-protocol-261120 (sha256 72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813) and addendum v2 (sha256 75241bc7885378f266ba66ce383f3b50fe58869e9b699ae90f0ddd9c8ead6317). Both stay unedited and binding for their own grids; grader.py stays byte-identical. This addendum registers a TOTALS grid and one spread/total opening-line diagnostic, graded by scripts/ncaab_research/grader_v3.py, which imports grader.py and hard-codes this file's canonical sha256.",
+  "program": "quick 261121-hmc, lane T (totals)",
+  "written": "2026-11-21 ~18:00Z (13:00 ET). Before writing, only OUTCOME-FREE counts were taken this session: per-season box-score coverage of the confirmation history, CBBD period-score availability, opening-line availability. No total, margin, line-vs-outcome or model-vs-outcome number was computed by this lane before this hash was fixed.",
+  "hash_rule": "sha256 of json.dumps(<this object>, sort_keys=True, separators=(',', ':')), as grader.canonical_sha256. grader_v3.py hard-codes it and refuses to run on mismatch.",
+  "prior_totals_reads_disclosed": {
+    "pre_protocol": "11 total models were read market-relative before protocol 261120 (v1 multiplicity.prior_reads.total_market_relative), including the ncaab_v7_research effpace_total and v6+effpace blends and the v7 multiseason total recalibration.",
+    "BASELINE (read_log 2026-11-21T04:10:59Z and 04:18:34Z, identical baselines)": "served v6 total on the development window: RMSE 17.03 / bias -1.02 vs closing total 16.52 / +0.83 (n 22946), plain slope +0.068 [+0.017, +0.118], corr +0.0181, rule-1 MSE delta +0.0539 K-adj [-0.0556, +0.1500], over Brier 0.2584 / log loss 0.7110. Not charged by v1's K.",
+    "C1_ppp_adjusted (read_log 2026-11-21T08:29:01Z)": "C1 submitted mu_total = (eff_home + eff_away) x projected possessions / 100 from its per-possession ridge (variant selected by MARGIN RMSE, tempo on raw possessions including overtime), normal scale per games-played bucket. Its scorecard read that total: RMSE 17.03 / bias -0.14, plain slope -0.110 [-0.172, -0.043], corr -0.0256, rule-1 MSE delta +0.1282 K-adj [-0.0279, +0.3086], over Brier 0.2594 / log loss 0.7132. T1 below is the same machinery with three changes chosen from mechanism AFTER that read was seen (disclosed); it is charged as a new read."
+  },
+  "multiplicity": {
+    "counting_rule": "One K per statistic family. K = the v1 K of the family (which already charges the pre-protocol reads and all nine v1 grid slots) + 1 for the development BASELINE read (logged, never charged by v1) + every v3 grid entry that produces a statistic of that family, diagnostics included (T0 and S0 join outcomes and are logged reads even though they carry no verdict). Every totals statistic (market-relative slope/corr/rule-1, paired corr and RMSE deltas vs served v6, over log-loss and Brier deltas, over log loss vs ln 2) uses the single totals K. K never decreases; withdrawn or unread entries keep their charge.",
+    "K": {
+      "total": 26,
+      "spread_market_relative": 23
+    },
+    "derivation": {
+      "total": "v1 total_market_relative 20 + BASELINE 1 + v3 grid 5 (T0, T1, T2, T3, S0) = 26",
+      "spread_market_relative": "v1 21 + BASELINE 1 + S0 1 = 23 (only S0 produces a spread statistic in v3; reported, no verdict)"
+    },
+    "adjusted_interval": "percentile day-cluster bootstrap (4000 resamples, seed 17, Eastern game day clusters, grader._boot) at alpha = 0.025 / K per tail; the plain 95% interval is reported alongside",
+    "rereads": "One logged read per grid name in each window. A second, different predictions file under the same grid name and window gets REREAD_NO_VERDICT (grader_v3 checks read_log.jsonl before scoring)."
+  },
+  "windows": {
+    "development": "unchanged: season years 2023-2026, leave-one-season-out, espn_archive closing lines (ncaab-espn-lines-rule-1), history strictly before Eastern midnight of the game day. Season year >= 2027 or Eastern date >= 2026-07-01 is refused before any score or line is read.",
+    "totals_cohort": "the v1 cohort (D1-vs-D1 per the component archive, non-null closing spread line) restricted to a non-null closing total: 22946 games. Coverage rule: a candidate must predict >= 99% of this cohort in every held-out season, else INCOMPLETE.",
+    "confirmation_totals": {
+      "season_years": [2018, 2019, 2020, 2022],
+      "why_narrower_than_v2": "Addendum v2's confirmation window is 2015-2020 + 2022, but every totals statistic needs a closing total: the ESPN backfill (espn_backfill_261120) has closing totals only for 2018, 2019, 2020 and 2022, and the CBBD line source stays refused until its selection and id-crosswalk rule is pinned. So the totals confirmation window is 2018-2020 + 2022, touched once per DEV_ELIGIBLE candidate.",
+      "history": "season years 2014..2022 from replay_261120.load_confirmation_history (CBBD-converted 2014-15, ESPN backfill 2016-22; zero API calls). 2014 is burn-in, 2021 is history only.",
+      "box_source_per_season": {
+        "2014-2021": "CBBD games__teams cache teamStats (fieldGoals.attempted, freeThrows.attempted, rebounds.offensive, turnovers.total), joined CBBD gameId -> games.sourceId = ESPN event id. Outcome-free coverage of D1-vs-D1 history events with all four fields for both teams: 2014 5496/5503, 2015 5494/5494, 2016 5508/5514, 2017 5484/5520, 2018 5499/5533, 2019 5595/5597, 2020 5328/5328, 2021 3944/3944 (every season >= 99.3%).",
+        "2022": "ESPN box components (C1's box cache outputs/ncaab/research_261120/C1_ppp_adjusted/boxes_d1_2022_2026.jsonl.gz, ESPN summary field names): 5474/5485.",
+        "cross_validation": "No season has both an ESPN and a CBBD box (CBBD games__teams ends 2020-21; ESPN boxes start 2021-22), so the two box sources are not cross-checked. Disclosed: CBBD turnovers.total vs ESPN turnovers may differ in how team turnovers are counted."
+      },
+      "baseline_served_v6_total": "outputs/ncaab/research_261120/confirmation/components/components_<season>.jsonl v6_total and v6_total_sd (the served v6 replay used for the A_ml_w0 confirmation), normal distribution",
+      "read_policy": "Only DEV_ELIGIBLE candidates, once each, after a confirmation pin (inputs, code and predictions sha256) is written. Pass = the candidate's primary statistic with the plain one-sided 95% bound on the favourable side of zero, pooled over the window, plus coverage >= 99% of D1-vs-D1 games with a backfill closing total in every season. Parameters are refit once on all four development seasons; structure is frozen from development."
+    }
+  },
+  "overtime_and_periods": {
+    "source": "CBBD games cache (data/research/ncaab_external/cbbd/games, season files 2014..2026, zero API calls), homePeriodPoints / awayPeriodPoints, matched on sourceId = ESPN event id. A game has n_ot = len(homePeriodPoints) - 2 overtime periods (two halves in regulation). Regulation total = sum of the first two entries of both teams. The entries are accepted only when sum(home periods) = home score and sum(away periods) = away score, else the game counts as periods-unknown.",
+    "availability_outcome_free": "development D1 events with period scores: 2023 5715/5721, 2024 5726/5726, 2025 5764/5764, 2026 5752/5752; confirmation history >= 99.8% every season",
+    "pit_use": "period counts of HISTORY games (tipped before Eastern midnight of the game day) may feed a candidate; the predicted game's own period count is an outcome and is used only by T0 (a diagnostic)."
+  },
+  "candidate_grid": {
+    "T0_total_diagnostics": {
+      "family": "diagnostic",
+      "verdict": "none (reported only)",
+      "spec": {
+        "T0a_level_offset_asof": "For each totals-cohort game on Eastern day D: off_line(D) = mean(v6_total - closing total) over the SAME season's totals-cohort games with game_date < D (outcome-free); bias_v6(D) = mean(actual total - v6_total) and bias_line(D) = mean(actual total - closing total) over the same prior games (outcome-based, point-in-time). Reported once at least 100 prior games exist, as the distribution (mean, 10th/50th/90th percentile) of these as-of values over games, by season and by calendar month. No season means are used as a predictor.",
+        "T0b_bias_regulation_vs_overtime": "On the totals cohort with period scores: count and share of overtime games; mean(actual - closing total) and mean(actual - v6_total) separately for regulation and overtime games; mean(regulation total - closing total) over ALL games (the closing total prices overtime, regulation points do not). Games without period scores are reported as periods-unknown.",
+        "T0c_v6_lean": "Share of games with v6_total > closing total, mean(v6_total - closing total), mean served-v6 P(over) and share > 0.5 (outcome-free); realized over rate with pushes excluded, overall and split by the side v6 favours."
+      }
+    },
+    "T1_tempo_eff_total": {
+      "family": "mean",
+      "spec": "C1's opponent-adjusted per-possession ridge (scripts/ncaab_research/candidates/c_ppp_261120.py: efficiency ridge O/D/HCA/league mean on 100 x points / possessions, possessions = FGA - OREB + TOV + 0.44 FTA averaged over both teams, recency and blowout weights, tier prior, carryover, HCA prior, venue ridge weight, POSS_MIN/POSS_MAX filter, lam grid {1, 2, 4, 8}, carry grid {0.4, 0.6, 0.8}; all constants unchanged) with exactly three changes: (a) the TEMPO ridge is fit on possessions per 40 minutes, poss40 = poss x 40 / (40 + 5 x n_ot) with n_ot from the CBBD period scores of each history game (periods unknown -> n_ot = 0, counted and reported); the efficiency ridge is unchanged (per possession, overtime possessions included); (b) mu_total = (eff_home + eff_away) / 100 x poss40_projected x (1 + E[n_ot] / 8), E[n_ot] = c_ot x p_tie, p_tie = F_t8((0.5 - m) / s) - F_t8((-0.5 - m) / s) with m = the same variant's C1 margin and s = the fold's t(8) margin scale for the game's games-played bucket (MLE on training residuals of that variant's margin), c_ot = least squares without intercept of n_ot on p_tie over the training seasons' D1-vs-D1 games with period scores; (c) the (lam, carry) variant is selected per fold by the training seasons' D1-vs-D1 TOTAL RMSE of the (a)+(b) total. scale_total = normal SD per games-played bucket (0 | 1-2 | 3-7 | 8+, the archive's point-in-time sample) of the training residuals. Margin fields carry served v7 unchanged (totals-only candidate).",
+      "mechanism": "Overtime games inflate a team's observed possessions per game; normalising tempo to 40 minutes and adding the overtime expectation explicitly (proportional to the chance of a regulation tie) separates pace from overtime luck. Selecting the variant on totals fits the quantity being predicted.",
+      "free_parameters": "variant (lam, carry), c_ot, margin scales for p_tie, total SD per bucket; all per fold on the three training seasons",
+      "primary": "total_corr_delta_vs_v6"
+    },
+    "T2_total_combiner": {
+      "family": "mean",
+      "spec": "Ridge combiner, the v7 pattern applied to totals: mu_total = b0 + b . z(x) with x = [v6_total, t1_total, early x v6_total, early x t1_total, neutral, league_level_asof]; early = max(0, 1 - s / 8), s = the archive's point-in-time games-played sample; t1_total = T1's mu_total under the SAME fold's T1 parameters; league_level_asof = mean actual total of the current season's D1-vs-D1 history games that tipped before Eastern midnight of the game day when at least 50 exist, else the previous season's full D1-vs-D1 mean; z = standardisation on the training rows; ridge alpha 10 on the standardised coefficients, intercept unpenalised; fit on the training seasons' totals-cohort-eligible D1-vs-D1 games with all inputs present (target = actual total, never the line). scale_total = normal SD per games-played bucket of the training residuals.",
+      "mechanism": "v6 (trend levels, conference baselines) and T1 (opponent-adjusted efficiency x tempo) err differently; a fitted blend with sample-dependent weights and a point-in-time league scoring level can beat either alone.",
+      "free_parameters": "7 coefficients, 4 bucket SDs, per fold",
+      "primary": "total_corr_delta_vs_v6"
+    },
+    "T3_total_scale": {
+      "family": "scale",
+      "spec": "Location = v6_total + m, m = MEDIAN of (actual total - v6_total) over the training seasons' totals-cohort-eligible D1-vs-D1 games (median targeting: the over/under outcome is decided at the median; a single constant per fold). Distribution normal with sd = s0 x sqrt(p / 68) x (1 + c1 x max(0, 1 - s / 8)), p = T1's projected possessions per 40 (the fold's selected T1 variant), s = point-in-time sample; s0, c1 by Gaussian maximum likelihood on the training residuals (actual - v6_total - m), c1 >= 0. Because the location moves, T3 is also charged to the totals market-relative K (it is in the 26).",
+      "mechanism": "Total variance grows with the number of possessions and with rating uncertainty early in the season; the served v6 SD uses its own pace term and a credibility factor and is overdispersed enough that its over log loss (0.7110) is worse than a coin (0.6931).",
+      "free_parameters": "m, s0, c1 per fold",
+      "primary": "over_logloss_delta_vs_v6"
+    },
+    "S0_open_line_diagnostic": {
+      "family": "diagnostic",
+      "verdict": "none (reported only)",
+      "window": "development season years 2024, 2025, 2026 only (open_home_spread_line / open_total_line exist only there; never confirmable on the backcast)",
+      "spec": "Spread: served v7 mean (the grader's v7_served baseline) against the OPENING implied home margin O = -open_home_spread_line on D1-vs-D1 games with both an open and a closing spread line: plain slope/corr of (actual margin - O) on (v7 - O) and of (L_close - O) on (v7 - O), with day-cluster plain and K-adjusted (K 23) intervals; RMSE of v7, open and close against the actual margin. Total: the same with served v6 total, open_total_line and the closing total (K 26).",
+      "pit_assumption": "The line file carries no timestamp for the open. Assumption: the open was posted no later than the morning of the game day. The model's history cut is Eastern midnight of the game day, so it can include results the open could not have seen only if the open was posted on the previous day before late games finished; such information would bias corr(model - open, close - open) UPWARD. This is stated, not corrected (no timestamp exists)."
+    }
+  },
+  "statistics": {
+    "market_total": "x = mu_total - T, y = actual total - T (T = closing total), pooled over held-out seasons: plain OLS slope and Pearson corr with day-cluster CIs (grader.market_plain); rule-1 LOSO ridge (grader.rule1_loso, alpha 1000, shrink 0.5) with K = 26",
+    "total_corr_delta_vs_v6": "corr(y, cand - T) - corr(y, v6 - T) on identical games, day-cluster bootstrap, plain and K-adjusted (26) intervals; late-folds (2025+2026) point reported",
+    "total_rmse_delta_vs_v6": "RMSE(actual total - cand) - RMSE(actual total - v6), identical games, day-cluster bootstrap",
+    "over_logloss_delta_vs_v6": "mean log loss of P(over) at the closing total (grader.p_above_line: integer lines exclude the push mass; pushes dropped), candidate minus served v6 (normal, v6_total_sd), identical games, plain and K-adjusted intervals, late-folds point",
+    "over_logloss_vs_ln2": "mean over pushes-dropped games of (candidate over log loss - ln 2), plain and K-adjusted intervals",
+    "over_brier_delta_vs_v6": "mean of (p_over - over)^2, candidate minus served v6",
+    "secondary": "totals RMSE/bias overall, by games-played bucket and by season; over Brier/log loss with reliability bins"
+  },
+  "acceptance": {
+    "mean_family_dev": "DEV_ELIGIBLE iff (i) total_corr_delta_vs_v6 K-adjusted (K 26) lower bound > 0, (ii) total_rmse_delta_vs_v6 point <= 0, (iii) the pooled 2025+2026 folds' corr delta point > 0, (iv) no totals leak flag, (v) totals coverage >= 99% of the cohort in every held-out season.",
+    "scale_family_dev": "DEV_ELIGIBLE iff (i) over_logloss_delta_vs_v6 K-adjusted upper bound < 0, (ii) over_logloss_vs_ln2 K-adjusted upper bound < 0 (a candidate must beat a coin, not only the overdispersed served v6), (iii) the 2025+2026 folds' over log loss delta point < 0, (iv) over Brier delta point <= 0, (v) no totals leak flag, (vi) coverage met.",
+    "edge_eligible": "reported, never gating here: rule-1 total slope AND MSE-delta K-adjusted lower bounds > 0",
+    "confirmation_pass": "mean family: total_corr_delta_vs_v6 plain one-sided 95% lower bound (5th percentile of the day-cluster bootstrap) > 0; scale family: over_logloss_delta_vs_v6 AND over_logloss_vs_ln2 plain one-sided 95% upper bounds (95th percentiles) < 0. Coverage >= 99% in every confirmation season. One read; no subset chosen after the read.",
+    "beats_served_v6_total": "only a DEV_ELIGIBLE candidate that then passes its confirmation read. Promotion is a separate operator decision under a new model id via model_promotion; this addendum authorises none."
+  },
+  "leak_flags_totals": {
+    "rmse_below_line": "candidate total RMSE on a held-out season below the closing total's RMSE on the same games",
+    "market_corr": "|corr(actual total - T, cand - T)| > 0.15 on any held-out season",
+    "fit_includes_predicted": "the sidecar lists a predicted season among its fit seasons (hard refusal)",
+    "action": "verdict LEAK_SUSPECT, no eligibility until the producing code is reviewed"
+  },
+  "reproduction_gate": "Before any v3 candidate is scored, grader_v3 must reproduce the baseline scorecard's served-v6 totals block from outputs/ncaab/research_261120/baseline_scorecard.json with the v1 K (20): n, RMSE, bias, slope and CI, corr, rule-1 MSE delta and K-adjusted CI, over Brier and log loss, and the closing total's RMSE and bias, all to the scorecard's printed precision. A miss aborts. The gate is logged in read_log.jsonl (grid_name BASELINE_TOTALS_REPRO_V3) and adds no K (identical baseline predictions already read).",
+  "submission": {
+    "schema": "grader.py submission schema (event_id, season, game_date, home_team, away_team, neutral, mu_margin, scale_margin, dist, games_played_min, mu_total, scale_total, dist_total). Totals candidates carry served v7 in the margin fields.",
+    "sidecar": "candidate, grid_name (one of T1_tempo_eff_total, T2_total_combiner, T3_total_scale), protocol_sha256 (v1), addendum_v3_sha256, code_sha256, fit_seasons_by_predicted_season (the predicted season may never appear), history_cutoff 'strictly before Eastern midnight of the game day', data_sources with sha256"
+  },
+  "unchanged": "protocol v1 and addendum v2 (grids, K, verdicts, confirmation reads already done), the lock, the line rule, the bootstrap constants, the rule-1 machinery, no shrink-toward-the-market candidate (the market line never enters a candidate's inputs or targets)"
+}
