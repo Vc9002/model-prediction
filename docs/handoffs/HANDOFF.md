@@ -16,10 +16,14 @@ tasks run the working tree, so do not edit source while a daily run is in progre
 
 ## 1. NCAAB (updated 2026-11-21, quick 261120-nip)
 
-- **Next action:** read the A_ml_w0 confirmation result (agent run in progress; outputs under
-  `outputs/ncaab/research_261120/confirmation/`, read logged in `read_log.jsonl`). If it PASSES, the
-  moneyline Elo weight 0 change is a promotion decision for the operator (new id; v7 margin unchanged).
-  If it fails, record it and stop. Then commit `scripts/ncaab_research/confirmation/` and its test.
+- **Next action:** operator decision on A_ml_w0 (moneyline at Elo weight 0, v7 margin unchanged). The
+  confirmation read PASSED (`2e8b2bca`): 2015-2020 + 2022, 38,471 games, log-loss delta -0.004627,
+  one-sided 95% upper -0.003872, every season negative. If approved: new id, code-backed, promoted for
+  the NCAAB moneyline only via `model_promotion` (spread stays `ncaab-spread-v7`); the
+  `_ncaab_spread_champion_id` check that ML and spread champions match must be relaxed first.
+- **06:00 Daily 2026-11-21 verified:** 69/69 NCAAB v7 rows and 16/16 total rows carry
+  `model_artifact_hash`; all NCAAB calibrators served identity; trial evaluated v7 (8 candidates, 0
+  orders); pre-tip capture idle before tips (87 open rows, none in window).
 - **Done 2026-11-21:** `ncaab-spread-v7` promoted for moneyline + spread (`c3f97a4a`; rollback
   `ncaab-spread-v6` via `model_promotion rollback`, both markets). The `models.NCAAB.margin_engine` yaml
   key is retired and fails the slate closed. Slate replay: v7 id served probabilities identical to the
