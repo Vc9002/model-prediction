@@ -1,0 +1,134 @@
+{
+  "anchor": {
+    "fields": {
+      "margin": "-home_spread_current",
+      "total": "total_current"
+    },
+    "point_in_time": "core_odds.observed_at_utc <= decision time and < event start; latest wins",
+    "provider_id": "100",
+    "provider_name": "DraftKings",
+    "source": "espn_cfb_pregame_capture"
+  },
+  "artifact_hash": "70297de3344a17a956596ba4b11803d390d5a058a7ad8a01d8bf4d160f00661c",
+  "base_artifact_hash": "db869a4d96642983697571a828301585cc08a834f4d28b738622a7f57b38e5d2",
+  "base_model_version": "cfb-structural-v6",
+  "blend": {
+    "w_margin": 1.0,
+    "w_margin_raw": 1.0334792807219708,
+    "w_total": 1.0,
+    "w_total_raw": 1.0126588880071232
+  },
+  "frozen_at_utc": "2026-11-21T05:00:26+00:00",
+  "league": "NCAAF",
+  "margin_distribution": {
+    "key_log_multipliers": [
+      0.0008618145386949187,
+      -0.2795054391887494,
+      1.0424842773244254,
+      0.032503495804643234,
+      -0.2878588894989586,
+      -0.002439766397561941,
+      0.909659777742459,
+      -0.19538285667080943,
+      -0.9327220834914689,
+      0.3415044579074215,
+      -0.20693231971765674,
+      -0.8449843185091399,
+      -0.612846300989767,
+      0.3983213767126962,
+      -0.6364200809583942,
+      -0.5529867533893661,
+      0.26649645857455245,
+      0.01847232563445967,
+      -0.5205405415022767,
+      -0.44392666703495604,
+      0.5304325878315347,
+      -0.4752633903229726,
+      -0.26416998420930843,
+      0.2788809424219557,
+      -0.1675047859844198,
+      -0.7072495742185788,
+      -0.07661053239546282,
+      0.577748894362497
+    ],
+    "key_max": 28,
+    "recentre_iterations": 4,
+    "sd_params": [
+      2.7967671129304073,
+      -0.03583093310020342,
+      0.02634818905278858
+    ],
+    "sd_scale": 10.0,
+    "sd_total_centre": 55.0,
+    "support": 130,
+    "tie_rule": "g(0)=0; the regulation-tie mass is renormalised over non-zero margins, symmetric at pick'em (no home bias)"
+  },
+  "method": "cfb_structural_v6_ratings_anchor_blend_discrete_key_number_pmf",
+  "model_version": "cfb-structural-v6.2",
+  "note": "CHALLENGER (quick-261121-v62), never a champion: priced alongside v5, Flat/research tiers only. Frozen v6 ratings + walk-forward blend with a timestamped DraftKings anchor + a discrete margin pmf with fitted key-number mass + max-edge side selection. With w near 1 it is effectively 'anchor vs Polymarket ask'. Fit on train only; every market-relative number is design-informed.",
+  "promotion_protocol_hash": "08aa947170c1a0273b77e1bb246d4980201b9d66236afbb736255e60082ae368",
+  "qualification": {
+    "note": "Flat/research shakedown only; promotion only via model_promotion promote.",
+    "qualified": false,
+    "status": "challenger"
+  },
+  "schema_version": "1",
+  "side_selection": "max_edge",
+  "sport": "ncaaf",
+  "total_distribution": {
+    "bucket_sds": [
+      14.890175806505054,
+      15.543953808595933,
+      16.05683190654119,
+      17.787658957760158
+    ],
+    "buckets": [
+      [
+        0.0,
+        45.0
+      ],
+      [
+        45.0,
+        52.0
+      ],
+      [
+        52.0,
+        60.0
+      ],
+      [
+        60.0,
+        999.0
+      ]
+    ],
+    "support": 180
+  },
+  "training": {
+    "inputs": {
+      "base_rows": {
+        "path": "E:\\MP\\outputs\\ncaaf\\cfb_v6_base_rows.jsonl",
+        "sha256": "30c3383c4de3824e5a3ee7cb76053facd18b0fe105097fec066bb9fc2980f4be"
+      },
+      "espn_lines": {
+        "path": "E:\\MP\\data\\research\\ncaaf_v6\\espn_lines.jsonl",
+        "sha256": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54"
+      },
+      "frozen_v6_fit": {
+        "path": "outputs/ncaaf/cfb_v6_frozen_fit.json",
+        "sha256": "2df0e1f7ca99cc0a952098319b078c475add2e05f2036f3568143ba46c7db28d"
+      },
+      "v6_artifact": {
+        "artifact_hash": "db869a4d96642983697571a828301585cc08a834f4d28b738622a7f57b38e5d2",
+        "path": "config/models/cfb-structural-v6.json"
+      }
+    },
+    "ridge_lambda": 1.0,
+    "rule_sha256": "08aa947170c1a0273b77e1bb246d4980201b9d66236afbb736255e60082ae368",
+    "spec_path": "outputs/ncaaf/cfb_v62_spec.json",
+    "spec_sha256": "cf74057820d71ac0865f828f37f7ccda2321f3bc68d11bd4a92f2108754c99a0",
+    "train_end": "2022-11-11",
+    "train_n": 4590,
+    "validation_end": "2024-11-14",
+    "validation_n": 1789
+  },
+  "v6_frozen_params_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70"
+}
