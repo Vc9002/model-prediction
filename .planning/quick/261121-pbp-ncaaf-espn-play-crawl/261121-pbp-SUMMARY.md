@@ -39,3 +39,9 @@ status: crawl running (resumable); scripts, tests and coverage report committed
   608 games. Filter on it for rating fits.
 - Tests: `tests/research/test_cfb_pbp_features.py` (29 pass).
 - Rerun `python scripts/cfb_pbp_features.py` after the crawl finishes to cover all games.
+
+## Crawl complete (2026-11-21 04:04 ET)
+- 16,404 games: 15,535 ok, 869 no plays (exited cleanly, no 403/429 after the UA fix).
+- Full features: 31,066 team-game rows; final-score match 95.6%. Success rate 0.414 (FBS-FBS 0.420,
+  FCS-FCS 0.406), yards/play 5.74, explosive 6.8%, 2.05 pts/drive; box turnover match 76%, |yards diff| median 8.
+- Unknown types excluded: "fumble" (344 rows) and empty type (323 rows).
