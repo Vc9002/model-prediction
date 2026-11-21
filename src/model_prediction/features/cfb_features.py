@@ -627,12 +627,11 @@ class CFBFeatureExtractor:
             altitude_penalty = min(1.5, 0.35 * ((stadium_elev - 3500.0) / 1000.0))
 
         # Rest & Bye-Week Modeling
-        past_away_games = [g for g, h_key, a_key in keyed_rows if away_key in (h_key, a_key)]
-        past_home_games = [g for g, h_key, a_key in keyed_rows if home_key in (h_key, a_key)]
-        _get_dt = row_start
-
-        away_last_dt = max([_get_dt(g) for g in past_away_games]) if past_away_games else None
-        home_last_dt = max([_get_dt(g) for g in past_home_games]) if past_home_games else None
+        # keyed_rows holds only rows with a start before kickoff, so every row_start here is a datetime.
+        away_dts = [d for g, h, a in keyed_rows if away_key in (h, a) and (d := row_start(g)) is not None]
+        home_dts = [d for g, h, a in keyed_rows if home_key in (h, a) and (d := row_start(g)) is not None]
+        away_last_dt = max(away_dts) if away_dts else None
+        home_last_dt = max(home_dts) if home_dts else None
 
         away_rest = (
             (start_dt - away_last_dt).total_seconds() / 86400.0

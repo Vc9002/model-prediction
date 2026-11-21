@@ -201,3 +201,28 @@ def test_fcs_opponent_missing_from_team_table_is_priced_like_a_listed_fcs_team()
     assert maine.elo_rating == montana.elo_rating
     assert maine.adj_offense_ppp == montana.adj_offense_ppp
     assert maine.adj_defense_ppp == montana.adj_defense_ppp
+
+
+def test_slate_espn_id_beats_a_team_table_name_with_no_history() -> None:
+    # The slate's "FIU Panthers" resolves in the static table to a key of its own; FIU's history is stored as
+    # "Florida International Panthers" (not in the table) under ESPN id 2229. The id must win.
+    rows = [
+        _game(
+            i, "Florida International Panthers", f"Opponent {i} Owls", days_before=60 - 7 * i, home_id="2229"
+        )
+        for i in range(6)
+    ]
+    rows += [
+        _game(10 + i, "Georgia Bulldogs", f"Opponent {10 + i} Owls", days_before=60 - 7 * i) for i in range(6)
+    ]
+    feat = CFBFeatureExtractor().extract_features(
+        rows,
+        away_team="FIU Panthers",
+        home_team="Georgia Bulldogs",
+        event_id="slate",
+        game_start_utc=KICKOFF.isoformat(),
+        season_year=2026,
+        week=12,
+        away_team_id="2229",
+    )
+    assert feat.sample_games == 6

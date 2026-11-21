@@ -101,19 +101,17 @@ class CFBTeamIdentity:
         return cls(resolver, id_key, norm_key)
 
     def key(self, name: str, team_id: str | None = None) -> str:
-        if team_id is None:
-            hit = self._cache.get(name)
-            if hit is not None:
-                return hit
+        # An ESPN id the history knows wins over the name: the slate says "FIU Panthers" (a team-table name, so a
+        # canonical key of its own) while FIU's history sits under "Florida International Panthers" / ID:2229.
+        if team_id is not None and team_id in self._id_key:
+            return self._id_key[team_id]
+        hit = self._cache.get(name)
+        if hit is not None:
+            return hit
         key = self._resolver.base_key(name)
         if key.startswith("NAME:"):
-            # A slate name the history never used: the event's ESPN id is the identity when the history has it.
-            if team_id is not None and team_id in self._id_key:
-                key = self._id_key[team_id]
-            else:
-                key = self._norm_key.get(_norm(name), key)
-        if team_id is None:
-            self._cache[name] = key
+            key = self._norm_key.get(_norm(name), key)
+        self._cache[name] = key
         return key
 
     def row_keys(self, row: Any) -> tuple[str, str]:
