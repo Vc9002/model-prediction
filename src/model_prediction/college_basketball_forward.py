@@ -103,7 +103,73 @@ _NCAAB_ALIASES: dict[str, str] = {
     "umass minutemen": "massachusetts minutemen",
     "rutgers": "rutgers scarlet knights",
     "liu": "long island university sharks",
+    # Polymarket abbreviations whose school+mascot lands on an old-name history record ("UCA Bears")
+    # that is not in the D1 map; current-season history and the map use the full names (2026-11-21).
+    "uca": "central arkansas bears",
+    "uncw": "unc wilmington seahawks",
+    "nau": "northern arizona lumberjacks",
 }
+
+
+def _is_line_text(text: str) -> bool:
+    return any(c in text for c in "+-0123456789")
+
+
+def _away_home_sides(market: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    sides = market.get("sides", [])
+    away = next((s for s in sides if s.get("selection") == "away"), None)
+    home = next((s for s in sides if s.get("selection") == "home"), None)
+    return away, home
+
+
+def _event_team_names(event: dict[str, Any]) -> tuple[str | None, str | None, str, str]:
+    """(away school, home school, away mascot, home mascot) from a Polymarket event.
+
+    The school comes from the first market naming both teams, as before. The mascot is searched in
+    every market for that same school: spread sides describe a line ("+15.50"), and 49 of 57 events on
+    the 2026-11-21 slate listed a spread first, so taking only the first market dropped the mascot and
+    an ambiguous school ("Cornell": Big Red vs the non-D1 Cornell (IA) Rams) fell out as non-D1.
+    """
+    away_school: str | None = None
+    home_school: str | None = None
+    from_team_fields = False
+    for market in event.get("markets", []):
+        a_side, h_side = _away_home_sides(market)
+        if not (a_side and h_side):
+            continue
+        if a_side.get("team") and h_side.get("team"):
+            away_school, home_school = str(a_side["team"]), str(h_side["team"])
+            from_team_fields = True
+            break
+        desc_a, desc_h = str(a_side.get("description") or ""), str(h_side.get("description") or "")
+        if desc_a and desc_h and not _is_line_text(desc_a) and not _is_line_text(desc_h):
+            away_school, home_school = desc_a, desc_h
+            break
+
+    away_mascot = ""
+    home_mascot = ""
+    if from_team_fields:
+        for market in event.get("markets", []):
+            a_side, h_side = _away_home_sides(market)
+            if not (a_side and h_side):
+                continue
+            desc_a, desc_h = str(a_side.get("description") or ""), str(h_side.get("description") or "")
+            if not away_mascot and a_side.get("team") == away_school and desc_a and not _is_line_text(desc_a):
+                away_mascot = desc_a
+            if not home_mascot and h_side.get("team") == home_school and desc_h and not _is_line_text(desc_h):
+                home_mascot = desc_h
+            if away_mascot and home_mascot:
+                break
+
+    if not away_school:
+        title = event.get("title", "")
+        for sep in (" vs. ", " vs ", " at ", " @ "):
+            if sep in title:
+                parts = title.split(sep)
+                if len(parts) == 2:
+                    away_school, home_school = parts[0].strip(), parts[1].strip()
+                    break
+    return away_school, home_school, away_mascot, home_mascot
 
 
 def _resolve_ncaab_team(
@@ -469,45 +535,7 @@ def forecast_ncaab_sport(
             result["skipped"].append({"event_id": identity, "reason": "missing_identity_or_event_started"})
             continue
 
-        away_school = None
-        home_school = None
-        away_mascot = ""
-        home_mascot = ""
-
-        for m in event.get("markets", []):
-            sides = m.get("sides", [])
-            a_side = next((s for s in sides if s.get("selection") == "away"), None)
-            h_side = next((s for s in sides if s.get("selection") == "home"), None)
-            if a_side and h_side:
-                if a_side.get("team") and h_side.get("team"):
-                    away_school = str(a_side["team"])
-                    home_school = str(h_side["team"])
-                    desc_a = str(a_side.get("description", ""))
-                    desc_h = str(h_side.get("description", ""))
-                    if desc_a and not any(c in desc_a for c in "+-0123456789"):
-                        away_mascot = desc_a
-                    if desc_h and not any(c in desc_h for c in "+-0123456789"):
-                        home_mascot = desc_h
-                    break
-                if a_side.get("description") and h_side.get("description"):
-                    desc_a = str(a_side["description"])
-                    desc_h = str(h_side["description"])
-                    if not any(c in desc_a for c in "+-0123456789") and not any(
-                        c in desc_h for c in "+-0123456789"
-                    ):
-                        away_school = desc_a
-                        home_school = desc_h
-                        break
-
-        if not away_school:
-            title = event.get("title", "")
-            for sep in (" vs. ", " vs ", " at ", " @ "):
-                if sep in title:
-                    parts = title.split(sep)
-                    if len(parts) == 2:
-                        away_school = parts[0].strip()
-                        home_school = parts[1].strip()
-                        break
+        away_school, home_school, away_mascot, home_mascot = _event_team_names(event)
 
         if not away_school or not home_school:
             result["skipped"].append({"event_id": identity, "reason": "team_identity_unavailable"})

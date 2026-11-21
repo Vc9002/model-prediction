@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from model_prediction.college_basketball_forward import (
+    _event_team_names,
     _main_sample_eligible,
     _normalize_name,
     _resolve_ncaab_team,
@@ -13,6 +14,74 @@ from model_prediction.main_ledgers import MultiSportPickLedger
 
 # The served v6 model defines D1 as membership in its conference map (team_priors).
 _D1_TEAMS = {name: 1500.0 for name in ("Away", "Home", "MajorAway", "MajorHome", "SmallCollege")}
+
+
+def _sides(market_type, away_team, away_desc, home_team, home_desc):
+    return {
+        "market_type": market_type,
+        "sides": [
+            {"selection": "away", "team": away_team, "description": away_desc},
+            {"selection": "home", "team": home_team, "description": home_desc},
+        ],
+    }
+
+
+def test_mascot_comes_from_moneyline_when_a_spread_market_is_listed_first():
+    # Real 2026-11-21 Polymarket shape: 49 of 57 events listed a spread before the moneyline. Spread
+    # descriptions are lines ("+15.50"), so taking the first team-bearing market dropped the mascot,
+    # "Cornell" alone matched both "Cornell Big Red" and the non-D1 "Cornell (IA) Rams", and the D1
+    # game was declined as NO_CALL_NON_D1.
+    event = {
+        "title": "Cornell vs. Morgan State",
+        "markets": [
+            _sides("spread", "Cornell", "+15.50", "Morgan State", "-15.50"),
+            {
+                "market_type": "total",
+                "sides": [
+                    {"selection": "over", "team": None, "description": "Over"},
+                    {"selection": "under", "team": None, "description": "Under"},
+                ],
+            },
+            _sides("moneyline", "Cornell", "Big Red", "Morgan State", "Bears"),
+        ],
+    }
+    assert _event_team_names(event) == ("Cornell", "Morgan State", "Big Red", "Bears")
+
+    names = {"Cornell Big Red", "Cornell (IA) Rams", "Morgan State Bears"}
+    normalized = {_normalize_name(n): n for n in names}
+    away, home, away_mascot, home_mascot = _event_team_names(event)
+    assert _resolve_ncaab_team(away, away_mascot, names, normalized) == "Cornell Big Red"
+    assert _resolve_ncaab_team(home, home_mascot, names, normalized) == "Morgan State Bears"
+
+
+def test_polymarket_abbreviations_resolve_to_the_d1_map_names():
+    # With the mascot found, "UCA"+"Bears" matched an old-name history record "UCA Bears" that is not in
+    # the D1 map, so the game was still declined as non-D1 (2026-11-21 slate).
+    names = {
+        "UCA Bears",
+        "Central Arkansas Bears",
+        "UNCW Seahawks",
+        "UNC Wilmington Seahawks",
+        "NAU Lumberjacks",
+        "Northern Arizona Lumberjacks",
+    }
+    normalized = {_normalize_name(n): n for n in names}
+    for school, mascot, expected in (
+        ("UCA", "Bears", "Central Arkansas Bears"),
+        ("UNCW", "Seahawks", "UNC Wilmington Seahawks"),
+        ("NAU", "Lumberjacks", "Northern Arizona Lumberjacks"),
+    ):
+        assert _resolve_ncaab_team(school, mascot, names, normalized) == expected
+
+
+def test_event_team_names_falls_back_without_a_moneyline():
+    spread_only = {"title": "A vs. B", "markets": [_sides("spread", "Alpha", "+3.50", "Beta", "-3.50")]}
+    assert _event_team_names(spread_only) == ("Alpha", "Beta", "", "")
+    descriptions_only = {"title": "A vs. B", "markets": [_sides("moneyline", None, "Alpha", None, "Beta")]}
+    assert _event_team_names(descriptions_only) == ("Alpha", "Beta", "", "")
+    title_only = {"title": "Alpha vs. Beta", "markets": []}
+    assert _event_team_names(title_only) == ("Alpha", "Beta", "", "")
+    assert _event_team_names({"title": "", "markets": []}) == (None, None, "", "")
 
 
 def test_uconn_never_resolves_to_central_connecticut():
