@@ -272,6 +272,24 @@ Its output feeds Phase 2 as `model`; it only influences prices through a lambda 
     the benchmark-scored picks.
   - Verdicts and confidence intervals: PENDING below 150 picks; FAIL at 150-299; KILL at 300+.
     CIs are a cluster bootstrap by game.
+- **G2 amendment (pinned 2026-11-21 ~16:00 ET, zero picks scored):** the consensus-CLV criterion is
+  circular for T-B picks, because the pick is selected on consensus minus ask. PASS now needs all
+  of the following:
+  - C1: at least 150 picks.
+  - C2a: consensus CLV of at least +1.0c with a CI excluding 0. Necessary, labelled
+    selection-correlated.
+  - C2b: Polymarket CLV net of fee: the T-10 Polymarket mid minus (ask + 0.06·p·(1-p)) is above 0
+    with a CI excluding 0.
+  - C3: paired v10 minus v9 on the C2b CLV is above 0.
+  - C4: Brier no worse than the decision-time Polymarket mid.
+  - C5: realized net-of-fee return above 0 as a point estimate. 150 picks cannot establish it, and
+    the report says so.
+
+  Diagnostics, not gating:
+  - D1, "who moved": consensus change versus Polymarket change between decision and T-10. If the
+    book moves to Polymarket, T-B is fading a stale single-book line.
+  - D2: same-line versus translated-line picks. One spread point is about 3 probability points at
+    sigma 13.
 
 ## 10. Progress (2026-11-21)
 
