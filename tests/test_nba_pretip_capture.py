@@ -188,8 +188,11 @@ def test_match_polymarket_event_by_tip_and_nicknames() -> None:
 
 
 # --------------------------------------------------------------------------- end to end
-def test_capture_writes_espn_records_and_canonical_polymarket_snapshots(tmp_path) -> None:
+def test_capture_writes_espn_records_and_canonical_polymarket_snapshots(tmp_path, monkeypatch) -> None:
     clock = _Clock(datetime(2026, 11, 22, 0, 40, tzinfo=UTC))  # 20 minutes before LAC @ DAL and MEM @ MIN
+    # The shared capture stamps quotes and decides "started" from utc_now(); pin it to the same clock,
+    # or the test silently changes meaning once real time passes the fixture's tip.
+    monkeypatch.setattr(polymarket_us, "utc_now", clock)
     calls: list[str] = []
     espn = _espn_get(_scoreboard())
     result = cap.capture_nba_pretip(
@@ -228,6 +231,8 @@ def test_capture_writes_espn_records_and_canonical_polymarket_snapshots(tmp_path
         assert snap["provider"] == "polymarket_us" and snap["league"] == "NBA"
         assert snap["event_start_utc"] == "2026-11-22T01:00:00Z" and snap["observed_at_utc"]
         assert snap["event_title"] == "LA Clippers vs. DAL Mavericks"
+        assert snap["timestamp_valid"] is True
+        assert snap["observed_at_utc"].startswith("2026-11-22T00:4")
     book_row = next(
         s
         for s in snaps
