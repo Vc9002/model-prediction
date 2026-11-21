@@ -445,8 +445,9 @@ class CFBFeatureExtractor:
                 # Ridge-regularized opponent strength adjustment:
                 # Scoring against a top defense (e.g. SEC +8.5) is scaled up;
                 # Scoring against FCS (-18.0) is shrunk down to avoid soft-schedule inflation.
-                adj_scored.append(s_pts - (opp_offset * 0.35))
-                adj_allowed.append(a_pts + (opp_offset * 0.35))
+                # The signs were inverted until 2026-11-21 (FCS opponents credited +6.3 scored per game).
+                adj_scored.append(s_pts + (opp_offset * 0.35))
+                adj_allowed.append(a_pts - (opp_offset * 0.35))
 
             raw_off_ppg = float(sum(pts_scored)) / float(n_games)
             raw_def_ppg = float(sum(pts_allowed)) / float(n_games)

@@ -226,3 +226,28 @@ def test_slate_espn_id_beats_a_team_table_name_with_no_history() -> None:
         away_team_id="2229",
     )
     assert feat.sample_games == 6
+
+
+def test_efficiency_opponent_adjustment_direction() -> None:
+    # Points scored against an FCS defence are shrunk and against an SEC defence credited up; points allowed to
+    # an FCS offence count against the defence more, to an SEC offence less.
+    def state(opponent: str, groups: tuple[int, ...]):
+        history = [
+            _game(
+                1,
+                "Georgia Bulldogs",
+                opponent,
+                days_before=14,
+                feed_groups=groups,
+                home_score=30,
+                away_score=20,
+            ),
+            _game(2, opponent, "Towson Tigers", days_before=7, feed_groups=(81,) if 81 in groups else (80,)),
+        ]
+        return CFBFeatureExtractor()._compute_team_state(history, "Georgia Bulldogs", KICKOFF, 2026, 1)
+
+    vs_fcs = state("Maine Black Bears", (80, 81))
+    vs_sec = state("Alabama Crimson Tide", (80,))
+    assert vs_fcs.raw_offense_ppg == vs_sec.raw_offense_ppg == 30.0
+    assert vs_fcs.adj_offense_ppp < vs_sec.adj_offense_ppp
+    assert vs_fcs.adj_defense_ppp > vs_sec.adj_defense_ppp
