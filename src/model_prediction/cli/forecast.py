@@ -2400,6 +2400,30 @@ def _forecast_nba_total_sport(
     )
 
 
+def _snapshot_season_games_min(snapshot: Any, default: int = 15) -> int:
+    """Smaller team's current-season games, read from the stored model input snapshot.
+
+    build_snapshot stores the engine inputs under ``features``; the Over floor used to read
+    a ``feature_basis`` key that never exists, so it always saw the default and never fired
+    (NBA review 2026-11-20, B2). The true current-season count is preferred over the v9
+    engine's ``current_season_games_min``, which counts lifetime rows (B1). This runs above
+    the Flat append inside a try that only catches ValueError, so it must never raise:
+    unreadable values fall through to the default.
+    """
+    features = snapshot.get("features") if isinstance(snapshot, dict) else None
+    if not isinstance(features, dict):
+        return default
+    for key in ("current_season_games_played_min", "current_season_games_min"):
+        value = features.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            return int(value)
+        except (OverflowError, TypeError, ValueError):
+            continue
+    return default
+
+
 def _log_basketball_total_picks(
     *,
     league: League,
@@ -2500,13 +2524,11 @@ def _log_basketball_total_picks(
                     eligibility = _downgrade_unserved(eligibility)
                 edge = float(contract["model_probability"]) - float(ask)
                 effective_min_total_edge = min_edge
-                if contract.get("selection") == "over":
-                    min_games = 15
-                    if contract.get("model_input_snapshot"):
-                        fb = contract["model_input_snapshot"].get("feature_basis", {})
-                        min_games = fb.get("current_season_games_min", 15)
-                    if min_games < 15:
-                        effective_min_total_edge = max(effective_min_total_edge, 0.09)
+                if (
+                    contract.get("selection") == "over"
+                    and _snapshot_season_games_min(contract.get("model_input_snapshot")) < 15
+                ):
+                    effective_min_total_edge = max(effective_min_total_edge, 0.09)
 
                 main_eligible = eligibility.decision == "CALL" and (
                     not nba_rules
