@@ -722,8 +722,7 @@ def test_ncaab_v7_champion_serves_the_v7_factory(tmp_path, monkeypatch):
     monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_v7_model", factory)
     monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_model", _unexpected_factory)
     flat = MultiSportPickLedger(tmp_path, flat=True)
-    # The yaml key stays until the orchestrator retires it; under v7 it must not reset the engine to v6.
-    config = {"models": {"NCAAB": {"decline_non_d1": False, "margin_engine": "v6"}}}
+    config = {"models": {"NCAAB": {"decline_non_d1": False}}}
     report = forecast_ncaab_sport(data_root=tmp_path, args_date=day, config=config, flat_ledger=flat)
     assert not report["errors"]
     assert report["flat_logged"] == 1
@@ -734,8 +733,8 @@ def test_ncaab_v7_champion_serves_the_v7_factory(tmp_path, monkeypatch):
     assert json.loads(rows[0]["model_input_snapshot_json"])["artifact_hash"] == "h7"
 
 
-def test_ncaab_v6_champion_still_honours_the_yaml_margin_engine(tmp_path, monkeypatch):
-    """Today's serving, unchanged until promotion: champion ncaab-spread-v6 with margin_engine v7 in yaml."""
+def test_ncaab_v6_rollback_serves_the_v6_engine(tmp_path, monkeypatch):
+    """Rollback to ncaab-spread-v6 serves the v6 factory as built (engine v6); nothing resets it."""
     day = _routing_fixture(tmp_path, monkeypatch)
     factory, built = _fake_spread_model("ncaab-spread-v6", "h6", "v6")
     monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_model", factory)
@@ -743,13 +742,26 @@ def test_ncaab_v6_champion_still_honours_the_yaml_margin_engine(tmp_path, monkey
         "model_prediction.college_basketball_forward.ncaab_spread_v7_model", _unexpected_factory
     )
     flat = MultiSportPickLedger(tmp_path, flat=True)
-    config = {"models": {"NCAAB": {"decline_non_d1": False, "margin_engine": "v7"}}}
+    config = {"models": {"NCAAB": {"decline_non_d1": False}}}
     report = forecast_ncaab_sport(data_root=tmp_path, args_date=day, config=config, flat_ledger=flat)
     assert report["flat_logged"] == 1
-    assert len(built) == 1 and built[0].margin_engine == "v7"
+    assert len(built) == 1 and built[0].margin_engine == "v6"
     rows = flat.rows()
     assert [r["model_version"] for r in rows] == ["ncaab-spread-v6"]
     assert rows[0]["model_artifact_hash"] == "h6"
+
+
+def test_ncaab_retired_margin_engine_key_fails_closed(tmp_path, monkeypatch):
+    day = _routing_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ProductionModelRegistry.load",
+        _registry("ncaab-spread-v7"),
+    )
+    factory, _ = _fake_spread_model("ncaab-spread-v7", "h7", "v7")
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_v7_model", factory)
+    config = {"models": {"NCAAB": {"decline_non_d1": False, "margin_engine": "v6"}}}
+    with pytest.raises(ValueError, match="retired"):
+        forecast_ncaab_sport(data_root=tmp_path, args_date=day, config=config)
 
 
 def test_ncaab_split_spread_champions_fail_closed(tmp_path, monkeypatch):

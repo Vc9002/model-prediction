@@ -760,7 +760,7 @@ prediction_service:
     implementation: code_backed_model
     entry: model_prediction.models.ncaab_spread_v6:ncaab_spread_v6_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: ncaab-spread-v5
@@ -956,8 +956,8 @@ prediction_service:
     rollback_model: null
   champions:
     NCAAB:
-      moneyline: ncaab-spread-v6
-      spread: ncaab-spread-v6
+      moneyline: ncaab-spread-v7
+      spread: ncaab-spread-v7
       total: ncaab-total-v6
     WNBA:
       moneyline: wnba-elo-trend-lr-v4

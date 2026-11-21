@@ -514,13 +514,14 @@ def forecast_ncaab_sport(
                 f"NCAAB {market} champion {champion.model_id if champion else None} does not match executable model {expected_model.version}"
             )
     policy = config.get("models", {}).get("NCAAB", {})
-    # TODO(orchestrator, at promotion): models.NCAAB.margin_engine is retired once ncaab-spread-v7 is the
-    # champion; raise ValueError here when the key is present, so nobody believes `margin_engine: v6`
-    # reverts anything (rollback is model_promotion rollback to ncaab-spread-v6).
-    # Until then, under the ncaab-spread-v6 champion the yaml key still selects the engine exactly as
-    # before. Never under v7: the v7 factory sets the engine, and the key must not reset it to v6.
-    if spread_champion_id != NCAAB_SPREAD_V7_VERSION and hasattr(spread_model, "margin_engine"):
-        spread_model.margin_engine = str(policy.get("margin_engine", "v6"))
+    # The champion id selects the margin engine (ncaab-spread-v7 = v7, ncaab-spread-v6 = v6) since the
+    # 2026-11-21 promotion; the old yaml switch would let someone believe `margin_engine: v6` reverts
+    # anything, so its presence fails the slate closed. Rollback is `model_promotion rollback`.
+    if "margin_engine" in policy:
+        raise ValueError(
+            "models.NCAAB.margin_engine is retired: the NCAAB spread champion in config/production.yaml "
+            "selects the engine (ncaab-spread-v7 = v7, ncaab-spread-v6 = v6)"
+        )
     min_edge = float(policy.get("min_edge", 0.035))
     min_team_games = int(policy.get("min_team_games", 0))
     min_moneyline_ask = float(policy.get("min_moneyline_ask", 0.20))

@@ -212,10 +212,9 @@ def test_real_production_yaml_resolves_every_model() -> None:
     ncaab = registry.entries["ncaab-tempo-v1"]
     assert ncaab.implementation == IMPLEMENTATION_CODE_BACKED
     assert ncaab.entry == "model_prediction.models.basketball_leagues:ncaab_model"
-    # TODO(orchestrator, at promotion): these two become ncaab-spread-v7; see
-    # test_ncaab_v7_is_the_spread_champion_after_promotion below.
-    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-spread-v6"
-    assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v6"
+    # Promoted 2026-11-21 (quick 261120-nip); ncaab-spread-v6 is the rollback.
+    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-spread-v7"
+    assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v7"
     assert registry.champion("NCAAB", "total").model_id == "ncaab-total-v6"
 
     config = yaml.safe_load((REPO / "config/production.yaml").read_text(encoding="utf-8"))
