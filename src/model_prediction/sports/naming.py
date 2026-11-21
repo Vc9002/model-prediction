@@ -165,7 +165,15 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         market="spread",
         standard_name="ncaab-spread-spread-v6",
         display_name="NCAAB Spread (Spread v6)",
-        description="NCAAB moneyline+spread champion (Elo + tiered trend priors).",
+        description="NCAAB moneyline+spread, v6 margin engine (Elo + tiered trend priors); rollback for v7.",
+    ),
+    "ncaab-spread-v7": ModelDescriptor(
+        model_id="ncaab-spread-v7",
+        sport="NCAAB",
+        market="spread",
+        standard_name="ncaab-spread-spread-v7",
+        display_name="NCAAB Spread (Spread v7)",
+        description="NCAAB moneyline+spread: v6 artifact with the frozen v7 multi-season margin engine.",
     ),
     "ncaab-total-v6": ModelDescriptor(
         model_id="ncaab-total-v6",

@@ -350,6 +350,14 @@ def _settle_all_unsettled(
             slug = _extract_market_slug(str(row.get("rationale", "")), row)
             if slug is not None and data_root is not None:
                 sport_dir = str(row.get("league", "")).lower()
+                # NCAAB only for now: its decision quote is the last pre-tip snapshot unless
+                # the buyer's pre-tip capture wrote a later one, so without the bound every
+                # NCAAB close was the row's own price. Other sports keep their call unchanged.
+                closing_kwargs: dict[str, Any] = {}
+                if sport_dir == "ncaab":
+                    decision_quote_at = row.get("market_quote_observed_at_utc") or row.get("observed_at_utc")
+                    if decision_quote_at:
+                        closing_kwargs["not_before_utc"] = str(decision_quote_at)
                 try:
                     closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
                         data_root,
@@ -360,6 +368,7 @@ def _settle_all_unsettled(
                         row.get("away_team", ""),
                         row.get("selection", ""),
                         line=row.get("line"),
+                        **closing_kwargs,
                     )
                 except (OSError, ValueError):
                     logger.warning(
@@ -607,6 +616,7 @@ def _closing_probability_for_moneyline_pick(
     selection: str,
     *,
     line: Any = None,
+    not_before_utc: str | None = None,
 ) -> tuple[float | None, int | None]:
     """Best-effort closing (last pregame) probability for a pick, read from
     the same per-sport-date Polymarket snapshot history the forecast pipeline
@@ -619,7 +629,9 @@ def _closing_probability_for_moneyline_pick(
     and the reason is logged. A close is the latest quote of the row's own
     contract observed before kickoff with an open book
     (``PolymarketSnapshotStore.closing_snapshot``); when the caller passes the
-    row's ``line``, a spread/total close must also be quoted at that line.
+    row's ``line``, a spread/total close must also be quoted at that line. With
+    ``not_before_utc`` (the decision's quote time) the close must be observed strictly
+    after it, so a row's own decision quote is never recorded as its close.
     """
     from datetime import timedelta
 
@@ -644,7 +656,10 @@ def _closing_probability_for_moneyline_pick(
             continue
         seen_dates.add(d)
         store = PolymarketSnapshotStore.for_sport_date(data_root, sport_dir, d)
-        snapshot = store.closing_snapshot(slug, event_start_utc)
+        if not_before_utc:
+            snapshot = store.closing_snapshot(slug, event_start_utc, after_utc=parse_utc(not_before_utc))
+        else:
+            snapshot = store.closing_snapshot(slug, event_start_utc)
         if snapshot is not None:
             break
 

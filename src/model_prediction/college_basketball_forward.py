@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import unicodedata
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .calibration import IdentityCalibrator, load_calibrator_artifact
+from .calibration import IdentityCalibrator
 from .college_contract_evidence import build_candidate_evidence, save_candidate_evidence
 from .config import PROJECT_ROOT
 from .data_sources.espn import ESPNClient
@@ -23,7 +24,7 @@ from .features.base import FeatureStore
 from .ledger import DuplicatePickError, defer_sqlite_xlsx_exports
 from .models.basketball import UpcomingGame
 from .models.ncaab_spread_v5 import ncaab_spread_v5_model
-from .models.ncaab_spread_v6 import ncaab_spread_v6_model
+from .models.ncaab_spread_v6 import NCAAB_SPREAD_V7_VERSION, ncaab_spread_v6_model, ncaab_spread_v7_model
 from .models.ncaab_total_v6 import ncaab_total_v6_model
 from .production_registry import ProductionModelRegistry
 
@@ -41,6 +42,55 @@ def _main_sample_eligible(current_season_sample: object, required_games: int) ->
         and not isinstance(current_season_sample, bool)
         and current_season_sample >= required_games
     )
+
+
+def _ncaab_spread_champion_id(registry: ProductionModelRegistry) -> str | None:
+    """The one spread-model id serving NCAAB moneyline AND spread (both price off one instance).
+
+    Serving follows the champion map, so model_promotion promote/rollback alone switches the margin
+    engine (ncaab-spread-v7 = v7 factory); see cfb_model() for the NCAAF precedent.
+    """
+    ids = {m: getattr(registry.champion("NCAAB", m), "model_id", None) for m in ("moneyline", "spread")}
+    if ids["moneyline"] != ids["spread"]:
+        raise ValueError(f"NCAAB moneyline and spread champions must name one spread model, got {ids}")
+    return ids["spread"]
+
+
+def _load_ncaab_calibrators(
+    data_root: Path | str, versions: dict[str, str]
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    """Guarded serving calibrators per market kind, plus the per-kind guard decision.
+
+    Goes through calibration_pipeline.load_serving_calibrator, the guard every other serving path
+    uses (own-model fit provenance, MIN_SERVING_SAMPLE, out-of-fold Brier gain). The NCAAB forward
+    used the bare loader until 2026-11-21, so the served transform flipped between beta, temperature,
+    platt and identity from one Daily refit to the next. A refused or unreadable calibrator serves
+    identity (the raw probability); nothing here may kill the slate.
+    """
+    from .calibration_pipeline import load_serving_calibrator
+
+    calibrators: dict[str, Any] = {}
+    decisions: dict[str, dict[str, Any]] = {}
+    for kind_key, mv in versions.items():
+        try:
+            calibrator, decision = load_serving_calibrator(
+                mv, kind_key, roots=(Path(data_root) / "calibration",)
+            )
+        except Exception as exc:  # noqa: BLE001 - a calibrator problem must degrade to raw, never raise
+            calibrator, decision = None, {"model_version": mv, "market": kind_key, "applied": False}
+            decision["reason"] = f"guard_error:{type(exc).__name__}"
+        calibrators[kind_key] = calibrator if calibrator is not None else IdentityCalibrator(mv)
+        decisions[kind_key] = decision
+    return calibrators, decisions
+
+
+def _served_probability(calibrator: Any, raw_probability: float) -> float:
+    """The calibrated probability, or the raw one when the transform fails or leaves (0, 1)."""
+    try:
+        mapped = float(calibrator.transform(raw_probability))
+    except (ArithmeticError, TypeError, ValueError):
+        return raw_probability
+    return mapped if math.isfinite(mapped) and 0.0 < mapped < 1.0 else raw_probability
 
 
 def _normalize_name(s: str) -> str:
@@ -412,11 +462,16 @@ def forecast_ncaab_sport(
     main_ledger=None,
 ):
     board = ESPNClient().scoreboard("NCAAB", args_date)
-    spread_model = (
-        ncaab_spread_model()
-        if ncaab_model in (ncaab_spread_v5_model, ncaab_spread_v6_model)
-        else ncaab_model()
-    )
+    registry = ProductionModelRegistry.load(PROJECT_ROOT)
+    spread_champion_id = _ncaab_spread_champion_id(registry)
+    if spread_champion_id == NCAAB_SPREAD_V7_VERSION:
+        spread_model = ncaab_spread_v7_model()
+    else:
+        spread_model = (
+            ncaab_spread_model()
+            if ncaab_model in (ncaab_spread_v5_model, ncaab_spread_v6_model)
+            else ncaab_model()
+        )
     total_model = ncaab_total_model()
     result: dict[str, Any] = {
         "sport": "ncaab",
@@ -448,7 +503,6 @@ def forecast_ncaab_sport(
     ).hexdigest()
     events = PolymarketUSClient().slate("NCAAB", date.fromisoformat(args_date))
     observed = utc_now()
-    registry = ProductionModelRegistry.load(PROJECT_ROOT)
     for market, expected_model in (
         ("moneyline", spread_model),
         ("spread", spread_model),
@@ -460,9 +514,12 @@ def forecast_ncaab_sport(
                 f"NCAAB {market} champion {champion.model_id if champion else None} does not match executable model {expected_model.version}"
             )
     policy = config.get("models", {}).get("NCAAB", {})
-    # Off unless the operator sets models.NCAAB.margin_engine: v7 (multi-season margin engine); only the
-    # v6 spread model carries the switch, any other executable model ignores it.
-    if hasattr(spread_model, "margin_engine"):
+    # TODO(orchestrator, at promotion): models.NCAAB.margin_engine is retired once ncaab-spread-v7 is the
+    # champion; raise ValueError here when the key is present, so nobody believes `margin_engine: v6`
+    # reverts anything (rollback is model_promotion rollback to ncaab-spread-v6).
+    # Until then, under the ncaab-spread-v6 champion the yaml key still selects the engine exactly as
+    # before. Never under v7: the v7 factory sets the engine, and the key must not reset it to v6.
+    if spread_champion_id != NCAAB_SPREAD_V7_VERSION and hasattr(spread_model, "margin_engine"):
         spread_model.margin_engine = str(policy.get("margin_engine", "v6"))
     min_edge = float(policy.get("min_edge", 0.035))
     min_team_games = int(policy.get("min_team_games", 0))
@@ -658,17 +715,14 @@ def forecast_ncaab_sport(
             },
         }
     archive_root = Path(data_root)
-    calibrators: dict[str, Any] = {}
-    for kind_key in ("moneyline", "spread", "total"):
-        mv = total_model.version if kind_key == "total" else spread_model.version
-        cal_path = archive_root / "calibration" / "models" / f"{mv}.{kind_key}_calibrator.json"
-        if cal_path.exists():
-            try:
-                calibrators[kind_key] = load_calibrator_artifact(cal_path)
-            except (OSError, json.JSONDecodeError, ValueError):
-                calibrators[kind_key] = IdentityCalibrator(mv)
-        else:
-            calibrators[kind_key] = IdentityCalibrator(mv)
+    calibrators, calibration_decisions = _load_ncaab_calibrators(
+        archive_root,
+        {
+            kind_key: total_model.version if kind_key == "total" else spread_model.version
+            for kind_key in ("moneyline", "spread", "total")
+        },
+    )
+    result["calibration"] = calibration_decisions
 
     candidate_rows, candidate_summary = build_candidate_evidence(
         sport="ncaab",
@@ -770,7 +824,7 @@ def forecast_ncaab_sport(
         )
         indicative_ask = best_side.get("price_probability")
         raw_probability = prediction.probabilities[selection]
-        probability = calibrator.transform(raw_probability)
+        probability = _served_probability(calibrator, raw_probability)
         edge = probability - float(ask)
         candidate_summary["serving_decision_joins"].append(
             {
@@ -917,6 +971,7 @@ def forecast_ncaab_sport(
                 line=decision_line,
                 probability=float(probability),
                 observed_at_utc=observed.isoformat(),
+                artifact_hash=str(getattr(model_inst, "model_artifact_hash", "") or ""),
             )
             cal_meta = getattr(calibrator, "metadata", None)
             cal_method = cal_meta.calibration_method if cal_meta else "identity"
@@ -945,6 +1000,7 @@ def forecast_ncaab_sport(
                 model_probability=probability,
                 model_uncertainty=prediction.uncertainty,
                 model_version=model_version,
+                model_artifact_hash=str(getattr(model_inst, "model_artifact_hash", "") or ""),
                 rationale=rationale,
                 risks=(
                     "Paper model; executable quote is a predecision snapshot, not a guaranteed fill."

@@ -28,7 +28,7 @@ CLOSING_FIELDS = (
 )
 
 
-def _settle_fixture(tmp_path, monkeypatch, *, archive: bool):
+def _settle_fixture(tmp_path, monkeypatch, *, archive: bool, at_decision: str | None = None):
     runtime = tmp_path / "runtime"
     runtime.mkdir()
     monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(runtime))
@@ -43,6 +43,12 @@ def _settle_fixture(tmp_path, monkeypatch, *, archive: bool):
             (start - timedelta(minutes=2), 0.52, 0.50),
             (start + timedelta(minutes=30), 0.99, 0.02),
         ]
+        # The row's own decision quote, observed exactly at decision time (start-5h): never a
+        # close. "only" leaves it as the sole quote; "extra" adds it to the others.
+        if at_decision == "only":
+            snapshots = [(start - timedelta(hours=5), 0.47, 0.55)]
+        elif at_decision == "extra":
+            snapshots.append((start - timedelta(hours=5), 0.47, 0.55))
         folder.joinpath("polymarket_snapshots.jsonl").write_text(
             "".join(
                 json.dumps(
@@ -135,6 +141,24 @@ def test_settlement_captures_the_last_pre_tip_quote_as_the_close(tmp_path, monke
 
 def test_settlement_without_an_archived_quote_leaves_empty_strings_not_none(tmp_path, monkeypatch):
     ledger, pick_id, _ = _settle_fixture(tmp_path, monkeypatch, archive=False)
+    row = _row(ledger, pick_id)
+    assert row["status"] == "settled"
+    for field in CLOSING_FIELDS:
+        assert row[field] == "", field
+
+
+def test_snapshot_at_decision_time_is_never_the_close(tmp_path, monkeypatch):
+    ledger, pick_id, _ = _settle_fixture(tmp_path, monkeypatch, archive=True, at_decision="extra")
+    row = _row(ledger, pick_id)
+    assert row["status"] == "settled"
+    # The start-2min quote still wins; the decision-time quote (0.47) is excluded.
+    assert float(row["closing_implied_probability"]) == 0.52
+
+
+def test_only_the_decision_quote_leaves_empty_strings_not_a_fake_zero_clv(tmp_path, monkeypatch):
+    # Before 261120-nip the decision's own quote was the last pre-tip snapshot and became the
+    # close, so every NCAAB row recorded a fake 0 CLV (339 of 339 settled rows, 2026-11-20).
+    ledger, pick_id, _ = _settle_fixture(tmp_path, monkeypatch, archive=True, at_decision="only")
     row = _row(ledger, pick_id)
     assert row["status"] == "settled"
     for field in CLOSING_FIELDS:

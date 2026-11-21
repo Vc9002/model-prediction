@@ -209,7 +209,12 @@ _LEDGER_COLUMNS = (
     "model_id, model_artifact_hash, feature_schema_version, "
     "model_probability, market_probability, edge, confidence, units, "
     "decision, reason_code, status, result, pnl_units, created_at_utc, "
-    "settled_at_utc"
+    "settled_at_utc, "
+    # The model_probability column is NCAAB's raw model output; the served (calibrated) value
+    # that set the row's edge lives only in the payload. json_valid guards the page: a bare
+    # json_extract raises on one malformed payload and would fail the whole ledger API.
+    "CASE WHEN json_valid(decision_payload_json) "
+    "THEN json_extract(decision_payload_json, '$.serving_probability') END AS serving_probability"
 )
 
 

@@ -929,8 +929,14 @@ class PolymarketSnapshotStore:
                     latest = item
         return latest
 
-    def closing_snapshot(self, slug: str, event_start_utc: str) -> dict[str, Any] | None:
+    def closing_snapshot(
+        self, slug: str, event_start_utc: str, *, after_utc: datetime | None = None
+    ) -> dict[str, Any] | None:
         """Latest quote of ``slug`` observed strictly before kickoff, or None.
+
+        With ``after_utc`` the quote must also be observed strictly after it (the decision
+        time): NCAAB quotes were written only by the Daily runs, so the latest pre-tip quote
+        was the row's own decision quote and every NCAAB "close" was a fake zero CLV.
 
         Kickoff is the earlier of the caller's ``event_start_utc`` and the
         contract's own stored ``event_start_utc``. Bounding only by the caller's
@@ -963,6 +969,8 @@ class PolymarketSnapshotStore:
                 except (ValueError, TypeError):
                     continue
                 if observed >= event_start:
+                    continue
+                if after_utc is not None and observed <= after_utc:
                     continue
                 state = item.get("market_state")
                 if state is not None and state != "MARKET_STATE_OPEN":

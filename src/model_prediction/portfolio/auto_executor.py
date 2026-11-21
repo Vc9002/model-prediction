@@ -149,6 +149,7 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "rainbow_six-tiered-elo-v6",  # 2W-8L (-68.1% ROI) in production ledgers
     # NCAAB decommissioned per operator directive 2026-11-09:
     "ncaab-spread-v6",
+    "ncaab-spread-v7",
     "ncaab-spread-v5",
     "ncaab-total-v6",
     "ncaab-total-v5",
@@ -419,6 +420,12 @@ def _auto_buyer_sport_market(row: dict[str, Any]) -> tuple[str, str]:
     return sport, market_type
 
 
+# Ids the isolated NCAAB spread paper trial may name. ncaab-spread-v7 (2026-11-21) is the v6 artifact
+# with the v7 margin engine; the trial's config file picks exactly one, and the buyer's whitelist
+# (set to that one id by run_ncaab_spread_paper_trial) keeps the other out.
+NCAAB_SPREAD_TRIAL_MODEL_IDS: tuple[str, ...] = ("ncaab-spread-v6", "ncaab-spread-v7")
+
+
 def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
     """Allow one quarantined model through only in the isolated paper run."""
     model_id = str(row.get("model_id") or row.get("model_version") or "")
@@ -426,7 +433,7 @@ def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionCo
         config.paper_ncaab_spread_v6_trial
         and config.mode == "paper"
         and not config.execute_live
-        and model_id == "ncaab-spread-v6"
+        and model_id in NCAAB_SPREAD_TRIAL_MODEL_IDS
         and _auto_buyer_sport_market(row) == ("ncaab", "spread")
     )
 

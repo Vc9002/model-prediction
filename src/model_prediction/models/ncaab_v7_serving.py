@@ -1,8 +1,8 @@
-"""NCAAB v7 multi-season margin engine, SERVING side (quick 261115-v7s). Off by default.
+"""NCAAB v7 multi-season margin engine, SERVING side (quick 261115-v7s).
 
 Turns the research components (``ncaab_v7_multiseason``) plus the frozen F1 combiner into a per-game margin
-mean and Student-t scale that ``NCAABSpreadModelV6`` can swap in for D1-vs-D1 games when
-``models.NCAAB.margin_engine == "v7"``. Nothing here is registered, promoted or scheduled.
+mean and Student-t scale that ``NCAABSpreadModelV6`` swaps in for D1-vs-D1 games when its margin_engine is
+"v7". Served by the ``ncaab-spread-v7`` model id (``ncaab_spread_v6.ncaab_spread_v7_model``).
 
 Why an archive: v7's gain needs three seasons of history (carryover) and per-season ESPN conference ids, but
 the live history only holds 2025-26 onward. ``data/archive/ncaab_v7_prior_seasons.jsonl.gz`` (built by
@@ -54,6 +54,29 @@ V7_COEF = (0.9592933218909206, 0.1610938843028618)  # F1: [ridge coefficient, ta
 V7_SCALES = (11.271310244143418, 10.872746171852754, 10.711292254487482, 9.967310767878121)
 BUCKET_CUTS = (1, 3, 8)  # current-season sample buckets 0 | 1-2 | 3-7 | 8+
 TAIL_KNOT = 12.0  # points of |v6 as-of margin| beyond which the tail term shrinks blowouts
+
+
+def v7_config_hash(archive_path: Path | str | None = None) -> str:
+    """Hash of everything that fixes v7's output besides the v6 artifact: the frozen combiner and the archive.
+
+    The archive's meta line carries games_sha256 and every season's conference map. A missing archive
+    hashes as "unavailable" (v7 then falls back to v6 for the slate anyway); this never raises.
+    """
+    path = ARCHIVE_PATH if archive_path is None else Path(archive_path)
+    try:
+        with gzip.open(path, "rb") as fh:
+            meta_sha = hashlib.sha256(fh.readline()).hexdigest()
+    except (OSError, EOFError):  # truncated gzip raises EOFError; must not kill the slate
+        meta_sha = "unavailable"
+    payload = {
+        "variant": V7_VARIANT,
+        "coef": list(V7_COEF),
+        "scales": list(V7_SCALES),
+        "bucket_cuts": list(BUCKET_CUTS),
+        "tail_knot": TAIL_KNOT,
+        "archive_meta_sha256": meta_sha,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 @dataclass(frozen=True)

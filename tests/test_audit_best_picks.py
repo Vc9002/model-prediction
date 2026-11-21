@@ -1106,3 +1106,41 @@ def test_model_family_negative_clv_blocks_confirmation(db):
     under = _audit(engine, sport="nba", market_type="total", selection="under", edge=0.09)
     assert under["verdict"] == "CONFIRMED_BEST"
     assert under["family_under_review"] is False
+
+
+# --- quick-261120-nip: bucket on the SERVED probability, not the raw column ---------------
+
+
+def test_ncaab_row_buckets_on_served_probability_not_raw_column(db):
+    # The column holds NCAAB's raw 0.5719 (+5.3% edge); the payload's served 0.5079 is a
+    # -1.1% edge, which is what the ledger's own edge and the buyer saw. The ledger stores
+    # serving_probability as text.
+    common = {
+        "sport": "ncaab",
+        "market_type": "spread",
+        "selection": "home",
+        "market_prob": 0.5192,
+        "edge": 0.5719 - 0.5192,
+        "payload_extra": {"serving_probability": "0.5079"},
+    }
+    _add(db, event_id="evt-served", provenance=VERIFIED, **common)
+    _add(db, event_id="evt-served-open", pick_id="open-served", open_pick=True, **common)
+    engine = abp.HistoricalAuditEngine(db)
+    assert engine.first_sight_edge("ncaab", "evt-served", "spread", "home", "m1") == pytest.approx(
+        0.5079 - 0.5192
+    )
+    assert engine.stats_by_sport_mkt_bucket[("ncaab", "spread", "< 0%")].all_rows.total_graded == 1
+    assert engine.stats_by_sport_mkt_bucket[("ncaab", "spread", "5.0% - 7.9%")].all_rows.total_graded == 0
+
+    (pick,) = abp.collect_open_pick_audits(db)
+    assert pick["model_prob"] == pytest.approx(0.5079)
+    assert pick["edge"] == pytest.approx(0.5079 - 0.5192)
+
+
+def test_empty_serving_probability_keeps_the_column_value(db):
+    # 22k of 27k payloads carry serving_probability = "" (the ledger writes "" for None); a
+    # bare COALESCE would read them as 0.0 and turn every +9% row into a -50% one.
+    _add(db, event_id="evt-empty", edge=0.09, payload_extra={"serving_probability": ""})
+    engine = abp.HistoricalAuditEngine(db)
+    assert engine.first_sight_edge("mlb", "evt-empty", "moneyline", "home", "m1") == pytest.approx(0.09)
+    assert engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")].all_rows.total_graded == 1

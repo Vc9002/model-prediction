@@ -53,6 +53,7 @@ from .base import GamePrediction, GamePredictionBase
 from .basketball import UpcomingGame
 
 NCAAB_SPREAD_V6_VERSION = "ncaab-spread-v6"
+NCAAB_SPREAD_V7_VERSION = "ncaab-spread-v7"  # the v6 artifact served with the v7 margin engine
 _logger = logging.getLogger(__name__)
 
 ARTIFACT_PATH = Path(__file__).resolve().parents[3] / "config" / "models" / "ncaab-spread-v6.json"
@@ -265,6 +266,7 @@ class NCAABSpreadModelV6:
         # multi-season v7 engine. Set by college_basketball_forward from models.NCAAB.margin_engine; it is
         # a runtime switch, not an artifact parameter, so the artifact hash and from_artifact are untouched.
         self.margin_engine = margin_engine
+        self.model_artifact_hash = ""  # set by the production factories; stamped on ledger rows
         self.v7_serving: Any = None  # injectable for tests; None builds the process-wide default lazily
         self.league = "NCAAB"
         self.sport = "ncaab"
@@ -700,4 +702,32 @@ class NCAABSpreadModelV6:
 
 def ncaab_spread_v6_model() -> NCAABSpreadModelV6:
     """Production factory: the served parameters are the hash-verified artifact's, nothing else."""
-    return NCAABSpreadModelV6.from_artifact(load_verified_artifact(ARTIFACT_PATH))
+    artifact = load_verified_artifact(ARTIFACT_PATH)
+    model = NCAABSpreadModelV6.from_artifact(artifact)
+    model.model_artifact_hash = str(artifact["artifact_hash"])
+    return model
+
+
+def ncaab_spread_v7_artifact_hash(base_artifact_hash: str) -> str:
+    """Identity of ncaab-spread-v7: the v6 artifact it reuses plus the frozen v7 engine (pin 2)."""
+    from .ncaab_v7_serving import v7_config_hash
+
+    payload = {
+        "model_id": NCAAB_SPREAD_V7_VERSION,
+        "base_artifact_hash": base_artifact_hash,
+        "v7_config_hash": v7_config_hash(),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def ncaab_spread_v7_model() -> NCAABSpreadModelV6:
+    """ncaab-spread-v7: the unchanged, hash-verified v6 artifact with the v7 margin engine on.
+
+    Same parameters as v6 by construction (nothing is re-read or re-fit); only the id, the engine
+    and the recorded model hash differ. It gives the engine that served under the v6 id since
+    2026-11-16 its own identity; rollback is ncaab-spread-v6 (engine v6).
+    """
+    artifact = load_verified_artifact(ARTIFACT_PATH)
+    model = NCAABSpreadModelV6.from_artifact(artifact, version=NCAAB_SPREAD_V7_VERSION, margin_engine="v7")
+    model.model_artifact_hash = ncaab_spread_v7_artifact_hash(str(artifact["artifact_hash"]))
+    return model

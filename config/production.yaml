@@ -764,6 +764,16 @@ prediction_service:
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: ncaab-spread-v5
+  - model_id: ncaab-spread-v7
+    sport: NCAAB
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.ncaab_spread_v6:ncaab_spread_v7_model
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: ncaab-spread-v6
   - model_id: ncaab-total-v6
     sport: NCAAB
     market: total
@@ -1179,6 +1189,7 @@ prediction_service:
   - ncaab-tempo-v2
   - ncaab-tempo-v3
   - ncaab-spread-v6
+  - ncaab-spread-v7
   - ncaab-total-v6
   - ncaab-spread-v5
   - ncaab-total-v5

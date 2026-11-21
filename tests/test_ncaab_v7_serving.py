@@ -229,3 +229,40 @@ def test_corrupt_archive_is_refused(tmp_path: Path) -> None:
         fh.write((json.dumps({"_meta": meta}) + '\n{"x":1}\n').encode())
     with pytest.raises(ValueError, match="sha256"):
         serving.load_archive(bad)
+
+
+def test_v7_id_is_the_v6_artifact_with_the_v7_engine() -> None:
+    from model_prediction.models.ncaab_spread_v6 import NCAAB_SPREAD_V7_VERSION, ncaab_spread_v7_model
+
+    v6, v7 = ncaab_spread_v6_model(), ncaab_spread_v7_model()
+    assert (v7.version, v7.margin_engine, v6.margin_engine) == (NCAAB_SPREAD_V7_VERSION, "v7", "v6")
+    skip = {"version", "margin_engine", "model_artifact_hash", "_stats", "v7_serving"}
+    assert {k: v for k, v in vars(v7).items() if k not in skip} == {
+        k: v for k, v in vars(v6).items() if k not in skip
+    }
+    v6.margin_engine = "v7"  # exactly what served under the v6 id since 2026-11-16
+    v6.v7_serving = v7.v7_serving = _FakeServing()
+    a, b = v6.predict_games(_history(), _upcoming()), v7.predict_games(_history(), _upcoming())
+    assert _summ(a) == _summ(b)  # served probabilities bit-identical
+    assert {getattr(p, "model_version", None) for p in b} == {NCAAB_SPREAD_V7_VERSION}
+
+
+def test_model_artifact_hashes() -> None:
+    from model_prediction.models.ncaab_spread_v6 import ncaab_spread_v7_artifact_hash, ncaab_spread_v7_model
+    from model_prediction.models.ncaab_total_v6 import ncaab_total_v6_model
+
+    art = json.loads((REPO / "config/models/ncaab-spread-v6.json").read_text(encoding="utf-8"))
+    tot = json.loads((REPO / "config/models/ncaab-total-v6.json").read_text(encoding="utf-8"))
+    assert ncaab_spread_v6_model().model_artifact_hash == art["artifact_hash"]
+    assert ncaab_total_v6_model().model_artifact_hash == tot["artifact_hash"]
+    h7 = ncaab_spread_v7_model().model_artifact_hash
+    assert len(h7) == 64 and h7 != art["artifact_hash"]
+    assert h7 == ncaab_spread_v7_artifact_hash(art["artifact_hash"])
+
+
+def test_v7_config_hash_tracks_the_archive(tmp_path: Path) -> None:
+    assert serving.v7_config_hash() == serving.v7_config_hash()
+    assert serving.v7_config_hash(tmp_path / "missing.gz") != serving.v7_config_hash()
+    truncated = tmp_path / "truncated.gz"
+    truncated.write_bytes(gzip.compress(b'{"meta": 1}\n')[:12])
+    assert serving.v7_config_hash(truncated) == serving.v7_config_hash(tmp_path / "missing.gz")

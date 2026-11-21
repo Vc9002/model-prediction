@@ -99,11 +99,11 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 89
+    assert len(registry.entries) == 90
     # Scope 2026-11-13: the 40 entries for switched-off sports are enabled: false and
     # therefore unavailable by decision, not by a failed contract. Every in-scope entry
     # must still resolve, so a healthy registry has zero *failed* entries.
-    assert len(registry.available_entries()) == 49
+    assert len(registry.available_entries()) == 50
     problems = registry.problem_entries()
     assert len(problems) == 40
     assert all(not e.enabled and e.load_error is None for e in problems)
@@ -212,6 +212,8 @@ def test_real_production_yaml_resolves_every_model() -> None:
     ncaab = registry.entries["ncaab-tempo-v1"]
     assert ncaab.implementation == IMPLEMENTATION_CODE_BACKED
     assert ncaab.entry == "model_prediction.models.basketball_leagues:ncaab_model"
+    # TODO(orchestrator, at promotion): these two become ncaab-spread-v7; see
+    # test_ncaab_v7_is_the_spread_champion_after_promotion below.
     assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-spread-v6"
     assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v6"
     assert registry.champion("NCAAB", "total").model_id == "ncaab-total-v6"
@@ -475,3 +477,21 @@ def test_unverified_registry_entries_never_carry_a_qualified_artifact_claim() ->
         if qualification.get("qualified") is True or qualification.get("locked_holdout") is True:
             offenders.append(entry["model_id"])
     assert offenders == []
+
+
+def test_ncaab_v7_entry_is_registered_with_v6_as_rollback() -> None:
+    registry = ProductionModelRegistry.load(REPO)
+    entry = registry.entries["ncaab-spread-v7"]
+    assert entry.implementation == IMPLEMENTATION_CODE_BACKED
+    assert entry.entry == "model_prediction.models.ncaab_spread_v6:ncaab_spread_v7_model"
+    assert entry.enabled and entry.load_error is None
+    assert entry.rollback_model == "ncaab-spread-v6"
+
+
+# FAILS UNTIL PROMOTION (2026-11-21): passes only after `model_promotion promote --new ncaab-spread-v7`
+# has run for NCAAB moneyline and spread.
+def test_ncaab_v7_is_the_spread_champion_after_promotion() -> None:
+    registry = ProductionModelRegistry.load(REPO)
+    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-spread-v7"
+    assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v7"
+    assert registry.rollback("NCAAB", "spread").model_id == "ncaab-spread-v6"

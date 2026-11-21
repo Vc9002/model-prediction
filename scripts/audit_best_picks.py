@@ -66,6 +66,17 @@ ET_TZ = zoneinfo.ZoneInfo("America/New_York")
 # any verdict evidence -- this is a literal operator rule, not a quality heuristic to widen.
 VERIFIED_QUOTE_PROVENANCE = "decision_time_executable_quote"
 
+# The ledger's model_probability column holds NCAAB's RAW model output, while the row's own
+# edge and every payload reader use the SERVED (calibrated) value in the payload; bucketing on
+# the column put NCAAB edges in the wrong bucket. NULLIF is load-bearing: the ledger writes ""
+# for None, so ~80% of payloads carry serving_probability = "" and a bare COALESCE would read
+# every non-NCAAB row as 0.0.
+_SERVED_MODEL_PROBABILITY_SQL = (
+    "COALESCE(CASE WHEN json_valid(decision_payload_json) "
+    "THEN NULLIF(json_extract(decision_payload_json, '$.serving_probability'), '') END, "
+    "model_probability) AS model_probability"
+)
+
 # MIN_GRADED now only picks the evidence basis (own model vs pooled) and detects traps; it no
 # longer confirms anything. Confirmation needs CONFIRM_MIN_GRADED below.
 MIN_GRADED = 4
@@ -428,8 +439,8 @@ class HistoricalAuditEngine:
         # Archived and removed rows are never read as evidence themselves; their KEYS are read
         # below only so the first-sight pass can exclude the whole decision.
         rows = conn.execute(
-            """
-            SELECT sport, market_type, model_probability, market_probability,
+            f"""
+            SELECT sport, market_type, {_SERVED_MODEL_PROBABILITY_SQL}, market_probability,
                    selection, line, pnl_units, result, units, event_id, model_id,
                    status, created_at_utc, event_start_utc, ledger_tier,
                    CASE WHEN json_valid(decision_payload_json)
@@ -832,9 +843,9 @@ def collect_open_pick_audits(
 
     conn = _connect_ro(db_path)
     rows = conn.execute(
-        """
+        f"""
         SELECT pick_id, sport, ledger_tier, market_type, selection, line,
-               model_probability, market_probability, units, event_start_utc, decision_payload_json,
+               {_SERVED_MODEL_PROBABILITY_SQL}, market_probability, units, event_start_utc, decision_payload_json,
                model_id, event_id
         FROM ledger_records
         WHERE status = 'open'

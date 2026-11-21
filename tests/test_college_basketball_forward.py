@@ -2,6 +2,8 @@ import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
+
 from model_prediction.college_basketball_forward import (
     _event_team_names,
     _main_sample_eligible,
@@ -14,6 +16,21 @@ from model_prediction.main_ledgers import MultiSportPickLedger
 
 # The served v6 model defines D1 as membership in its conference map (team_priors).
 _D1_TEAMS = {name: 1500.0 for name in ("Away", "Home", "MajorAway", "MajorHome", "SmallCollege")}
+
+
+def _registry(spread_id: str = "ncaab-spread-v6", moneyline_id: str | None = None):
+    ids = {"moneyline": moneyline_id or spread_id, "spread": spread_id, "total": "ncaab-total-v6"}
+    return lambda *a, **k: SimpleNamespace(
+        champion=lambda sport, market: SimpleNamespace(available=True, model_id=ids[market])
+    )
+
+
+@pytest.fixture(autouse=True)
+def _v6_spread_champion(monkeypatch):
+    """These tests pin gate behaviour, not routing; route NCAAB to v6 as test_ncaab_main_totals does."""
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ProductionModelRegistry.load", _registry()
+    )
 
 
 def _sides(market_type, away_team, away_desc, home_team, home_desc):
@@ -596,3 +613,200 @@ def test_ncaab_gates_total_divergence(tmp_path, monkeypatch):
     )
     # Divergence gates qualified calls, but Flat retains the priced prediction.
     assert report["flat_logged"] == 0  # This fixture has no archived executable quote.
+
+
+def _routing_fixture(tmp_path, monkeypatch):
+    """One moneyline game with an archived executable 56c home ask (as in the real-model test above)."""
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_AUTHORITY", "xlsx")
+    now = datetime.now(UTC)
+    start = (now + timedelta(days=1)).isoformat()
+    games = [
+        GameRecord(
+            str(i), (now - timedelta(days=i + 1)).isoformat(), "NCAAB", "Away", "Home", 65 + i % 3, 72 + i % 3
+        )
+        for i in range(20)
+    ]
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ESPNClient.scoreboard",
+        lambda *a: {"events": [{"id": "fixture"}]},
+    )
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.FeatureStore.games_before", lambda *a: games
+    )
+    event = {
+        "event_id": "fixture",
+        "event_start_utc": start,
+        "title": "Away vs. Home",
+        "markets": [
+            {
+                "market_id": "fixture-ml",
+                "market_slug": "fixture-ml",
+                "market_type": "moneyline",
+                "sides": [
+                    {"selection": "away", "description": "Away", "price_probability": 0.45, "is_long": False},
+                    {"selection": "home", "description": "Home", "price_probability": 0.55, "is_long": True},
+                ],
+            }
+        ],
+    }
+    archive = tmp_path / "odds" / "ncaab" / now.date().isoformat() / "polymarket_snapshots.jsonl"
+    archive.parent.mkdir(parents=True)
+    archive.write_text(
+        json.dumps(
+            {
+                "provider": "polymarket_us",
+                "reconstructed": False,
+                "timestamp_valid": True,
+                "market_state": "MARKET_STATE_OPEN",
+                "event_id": "fixture",
+                "event_start_utc": start,
+                "market_id": "fixture-ml",
+                "market_slug": "fixture-ml",
+                "market_type": "moneyline",
+                "line": None,
+                "observed_at_utc": (now - timedelta(minutes=1)).isoformat(),
+                "transact_time_utc": (now - timedelta(minutes=2)).isoformat(),
+                "long": {"bid": 0.54, "ask": 0.56},
+                "short": {"bid": 0.44, "ask": 0.46},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.PolymarketUSClient.slate", lambda *a: [event]
+    )
+    return now.date().isoformat()
+
+
+def _fake_spread_model(version: str, artifact_hash: str, margin_engine: str, home: float = 0.65):
+    class Model:
+        def __init__(self):
+            self.version = version
+            self.model_artifact_hash = artifact_hash
+            self.margin_engine = margin_engine
+            self.team_priors = _D1_TEAMS
+
+        def predict_games(self, history, upcoming):
+            return [
+                SimpleNamespace(
+                    market_type="moneyline",
+                    probabilities={"home": home, "away": round(1 - home, 6)},
+                    uncertainty=0.1,
+                    rationale="fixture",
+                    feature_basis={"margin_engine": self.margin_engine},
+                )
+            ]
+
+    built: list = []
+
+    def factory():
+        built.append(Model())
+        return built[-1]
+
+    return factory, built
+
+
+def _unexpected_factory():
+    raise AssertionError("the wrong NCAAB spread factory was dispatched")
+
+
+def test_ncaab_v7_champion_serves_the_v7_factory(tmp_path, monkeypatch):
+    day = _routing_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ProductionModelRegistry.load",
+        _registry("ncaab-spread-v7"),
+    )
+    factory, built = _fake_spread_model("ncaab-spread-v7", "h7", "v7")
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_v7_model", factory)
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_model", _unexpected_factory)
+    flat = MultiSportPickLedger(tmp_path, flat=True)
+    # The yaml key stays until the orchestrator retires it; under v7 it must not reset the engine to v6.
+    config = {"models": {"NCAAB": {"decline_non_d1": False, "margin_engine": "v6"}}}
+    report = forecast_ncaab_sport(data_root=tmp_path, args_date=day, config=config, flat_ledger=flat)
+    assert not report["errors"]
+    assert report["flat_logged"] == 1
+    assert len(built) == 1 and built[0].margin_engine == "v7"
+    rows = flat.rows()
+    assert [r["model_version"] for r in rows] == ["ncaab-spread-v7"]
+    assert rows[0]["model_artifact_hash"] == "h7"
+    assert json.loads(rows[0]["model_input_snapshot_json"])["artifact_hash"] == "h7"
+
+
+def test_ncaab_v6_champion_still_honours_the_yaml_margin_engine(tmp_path, monkeypatch):
+    """Today's serving, unchanged until promotion: champion ncaab-spread-v6 with margin_engine v7 in yaml."""
+    day = _routing_fixture(tmp_path, monkeypatch)
+    factory, built = _fake_spread_model("ncaab-spread-v6", "h6", "v6")
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_model", factory)
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ncaab_spread_v7_model", _unexpected_factory
+    )
+    flat = MultiSportPickLedger(tmp_path, flat=True)
+    config = {"models": {"NCAAB": {"decline_non_d1": False, "margin_engine": "v7"}}}
+    report = forecast_ncaab_sport(data_root=tmp_path, args_date=day, config=config, flat_ledger=flat)
+    assert report["flat_logged"] == 1
+    assert len(built) == 1 and built[0].margin_engine == "v7"
+    rows = flat.rows()
+    assert [r["model_version"] for r in rows] == ["ncaab-spread-v6"]
+    assert rows[0]["model_artifact_hash"] == "h6"
+
+
+def test_ncaab_split_spread_champions_fail_closed(tmp_path, monkeypatch):
+    day = _routing_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ProductionModelRegistry.load",
+        _registry("ncaab-spread-v7", moneyline_id="ncaab-spread-v6"),
+    )
+    with pytest.raises(ValueError, match="one spread model"):
+        forecast_ncaab_sport(data_root=tmp_path, args_date=day, config={"models": {"NCAAB": {}}})
+
+
+def _write_calibrator(tmp_path, *, sample_size: int, temperature: float = 2.0) -> None:
+    path = tmp_path / "calibration" / "models" / "ncaab-spread-v6.moneyline_calibrator.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "sport": "ncaab",
+                "market": "moneyline",
+                "model_version": "ncaab-spread-v6",
+                "champion_method": "temperature",
+                "parameters": {"temperature": temperature},
+                "sample_size": sample_size,
+                "baseline_brier": 0.25,
+                "calibrated_oof_brier": 0.24,
+                "fit_model_versions": ["ncaab-spread-v6"],
+                "fit_source": "settled_live_rows",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _served_moneyline(tmp_path, monkeypatch, sample_size: int):
+    day = _routing_fixture(tmp_path, monkeypatch)
+    _write_calibrator(tmp_path, sample_size=sample_size)
+    factory, _built = _fake_spread_model("ncaab-spread-v6", "h6", "v6", home=0.80)
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_model", factory)
+    flat = MultiSportPickLedger(tmp_path, flat=True)
+    config = {"models": {"NCAAB": {"decline_non_d1": False}}}
+    report = forecast_ncaab_sport(data_root=tmp_path, args_date=day, config=config, flat_ledger=flat)
+    assert report["flat_logged"] == 1
+    return report, flat.rows()[0]
+
+
+def test_ncaab_serves_a_calibrator_that_passes_the_serving_guard(tmp_path, monkeypatch):
+    report, row = _served_moneyline(tmp_path, monkeypatch, sample_size=150)
+    assert report["calibration"]["moneyline"]["applied"] is True
+    assert float(row["model_probability_raw"]) == pytest.approx(0.80)
+    assert float(row["serving_probability"]) < 0.75  # temperature 2 pulls 80% toward 50%
+    assert row["calibration_method"] == "temperature"
+
+
+def test_ncaab_serves_raw_when_the_calibrator_fails_the_guard(tmp_path, monkeypatch):
+    report, row = _served_moneyline(tmp_path, monkeypatch, sample_size=50)
+    assert report["calibration"]["moneyline"]["applied"] is False
+    assert report["calibration"]["moneyline"]["reason"] == "sample_too_small"
+    assert float(row["serving_probability"]) == pytest.approx(0.80)
+    assert row["calibration_method"] == "identity"

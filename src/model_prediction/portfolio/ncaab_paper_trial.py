@@ -21,6 +21,7 @@ from model_prediction.runtime_paths import RuntimePaths
 
 from .auto_buyer_ledger import read_auto_buyer_ledger, record_auto_buy_execution, settle_auto_buyer_ledger
 from .auto_executor import (
+    NCAAB_SPREAD_TRIAL_MODEL_IDS,
     PAPER_AUTO_BUYER_DATA_ROOT,
     AutoExecutionConfig,
     AutoPolymarketBuyer,
@@ -35,14 +36,24 @@ _PAPER_EXECUTION_SANITY_MAX_EDGE = 0.25
 
 _logger = logging.getLogger(__name__)
 
+# Shown when the runtime config file is absent; the live file names its model explicitly.
+_DEFAULT_TRIAL_MODEL_ID = "ncaab-spread-v7"
+
+
+def _trial_model_id(settings: dict[str, Any]) -> str:
+    """The one spread model the trial trades (ncaab-spread-v6 or ncaab-spread-v7), or raise."""
+    model_id = settings.get("model_id")
+    if model_id not in NCAAB_SPREAD_TRIAL_MODEL_IDS or settings.get("market_type") != "spread":
+        raise ValueError("NCAAB paper trial config must name ncaab-spread-v6 or ncaab-spread-v7, spread")
+    return str(model_id)
+
 
 def paper_trial_status() -> dict[str, Any]:
     path = RuntimePaths.resolve().runtime_root / "auto_buyer_ncaab_spread_paper_trial.json"
     if not path.is_file():
-        return {"enabled": False, "model_id": "ncaab-spread-v6", "market_type": "spread"}
+        return {"enabled": False, "model_id": _DEFAULT_TRIAL_MODEL_ID, "market_type": "spread"}
     settings = json.loads(path.read_text(encoding="utf-8"))
-    if settings.get("model_id") != "ncaab-spread-v6" or settings.get("market_type") != "spread":
-        raise ValueError("NCAAB paper trial config must name only ncaab-spread-v6 spread")
+    _trial_model_id(settings)
     return settings
 
 
@@ -61,9 +72,11 @@ def set_paper_trial_enabled(enabled: bool) -> dict[str, Any]:
     return settings
 
 
-def eligible_trial_pick(row: dict[str, Any], *, min_edge: float, max_edge: float) -> bool:
+def eligible_trial_pick(
+    row: dict[str, Any], *, min_edge: float, max_edge: float, model_id: str = "ncaab-spread-v6"
+) -> bool:
     """Use the saved decision edge, not a later quote, to select the cohort."""
-    if str(row.get("model_id") or row.get("model_version") or "") != "ncaab-spread-v6":
+    if str(row.get("model_id") or row.get("model_version") or "") != model_id:
         return False
     if str(row.get("sport") or row.get("league") or "").lower() != "ncaab":
         return False
@@ -228,8 +241,7 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
     settings = json.loads(settings_file.read_text(encoding="utf-8"))
     if not settings.get("enabled", False):
         return {"status": "disabled"}
-    if settings.get("model_id") != "ncaab-spread-v6" or settings.get("market_type") != "spread":
-        raise ValueError("NCAAB paper trial config must name only ncaab-spread-v6 spread")
+    model_id = _trial_model_id(settings)
     min_edge = float(settings["min_saved_edge"])
     max_edge = float(settings["max_saved_edge_exclusive"])
     if not (math.isfinite(min_edge) and math.isfinite(max_edge) and 0 <= min_edge < max_edge <= 1):
@@ -256,7 +268,7 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
     for row in read_picks() + read_flat_picks():
         if row.get("status") != "open":
             continue
-        if not eligible_trial_pick(row, min_edge=min_edge, max_edge=max_edge):
+        if not eligible_trial_pick(row, min_edge=min_edge, max_edge=max_edge, model_id=model_id):
             continue
         pick_id = str(row.get("pick_id") or "")
         if not pick_id:
@@ -272,7 +284,7 @@ def run_ncaab_spread_paper_trial() -> dict[str, Any]:
         mode="paper",
         execute_live=False,
         paper_ncaab_spread_v6_trial=True,
-        whitelisted_models=("ncaab-spread-v6",),
+        whitelisted_models=(model_id,),
         blacklisted_models=(),
         disabled_sport_markets=(("ncaab", "moneyline"), ("ncaab", "total")),
         # Cohort membership is decided ABOVE by eligible_trial_pick() on the
