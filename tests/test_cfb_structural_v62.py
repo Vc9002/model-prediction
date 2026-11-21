@@ -427,3 +427,39 @@ def test_build_cfb_slate_appends_challenger_after_an_unchanged_champion(monkeypa
     assert json.dumps(failed["priced_contracts"], sort_keys=True, default=str) == json.dumps(
         off["priced_contracts"], sort_keys=True, default=str
     )
+
+
+def test_canonical_history_merges_a_renamed_team_and_maps_the_slate_by_espn_id() -> None:
+    """Reuses features/cfb_team_identity: one team under two display names (one id-less) becomes one history."""
+    from model_prediction.features.cfb_features_v6 import V6Game
+    from model_prediction.models.cfb_structural_v62 import canonical_history
+
+    def game(eid, day, home, away, hid, aid):
+        return V6Game(
+            eid,
+            datetime(2026, 9, day, 18, tzinfo=UTC),
+            2026,
+            home,
+            away,
+            30,
+            20,
+            False,
+            None,
+            "existing",
+            hid,
+            aid,
+        )
+
+    history = [
+        game("g1", 1, "Mystery Owls", "Rival Hawks", "9001", "9002"),
+        game("g2", 8, "Rival Hawks", "Mystery Owls", "9002", "9001"),
+        game("g3", 15, "Mystery Owls Renamed", "Rival Hawks", "9001", "9002"),
+        game("g4", 22, "Rival Hawks", "Mystery Owls Renamed", None, None),
+    ]
+    relabelled, history_name = canonical_history(history)
+    owls = {g.home for g in relabelled} | {g.away for g in relabelled}
+    assert len(owls) == 2, owls
+    rep = history_name("Mystery Owls", "9001")
+    assert rep in owls
+    assert history_name("Brand New Display Name", "9001") == rep  # the ESPN id wins over an unseen name
+    assert history_name("Totally Unknown", None) == "Totally Unknown"

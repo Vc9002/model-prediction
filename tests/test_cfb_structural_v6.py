@@ -524,8 +524,10 @@ def test_serving_modules_never_load_v6_in_a_clean_subprocess() -> None:
         "model_prediction.learned_forward,model_prediction.models.college_football,model_prediction.cli.daily"
     )
     loaded = _probe(serving)
+    # The v6 MODEL never loads at import. Since quick-261121-idf the v6 feature module's TeamResolver is a serving
+    # dependency of the shared NCAAF identity (features/cfb_team_identity.py), so cfb_features_v6 does load.
     assert loaded["model_prediction.models.cfb_structural_v6"] is False
-    assert loaded["model_prediction.features.cfb_features_v6"] is False
+    assert loaded["model_prediction.features.cfb_features_v6"] is True
 
 
 def test_the_inertness_probe_detects_a_loaded_module() -> None:
@@ -551,12 +553,17 @@ def test_no_module_under_src_imports_or_names_v6_and_no_config_routes_to_it() ->
         src / "features" / "cfb_features_v6.py",
         src / "models" / "cfb_structural_v61.py",
         src / "models" / "cfb_structural_v62.py",
+        # quick-261121-idf: the shared NCAAF identity reuses v6's TeamResolver, and the serving code hash covers it.
+        src / "features" / "cfb_team_identity.py",
     }
     bare_v6 = re.compile(r"cfb_structural_v6(?!\d)|cfb_features_v6")
     offenders = [
         str(p.relative_to(PROJECT_ROOT))
         for p in src.rglob("*.py")
-        if p not in own and bare_v6.search(p.read_text(encoding="utf-8"))
+        if p not in own
+        and bare_v6.search(
+            p.read_text(encoding="utf-8").replace('"cfb_features_v6.py").read_bytes())  # TeamResolver', "")
+        )
     ]
     assert offenders == []
     learned_forward = (src / "learned_forward.py").read_text(encoding="utf-8")

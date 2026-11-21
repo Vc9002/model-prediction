@@ -849,6 +849,8 @@ def build_cfb_slate(
                 "away_team": away_team,
                 "home_team": home_team,
                 "is_neutral_site": is_neutral,
+                "home_team_id": (home.get("team") or {}).get("id"),
+                "away_team_id": (away.get("team") or {}).get("id"),
                 "moneyline": None
                 if pm_ml_home_prob is None or pm_ml is None
                 else {

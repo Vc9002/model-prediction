@@ -342,6 +342,8 @@ class EventQuotes:
     moneyline: Mapping[str, Any] | None  # {"home_ask","away_ask","slug_base","sportsbook","lineage"}
     spread: Mapping[str, Any] | None  # {"home_line","home_ask","away_ask","slug","sportsbook","lineage"}
     total: Mapping[str, Any] | None  # {"line","over_ask","under_ask","slug","sportsbook","lineage"}
+    home_team_id: str | None = None  # ESPN team ids from the slate event: identity lookup wins over the name
+    away_team_id: str | None = None
 
 
 def build_contracts(
@@ -475,6 +477,46 @@ def build_contracts(
 
 
 # ------------------------------------------------------------------------------------------------ slate entry
+def canonical_history(history: Sequence[Any]) -> tuple[list[Any], Any]:
+    """v6 history with one display name per team identity, and a slate (name, ESPN id) -> history name lookup.
+
+    ESPN renames teams mid-season and many daily rows carry no team id, so v6's own resolver can split one team into
+    two partial histories (2026: App State, San Jose State, Hawaii). The identity rule is the shared
+    ``features/cfb_team_identity.CFBTeamIdentity`` (v6's resolver plus the id-less name step and the serving-time ESPN
+    id lookup); every game is relabelled with its identity's most frequent display name before the v6 extractor
+    sees it. The v6 solver and its frozen parameters are untouched; only the grouping of the same results changes.
+    """
+    from dataclasses import replace
+
+    from ..features.cfb_team_identity import CFBTeamIdentity
+
+    rows = [
+        {
+            "home_team": g.home,
+            "away_team": g.away,
+            "home_team_id": g.home_id,
+            "away_team_id": g.away_id,
+            "event_start_utc": g.start,
+            "season_year": g.season,
+        }
+        for g in history
+    ]
+    identity = CFBTeamIdentity.from_rows(rows)
+    keys = [identity.row_keys(r) for r in rows]
+    counts: dict[str, dict[str, int]] = {}
+    for g, (hk, ak) in zip(history, keys, strict=True):
+        for key, name in ((hk, g.home), (ak, g.away)):
+            bucket = counts.setdefault(key, {})
+            bucket[name] = bucket.get(name, 0) + 1
+    rep = {key: max(names.items(), key=lambda kv: (kv[1], kv[0]))[0] for key, names in counts.items()}
+    relabelled = [replace(g, home=rep[hk], away=rep[ak]) for g, (hk, ak) in zip(history, keys, strict=True)]
+
+    def history_name(name: str, team_id: Any = None) -> str:
+        return rep.get(identity.key(name, None if team_id in (None, "") else str(team_id)), name)
+
+    return relabelled, history_name
+
+
 def routed_markets(repo_root: str | Path | None = None) -> list[str]:
     """NCAAF markets whose registered challenger is v6.2 (config/production.yaml ``challengers.NCAAF``)."""
     from ..production_registry import ProductionModelRegistry
@@ -522,6 +564,7 @@ def price_challenger_slate(
     )
     from .cfb_structural_v6 import cfb_structural_v6_model
 
+    history, history_name = canonical_history(history)
     extractor = cfb_structural_v6_model().extractor_for(history)
     anchors = load_anchor_index(
         capture_file if capture_file is not None else capture_path(root), decision_time
@@ -533,8 +576,8 @@ def price_challenger_slate(
             feat = extractor.extract_features(
                 event_id=ev.event_id,
                 game_start_utc=ev.event_start_utc,
-                home_team=ev.home_team,
-                away_team=ev.away_team,
+                home_team=history_name(ev.home_team, ev.home_team_id),
+                away_team=history_name(ev.away_team, ev.away_team_id),
                 is_neutral_site=ev.is_neutral_site,
                 decision_time=decision_time,
             )
