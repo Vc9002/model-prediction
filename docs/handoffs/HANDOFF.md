@@ -14,56 +14,38 @@ checkpoint `0af19ecd`: 9 in `tests/test_cli.py`, 1 each in `test_five_blind_spot
 targeted runs (`-o addopts='' -q`, never the full suite), then merge or hold. The scheduled
 tasks run the working tree, so do not edit source while a daily run is in progress.
 
-## 1. NCAAB (open, most expensive loss source)
+## 1. NCAAB (updated 2026-11-21, quick 261120-nip)
 
-- **Evidence:** `docs/NCAAB_LOSS_AUDIT_2026-11-10.md`. v6 Main spread 20/40 (+0.95u), total 11/36
-  (-25.78u); v3 away moneyline 13 of 151. Gates added: executable-quote requirement,
-  current-season sample >= 8, totals paused in Main.
-- **Forward check (pinned):** `ncaab-spread-v6`, spread, edge 5%-8%, picks created on or after
-  2026-11-12, dedupe on (event, selection, line, model) preferring Main over Flat. Report record,
-  ROI, mean model probability vs hit rate, verified-quote count. Baseline 11W-3L is post-hoc;
-  call it real only after about 50+ forward picks at roughly 58%+. Do not size up or gate on it.
-  Use `ledgers.db`, not the buyer ledger (buyer rows include manual early exits).
-- **Falsifiable next check from the audit:** once fresh quoted games settle, compare serving
-  probability vs outcome vs decision-time market probability per market and side (Brier, log loss,
-  calibration, line error) before restoring Main totals or considering a v7. Do not fit on the
-  evaluated dates.
-- **Structural finding, still unfixed:** pure Elo underrates home teams across most probability
-  buckets (worst at p_home 0.4-0.5, actual about 60%), consistent across ncaab/euroleague/acb/lnb/bbl.
-  Needs a real `elo_weight` x `offseason_regression` ablation on multi-season history. The local
-  NCAAB file covers one season, so `offseason_regression` cannot be tuned yet.
-- **2026-11-12 review fixes landed (`quick-261112-nc6`)**: #7 total baseline mismatch, #9 artifact
-  drift, #10 coherent moneyline, #11 early-season compression (tiered trend priors + additive
-  matchup), integer-line push mass; HCA 7.2 -> 5.0 / Elo 55 -> 45 and `total_sd` 13.5 -> 16.5
-  selected on validation. Evidence: `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md`,
-  `outputs/ncaab/ncaab_v6_review_ablation.md` (not market-relative). Both champions changed in
-  place under the same version string -- the forward check above now measures the fixed model;
-  rows created before 2026-11-12T07:00Z were priced by the old one.
-- **Settled-ledger replay of the fixed model** (`scripts/replay_ncaab_v6_all_settled.py`,
-  `outputs/ncaab/ncaab_v6_settled_replay.md`): all 1,167 settled Flat rows re-priced under the live
-  forward rule -- fixed vs pre-fix control: ML 46 bets +1.60u vs 71 bets -0.90u; spread 303 bets
-  -13.91u vs 329 bets -18.59u (8% hurdle: -2.24u vs -22.23u); total 79 bets -9.36u vs 142 bets
-  -16.92u. Better on every market, still negative on spreads/totals; every row is a sample 0-3
-  season-opener and 1,157 of 1,167 asks are indicative. Does not validate Main; the forward check
-  above does.
-- **Feature round landed (`quick-261112-nc6` round 2)**: history-derived non-D1 Elo prior and
-  AP-rank prior (8 Elo per slot) on the spread model; attempts-based tempo (FGA + 0.44 FTA from
-  the archived ESPN scoreboards, sensitivity 1.5) on the total model. Holdout margin MAE 16.5 ->
-  12.7, holdout moneyline Brier 0.122 -> 0.110 (pre-fix control 0.112); validation total MAE
-  13.78 -> 13.38. Early-season features were selected on the train window (validation has no
-  openers) -- see `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md`. New data module:
-  `features/ncaab_scoreboard_stats.py`.
-- **2026-11-13**: Main totals restored (`df37969f`) behind the sample gate (>= 8) with a new
-  `models.NCAAB.main_totals_enabled` policy switch. Box scores backfilled for 2025-26 (6,483 games,
-  `scripts/backfill_ncaab_boxscores.py`, 99.97% history coverage); exact possessions tested as the
-  total tempo source and found indistinguishable from the shipped attempts proxy (not shipped).
-  Natural next model step: points-per-possession efficiency as the spread trend half.
-- **Open after the fixes (needs a second cross-season window or market lines to select on):**
-  early-season under-dispersion (served margin scale ~15 vs realised 22-24 in 2026-11; total
-  credibility widening x1.4 is now too wide on top of `total_sd` 16.5); `elo_weight_ramp_games`
-  (implemented, off); `offseason_retention` 0.2 vs 0.35. Do not pick these on the 2026-11 games --
-  that window is the locked holdout of the ablation.
-- `aba`, `nbl`, `wncaab` still have no game-result dataset and stay on the generic Elo config.
+- **Next action:** read the A_ml_w0 confirmation result (agent run in progress; outputs under
+  `outputs/ncaab/research_261120/confirmation/`, read logged in `read_log.jsonl`). If it PASSES, the
+  moneyline Elo weight 0 change is a promotion decision for the operator (new id; v7 margin unchanged).
+  If it fails, record it and stop. Then commit `scripts/ncaab_research/confirmation/` and its test.
+- **Done 2026-11-21:** `ncaab-spread-v7` promoted for moneyline + spread (`c3f97a4a`; rollback
+  `ncaab-spread-v6` via `model_promotion rollback`, both markets). The `models.NCAAB.margin_engine` yaml
+  key is retired and fails the slate closed. Slate replay: v7 id served probabilities identical to the
+  v6-id/v7-engine serving (46/46). Live state: buyer state v937 blacklists v7 (NCAAB stays disabled in
+  all three markets); paper trial trades v7 only (backups `*.pre-ncaab-v7-id-*.bak`).
+- **Calibration changed (operator-approved):** NCAAB fits on `model_probability_raw`, engine-pure pools
+  (v6-labelled rows priced by the v7 engine fit v7), serving through `load_serving_calibrator` (sample
+  floor + OOF Brier gain). At the change all NCAAB calibrators resolved to identity (raw). Watch the
+  Daily `result["calibration"]` decisions.
+- **CLV:** NCAAB closes must be observed strictly after the decision; the 15-min buyer worker captures
+  pre-tip snapshots (NCAAB, tips within 25 min). First real captures from ~10:40 ET 2026-11-21. Check
+  settled NCAAB rows from 11-21 carry a close != decision price. Not yet on `_settle_by_resolution` /
+  `auto_buyer_ledger.py:1404` paths.
+- **Forward check (re-pinned by engine):** split on
+  `COALESCE(json_extract(json_extract(decision_payload_json,'$.model_input_snapshot_json'),'$.features.margin_engine'),'v6')`;
+  v7 cohort = (v6 id AND engine v7) OR v7 id. Spread 5-8% edge since 11-12 was 13-16 (n=29) at review.
+- **Research verdicts (dev window, 22,947 games):** no candidate has edge over the closing line; only
+  A_ml_w0 is DEV_ELIGIBLE. B1/B3 (scale) help cover log loss slightly but worsen moneyline; B2 cap,
+  C1/C2 per-possession, D1 preseason prior not eligible. Evidence: `docs/ncaab_review_2026-11-20/`,
+  `outputs/ncaab/research_261120/`.
+- **Team matching fixed (`cb1b980f`):** mascot kept when a spread lists first; UCA/UNCW/NAU aliases.
+- **Data:** CBBD key in `.env` as `CBBD_API_KEY` (3,000 calls/month shared with CFBD; ~176 used);
+  cbbdata has no valid key (client inert); Kaggle Massey dropped. History boxes 2021-22+ in
+  `data/research/ncaab_external/espn_boxscores/`.
+- **Still open:** NCAAB auto-buyer stays disabled by operator state; ledger `model_probability` column is
+  raw while the payload is served (documented; readers fixed in best-pick audit and ledger API).
 
 ## 2. Best-picks audit script (offered, not done)
 
