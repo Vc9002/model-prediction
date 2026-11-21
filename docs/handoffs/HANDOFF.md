@@ -270,16 +270,20 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
 
 ## 13. NBA v10 overhaul (started 2026-11-20)
 
-- **Next action:** in an ADMIN PowerShell, register the capture task (only that task, S4U,
-  every 10 min 11:00-02:00):
-  `& 'C:\Users\Vince\AppData\Local\Temp\claude\3c4e37e4a6ec2934\725cd53a-6904-44cd-9660-1dcec21da8a9\scratchpad\register_nba_pretip.ps1'`.
-  If the scratchpad is gone, copy the NbaPretipCapture block from `scripts/register_windows_tasks.ps1`.
+- **Next action:** review and merge `nba-v10/backfill` (injury-report parse finishing 2022-12..2026-11)
+  and `nba-v10/player` (Phase 3 player layer, worktree `E:\MP-wt\player`; PREREG.md is committed
+  before any validation join, then G1_PLAYER.md). Merge by path; v9 engine files untouched.
+- **Capture task registered 2026-11-21 14:34 ET** (`ModelPrediction-NbaPretipCapture`, S4U, every
+  10 min 11:00-02:00). First run exit 0: 5 ESPN-only records for the 2026-11-21 slate. G2 clock
+  started.
 - **Status:** plan section 10 in `docs/NBA_REVIEW_AND_V10_PLAN_2026-11-20.md`. Merged: capture,
   plumbing fixes, harness, v9.1, anchor scaffold (G1 failed, lambda 0), v10 Flat-only wiring.
   v9 keeps serving with edge-based sizing; Flat keeps calling everything; v10 replaces v9 in
   Main only after gate G2 (forward CLV against the devigged consensus).
 - **Open:** backfills into `data/research/nba_v10/` (worktree `E:\MP-wt\backfill`, branch
-  `nba-v10/backfill`, not merged); Phase 3 player layer; G2 forward check (>= 150 v10 picks);
+  `nba-v10/backfill`, not merged; scoreboards, 10,204 box scores, 13,073 ESPN odds events, closes
+  2007-2026 and injury PDFs through 2026-11-19 are done); Phase 3 player layer (running); G2
+  forward check (>= 150 v10 picks);
   v10 `main_min_edge` unset until then.
 - **Leftover:** four empty locked worktrees under `.claude/worktrees/agent-*`; merged worktrees
   `E:\MP-wt\{plumbing,harness,capture,wiring}` can be removed.
