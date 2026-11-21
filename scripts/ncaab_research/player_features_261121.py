@@ -94,7 +94,7 @@ def game_score(p: dict[str, Any]) -> float:
 MINUTES_TOLERANCE = 5  # team minutes may differ from 200 (+25 per OT) by rounding; more means a broken box
 
 
-def box_quality(team: dict[str, Any]) -> str | None:
+def box_quality(team: dict[str, Any], opponent: dict[str, Any] | None = None) -> str | None:
     """None when the team's player box is complete; else why it cannot be trusted.
 
     ESPN serves some boxes with real players listed as did-not-play, without stats and often without
@@ -114,6 +114,15 @@ def box_quality(team: dict[str, Any]) -> str | None:
         return "minutes_sum_mismatch"
     if any(p.get("athlete_id") is None and (p.get("minutes") or 0) > 0 for p in players):
         return "played_without_athlete_id"
+    if opponent is not None:
+        # ESPN sometimes copies one team's player list onto the other side of the same game; which
+        # side is real cannot be told from the box alone, so both sides fail.
+        own = {p.get("athlete_id") for p in players if p.get("athlete_id") is not None}
+        other = {
+            p.get("athlete_id") for p in opponent.get("players") or [] if p.get("athlete_id") is not None
+        }
+        if own & other:
+            return "players_shared_with_opponent"
     return None
 
 
@@ -121,7 +130,7 @@ def team_games_from_record(record: dict[str, Any]) -> list[TeamGame]:
     out = []
     for side, other in (("home", "away"), ("away", "home")):
         team = record[side]
-        quality = box_quality(team)
+        quality = box_quality(team, record[other])
         players = []
         for p in team.get("players") or []:
             if p.get("athlete_id") is None:
@@ -184,13 +193,16 @@ class PriorSeason:
     athlete_team_gmsc: dict[str, dict[str, float]] = field(default_factory=dict)
     team_minutes: dict[str, float] = field(default_factory=dict)
     team_gmsc: dict[str, float] = field(default_factory=dict)
-    team_games: dict[str, int] = field(default_factory=dict)
+    team_games: dict[str, int] = field(default_factory=dict)  # usable boxes only
+    team_games_any: dict[str, int] = field(default_factory=dict)  # every box file, usable or not
 
 
 def build_prior_season(games: Iterable[TeamGame], season: int) -> PriorSeason:
-    games = [g for g in games if g.season == season and g.box_available]
-    prior = PriorSeason(season=season, max_date=max((g.game_date for g in games), default=""))
-    for g in games:
+    all_games = [g for g in games if g.season == season]
+    prior = PriorSeason(season=season, max_date=max((g.game_date for g in all_games), default=""))
+    for g in all_games:
+        prior.team_games_any[g.team_id] = prior.team_games_any.get(g.team_id, 0) + 1
+    for g in (g for g in all_games if g.box_available):
         prior.team_games[g.team_id] = prior.team_games.get(g.team_id, 0) + 1
         for p in g.players:
             if p.minutes <= 0:
@@ -248,8 +260,11 @@ def availability_features(
     out["availability_null_reason"] = None
     out["avail_prev2_null_reason"] = None
     if len(history) < MIN_ROTATION_GAMES:
-        out["availability_null_reason"] = "insufficient_history"
-        out["avail_prev2_null_reason"] = "insufficient_history"
+        # Separate "too early in the season" from "games were played but their boxes failed the gate".
+        early = scheduled_before is None or len(scheduled_before) < MIN_ROTATION_GAMES
+        reason = "insufficient_history" if early else "insufficient_box_history"
+        out["availability_null_reason"] = reason
+        out["avail_prev2_null_reason"] = reason
         return out
     by_event = {g.event_id: g for g in history}
     if scheduled_before:
@@ -309,7 +324,11 @@ def prior_season_features(history: list[TeamGame], team_id: str, prior: PriorSea
         out["prior_null_reason"] = "no_prior_season_data"
         return out
     if prior.team_games.get(team_id, 0) < MIN_PRIOR_TEAM_GAMES or prior.team_minutes.get(team_id, 0) <= 0:
-        out["prior_null_reason"] = "team_absent_prior_season"
+        out["prior_null_reason"] = (
+            "prior_season_boxes_unusable"
+            if prior.team_games_any.get(team_id, 0) >= MIN_PRIOR_TEAM_GAMES
+            else "team_absent_prior_season"
+        )
         return out
     if not history:
         out["prior_null_reason"] = "no_current_season_history"
@@ -469,6 +488,7 @@ def audit(root: Path = BOX_ROOT) -> dict[str, Any]:
     coverage: dict[str, Counter] = defaultdict(Counter)
     empty_team = Counter()
     quality_by_season: dict[str, Counter] = defaultdict(Counter)
+    team_season_quality: dict[tuple, Counter] = defaultdict(Counter)
     minutes_dev: Counter[str] = Counter()
     minutes_bad_examples: list[dict[str, Any]] = []
     points_mismatch = 0
@@ -488,7 +508,10 @@ def audit(root: Path = BOX_ROOT) -> dict[str, Any]:
         for side in ("home", "away"):
             team = record[side]
             team_games_n += 1
-            quality_by_season[str(season)][box_quality(team) or "ok"] += 1
+            quality = box_quality(team, record["away" if side == "home" else "home"])
+            quality_by_season[str(season)][quality or "ok"] += 1
+            if team.get("conference_id") is not None:
+                team_season_quality[(team["team_id"], season)][quality is None] += 1
             players = team.get("players") or []
             if not team.get("player_box_available"):
                 empty_team[str(season)] += 1
@@ -554,6 +577,10 @@ def audit(root: Path = BOX_ROOT) -> dict[str, Any]:
         "events_with_multiple_files": sum(1 for n in files_per_event.values() if n > 1),
         "team_games": team_games_n,
         "box_quality_by_season": {k: dict(v) for k, v in sorted(quality_by_season.items())},
+        "d1_team_seasons_box_fail_rate_over_half_by_season": dict(
+            Counter(str(season) for (_, season), c in team_season_quality.items() if c[False] > c[True])
+        ),
+        "d1_team_seasons_by_season": dict(Counter(str(season) for _, season in team_season_quality)),
         "team_games_without_player_box_by_season": dict(empty_team),
         "minutes_vs_expected": dict(minutes_dev),
         "minutes_off_examples": minutes_bad_examples,

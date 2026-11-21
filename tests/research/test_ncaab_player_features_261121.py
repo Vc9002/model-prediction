@@ -218,9 +218,9 @@ def test_backfill_parser_maps_by_key_and_keeps_no_id_rows() -> None:
         bf.parse_player_boxes(game, _summary(players, keys), "2025-01-01T19:00:00+00:00")
 
 
-def _team(points: list[int], minutes: list[int], score: int, ids: bool = True) -> dict:
+def _team(points: list[int], minutes: list[int], score: int, ids: bool = True, prefix: str = "h") -> dict:
     players = [
-        {"athlete_id": (str(i) if ids else None), "points": p, "minutes": m}
+        {"athlete_id": (f"{prefix}{i}" if ids else None), "points": p, "minutes": m}
         for i, (p, m) in enumerate(zip(points, minutes, strict=True))
     ]
     return {
@@ -245,8 +245,38 @@ def test_box_quality_gate_rejects_broken_boxes() -> None:
         "game_date": "2025-01-01",
         "event_start_utc": "2025-01-01T20:00Z",
         "home": _team([40, 20], [100, 100], 70),
-        "away": dict(_team([40, 30], [100, 100], 70), team_id="U"),
+        "away": dict(_team([40, 30], [100, 100], 70, prefix="a"), team_id="U"),
     }
     home, away = pf.team_games_from_record(record)
     assert home.box_available is False and home.box_quality_reason == "points_sum_mismatch"
     assert away.box_available is True
+
+
+def test_box_copied_onto_opponent_fails_both_sides() -> None:
+    home = _team([40, 30], [100, 100], 70)
+    away = dict(_team([40, 30], [100, 100], 70), team_id="U")  # same athlete ids as home
+    assert pf.box_quality(home, away) == "players_shared_with_opponent"
+    record = {
+        "event_id": "9",
+        "season_year": 2025,
+        "game_date": "2025-01-01",
+        "event_start_utc": "2025-01-01T20:00Z",
+        "home": home,
+        "away": away,
+    }
+    assert [g.box_available for g in pf.team_games_from_record(record)] == [False, False]
+
+
+def test_failed_boxes_get_their_own_null_reasons() -> None:
+    games = season_games()
+    schedule = {("T", 2025): sorted((g.game_date, g.event_id) for g in games)}
+    broken = [dataclasses.replace(g, box_available=False) if g.event_id in ("e1", "e2") else g for g in games]
+    e3 = row_for(pf.build_feature_rows(broken, schedule), "e3")
+    assert e3["availability_null_reason"] == "insufficient_box_history"
+    e2 = row_for(pf.build_feature_rows(games, schedule), "e2")
+    assert e2["availability_null_reason"] == "insufficient_history"
+
+    prior = [tg(f"p{i}", "T", 2024, f"2024-01-{i + 10:02d}", {"a0": 200}, box=False) for i in range(10)]
+    current = [tg("c0", "T", 2025, "2024-11-04", {"a0": 200}), tg("c1", "T", 2025, "2024-11-08", {"a0": 200})]
+    c1 = row_for(pf.build_feature_rows(prior + current), "c1")
+    assert c1["prior_null_reason"] == "prior_season_boxes_unusable"

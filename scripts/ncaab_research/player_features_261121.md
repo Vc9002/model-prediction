@@ -27,10 +27,18 @@ mark those players absent, so a team-game counts as having a box only if all fou
 1. points summed over players equal the team score;
 2. team minutes are within 5 of 200 + 25 per overtime period (the period count comes from the linescores);
 3. no athlete who logged minutes is missing an id;
-4. at least one player is listed.
+4. at least one player is listed;
+5. no athlete id appears on both teams of the same game. ESPN sometimes copies one side's list onto the
+   other (5 games). Both sides fail, because the box alone cannot show which side is real.
 
 A team-game that fails the gate is treated like a missing box: it is excluded from history and from the
 prior-season index.
+
+Failures are not random. They cluster on whole team-seasons, where ESPN lost the athlete linkage for part
+of a roster. The audit (`audit_261121.json`) counts D1 team-seasons with more than half their boxes
+failing: 2022: 33 of 359, 2023: 29 of 363, 2024: 11 of 362, 2025: 0, 2026: 0. Team-game failure rates by
+season are 8.7%, 7.5%, 3.2%, 0.2% and 0.1%. Any v4 candidate must fall back to its base model on null rows,
+and its coverage must be read with this in mind.
 
 ## Point-in-time rule
 
@@ -52,7 +60,9 @@ Context: `n_prior_games_box` (prior same-season games with a usable box), `n_pri
 
 ### Availability
 
-These need at least 3 prior boxes; otherwise every field is null with reason `insufficient_history`.
+These need at least 3 prior boxes; otherwise every field is null. The reason is
+`insufficient_history` when fewer than 3 games were played, or `insufficient_box_history` when the games
+were played but their boxes failed the gate.
 
 - The rotation is the top 7 athletes by season-to-date minutes over the prior games (ties broken by
   athlete id). `m_a` is that season-to-date minute total.
@@ -79,7 +89,9 @@ game itself is broken, the row is null instead.
 These fields are null when:
 
 - there is no season s-1 in the data (all of 2022, reason `no_prior_season_data`);
-- T has fewer than 10 usable s-1 boxes (`team_absent_prior_season`, which covers new D1 members);
+- T has fewer than 10 usable s-1 boxes. The reason is `prior_season_boxes_unusable` when T had at least
+  10 s-1 box files that failed the gate, and `team_absent_prior_season` otherwise (which covers new D1
+  members);
 - G is T's first game of the season (`no_current_season_history`).
 
 Only athletes who have already logged minutes for T this season (before day d) are counted. A returner
@@ -107,6 +119,8 @@ carries an inflated rate. Adjusting by the old team's PIT rating is a candidate 
 - **Only identified athletes are covered.** Transfers from non-D1 programs, or from D1 teams whose games
   are missing, are not covered (`continuity_any_team` and the transfer fields undercount them).
 - **The top-7 rotation is a choice.** It is fixed here, before any outcome join, and is not tuned.
+- **The prior-season index uses only usable boxes.** For a team with some failed s-1 boxes, shares are
+  computed within the usable ones. A player whose s-1 minutes all came in failed boxes is unseen.
 - **Mid-season departures** (dismissal, transfer) look like long absences. That is the intended signal:
   the player is not available.
 
