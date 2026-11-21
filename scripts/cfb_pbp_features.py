@@ -19,6 +19,8 @@ Definitions (fixed here so later walk-forward work does not drift):
 * Yards: ``statYardage``; interception plays count 0 offensive yards (``statYardage`` there is the
   return), fumbles lost keep the gain before the fumble.
 * Turnovers: scrimmage plays flagged ``isTurnover`` (interceptions, fumbles lost) charged to the offense.
+  ESPN sometimes types a lost fumble as a plain Rush without the flag, so this undercounts slightly;
+  special-teams fumbles (counted in the box score) are deliberately excluded.
 * Garbage time: pre-play |margin| > 38 in Q2, > 28 in Q3, > 22 in Q4; never in Q1 or overtime.
   ESPN's ``homeScore``/``awayScore`` are post-play, so the pre-play margin is the previous row's score.
 * Drives: drives with >= 1 scrimmage play by the drive team. Points per drive = the drive team's own
@@ -390,6 +392,11 @@ def game_rows(meta: dict[str, Any], payload: dict[str, Any]) -> tuple[list[dict[
     if not any(p.is_scrimmage for d in drives for p in d.plays):
         return [], unknown
     box = _box_stats(payload)
+    last = next((d.plays[-1] for d in reversed(drives) if d.plays), None)
+    final_match = last is not None and (last.post_home, last.post_away) == (
+        _int(home.get("score")),
+        _int(away.get("score")),
+    )
     stats = {
         home_id: offense_stats(drives, home_id, True),
         away_id: offense_stats(drives, away_id, False),
@@ -412,6 +419,9 @@ def game_rows(meta: dict[str, Any], payload: dict[str, Any]) -> tuple[list[dict[
             "raw_sha256": meta.get("sha256"),
             "box_total_yards": (box.get(tid) or {}).get("total_yards"),
             "box_turnovers": (box.get(tid) or {}).get("turnovers"),
+            # False when the play feed ends short of the final (truncated OT, missing drives, score
+            # glitches): ~5% of games in the coverage sample. Filter on it for rating fits.
+            "pbp_final_score_match": final_match,
         }
         row.update(_flatten("off", stats[tid]))
         row.update(_flatten("def", stats[oid]))
@@ -484,6 +494,9 @@ def summarize(rows: list[dict[str, Any]], unknown: Counter[str], skipped: int) -
         }
     return {
         "team_game_rows": len(rows),
+        "pbp_final_score_match_share": (
+            sum(bool(r["pbp_final_score_match"]) for r in rows) / len(rows) if rows else None
+        ),
         "events_without_plays": skipped,
         "explosive_definition": f"non-turnover scrimmage play gaining >= {EXPLOSIVE_YARDS} yards",
         "unknown_play_types": dict(unknown.most_common()),

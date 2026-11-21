@@ -10,6 +10,8 @@ status: crawl running (resumable); scripts, tests and coverage report committed
 - On scrimmage plays, period/score/down/distance/yardsToEndzone/clock/start.team/statYardage are present 100%.
 - Failures are (a) no drives at all (25 games, mostly FCS) and (b) last-play running score != final (19 games:
   truncated overtime, a trailing 0-0 "End of Game" row, 1-3 point PAT glitches). No season is missing.
+- With 12 games per season x class cell, one or two failures trip 90%, so the cell gap list is noisy. Real
+  gaps: 2022 FBS-involved (18/24 usable, 4 with no drives) and FCS-FCS no-drive games in 2017, 2018, 2022.
 - Report: `outputs/ncaaf/cfb_espn_pbp_coverage.{json,md}` (includes the play-type census).
 
 ## Crawl
@@ -30,7 +32,10 @@ status: crawl running (resumable); scripts, tests and coverage report committed
   back-to-back duplicate rows, non-monotone score glitches.
 - Sanity on the first 792 team-games: success rate 0.420, yards/play 5.79, explosive 6.7%, 2.09 pts/drive,
   27 s/play. Box cross-check: yards diff median 0 (|diff| median 7), turnovers match 76% (box counts
-  special-teams fumbles; ours are offensive scrimmage turnovers), points_for - drive points = 0 on 73%
+  special-teams fumbles; ours are ESPN-flagged offensive scrimmage turnovers and undercount slightly, e.g.
+  a lost fumble typed as a plain Rush without the flag), points_for - drive points = 0 on 73%
   of team-games, the rest mainly defensive/return TDs.
+- Each row carries `pbp_final_score_match` (feed's last running score == final); 96.7% True on the first
+  608 games. Filter on it for rating fits.
 - Tests: `tests/research/test_cfb_pbp_features.py` (29 pass).
 - Rerun `python scripts/cfb_pbp_features.py` after the crawl finishes to cover all games.
