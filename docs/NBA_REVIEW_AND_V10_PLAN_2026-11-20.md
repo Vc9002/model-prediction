@@ -315,4 +315,19 @@ Its output feeds Phase 2 as `model`; it only influences prices through a lambda 
   Moneyline is not priced by the anchor module.
 - **In flight:** Phase 0.3-0.5 backfills into `data/research/nba_v10/`. The Phase 3 player layer
   starts on that data and reaches serving only through a lambda that passes G1.
-- **G2 clock:** starts once the capture task is registered; at least 150 forward v10 picks.
+- **G2 clock:** the capture task was registered 2026-11-21 14:34 ET. The G2 scorer was merged in
+  `73c5f0cb` and the gate was amended before any pick was scored (section 9).
+- **Phase 3 player layer (`nba-player-v10`, `3dfb35ce`): G1 FAIL in all four cells.**
+  - Cells: spread and total, each with and without availability; validation n = 762, the same
+    games v9 was scored on.
+  - It is less wrong than v9:
+    - Spread RMSE 14.13 against v9's 14.46 on the availability subset.
+    - Total RMSE 18.90 against 19.42, bias -1.0 against v9's +3.3.
+    - The close is still better: spread 13.87, total 18.18.
+    - corr with the close's error is about 0 in every cell, so the research artifact ships lambda 0.
+  - Train corr for spreads was +0.03 to +0.05 per season. Validation at n = 762 cannot detect an
+    effect that small.
+  - Next: line movement as the target, not outcomes. Pre-register whether "model minus the
+    decision-time line" predicts "T-10 line minus the decision-time line", forward only. That is
+    much less noisy than outcomes, plus T-C2 (injury latency) with a live injury-report capture.
+    Both are research logs only.
