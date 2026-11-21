@@ -1,30 +1,40 @@
 """Forward gate G2 for the NBA v10 overhaul: read-only scoring of ``nba-anchor-v10`` rows.
 
-Pre-registered in ``docs/NBA_REVIEW_AND_V10_PLAN_2026-11-20.md`` (sections 6, 9, 10); the criteria
-are fixed and must not be re-tuned after results are seen. Over forward picks only (rows written by
-``nba-anchor-v10`` since its wiring on 2026-11-21), games clustered across markets:
+Pre-registered in ``docs/NBA_REVIEW_AND_V10_PLAN_2026-11-20.md`` (sections 6, 9, 10, and the G2
+amendment pinned 2026-11-21 before any pick was scored); the criteria are fixed and must not be
+re-tuned after results are seen. Over forward picks only (rows written by ``nba-anchor-v10`` since
+its wiring on 2026-11-21), games clustered across markets. A G2 pick, per market: with the
+artifact's ``main_min_edge`` null (as shipped, lambda = 0), a consensus-anchored v10 row whose
+devigged consensus probability of a side minus the Polymarket ask for that side is >= 3.0 points,
+gross of fees, graded on that side (track T-B, plan section 9); with ``main_min_edge`` set, a row
+whose ``net_edge`` clears it. PASS needs every criterion:
 
-1. at least 150 picks. A pick, per market: with the artifact's ``main_min_edge`` null (as shipped,
-   lambda = 0), a consensus-anchored v10 row whose devigged consensus probability of a side minus
-   the Polymarket ask for that side is >= 3.0 points, gross of fees, graded on that side (track
-   T-B, plan section 9); with ``main_min_edge`` set, a row whose ``net_edge`` clears it;
-2. mean CLV against the devigged sportsbook consensus at T-10 min of at least +1.0c, with a
-   95% cluster-bootstrap CI (by game) excluding 0;
-3. CLV above v9's on the same games and markets (paired, same benchmark capture);
-4. Brier on settled picks no worse than the Polymarket mid at decision time on the same picks.
+- C1: at least 150 consensus-benchmark-scored picks.
+- C2a (necessary, selection-correlated): mean CLV against the devigged consensus at T-10 of at
+  least +1.0c with a 95% cluster-bootstrap CI (by game) above 0. T-B picks are selected on
+  consensus minus ask, so this passes by construction unless the book drifts to Polymarket.
+- C2b (selection-independent): Polymarket CLV net of fee, the Polymarket T-10 mid of the picked
+  side minus (ask + 0.06 * ask * (1 - ask)), mean above 0 with the CI above 0.
+- C3: paired v10 minus v9 on the C2b CLV (same game, market and T-10 quote), mean above 0.
+- C4: Brier on settled picks no worse than the decision-time Polymarket mid on the same picks.
+- C5: realized net-of-fee return per 1-unit settled pick above 0 (point estimate; 150 picks
+  cannot establish it, and the report says so).
 
-Kill rule: a G2 failure at 300 or more picks is KILL, never "extend". Below 150 picks: PENDING.
-Polymarket-to-Polymarket CLV is reported but is NOT a G2 criterion (it passes no-skill models).
+Diagnostics, not gating: D1 "who moved" (consensus change vs Polymarket mid change between the
+decision and T-10) and D2 (picks whose Polymarket rung equals the decision ESPN line vs picks whose
+consensus was translated to the rung).
 
-Benchmark, point in time: the T-10 benchmark for a pick is the LATEST ESPN consensus capture
-(``<runtime root>/odds/nba/<ET date>/espn_odds.jsonl``) of that game with
-``decision_time < observed_at_utc <= tip - 10 min``, where tip is the earlier of the ledger row's
-and the capture's own ``event_start_utc``. A game is scored only once ``as_of >= tip``, so a
-report run before tip never freezes an early capture as the "T-10" line. The latest qualifying
-capture must also be no older than ``BENCHMARK_MAX_LEAD`` before tip, otherwise the pick is
-excluded as ``stale_benchmark`` (an operator-visible choice: the capture worker runs every 10 min,
-so a T-10 capture older than 40 min means the worker missed runs). Nothing falls back silently:
-every excluded pick carries a reason.
+Kill rule: a G2 failure at 300 or more picks is KILL, never "extend". Below 150 picks: PENDING. A
+criterion that cannot be computed yet is never a pass.
+
+Benchmarks, point in time. Both T-10 benchmarks take the LATEST observation with
+``decision_time < observed_at_utc <= tip - 10 min``, tip being the earlier of the ledger row's and
+the observation's own ``event_start_utc``; nothing is scored before tip; an observation older than
+``tip - 40 min`` is stale (excluded, counted). The consensus benchmark reads
+``<runtime root>/odds/nba/<ET date>/espn_odds.jsonl``; the Polymarket T-10 mid reads the pick's own
+contract (``market_slug``) in ``polymarket_snapshots.jsonl`` and needs an open, two-sided book
+(the side's mid and one minus the other side's mid, each from a quote at most 10 points wide, as
+v10's Polymarket-mid anchor). Nothing falls back silently: every excluded pick carries a reason.
 
 The consensus is quoted at ESPN's line; it is moved to the contract's line with the same normal
 translation ``nba-anchor-v10`` uses for its anchor and track T-B (``anchor_mean`` then
@@ -40,7 +50,7 @@ import math
 import sqlite3
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from statistics import NormalDist
@@ -64,6 +74,9 @@ BENCHMARK_MAX_LEAD = timedelta(minutes=40)  # older than tip - 40 min is not a T
 # A v10 row and its v9 pair come from the same daily run (v10 is logged right after v9); runs are
 # hours apart, so a wider decision gap means the pair mixes two runs.
 PAIR_MAX_DECISION_GAP = timedelta(minutes=15)
+# Polymarket US taker fee c * p * (1 - p) on the price paid (plan G2 amendment C2b/C5; the same
+# coefficient as the nba-anchor-v10 artifact's ``fee_coefficient``).
+FEE_COEFFICIENT = 0.06
 BOOTSTRAP_DRAWS = 10_000
 BOOTSTRAP_SEED = 20261121
 
@@ -109,9 +122,26 @@ class Pick:
     tip: datetime
     sigma: float
     outcome: int | None = None  # 1 win, 0 loss, None unsettled / push / void
-    mid: float | None = None  # Polymarket mid of this side at decision time (two-sided, <= 10 wide)
-    pm_close: float | None = None  # Polymarket closing ask of this side (NOT a G2 benchmark)
+    # Polymarket mid of this side in the exact decision quote (two-sided, <= 10 points wide).
+    pm_mid_decision: float | None = None
+    pm_close: float | None = None  # settlement's closing ask of this side (reference only)
     anchor_source: str | None = None
+    anchor_observed_at_utc: str | None = None  # the decision-time consensus capture, if consensus-anchored
+    # Every Polymarket quote of this contract, as this side's mid: the C2b T-10 candidates.
+    pm_quotes: tuple[PolymarketQuote, ...] = ()
+
+
+@dataclass(frozen=True)
+class PolymarketQuote:
+    """One stored Polymarket quote of a pick's contract, reduced to the pick side's mid.
+
+    ``mid`` is None when the book was not open or not two-sided within 10 points; such a quote is
+    never a T-10 mid.
+    """
+
+    observed_at_utc: datetime
+    event_start_utc: datetime | None
+    mid: float | None
 
 
 @dataclass
@@ -123,7 +153,14 @@ class ScoredPick:
     benchmark_line: float | None = None
     benchmark_n_books: int | None = None
     consensus_prob: float | None = None
-    clv: float | None = None
+    clv: float | None = None  # C2a: T-10 consensus minus ask (selection-correlated for T-B picks)
+    pm_reason: str | None = None  # None when a Polymarket T-10 mid was found; else the exclusion reason
+    pm_mid_t10: float | None = None
+    pm_mid_t10_observed_at_utc: str | None = None
+    pm_clv_net: float | None = None  # C2b: pm_mid_t10 - (ask + fee)
+    consensus_prob_decision: float | None = None  # D1: consensus at the decision capture, same side
+    decision_consensus_line: float | None = None
+    line_split: str = "unknown"  # D2: same_line / translated / unknown (no decision consensus)
 
 
 # --------------------------------------------------------------------------- ESPN captures
@@ -238,6 +275,56 @@ def _record_quality(record: Mapping[str, Any], diag: Counter[str]) -> None:
 
 
 # --------------------------------------------------------------------------- benchmark
+def _select_t10(
+    items: Sequence[Any],
+    *,
+    observed: Any,
+    own_start: Any,
+    usable: Any,
+    decision_time: datetime,
+    tip: datetime,
+    as_of: datetime,
+    max_lead: timedelta,
+    missing: str,
+    stale: str,
+) -> tuple[Any | None, str | None]:
+    """Shared T-10 window rule for the consensus (C2a) and Polymarket (C2b) benchmarks.
+
+    Qualifying: ``decision_time < observed <= min(tip, item tip) - 10 min`` and ``usable(item)``.
+    The latest qualifying item wins (a max-scan: the stores are ingest-ordered). Nothing is final
+    before tip, and a latest item older than ``tip - max_lead`` is stale, never a T-10 value.
+    """
+    if as_of < tip:
+        return None, "pre_tip_not_final"
+    if not items:
+        return None, f"{missing}_no_capture"
+    in_window = []
+    before = after = 0
+    for item in items:
+        start = own_start(item)
+        cutoff = (tip if start is None else min(tip, start)) - BENCHMARK_LEAD
+        if observed(item) <= decision_time:
+            before += 1
+        elif observed(item) > cutoff:
+            after += 1
+        else:
+            in_window.append(item)
+    if not in_window:
+        if after == 0:
+            return None, f"{missing}_all_before_decision"
+        if before == 0:
+            return None, f"{missing}_all_after_t10"
+        return None, f"{missing}_outside_window"
+    qualifying = [item for item in in_window if usable(item)]
+    if not qualifying:
+        return None, f"{missing}_no_two_sided_quote"
+    best = max(qualifying, key=observed)
+    start = own_start(best)
+    if observed(best) < (tip if start is None else min(tip, start)) - max_lead:
+        return None, stale
+    return best, None
+
+
 def select_t10_benchmark(
     captures: Sequence[ConsensusCapture],
     *,
@@ -246,38 +333,68 @@ def select_t10_benchmark(
     as_of: datetime,
     max_lead: timedelta = BENCHMARK_MAX_LEAD,
 ) -> tuple[ConsensusCapture | None, str | None]:
-    """The T-10 consensus capture for one pick, or (None, exclusion reason).
+    """The T-10 consensus capture for one pick (C2a), or (None, exclusion reason).
 
-    Qualifying: ``decision_time < observed_at_utc <= min(tip, capture tip) - 10 min``. The latest
-    qualifying capture wins (max-scan). Reasons: ``pre_tip_not_final`` (the game has not tipped
-    at ``as_of``), ``missing_benchmark_no_capture``, ``missing_benchmark_all_before_decision``,
-    ``missing_benchmark_all_after_t10``, ``missing_benchmark_outside_window`` (a mix of both),
-    ``stale_benchmark`` (the latest qualifying capture is older than ``tip - max_lead``).
+    Qualifying: ``decision_time < observed_at_utc <= min(tip, capture tip) - 10 min``; the latest
+    wins. Reasons: ``pre_tip_not_final``, ``missing_benchmark_no_capture``,
+    ``missing_benchmark_all_before_decision``, ``missing_benchmark_all_after_t10``,
+    ``missing_benchmark_outside_window`` (a mix of both) and ``stale_benchmark``.
     """
-    if as_of < tip:
-        return None, "pre_tip_not_final"
-    if not captures:
-        return None, "missing_benchmark_no_capture"
-    qualifying = []
-    before = after = 0
-    for capture in captures:
-        cutoff = min(tip, capture.event_start_utc) - BENCHMARK_LEAD
-        if capture.observed_at_utc <= decision_time:
-            before += 1
-        elif capture.observed_at_utc > cutoff:
-            after += 1
-        else:
-            qualifying.append(capture)
-    if not qualifying:
-        if after == 0:
-            return None, "missing_benchmark_all_before_decision"
-        if before == 0:
-            return None, "missing_benchmark_all_after_t10"
-        return None, "missing_benchmark_outside_window"
-    best = max(qualifying, key=lambda c: c.observed_at_utc)
-    if best.observed_at_utc < min(tip, best.event_start_utc) - max_lead:
-        return None, "stale_benchmark"
-    return best, None
+    return _select_t10(
+        captures,
+        observed=lambda c: c.observed_at_utc,
+        own_start=lambda c: c.event_start_utc,
+        usable=lambda c: True,
+        decision_time=decision_time,
+        tip=tip,
+        as_of=as_of,
+        max_lead=max_lead,
+        missing="missing_benchmark",
+        stale="stale_benchmark",
+    )
+
+
+def select_pm_t10_mid(
+    quotes: Sequence[PolymarketQuote],
+    *,
+    decision_time: datetime,
+    tip: datetime,
+    as_of: datetime,
+    max_lead: timedelta = BENCHMARK_MAX_LEAD,
+) -> tuple[PolymarketQuote | None, str | None]:
+    """The Polymarket T-10 mid for one pick (C2b), or (None, exclusion reason).
+
+    The latest quote of the pick's own contract (rung) with
+    ``decision_time < observed_at_utc <= min(tip, quote tip) - 10 min`` and a two-sided open book
+    for the side; the same stale rule as the consensus. Reasons are the consensus ones with the
+    ``missing_pm_benchmark`` / ``stale_pm_benchmark`` prefix, plus
+    ``missing_pm_benchmark_no_two_sided_quote``.
+    """
+    return _select_t10(
+        quotes,
+        observed=lambda q: q.observed_at_utc,
+        own_start=lambda q: q.event_start_utc,
+        usable=lambda q: q.mid is not None,
+        decision_time=decision_time,
+        tip=tip,
+        as_of=as_of,
+        max_lead=max_lead,
+        missing="missing_pm_benchmark",
+        stale="stale_pm_benchmark",
+    )
+
+
+def fee(price: float) -> float:
+    """Polymarket US taker fee per contract at ``price``: ``0.06 * p * (1 - p)``."""
+    return FEE_COEFFICIENT * price * (1.0 - price)
+
+
+def net_return(pick: Pick) -> float | None:
+    """C5: realized return per 1 unit staked, net of fee (None while unsettled or on a push)."""
+    if pick.outcome is None:
+        return None
+    cost = pick.ask + fee(pick.ask)
+    return pick.outcome / cost - 1.0
 
 
 def consensus_side_probability(
@@ -291,31 +408,56 @@ def consensus_side_probability(
     return p_low if side == _LOW_SIDE[capture.market] else 1.0 - p_low
 
 
+def _decision_capture(pick: Pick, captures: Sequence[ConsensusCapture]) -> ConsensusCapture | None:
+    """The consensus capture the row was anchored on (matched on its observed time), if any."""
+    if not pick.anchor_observed_at_utc:
+        return None
+    try:
+        anchored = parse_utc(pick.anchor_observed_at_utc)
+    except (TypeError, ValueError):
+        return None
+    return next((c for c in captures if c.observed_at_utc == anchored), None)
+
+
 def score_pick(
     pick: Pick,
     captures: Mapping[tuple[str, str], Sequence[ConsensusCapture]],
     *,
     as_of: datetime,
 ) -> ScoredPick:
-    capture, reason = select_t10_benchmark(
-        captures.get((pick.event_id, pick.market), ()),
-        decision_time=pick.decision_time,
-        tip=pick.tip,
-        as_of=as_of,
+    """Both T-10 benchmarks of one pick, each with its own exclusion reason, plus D1/D2 inputs."""
+    own = captures.get((pick.event_id, pick.market), ())
+    scored = ScoredPick(pick, None)
+
+    decision_capture = _decision_capture(pick, own)
+    if decision_capture is not None:
+        scored.consensus_prob_decision = round(
+            consensus_side_probability(decision_capture, pick.side, pick.contract_line, pick.sigma), 6
+        )
+        scored.decision_consensus_line = decision_capture.line
+        same = abs(decision_capture.line - pick.contract_line) < 1e-9
+        scored.line_split = "same_line" if same else "translated"
+
+    quote, scored.pm_reason = select_pm_t10_mid(
+        pick.pm_quotes, decision_time=pick.decision_time, tip=pick.tip, as_of=as_of
     )
-    if capture is None:
-        return ScoredPick(pick, reason)
-    prob = consensus_side_probability(capture, pick.side, pick.contract_line, pick.sigma)
-    return ScoredPick(
-        pick,
-        None,
-        benchmark_observed_at_utc=capture.observed_at_utc.isoformat(),
-        benchmark_lead_minutes=round((pick.tip - capture.observed_at_utc).total_seconds() / 60, 1),
-        benchmark_line=capture.line,
-        benchmark_n_books=capture.n_books,
-        consensus_prob=round(prob, 6),
-        clv=round(prob - pick.ask, 6),
+    if quote is not None and quote.mid is not None:
+        scored.pm_mid_t10 = quote.mid
+        scored.pm_mid_t10_observed_at_utc = quote.observed_at_utc.isoformat()
+        scored.pm_clv_net = round(quote.mid - (pick.ask + fee(pick.ask)), 6)
+
+    capture, scored.reason = select_t10_benchmark(
+        own, decision_time=pick.decision_time, tip=pick.tip, as_of=as_of
     )
+    if capture is not None:
+        prob = consensus_side_probability(capture, pick.side, pick.contract_line, pick.sigma)
+        scored.benchmark_observed_at_utc = capture.observed_at_utc.isoformat()
+        scored.benchmark_lead_minutes = round((pick.tip - capture.observed_at_utc).total_seconds() / 60, 1)
+        scored.benchmark_line = capture.line
+        scored.benchmark_n_books = capture.n_books
+        scored.consensus_prob = round(prob, 6)
+        scored.clv = round(prob - pick.ask, 6)
+    return scored
 
 
 # --------------------------------------------------------------------------- statistics
@@ -381,7 +523,37 @@ def g2_verdict(n_picks: int, criteria: Mapping[str, str]) -> tuple[str, str]:
         return "FAIL", f"failing at {n_picks} picks (kill check at {G2_KILL_PICKS}): {', '.join(failed)}"
     if waiting:
         return "PENDING", f"not yet evaluable: {', '.join(waiting)}"
-    return "PASS", f"all four criteria pass at {n_picks} picks"
+    return "PASS", f"all criteria pass at {n_picks} picks"
+
+
+def _ci_block(values: Sequence[float], clusters: Sequence[str], draws: int) -> dict[str, Any]:
+    return asdict(cluster_mean_ci(values, clusters, draws=draws))
+
+
+def who_moved(delta_consensus: float | None, delta_poly: float | None) -> str:
+    """D1 reading of the mean moves between decision and T-10 on the picked side.
+
+    For a T-B pick the book sat above Polymarket at the decision; the gap closes by
+    ``delta_poly - delta_consensus``. The book's share is ``-delta_consensus``.
+    """
+    if delta_consensus is None or delta_poly is None:
+        return "not computable (no pick has decision and T-10 values for both the book and Polymarket)"
+    closure = delta_poly - delta_consensus
+    if closure <= 0:
+        return "the consensus-Polymarket gap did not close on average"
+    if -delta_consensus > delta_poly:
+        return (
+            "the book moved toward Polymarket more than Polymarket moved toward the book: "
+            "T-B is fading a stale single-book line"
+        )
+    return "Polymarket moved toward the book more than the book moved toward Polymarket"
+
+
+def _ci_pass(ci: MeanCI, floor: float) -> str:
+    """PASS when the mean clears ``floor`` and the 95% CI lies above 0."""
+    if ci.mean is None or ci.low is None:
+        return NOT_EVALUABLE
+    return PASS if ci.mean >= floor and ci.low > 0.0 else FAIL
 
 
 def evaluate_population(
@@ -390,67 +562,111 @@ def evaluate_population(
     *,
     draws: int = BOOTSTRAP_DRAWS,
 ) -> dict[str, Any]:
-    """The full G2 scorecard of one population of picks (criteria, verdict and supporting numbers)."""
+    """The amended G2 scorecard of one population (criteria C1-C5, verdict, diagnostics D1/D2)."""
+    games = [s.pick.event_id for s in scored]
     ok = [s for s in scored if s.reason is None and s.clv is not None]
     exclusions = Counter(s.reason for s in scored if s.reason is not None)
-    clv = cluster_mean_ci([s.clv for s in ok], [s.pick.event_id for s in ok], draws=draws)  # type: ignore[misc]
+    c2a = cluster_mean_ci([s.clv for s in ok], [s.pick.event_id for s in ok], draws=draws)  # type: ignore[misc]
 
-    # Paired v10 - v9 on the same game and market, against the same benchmark capture.
-    diffs, diff_games = [], []
+    # C2b: selection-independent Polymarket CLV net of fee, with its own benchmark and exclusions.
+    pm_ok = [s for s in scored if s.pm_clv_net is not None]
+    pm_excl = Counter(str(s.pm_reason) for s in scored if s.pm_clv_net is None)
+    c2b = cluster_mean_ci([s.pm_clv_net for s in pm_ok], [s.pick.event_id for s in pm_ok], draws=draws)  # type: ignore[misc]
+
+    # C3: paired v10 - v9 on the C2b CLV, same game and market, same Polymarket T-10 quote.
+    diffs: list[float] = []
+    diff_games: list[str] = []
     pair_reasons: Counter[str] = Counter()
-    for s in ok:
+    for s in pm_ok:
         v9 = v9_by_key.get((s.pick.event_id, s.pick.market))
         if v9 is None:
             pair_reasons["no_v9_row"] += 1
-        elif v9.reason is not None or v9.clv is None:
-            pair_reasons[f"v9_{v9.reason}"] += 1
-        elif v9.benchmark_observed_at_utc != s.benchmark_observed_at_utc:
+        elif v9.pm_clv_net is None:
+            pair_reasons[f"v9_{v9.pm_reason}"] += 1
+        elif v9.pm_mid_t10_observed_at_utc != s.pm_mid_t10_observed_at_utc:
             pair_reasons["v9_different_benchmark"] += 1
         elif abs(v9.pick.decision_time - s.pick.decision_time) > PAIR_MAX_DECISION_GAP:
             # Both rows are replaced together on every daily re-run; a wider gap means they come
             # from different runs (one model failed or was skipped in a run), so not a fair pair.
             pair_reasons["v9_decision_not_same_run"] += 1
         else:
-            diffs.append(s.clv - v9.clv)  # type: ignore[operator]
+            diffs.append(s.pm_clv_net - v9.pm_clv_net)  # type: ignore[operator]
             diff_games.append(s.pick.event_id)
     paired = cluster_mean_ci(diffs, diff_games, draws=draws)
 
-    settled = [s for s in ok if s.pick.outcome is not None and s.pick.mid is not None]
+    # C4 on the consensus-scored picks (the C1 sample).
+    settled = [s for s in ok if s.pick.outcome is not None and s.pick.pm_mid_decision is not None]
     brier_reasons = Counter(
         "unsettled_or_push" if s.pick.outcome is None else "no_decision_mid"
         for s in ok
-        if s.pick.outcome is None or s.pick.mid is None
+        if s.pick.outcome is None or s.pick.pm_mid_decision is None
     )
-    brier_model = brier([s.pick.probability for s in settled], [s.pick.outcome for s in settled])  # type: ignore[misc]
-    brier_mid = brier([s.pick.mid for s in settled], [s.pick.outcome for s in settled])  # type: ignore[misc]
+    outcomes = [int(s.pick.outcome) for s in settled]  # type: ignore[arg-type]
+    brier_model = brier([s.pick.probability for s in settled], outcomes)
+    brier_mid = brier([float(s.pick.pm_mid_decision) for s in settled], outcomes)  # type: ignore[arg-type]
     by_anchor: dict[str, dict[str, Any]] = {}
     for source in sorted({str(s.pick.anchor_source) for s in settled}):
         rows = [s for s in settled if str(s.pick.anchor_source) == source]
+        row_outcomes = [int(s.pick.outcome) for s in rows]  # type: ignore[arg-type]
         by_anchor[source] = {
             "n": len(rows),
-            "brier_model": brier([s.pick.probability for s in rows], [s.pick.outcome for s in rows]),  # type: ignore[misc]
-            "brier_mid": brier([s.pick.mid for s in rows], [s.pick.outcome for s in rows]),  # type: ignore[misc]
+            "brier_model": brier([s.pick.probability for s in rows], row_outcomes),
+            "brier_mid": brier([float(s.pick.pm_mid_decision) for s in rows], row_outcomes),  # type: ignore[arg-type]
         }
 
-    # Reference only and benchmark-free: every row with a Polymarket close counts, not just the
-    # consensus-scored ones, so it stays visible while T-10 captures are missing or stale.
-    pm = [s for s in scored if s.pick.pm_close is not None]
-    pm_clv = cluster_mean_ci(
-        [s.pick.pm_close - s.pick.ask for s in pm],  # type: ignore[operator]
-        [s.pick.event_id for s in pm],
+    # C5: realized net-of-fee return per 1-unit pick over every settled pick (needs no benchmark).
+    returns = [(r, s.pick.event_id) for s in scored if (r := net_return(s.pick)) is not None]
+    c5 = cluster_mean_ci([r for r, _ in returns], [g for _, g in returns], draws=draws)
+
+    # D1: who moved between the decision and T-10, on the picked side.
+    moved = [
+        s
+        for s in scored
+        if None not in (s.consensus_prob_decision, s.consensus_prob, s.pick.pm_mid_decision, s.pm_mid_t10)
+    ]
+    moved_games = [s.pick.event_id for s in moved]
+    d_cons = cluster_mean_ci(
+        [s.consensus_prob - s.consensus_prob_decision for s in moved],  # type: ignore[operator]
+        moved_games,
+        draws=draws,
+    )
+    d_poly = cluster_mean_ci(
+        [s.pm_mid_t10 - s.pick.pm_mid_decision for s in moved],  # type: ignore[operator]
+        moved_games,
+        draws=draws,
+    )
+
+    # D2: same-line vs translated-line picks (the decision consensus line vs the contract rung).
+    splits: dict[str, dict[str, Any]] = {}
+    for split in ("same_line", "translated", "unknown"):
+        part = [s for s in scored if s.line_split == split]
+        a = [s for s in part if s.reason is None and s.clv is not None]
+        b = [s for s in part if s.pm_clv_net is not None]
+        r = [(ret, s.pick.event_id) for s in part if (ret := net_return(s.pick)) is not None]
+        splits[split] = {
+            "rows": len(part),
+            "c2a_consensus_clv": _ci_block([s.clv for s in a], [s.pick.event_id for s in a], draws),  # type: ignore[misc]
+            "c2b_polymarket_clv_net": _ci_block(
+                [s.pm_clv_net for s in b],  # type: ignore[misc]
+                [s.pick.event_id for s in b],
+                draws,
+            ),
+            "c5_net_return": _ci_block([x for x, _ in r], [g for _, g in r], draws),
+        }
+
+    closes = [s for s in scored if s.pick.pm_close is not None]
+    close_clv = cluster_mean_ci(
+        [s.pick.pm_close - s.pick.ask for s in closes],  # type: ignore[operator]
+        [s.pick.event_id for s in closes],
         draws=draws,
     )
 
     criteria = {
-        "c1_n_picks": PASS if clv.n >= G2_MIN_PICKS else FAIL,
-        "c2_consensus_clv": (
-            NOT_EVALUABLE
-            if clv.mean is None or clv.low is None
-            else PASS
-            if clv.mean >= G2_MIN_MEAN_CLV and clv.low > 0.0
-            else FAIL
-        ),
-        "c3_clv_above_v9": (NOT_EVALUABLE if paired.mean is None else PASS if paired.mean > 0.0 else FAIL),
+        "c1_n_picks": PASS if c2a.n >= G2_MIN_PICKS else FAIL,
+        "c2a_consensus_clv": _ci_pass(c2a, G2_MIN_MEAN_CLV),
+        # "Mean > 0 with the CI excluding 0": the CI lying above 0 already implies the mean does.
+        "c2b_polymarket_clv_net": _ci_pass(c2b, 0.0),
+        "c3_clv_above_v9": NOT_EVALUABLE if paired.mean is None else PASS if paired.mean > 0.0 else FAIL,
         "c4_brier_vs_mid": (
             NOT_EVALUABLE
             if brier_model is None or brier_mid is None
@@ -458,19 +674,26 @@ def evaluate_population(
             if brier_model <= brier_mid
             else FAIL
         ),
+        "c5_net_return": NOT_EVALUABLE if c5.mean is None else PASS if c5.mean > 0.0 else FAIL,
     }
-    verdict, why = g2_verdict(clv.n, {k: v for k, v in criteria.items() if k != "c1_n_picks"})
+    verdict, why = g2_verdict(c2a.n, {k: v for k, v in criteria.items() if k != "c1_n_picks"})
     leads = [s.benchmark_lead_minutes for s in ok if s.benchmark_lead_minutes is not None]
     return {
         "rows": len(scored),
-        "scored": clv.n,
-        "games": clv.n_games,
+        "row_games": len(set(games)),
+        "scored": c2a.n,
+        "games": c2a.n_games,
         "excluded": dict(sorted(exclusions.items())),
         "criteria": criteria,
         "verdict": verdict,
         "verdict_reason": why,
-        "consensus_clv": asdict(clv),
-        "v9_paired_clv_diff": {**asdict(paired), "unpaired": dict(sorted(pair_reasons.items()))},
+        "consensus_clv": asdict(c2a),
+        "polymarket_clv_net": {**asdict(c2b), "excluded": dict(sorted(pm_excl.items()))},
+        "v9_paired_clv_diff": {
+            **asdict(paired),
+            "basis": "polymarket_clv_net",
+            "unpaired": dict(sorted(pair_reasons.items())),
+        },
         "brier": {
             "n": len(settled),
             "model": brier_model,
@@ -478,7 +701,14 @@ def evaluate_population(
             "excluded": dict(sorted(brier_reasons.items())),
             "by_anchor_source": by_anchor,
         },
-        "polymarket_clv_not_g2": asdict(pm_clv),
+        "net_return": asdict(c5),
+        "d1_who_moved": {
+            "delta_consensus": asdict(d_cons),
+            "delta_poly": asdict(d_poly),
+            "reading": who_moved(d_cons.mean, d_poly.mean),
+        },
+        "d2_line_split": splits,
+        "polymarket_close_ask_clv_reference": asdict(close_clv),
         "benchmark_lead_minutes": (
             None if not leads else {"min": min(leads), "median": float(np.median(leads)), "max": max(leads)}
         ),
@@ -561,6 +791,38 @@ class _DecisionQuotes:
         if not slug or not observed:
             return None
         return self._load(tip.astimezone(EASTERN).date().isoformat()).get((slug, observed))
+
+    def contract(self, slug: str | None, tip: datetime) -> list[dict[str, Any]]:
+        """Every stored quote of one contract (rung), in no particular order."""
+        if not slug:
+            return []
+        index = self._load(tip.astimezone(EASTERN).date().isoformat())
+        return [item for (item_slug, _), item in index.items() if item_slug == slug]
+
+
+def _pm_quotes(
+    records: Sequence[Mapping[str, Any]], market: str, side: str, away_team: str
+) -> tuple[PolymarketQuote, ...]:
+    """A contract's stored quotes reduced to ``side``'s two-sided mid (None when unusable).
+
+    A quote whose book is not open (halted, closed, expired) is never a mid, as in settlement's
+    ``closing_snapshot``.
+    """
+    out = []
+    for record in records:
+        try:
+            observed = parse_utc(str(record["observed_at_utc"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        try:
+            own_start = parse_utc(str(record["event_start_utc"])) if record.get("event_start_utc") else None
+        except (TypeError, ValueError):
+            continue
+        state = record.get("market_state")
+        _, mid, problem = _quote_side(record, market, side, away_team)
+        usable = problem is None and (state is None or state == "MARKET_STATE_OPEN")
+        out.append(PolymarketQuote(observed, own_start, mid if usable else None))
+    return tuple(out)
 
 
 def _quote_side(
@@ -718,8 +980,9 @@ def load_g2_inputs(
                 tip=tip,
                 sigma=float("nan"),  # set from the paired v10 row (same translation for both)
                 outcome=outcome,
-                mid=mid,
+                pm_mid_decision=mid,
                 pm_close=_pm_close(data_root, slug, row, selection, line, decision, as_of, tip),
+                pm_quotes=_pm_quotes(quotes.contract(slug, tip), market, selection, str(row["away_team"])),
             )
         else:
             v9_excl["no_live_v10_row_for_game_market"] += 1
@@ -727,7 +990,7 @@ def load_g2_inputs(
     # v9 is translated with its v10 pair's sigma, so the benchmark is literally the same.
     sigma_by_key = {(p.event_id, p.market): p.sigma for p in out.populations["all_flat"]}
     for key, pick in list(out.v9.items()):
-        out.v9[key] = Pick(**{**asdict(pick), "sigma": sigma_by_key.get(key, float("nan"))})
+        out.v9[key] = replace(pick, sigma=sigma_by_key.get(key, float("nan")))
 
     from .data_sources.nba_pretip_capture import espn_odds_path
 
@@ -787,6 +1050,9 @@ def _add_v10(
     row_line = float(row["line"])
     if abs(_contract_line_from_row(market, side, row_line) - contract_line) > 1e-9:
         diag["v10_ledger_line_differs_from_contract_line"] += 1
+    from .cli.forecast_nba_anchor_v10 import SOURCE_CONSENSUS
+
+    contract_quotes = quotes.contract(slug, tip)
     base = Pick(
         pick_id=str(row["pick_id"]),
         model=V10_MODEL,
@@ -800,9 +1066,13 @@ def _add_v10(
         tip=tip,
         sigma=sigma,
         outcome=outcome,
-        mid=mid,
+        pm_mid_decision=mid,
         pm_close=_pm_close(data_root, slug, row, side, row_line, decision, as_of, tip),
         anchor_source=snap.get("anchor_source"),
+        anchor_observed_at_utc=(
+            snap.get("anchor_observed_at_utc") if snap.get("anchor_source") == SOURCE_CONSENSUS else None
+        ),
+        pm_quotes=_pm_quotes(contract_quotes, market, side, str(row["away_team"])),
     )
     out.populations["all_flat"].append(base)
 
@@ -816,7 +1086,7 @@ def _add_v10(
         if edge is not None and edge >= threshold and snap.get("anchor_source"):
             out.populations["g2_picks"].append(base)
 
-    tb_pick = _tb_pick(base, snap, row, quote, outcome, data_root, as_of, tb_counts)
+    tb_pick = _tb_pick(base, snap, row, quote, contract_quotes, outcome, data_root, as_of, tb_counts)
     if tb_pick is not None:
         out.populations["tb"].append(tb_pick)
         if threshold is None and _is_tb_g2_pick(snap, tb_pick.side):
@@ -847,6 +1117,7 @@ def _tb_pick(
     snap: Mapping[str, Any],
     row: Mapping[str, Any],
     quote: Mapping[str, Any] | None,
+    contract_quotes: Sequence[Mapping[str, Any]],
     outcome: int | None,
     data_root: Path,
     as_of: datetime,
@@ -873,19 +1144,19 @@ def _tb_pick(
     tb_ask_q, tb_mid, _ = _quote_side(quote, base.market, tb_side, str(row["away_team"]))
     row_line = float(row["line"])
     tb_line = row_line if tb_side == base.side or base.market == "total" else -row_line
-    return Pick(
-        **{
-            **asdict(base),
-            "pick_id": f"{base.pick_id}:tb",
-            "side": tb_side,
-            "ask": round(tb_ask, 6) if tb_ask_q is None else tb_ask_q,
-            "probability": tb_prob,
-            "outcome": None if outcome is None or tb_side == base.side else 1 - outcome,
-            "mid": tb_mid,
-            "pm_close": _pm_close(
-                data_root, snap.get("market_slug"), row, tb_side, tb_line, base.decision_time, as_of, base.tip
-            ),
-        }
+    away = str(row["away_team"])
+    return replace(
+        base,
+        pick_id=f"{base.pick_id}:tb",
+        side=tb_side,
+        ask=round(tb_ask, 6) if tb_ask_q is None else tb_ask_q,
+        probability=tb_prob,
+        outcome=None if outcome is None or tb_side == base.side else 1 - outcome,
+        pm_mid_decision=tb_mid,
+        pm_close=_pm_close(
+            data_root, snap.get("market_slug"), row, tb_side, tb_line, base.decision_time, as_of, base.tip
+        ),
+        pm_quotes=_pm_quotes(contract_quotes, base.market, tb_side, away),
     )
 
 
@@ -924,6 +1195,7 @@ def run_g2(
 
 def _row_json(scored: ScoredPick) -> dict[str, Any]:
     pick = asdict(scored.pick)
+    pick.pop("pm_quotes")  # every stored quote of the contract: candidates, not results
     for key in ("decision_time", "tip"):
         pick[key] = pick[key].isoformat()
     return {**pick, **{k: v for k, v in asdict(scored).items() if k != "pick"}}
@@ -937,16 +1209,21 @@ __all__ = [
     "G2_MIN_PICKS",
     "ConsensusCapture",
     "Pick",
+    "PolymarketQuote",
     "ScoredPick",
     "cluster_mean_ci",
     "consensus_side_probability",
     "evaluate_population",
+    "fee",
     "g2_rule",
     "g2_verdict",
     "load_consensus_captures",
     "load_g2_inputs",
+    "net_return",
     "parse_espn_record",
     "run_g2",
     "score_pick",
+    "select_pm_t10_mid",
     "select_t10_benchmark",
+    "who_moved",
 ]

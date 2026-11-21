@@ -1,14 +1,14 @@
 {
  "artifact_hash": "2bb069150528fe529f0e19f50562c99a7d7daaf11d9a0ec32ee8a8b6d1de9f85",
- "as_of_utc": "2026-11-21T20:06:47.863435+00:00",
+ "as_of_utc": "2026-11-21T21:05:43.243090+00:00",
  "bootstrap_draws": 10000,
  "capture_diagnostics": {
   "files": 1,
-  "records": 21,
-  "spread_consensus": 21,
-  "spread_n_books=1": 21,
-  "total_consensus": 21,
-  "total_n_books=1": 21
+  "records": 51,
+  "spread_consensus": 51,
+  "spread_n_books=1": 51,
+  "total_consensus": 51,
+  "total_n_books=1": 51
  },
  "capture_files": [
   "E:\\model-prediction-runtime\\odds\\nba\\2026-11-21\\espn_odds.jsonl"
@@ -47,24 +47,136 @@
    },
    "criteria": {
     "c1_n_picks": "fail",
-    "c2_consensus_clv": "not_evaluable",
+    "c2a_consensus_clv": "not_evaluable",
+    "c2b_polymarket_clv_net": "not_evaluable",
     "c3_clv_above_v9": "not_evaluable",
-    "c4_brier_vs_mid": "not_evaluable"
+    "c4_brier_vs_mid": "not_evaluable",
+    "c5_net_return": "not_evaluable"
+   },
+   "d1_who_moved": {
+    "delta_consensus": {
+     "high": null,
+     "low": null,
+     "mean": null,
+     "n": 0,
+     "n_games": 0
+    },
+    "delta_poly": {
+     "high": null,
+     "low": null,
+     "mean": null,
+     "n": 0,
+     "n_games": 0
+    },
+    "reading": "not computable (no pick has decision and T-10 values for both the book and Polymarket)"
+   },
+   "d2_line_split": {
+    "same_line": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 0
+    },
+    "translated": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 0
+    },
+    "unknown": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 10
+    }
    },
    "excluded": {
     "pre_tip_not_final": 10
    },
    "games": 0,
-   "polymarket_clv_not_g2": {
+   "net_return": {
     "high": null,
     "low": null,
     "mean": null,
     "n": 0,
     "n_games": 0
    },
+   "polymarket_close_ask_clv_reference": {
+    "high": null,
+    "low": null,
+    "mean": null,
+    "n": 0,
+    "n_games": 0
+   },
+   "polymarket_clv_net": {
+    "excluded": {
+     "pre_tip_not_final": 10
+    },
+    "high": null,
+    "low": null,
+    "mean": null,
+    "n": 0,
+    "n_games": 0
+   },
+   "row_games": 5,
    "rows": 10,
    "scored": 0,
    "v9_paired_clv_diff": {
+    "basis": "polymarket_clv_net",
     "high": null,
     "low": null,
     "mean": null,
@@ -93,22 +205,132 @@
    },
    "criteria": {
     "c1_n_picks": "fail",
-    "c2_consensus_clv": "not_evaluable",
+    "c2a_consensus_clv": "not_evaluable",
+    "c2b_polymarket_clv_net": "not_evaluable",
     "c3_clv_above_v9": "not_evaluable",
-    "c4_brier_vs_mid": "not_evaluable"
+    "c4_brier_vs_mid": "not_evaluable",
+    "c5_net_return": "not_evaluable"
+   },
+   "d1_who_moved": {
+    "delta_consensus": {
+     "high": null,
+     "low": null,
+     "mean": null,
+     "n": 0,
+     "n_games": 0
+    },
+    "delta_poly": {
+     "high": null,
+     "low": null,
+     "mean": null,
+     "n": 0,
+     "n_games": 0
+    },
+    "reading": "not computable (no pick has decision and T-10 values for both the book and Polymarket)"
+   },
+   "d2_line_split": {
+    "same_line": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 0
+    },
+    "translated": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 0
+    },
+    "unknown": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 0
+    }
    },
    "excluded": {},
    "games": 0,
-   "polymarket_clv_not_g2": {
+   "net_return": {
     "high": null,
     "low": null,
     "mean": null,
     "n": 0,
     "n_games": 0
    },
+   "polymarket_close_ask_clv_reference": {
+    "high": null,
+    "low": null,
+    "mean": null,
+    "n": 0,
+    "n_games": 0
+   },
+   "polymarket_clv_net": {
+    "excluded": {},
+    "high": null,
+    "low": null,
+    "mean": null,
+    "n": 0,
+    "n_games": 0
+   },
+   "row_games": 0,
    "rows": 0,
    "scored": 0,
    "v9_paired_clv_diff": {
+    "basis": "polymarket_clv_net",
     "high": null,
     "low": null,
     "mean": null,
@@ -137,22 +359,132 @@
    },
    "criteria": {
     "c1_n_picks": "fail",
-    "c2_consensus_clv": "not_evaluable",
+    "c2a_consensus_clv": "not_evaluable",
+    "c2b_polymarket_clv_net": "not_evaluable",
     "c3_clv_above_v9": "not_evaluable",
-    "c4_brier_vs_mid": "not_evaluable"
+    "c4_brier_vs_mid": "not_evaluable",
+    "c5_net_return": "not_evaluable"
+   },
+   "d1_who_moved": {
+    "delta_consensus": {
+     "high": null,
+     "low": null,
+     "mean": null,
+     "n": 0,
+     "n_games": 0
+    },
+    "delta_poly": {
+     "high": null,
+     "low": null,
+     "mean": null,
+     "n": 0,
+     "n_games": 0
+    },
+    "reading": "not computable (no pick has decision and T-10 values for both the book and Polymarket)"
+   },
+   "d2_line_split": {
+    "same_line": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 0
+    },
+    "translated": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 0
+    },
+    "unknown": {
+     "c2a_consensus_clv": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c2b_polymarket_clv_net": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "c5_net_return": {
+      "high": null,
+      "low": null,
+      "mean": null,
+      "n": 0,
+      "n_games": 0
+     },
+     "rows": 0
+    }
    },
    "excluded": {},
    "games": 0,
-   "polymarket_clv_not_g2": {
+   "net_return": {
     "high": null,
     "low": null,
     "mean": null,
     "n": 0,
     "n_games": 0
    },
+   "polymarket_close_ask_clv_reference": {
+    "high": null,
+    "low": null,
+    "mean": null,
+    "n": 0,
+    "n_games": 0
+   },
+   "polymarket_clv_net": {
+    "excluded": {},
+    "high": null,
+    "low": null,
+    "mean": null,
+    "n": 0,
+    "n_games": 0
+   },
+   "row_games": 0,
    "rows": 0,
    "scored": 0,
    "v9_paired_clv_diff": {
+    "basis": "polymarket_clv_net",
     "high": null,
     "low": null,
     "mean": null,
@@ -174,6 +506,7 @@
  "rows": {
   "all_flat": [
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.51,
     "benchmark_lead_minutes": null,
@@ -182,15 +515,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 3.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.156063+00:00",
     "event_id": "401910024",
+    "line_split": "unknown",
     "market": "spread",
-    "mid": 0.505,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "a0577a3dfccc4103",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.505,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.505,
     "reason": "pre_tip_not_final",
     "side": "away",
@@ -198,6 +538,7 @@
     "tip": "2026-11-22T00:30:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.51,
     "benchmark_lead_minutes": null,
@@ -206,15 +547,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 5.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.156063+00:00",
     "event_id": "401910025",
+    "line_split": "unknown",
     "market": "spread",
-    "mid": 0.505,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "697f450aac5e420c",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.505,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.505,
     "reason": "pre_tip_not_final",
     "side": "away",
@@ -222,6 +570,7 @@
     "tip": "2026-11-22T01:00:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.52,
     "benchmark_lead_minutes": null,
@@ -230,15 +579,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 6.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.156063+00:00",
     "event_id": "401910026",
+    "line_split": "unknown",
     "market": "spread",
-    "mid": 0.515,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "2c36af6c315c491f",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.515,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.515,
     "reason": "pre_tip_not_final",
     "side": "away",
@@ -246,6 +602,7 @@
     "tip": "2026-11-22T01:00:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.52,
     "benchmark_lead_minutes": null,
@@ -254,15 +611,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 18.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.156063+00:00",
     "event_id": "401910027",
+    "line_split": "unknown",
     "market": "spread",
-    "mid": 0.515,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "1b80b5be246a458d",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.515,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.515,
     "reason": "pre_tip_not_final",
     "side": "home",
@@ -270,6 +634,7 @@
     "tip": "2026-11-22T01:00:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.51,
     "benchmark_lead_minutes": null,
@@ -278,15 +643,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": -13.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.156063+00:00",
     "event_id": "401910028",
+    "line_split": "unknown",
     "market": "spread",
-    "mid": 0.505,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "360f742e6ff64a5a",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.505,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.505,
     "reason": "pre_tip_not_final",
     "side": "away",
@@ -294,6 +666,7 @@
     "tip": "2026-11-22T03:00:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.51,
     "benchmark_lead_minutes": null,
@@ -302,15 +675,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 215.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.876829+00:00",
     "event_id": "401910024",
+    "line_split": "unknown",
     "market": "total",
-    "mid": 0.505,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "3e3039a449454b04",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.505,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.505,
     "reason": "pre_tip_not_final",
     "side": "over",
@@ -318,6 +698,7 @@
     "tip": "2026-11-22T00:30:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.51,
     "benchmark_lead_minutes": null,
@@ -326,15 +707,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 230.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.876829+00:00",
     "event_id": "401910025",
+    "line_split": "unknown",
     "market": "total",
-    "mid": 0.505,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "0c04ab59a9c744ce",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.505,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.505,
     "reason": "pre_tip_not_final",
     "side": "under",
@@ -342,6 +730,7 @@
     "tip": "2026-11-22T01:00:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.51,
     "benchmark_lead_minutes": null,
@@ -350,15 +739,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 229.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.876829+00:00",
     "event_id": "401910026",
+    "line_split": "unknown",
     "market": "total",
-    "mid": 0.505,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "935bbac140944f23",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.505,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.505,
     "reason": "pre_tip_not_final",
     "side": "over",
@@ -366,6 +762,7 @@
     "tip": "2026-11-22T01:00:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.51,
     "benchmark_lead_minutes": null,
@@ -374,15 +771,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 228.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.876829+00:00",
     "event_id": "401910027",
+    "line_split": "unknown",
     "market": "total",
-    "mid": 0.505,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "f1d80a936a154201",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.505,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.505,
     "reason": "pre_tip_not_final",
     "side": "under",
@@ -390,6 +794,7 @@
     "tip": "2026-11-22T01:00:00+00:00"
    },
    {
+    "anchor_observed_at_utc": null,
     "anchor_source": "polymarket_mid",
     "ask": 0.51,
     "benchmark_lead_minutes": null,
@@ -398,15 +803,22 @@
     "benchmark_observed_at_utc": null,
     "clv": null,
     "consensus_prob": null,
+    "consensus_prob_decision": null,
     "contract_line": 218.5,
+    "decision_consensus_line": null,
     "decision_time": "2026-11-21T19:21:29.876829+00:00",
     "event_id": "401910028",
+    "line_split": "unknown",
     "market": "total",
-    "mid": 0.505,
     "model": "nba-anchor-v10",
     "outcome": null,
     "pick_id": "3adc3860b32f4875",
     "pm_close": null,
+    "pm_clv_net": null,
+    "pm_mid_decision": 0.505,
+    "pm_mid_t10": null,
+    "pm_mid_t10_observed_at_utc": null,
+    "pm_reason": "pre_tip_not_final",
     "probability": 0.505,
     "reason": "pre_tip_not_final",
     "side": "under",
@@ -423,6 +835,7 @@
  },
  "v9_rows": [
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.5,
    "benchmark_lead_minutes": null,
@@ -431,15 +844,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 3.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.246548+00:00",
    "event_id": "401910024",
+   "line_split": "unknown",
    "market": "spread",
-   "mid": 0.495,
    "model": "nba-spread-margin-v9",
    "outcome": null,
    "pick_id": "b5e1b4e8ba094c00",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.495,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.634501,
    "reason": "pre_tip_not_final",
    "side": "home",
@@ -447,6 +867,7 @@
    "tip": "2026-11-22T00:30:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.51,
    "benchmark_lead_minutes": null,
@@ -455,15 +876,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 5.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.246548+00:00",
    "event_id": "401910025",
+   "line_split": "unknown",
    "market": "spread",
-   "mid": 0.505,
    "model": "nba-spread-margin-v9",
    "outcome": null,
    "pick_id": "d6d54d438d5844da",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.505,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.541494,
    "reason": "pre_tip_not_final",
    "side": "away",
@@ -471,6 +899,7 @@
    "tip": "2026-11-22T01:00:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.49,
    "benchmark_lead_minutes": null,
@@ -479,15 +908,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 6.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.246548+00:00",
    "event_id": "401910026",
+   "line_split": "unknown",
    "market": "spread",
-   "mid": 0.485,
    "model": "nba-spread-margin-v9",
    "outcome": null,
    "pick_id": "7df75e4b4c6a4c03",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.485,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.500338,
    "reason": "pre_tip_not_final",
    "side": "home",
@@ -495,6 +931,7 @@
    "tip": "2026-11-22T01:00:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.49,
    "benchmark_lead_minutes": null,
@@ -503,15 +940,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 18.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.246548+00:00",
    "event_id": "401910027",
+   "line_split": "unknown",
    "market": "spread",
-   "mid": 0.485,
    "model": "nba-spread-margin-v9",
    "outcome": null,
    "pick_id": "7f15a43c97a84c8d",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.485,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.570667,
    "reason": "pre_tip_not_final",
    "side": "away",
@@ -519,6 +963,7 @@
    "tip": "2026-11-22T01:00:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.5,
    "benchmark_lead_minutes": null,
@@ -527,15 +972,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": -13.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.246548+00:00",
    "event_id": "401910028",
+   "line_split": "unknown",
    "market": "spread",
-   "mid": 0.495,
    "model": "nba-spread-margin-v9",
    "outcome": null,
    "pick_id": "c8b1a7ed536b4d67",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.495,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.591397,
    "reason": "pre_tip_not_final",
    "side": "home",
@@ -543,6 +995,7 @@
    "tip": "2026-11-22T03:00:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.51,
    "benchmark_lead_minutes": null,
@@ -551,15 +1004,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 215.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.425909+00:00",
    "event_id": "401910024",
+   "line_split": "unknown",
    "market": "total",
-   "mid": 0.505,
    "model": "nba-total-margin-v9",
    "outcome": null,
    "pick_id": "6353c06677864d8b",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.505,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.520933,
    "reason": "pre_tip_not_final",
    "side": "over",
@@ -567,6 +1027,7 @@
    "tip": "2026-11-22T00:30:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.51,
    "benchmark_lead_minutes": null,
@@ -575,15 +1036,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 230.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.425909+00:00",
    "event_id": "401910025",
+   "line_split": "unknown",
    "market": "total",
-   "mid": 0.505,
    "model": "nba-total-margin-v9",
    "outcome": null,
    "pick_id": "264b36fc71394422",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.505,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.547158,
    "reason": "pre_tip_not_final",
    "side": "under",
@@ -591,6 +1059,7 @@
    "tip": "2026-11-22T01:00:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.5,
    "benchmark_lead_minutes": null,
@@ -599,15 +1068,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 229.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.425909+00:00",
    "event_id": "401910026",
+   "line_split": "unknown",
    "market": "total",
-   "mid": 0.495,
    "model": "nba-total-margin-v9",
    "outcome": null,
    "pick_id": "a47e20d509214d9d",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.495,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.624004,
    "reason": "pre_tip_not_final",
    "side": "under",
@@ -615,6 +1091,7 @@
    "tip": "2026-11-22T01:00:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.51,
    "benchmark_lead_minutes": null,
@@ -623,15 +1100,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 228.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.425909+00:00",
    "event_id": "401910027",
+   "line_split": "unknown",
    "market": "total",
-   "mid": 0.505,
    "model": "nba-total-margin-v9",
    "outcome": null,
    "pick_id": "a1a55e9a2d3349b0",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.505,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.521616,
    "reason": "pre_tip_not_final",
    "side": "under",
@@ -639,6 +1123,7 @@
    "tip": "2026-11-22T01:00:00+00:00"
   },
   {
+   "anchor_observed_at_utc": null,
    "anchor_source": null,
    "ask": 0.51,
    "benchmark_lead_minutes": null,
@@ -647,15 +1132,22 @@
    "benchmark_observed_at_utc": null,
    "clv": null,
    "consensus_prob": null,
+   "consensus_prob_decision": null,
    "contract_line": 218.5,
+   "decision_consensus_line": null,
    "decision_time": "2026-11-21T19:17:36.425909+00:00",
    "event_id": "401910028",
+   "line_split": "unknown",
    "market": "total",
-   "mid": 0.505,
    "model": "nba-total-margin-v9",
    "outcome": null,
    "pick_id": "48ec64915ce54c4f",
    "pm_close": null,
+   "pm_clv_net": null,
+   "pm_mid_decision": 0.505,
+   "pm_mid_t10": null,
+   "pm_mid_t10_observed_at_utc": null,
+   "pm_reason": "pre_tip_not_final",
    "probability": 0.51273,
    "reason": "pre_tip_not_final",
    "side": "under",

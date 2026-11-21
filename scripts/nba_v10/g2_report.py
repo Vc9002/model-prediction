@@ -21,6 +21,7 @@ from model_prediction.nba_v10_g2 import (
     BENCHMARK_LEAD,
     BENCHMARK_MAX_LEAD,
     BOOTSTRAP_DRAWS,
+    FEE_COEFFICIENT,
     G2_KILL_PICKS,
     G2_MIN_MEAN_CLV,
     G2_MIN_PICKS,
@@ -71,6 +72,8 @@ def _brier(value: float | None) -> str:
 def render_markdown(report: dict[str, Any]) -> str:
     pops = report["populations"]
     g2 = pops["g2_picks"]
+    lead = int(BENCHMARK_LEAD.total_seconds() // 60)
+    stale = int(BENCHMARK_MAX_LEAD.total_seconds() // 60)
     lines = [
         f"# NBA v10 gate G2 -- {report['report_date_et']}",
         "",
@@ -82,35 +85,53 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"## Verdict: **{g2['verdict']}** ({g2['verdict_reason']})",
         "",
         f"- G2 pick rule per market: {_rule_text(report)}",
+        "- Amended G2 (pinned 2026-11-21 before any pick was scored); PASS needs every criterion:",
+        f"  - C1: n >= {G2_MIN_PICKS} consensus-benchmark-scored G2 picks.",
         (
-            f"- Pre-registered: n >= {G2_MIN_PICKS}; mean consensus CLV >= {_c(G2_MIN_MEAN_CLV)} with the 95% "
-            "game-cluster bootstrap CI above 0; mean paired CLV above v9's on the same game and market; Brier "
-            f"no worse than the Polymarket decision mid. Any failure at >= {G2_KILL_PICKS} picks is KILL."
+            f"  - C2a (necessary; **selection-correlated**): consensus CLV >= {_c(G2_MIN_MEAN_CLV)} with the "
+            "95% game-cluster CI above 0. T-B picks are selected on consensus minus ask, so this passes by "
+            "construction unless the book drifts toward Polymarket."
         ),
+        (
+            "  - C2b (selection-independent): Polymarket CLV net of fee = Polymarket T-10 mid of the picked side "
+            f"minus (ask + {FEE_COEFFICIENT:g} * ask * (1 - ask)); mean > 0 with the CI above 0."
+        ),
+        "  - C3: paired v10 minus v9 on the C2b CLV (same game, market and T-10 quote); mean > 0.",
+        "  - C4: Brier no worse than the decision-time Polymarket mid on the same (C1) picks.",
+        (
+            "  - C5: realized net-of-fee return per 1-unit settled pick > 0 (point estimate; CI reported). "
+            "**150 picks cannot establish C5**: per-pick return SD is about 1 unit, so the CI half-width at "
+            "n = 150 is about 16 points of return."
+        ),
+        f"  - Any failure at >= {G2_KILL_PICKS} picks is KILL; a criterion not yet computable keeps PENDING.",
         "",
-        "## Benchmark and decision time",
+        "## Benchmarks and decision time",
         "",
         (
             "- Decision time: v10 `model_input_snapshot_json.decision_time_utc`; v9 pair `created_at_utc`. "
             "Price paid: v10 snapshot `ask` (checked against the Polymarket decision quote at "
-            "`market_slug` + `quote_observed_at_utc`); v9 the same decision quote's ask of its side."
+            "`market_slug` + `quote_observed_at_utc`); v9 the same decision quote's ask of its side. "
+            "Decision-time mid (`pm_mid_decision`): the picked side's two-sided mid in that decision quote."
         ),
         (
-            f"- T-10 benchmark: the latest ESPN consensus capture (`odds/nba/<ET date>/espn_odds.jsonl`, "
-            f"`observed_at_utc`) with decision_time < observed <= tip - {int(BENCHMARK_LEAD.total_seconds() // 60)} "
-            "min, tip = the earlier of the row's and the capture's `event_start_utc`. Scored only after tip. "
-            f"Captures older than tip - {int(BENCHMARK_MAX_LEAD.total_seconds() // 60)} min are `stale_benchmark` "
-            "(excluded, counted)."
+            "- C2a benchmark: the latest ESPN consensus capture (`odds/nba/<ET date>/espn_odds.jsonl`, "
+            f"`observed_at_utc`) with decision_time < observed <= tip - {lead} min, tip = the earlier of the "
+            "row's and the capture's `event_start_utc`. Moved to the contract line with v10's normal "
+            f"translation and the row's sigma (artifact: {report['sigma']})."
         ),
         (
-            "- Consensus moved to the contract line with v10's normal translation and the row's sigma "
-            f"(artifact: {report['sigma']}). CLV = consensus probability of the picked side minus the ask."
+            "- C2b benchmark (`pm_mid_t10`): the latest quote of the pick's own contract (`market_slug`) in "
+            f"`polymarket_snapshots.jsonl` with decision_time < observed <= tip - {lead} min and an open, "
+            "two-sided book (side mid and one minus the other side's mid, each at most 10 points wide)."
         ),
         (
-            "- Polymarket-to-Polymarket CLV (settlement's closing ask after the decision, before tip, minus the "
-            "ask) is shown for reference only, over every row with a close (no consensus benchmark needed). "
-            "**It is NOT a G2 criterion**: v9 averages +0.58c on it while losing. C3 pairs are dropped when the "
-            "v10 and v9 decisions are more than 15 min apart (different runs). C4 uses benchmark-scored picks."
+            f"- Both: scored only after tip; latest observation older than tip - {stale} min is stale "
+            "(excluded, counted). C3 pairs are dropped when the v10 and v9 decisions are more than 15 min "
+            "apart (different runs). C5 covers every settled pick (no benchmark needed); pushes are excluded."
+        ),
+        (
+            "- Reference only, not a criterion: settlement's Polymarket closing ask minus the ask, gross of "
+            "fee (v9 averages +0.58c on it while losing)."
         ),
         "",
         "## Scorecards",
@@ -123,11 +144,13 @@ def render_markdown(report: dict[str, Any]) -> str:
         return f"| {label} | " + " | ".join(fn(p) for p in pops.values()) + " |"
 
     lines += [
-        row("v10 rows", lambda p: str(p["rows"])),
-        row("scored (benchmark found)", lambda p: str(p["scored"])),
-        row("excluded", lambda p: _counts(p["excluded"])),
-        row("C2 consensus CLV", lambda p: _ci(p["consensus_clv"])),
-        row("C3 v10 minus v9 CLV (paired)", lambda p: _ci(p["v9_paired_clv_diff"])),
+        row("v10 rows (games)", lambda p: f"{p['rows']} ({p['row_games']})"),
+        row("C1 scored on consensus benchmark", lambda p: str(p["scored"])),
+        row("C1/C2a excluded", lambda p: _counts(p["excluded"])),
+        row("C2a consensus CLV (selection-correlated)", lambda p: _ci(p["consensus_clv"])),
+        row("C2b Polymarket CLV net of fee", lambda p: _ci(p["polymarket_clv_net"])),
+        row("C2b excluded", lambda p: _counts(p["polymarket_clv_net"]["excluded"])),
+        row("C3 v10 minus v9 (C2b basis, paired)", lambda p: _ci(p["v9_paired_clv_diff"])),
         row("C3 unpaired", lambda p: _counts(p["v9_paired_clv_diff"]["unpaired"])),
         row(
             "C4 Brier v10 / mid",
@@ -136,14 +159,19 @@ def render_markdown(report: dict[str, Any]) -> str:
             ),
         ),
         row("C4 excluded", lambda p: _counts(p["brier"]["excluded"])),
+        row("C5 net return per unit", lambda p: _ret(p["net_return"])),
         row("criteria", lambda p: ", ".join(f"{k} {v}" for k, v in p["criteria"].items())),
         row("would-be verdict", lambda p: p["verdict"]),
-        row("Polymarket CLV (NOT G2)", lambda p: _ci(p["polymarket_clv_not_g2"])),
-        row("benchmark lead (min)", lambda p: json.dumps(p["benchmark_lead_minutes"])),
+        row("D1 delta consensus (T-10 minus decision)", lambda p: _ci(p["d1_who_moved"]["delta_consensus"])),
+        row("D1 delta Polymarket mid", lambda p: _ci(p["d1_who_moved"]["delta_poly"])),
+        row("D1 reading", lambda p: p["d1_who_moved"]["reading"]),
+        row("reference: closing ask CLV (gross)", lambda p: _ci(p["polymarket_close_ask_clv_reference"])),
+        row("consensus benchmark lead (min)", lambda p: json.dumps(p["benchmark_lead_minutes"])),
         "",
         (
-            "Only the g2_picks column carries the gate; all_flat and tb are informational. On rows anchored on the Polymarket mid the v10 "
-            "probability IS the mid, so C4 ties there by construction; the split by anchor source:"
+            "Only the g2_picks column carries the gate; all_flat and tb are informational. On rows anchored "
+            "on the Polymarket mid the v10 probability IS the mid, so C4 ties there by construction; the "
+            "split by anchor source:"
         ),
         "",
     ]
@@ -152,6 +180,25 @@ def render_markdown(report: dict[str, Any]) -> str:
             lines.append(
                 f"- {name} / {source}: n={block['n']}, Brier v10 {_brier(block['brier_model'])}, "
                 f"mid {_brier(block['brier_mid'])}"
+            )
+    lines += [
+        "",
+        "## D2: same-line vs translated-line picks",
+        "",
+        (
+            "Same line: the Polymarket rung equals the decision-time ESPN line (no translation). Translated: "
+            "the consensus was moved to the rung (1 spread point is about 3 probability points at sigma 13). "
+            "Unknown: no decision-time consensus (row anchored on the Polymarket mid)."
+        ),
+        "",
+        "| population / split | rows | C2a | C2b | C5 |",
+        "|---|---|---|---|---|",
+    ]
+    for name, pop in pops.items():
+        for split, block in pop["d2_line_split"].items():
+            lines.append(
+                f"| {name} / {split} | {block['rows']} | {_ci(block['c2a_consensus_clv'])} | "
+                f"{_ci(block['c2b_polymarket_clv_net'])} | {_ret(block['c5_net_return'])} |"
             )
     lines += [
         "",
@@ -169,21 +216,29 @@ def render_markdown(report: dict[str, Any]) -> str:
         "## v10 rows",
         "",
         (
-            "| event | market | side | contract line | ask | decision (UTC) | tip (UTC) | benchmark observed | "
-            "lead min | consensus | CLV | status |"
+            "| event | market | side | contract line | ask | decision (UTC) | tip (UTC) | consensus T-10 | "
+            "C2a | pm_mid_decision | pm_mid_t10 | C2b | status (C2a / C2b) |"
         ),
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in report["rows"]["all_flat"][:80]:
         lines.append(
             f"| {r['event_id']} | {r['market']} | {r['side']} | {r['contract_line']:g} | {_c(r['ask'], False)} | "
-            f"{r['decision_time'][:19]} | {r['tip'][:16]} | {(r['benchmark_observed_at_utc'] or '')[:19]} | "
-            f"{'' if r['benchmark_lead_minutes'] is None else r['benchmark_lead_minutes']} | "
-            f"{_c(r['consensus_prob'], False)} | {_c(r['clv'])} | {r['reason'] or 'scored'} |"
+            f"{r['decision_time'][:19]} | {r['tip'][:16]} | {_c(r['consensus_prob'], False)} | {_c(r['clv'])} | "
+            f"{_c(r['pm_mid_decision'], False)} | {_c(r['pm_mid_t10'], False)} | {_c(r['pm_clv_net'])} | "
+            f"{r['reason'] or 'scored'} / {r['pm_reason'] or 'scored'} |"
         )
     if len(report["rows"]["all_flat"]) > 80:
         lines.append(f"\n({len(report['rows']['all_flat']) - 80} more rows in the JSON.)")
     return "\n".join(lines) + "\n"
+
+
+def _ret(block: dict[str, Any]) -> str:
+    """A return per unit staked, as a percentage of the stake."""
+    if block["mean"] is None:
+        return "n/a (no settled picks)"
+    ci = "no CI (<2 games)" if block["low"] is None else f"95% CI [{block['low']:+.1%}, {block['high']:+.1%}]"
+    return f"{block['mean']:+.1%}, {ci}, n={block['n']} over {block['n_games']} games"
 
 
 def main(argv: list[str] | None = None) -> int:

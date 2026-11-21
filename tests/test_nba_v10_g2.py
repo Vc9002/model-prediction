@@ -42,6 +42,10 @@ def _espn_record(observed: datetime, *, home_line: float = -3.5, away: float = 0
     }
 
 
+def _pm(observed: datetime, mid: float | None, *, start: datetime | None = TIP) -> g2.PolymarketQuote:
+    return g2.PolymarketQuote(observed, start, mid)
+
+
 def _pick(event_id: str = "401910024", **overrides) -> g2.Pick:
     base = {
         "pick_id": f"p-{event_id}",
@@ -169,6 +173,9 @@ ALL_PASS = {"c2": g2.PASS, "c3": g2.PASS, "c4": g2.PASS}
         (300, {**ALL_PASS, "c3": g2.FAIL}, "KILL"),
         (450, {**ALL_PASS, "c4": g2.FAIL, "c2": g2.NOT_EVALUABLE}, "KILL"),
         (200, {**ALL_PASS, "c4": g2.NOT_EVALUABLE}, "PENDING"),
+        (150, {**ALL_PASS, "c5": g2.NOT_EVALUABLE}, "PENDING"),
+        (310, {**ALL_PASS, "c5": g2.NOT_EVALUABLE}, "PENDING"),
+        (310, {**ALL_PASS, "c5": g2.FAIL}, "KILL"),
     ],
 )
 def test_verdict(n, criteria, verdict):
@@ -206,6 +213,7 @@ def _ledger(path, rows):
 def _write_g2_fixture(
     tmp_path, *, anchor_source: str = "polymarket_mid", net_edge: float = -0.019994
 ) -> None:
+    # Consensus-anchored rows point at the decision-time ESPN capture (DECISION - 1 min below).
     """One settled v10 spread row (away, won) with its v9 pair, decision quote, close and ESPN captures."""
     quote_seen = "2026-11-21T19:02:01.359634Z"
     slug = "asc-nba-por-ny-2026-11-21-pos-3pt5"
@@ -221,6 +229,7 @@ def _write_g2_fixture(
         "net_edge": net_edge,
         "market_slug": slug,
         "quote_observed_at_utc": quote_seen,
+        "anchor_observed_at_utc": (DECISION - timedelta(minutes=1)).isoformat(),
         # T-B fired on the side opposite the row's: consensus home 54c vs the 50c home ask.
         "tb": {
             "evaluated": True,
@@ -265,13 +274,33 @@ def _write_g2_fixture(
         "long": {**side, "bid": 0.50, "ask": 0.51, "midpoint": 0.505, "description": "+3.50"},
         "short": {**side, "bid": 0.49, "ask": 0.50, "midpoint": 0.495, "description": "-3.50"},
     }
-    close = {**quote, "long": {**quote["long"], "ask": 0.54}, "short": {**quote["short"], "ask": 0.47}}
+
+    def _book(long_bid: float, long_ask: float, short_bid: float, short_ask: float) -> dict:
+        return {
+            **quote,
+            "long": {
+                **quote["long"],
+                "bid": long_bid,
+                "ask": long_ask,
+                "midpoint": (long_bid + long_ask) / 2,
+            },
+            "short": {
+                **quote["short"],
+                "bid": short_bid,
+                "ask": short_ask,
+                "midpoint": (short_bid + short_ask) / 2,
+            },
+        }
+
+    snapshots = [
+        {**quote, "observed_at_utc": quote_seen},  # the decision quote (before the decision time)
+        # The Polymarket T-10 mid: away 53c, home 47c.
+        {**_book(0.52, 0.54, 0.46, 0.48), "observed_at_utc": "2026-11-22T00:18:00Z"},
+        # After tip - 10: never the T-10 mid, but it is settlement's (reference) closing ask.
+        {**_book(0.59, 0.61, 0.39, 0.41), "observed_at_utc": "2026-11-22T00:25:00Z"},
+    ]
     (day / "polymarket_snapshots.jsonl").write_text(
-        json.dumps({**quote, "observed_at_utc": quote_seen})
-        + "\n"
-        + json.dumps({**close, "observed_at_utc": "2026-11-22T00:20:00Z"})
-        + "\n",
-        encoding="utf-8",
+        "".join(json.dumps(item) + "\n" for item in snapshots), encoding="utf-8"
     )
     (day / "espn_odds.jsonl").write_text(
         "\n".join(
@@ -279,7 +308,7 @@ def _write_g2_fixture(
             for at, p in (
                 (TIP - timedelta(minutes=12), 0.53),  # the T-10 benchmark
                 (TIP - timedelta(minutes=2), 0.60),  # after tip - 10: never the benchmark
-                (DECISION - timedelta(minutes=1), 0.40),  # before the decision
+                (DECISION - timedelta(minutes=1), 0.46),  # the decision capture: home 54c
             )
         )
         + "\n",
@@ -296,11 +325,22 @@ def test_run_g2_scores_a_settled_v10_row_and_its_v9_pair(tmp_path):
     flat = report["populations"]["all_flat"]
     assert flat["scored"] == 1
     assert flat["consensus_clv"]["mean"] == pytest.approx(0.53 - 0.51, abs=1e-6)
-    # v9 took home at the same contract and quote: consensus home 47c minus its 50c ask.
-    assert flat["v9_paired_clv_diff"]["mean"] == pytest.approx(0.02 - (0.47 - 0.50), abs=1e-6)
+    # C2b: away T-10 mid 53c minus (51c ask + fee 0.06 * 0.51 * 0.49).
+    v10_c2b = 0.53 - (0.51 + 0.06 * 0.51 * 0.49)
+    assert flat["polymarket_clv_net"]["mean"] == pytest.approx(v10_c2b, abs=1e-6)
+    [row] = report["rows"]["all_flat"]
+    assert row["pm_mid_t10_observed_at_utc"].startswith("2026-11-22T00:18:00")
+    assert row["pm_mid_decision"] == pytest.approx(0.505)
+    # C3 on the C2b basis: v9 took home (47c T-10 mid) at its 50c ask, same quote and run.
+    v9_c2b = 0.47 - (0.50 + 0.06 * 0.50 * 0.50)
+    assert flat["v9_paired_clv_diff"]["basis"] == "polymarket_clv_net"
+    assert flat["v9_paired_clv_diff"]["mean"] == pytest.approx(v10_c2b - v9_c2b, abs=1e-6)
     assert flat["brier"]["n"] == 1 and flat["brier"]["model"] == pytest.approx((1 - 0.505) ** 2)
     assert flat["brier"]["polymarket_mid"] == pytest.approx((1 - 0.505) ** 2)
-    assert flat["polymarket_clv_not_g2"]["mean"] == pytest.approx(0.54 - 0.51, abs=1e-6)
+    # C5: the away row won at 51c plus fee, per unit staked.
+    assert flat["net_return"]["mean"] == pytest.approx(1 / (0.51 + 0.06 * 0.51 * 0.49) - 1, abs=1e-9)
+    assert flat["criteria"]["c5_net_return"] == g2.PASS
+    assert flat["polymarket_close_ask_clv_reference"]["mean"] == pytest.approx(0.61 - 0.51, abs=1e-6)
     assert report["row_exclusions"]["v9"] == {"status_superseded": 1}
     assert report["load_diagnostics"]["rows"] == {}
     # main_min_edge unset, so the T-B rule applies, and a row anchored on the Polymarket mid is never
@@ -315,20 +355,26 @@ def test_run_g2_scores_a_settled_v10_row_and_its_v9_pair(tmp_path):
     assert (tb_row["side"], tb_row["ask"], tb_row["probability"]) == ("home", 0.50, 0.54)
     assert tb_row["outcome"] == 0  # the away row won, so the home side lost
     assert tb["consensus_clv"]["mean"] == pytest.approx((1 - 0.53) - 0.50, abs=1e-6)
-    assert tb["polymarket_clv_not_g2"]["mean"] == pytest.approx(0.47 - 0.50, abs=1e-6)
+    assert tb["polymarket_clv_net"]["mean"] == pytest.approx(0.47 - (0.50 + 0.015), abs=1e-6)
+    assert tb["net_return"]["mean"] == pytest.approx(-1.0)
+    assert tb["polymarket_close_ask_clv_reference"]["mean"] == pytest.approx(0.41 - 0.50, abs=1e-6)
     assert report["load_diagnostics"]["tb"] == {"evaluated": 1, "flagged": 1, "flagged_off_row_side": 1}
 
 
 def test_v9_pair_from_another_run_is_not_compared():
     captures = {("401910024", "spread"): [_capture(TIP - timedelta(minutes=12), p_low=0.53)]}
-    v10 = g2.score_pick(_pick(), captures, as_of=AFTER_TIP)
+    t10 = TIP - timedelta(minutes=12)
+    v10 = g2.score_pick(_pick(pm_quotes=(_pm(t10, 0.53),)), captures, as_of=AFTER_TIP)
+    home = (_pm(t10, 0.47),)
     same_run = g2.score_pick(
-        _pick(model="v9", side="home", decision_time=DECISION - timedelta(minutes=4)),
+        _pick(model="v9", side="home", decision_time=DECISION - timedelta(minutes=4), pm_quotes=home),
         captures,
         as_of=AFTER_TIP,
     )
     other_run = g2.score_pick(
-        _pick(model="v9", side="home", decision_time=DECISION - timedelta(hours=2)), captures, as_of=AFTER_TIP
+        _pick(model="v9", side="home", decision_time=DECISION - timedelta(hours=2), pm_quotes=home),
+        captures,
+        as_of=AFTER_TIP,
     )
     paired = g2.evaluate_population([v10], {("401910024", "spread"): same_run}, draws=100)
     assert paired["v9_paired_clv_diff"]["n"] == 1
@@ -348,6 +394,14 @@ def test_null_threshold_makes_consensus_tb_rows_the_g2_picks_graded_on_the_tb_si
     assert (row["side"], row["ask"], row["outcome"]) == ("home", 0.50, 0)
     assert picks["scored"] == 1
     assert picks["consensus_clv"]["mean"] == pytest.approx((1 - 0.53) - 0.50, abs=1e-6)
+    # D1: the book fell from 54c to 47c on home while the Polymarket mid moved 49.5c -> 47c.
+    d1 = picks["d1_who_moved"]
+    assert d1["delta_consensus"]["mean"] == pytest.approx(0.47 - 0.54, abs=1e-6)
+    assert d1["delta_poly"]["mean"] == pytest.approx(0.47 - 0.495, abs=1e-6)
+    assert "fading a stale single-book line" in d1["reading"]
+    # D2: the decision ESPN line (home -3.5) is the Polymarket rung, so no translation.
+    assert row["line_split"] == "same_line"
+    assert picks["d2_line_split"]["same_line"]["rows"] == 1
 
 
 @pytest.mark.parametrize(("threshold", "picked"), [(0.01, True), (0.05, False)])
@@ -373,3 +427,114 @@ def test_set_threshold_switches_g2_to_the_net_edge_rule(tmp_path, threshold, pic
 def test_tb_g2_rule_boundary_and_anchor(anchor, gap, picked):
     snap = {"anchor_source": anchor, "tb": {"gap_by_side": {"home": gap}}}
     assert g2._is_tb_g2_pick(snap, "home") is picked
+
+
+# --------------------------------------------------------------------------- amended G2: C2b, C3, C5
+def test_pm_t10_mid_is_the_latest_two_sided_quote_inside_the_window():
+    quotes = (
+        _pm(DECISION - timedelta(minutes=5), 0.40),  # before the decision
+        _pm(TIP - timedelta(minutes=30), 0.45),
+        _pm(TIP - timedelta(minutes=15), 0.52),  # the T-10 mid
+        _pm(TIP - timedelta(minutes=12), None),  # later, but one-sided / not open
+        _pm(TIP - timedelta(minutes=5), 0.60),  # after tip - 10
+    )
+    best, reason = g2.select_pm_t10_mid(quotes, decision_time=DECISION, tip=TIP, as_of=AFTER_TIP)
+    assert reason is None and best.mid == 0.52
+
+
+@pytest.mark.parametrize(
+    ("quotes", "reason"),
+    [
+        ((), "missing_pm_benchmark_no_capture"),
+        (
+            (_pm(TIP - timedelta(minutes=9), 0.5), _pm(TIP + timedelta(minutes=1), 0.5)),
+            "missing_pm_benchmark_all_after_t10",
+        ),
+        (
+            (_pm(DECISION, 0.5), _pm(DECISION - timedelta(hours=1), 0.5)),
+            "missing_pm_benchmark_all_before_decision",
+        ),
+        ((_pm(DECISION, 0.5), _pm(TIP - timedelta(minutes=5), 0.5)), "missing_pm_benchmark_outside_window"),
+        ((_pm(TIP - timedelta(minutes=15), None),), "missing_pm_benchmark_no_two_sided_quote"),
+        ((_pm(TIP - timedelta(hours=2), 0.5),), "stale_pm_benchmark"),
+        # The quote's own tip is 20 minutes earlier, so tip - 15 on the row's clock is past its T-10.
+        (
+            (_pm(TIP - timedelta(minutes=15), 0.5, start=TIP - timedelta(minutes=20)),),
+            "missing_pm_benchmark_all_after_t10",
+        ),
+    ],
+)
+def test_pm_t10_mid_rejections(quotes, reason):
+    assert g2.select_pm_t10_mid(quotes, decision_time=DECISION, tip=TIP, as_of=AFTER_TIP) == (None, reason)
+
+
+def test_pm_t10_mid_is_not_final_before_tip():
+    quotes = (_pm(TIP - timedelta(minutes=12), 0.53),)
+    before = TIP - timedelta(minutes=1)
+    assert g2.select_pm_t10_mid(quotes, decision_time=DECISION, tip=TIP, as_of=before) == (
+        None,
+        "pre_tip_not_final",
+    )
+
+
+def test_c2b_is_net_of_fee_and_independent_of_the_consensus_benchmark():
+    pick = _pick(pm_quotes=(_pm(TIP - timedelta(minutes=12), 0.53),))
+    scored = g2.score_pick(pick, {}, as_of=AFTER_TIP)  # no ESPN capture at all
+    assert scored.reason == "missing_benchmark_no_capture" and scored.clv is None
+    assert scored.pm_clv_net == pytest.approx(0.53 - 0.51 - 0.06 * 0.51 * 0.49, abs=1e-6)
+    card = g2.evaluate_population([scored], {}, draws=100)
+    assert card["scored"] == 0 and card["polymarket_clv_net"]["n"] == 1
+
+
+def test_c3_compares_c2b_clv_not_consensus_clv():
+    # Same consensus CLV for both, but v9 paid less net of fee on Polymarket: C3 must be negative.
+    captures = {("401910024", "spread"): [_capture(TIP - timedelta(minutes=12), p_low=0.53)]}
+    t10 = (_pm(TIP - timedelta(minutes=12), 0.53),)
+    v10 = g2.score_pick(_pick(ask=0.51, pm_quotes=t10), captures, as_of=AFTER_TIP)
+    v9 = g2.score_pick(_pick(model="v9", ask=0.49, pm_quotes=t10), captures, as_of=AFTER_TIP)
+    card = g2.evaluate_population([v10], {("401910024", "spread"): v9}, draws=100)
+    expected = (0.53 - 0.51 - g2.fee(0.51)) - (0.53 - 0.49 - g2.fee(0.49))
+    assert card["v9_paired_clv_diff"]["mean"] == pytest.approx(expected, abs=1e-6)
+    assert card["criteria"]["c3_clv_above_v9"] == g2.FAIL
+
+
+def test_c5_with_no_settled_rows_is_not_computable_and_keeps_pending():
+    captures = {("401910024", "spread"): [_capture(TIP - timedelta(minutes=12), p_low=0.53)]}
+    scored = [g2.score_pick(_pick(outcome=None), captures, as_of=AFTER_TIP)]
+    card = g2.evaluate_population(scored, {}, draws=100)
+    assert card["net_return"]["mean"] is None
+    assert card["criteria"]["c5_net_return"] == g2.NOT_EVALUABLE
+    assert card["verdict"] == "PENDING"
+
+
+def test_net_return_per_unit_is_net_of_fee():
+    assert g2.net_return(_pick(outcome=None)) is None
+    assert g2.net_return(_pick(ask=0.50, outcome=1)) == pytest.approx(1 / 0.515 - 1)
+    assert g2.net_return(_pick(ask=0.50, outcome=0)) == -1.0
+
+
+def test_d2_translated_line_when_the_decision_line_differs_from_the_rung():
+    decision = _capture(DECISION - timedelta(minutes=1), line=4.5, p_low=0.5)
+    pick = _pick(anchor_observed_at_utc=decision.observed_at_utc.isoformat())
+    scored = g2.score_pick(pick, {("401910024", "spread"): [decision]}, as_of=AFTER_TIP)
+    assert scored.line_split == "translated" and scored.decision_consensus_line == 4.5
+    # Away at the 3.5 rung is worse than at 4.5, where the book has it at 50%.
+    assert scored.consensus_prob_decision < 0.5
+    assert g2.score_pick(_pick(), {}, as_of=AFTER_TIP).line_split == "unknown"
+
+
+def test_closed_or_one_sided_polymarket_quotes_never_give_a_mid():
+    base = {
+        "observed_at_utc": "2026-11-22T00:18:00Z",
+        "event_start_utc": "2026-11-22T00:30:00Z",
+        "team": "Portland Trail Blazers",
+        "long": {"bid": 0.52, "ask": 0.54},
+        "short": {"bid": 0.46, "ask": 0.48},
+    }
+    records = [
+        {**base, "market_state": "MARKET_STATE_OPEN"},
+        {**base, "market_state": "MARKET_STATE_CLOSED"},
+        {**base, "long": {"bid": None, "ask": 0.54}, "short": {"bid": None, "ask": 0.48}},
+    ]
+    quotes = g2._pm_quotes(records, "spread", "away", "Portland Trail Blazers")
+    assert [q.mid for q in quotes] == [pytest.approx(0.53), None, None]
