@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
+from model_prediction.cli import settle as settle_module
 from model_prediction.cli.settle import _scores_for_outcome, _settle_by_resolution
 from model_prediction.domain import MarketType
 from model_prediction.pricing import PickResult, grade_pick
+
+# Captured before the autouse stub below replaces it, for the closing-bound tests.
+_REAL_CLOSING_LOOKUP = settle_module._closing_probability_for_moneyline_pick
 
 
 @pytest.mark.parametrize(
@@ -165,3 +171,75 @@ def test_spread_resolution_matches_spelling_variant_and_keeps_line_check():
     assert _settle_by_resolution(row, ledger, _Client("MARKET_STATE_EXPIRED", [1.0, 0.0], sides))["settled"]
     away, home = ledger.args
     assert grade_pick(MarketType.SPREAD, "away", 1.5, away, home) is PickResult.WIN
+
+
+class _ClosingLedger:
+    def settle(self, pick_id, away, home, line, odds, **kwargs):
+        self.closing = kwargs.get("closing_raw_probability")
+        return {"result": "win"}
+
+
+def _resolution_close(tmp_path, monkeypatch, league, quotes):
+    """Settle a home-moneyline row by resolution against real snapshot files; return its close."""
+    monkeypatch.setattr(settle_module, "_closing_probability_for_moneyline_pick", _REAL_CLOSING_LOOKUP)
+    slug = f"aec-{league}-aaaa-bbbb-2026-11-21"
+    start = "2026-11-21T19:00:00Z"
+    folder = tmp_path / "odds" / league / "2026-11-21"
+    folder.mkdir(parents=True)
+    folder.joinpath("polymarket_snapshots.jsonl").write_text(
+        "".join(
+            json.dumps(
+                {
+                    "market_slug": slug,
+                    "market_type": "moneyline",
+                    "observed_at_utc": observed,
+                    "market_state": "MARKET_STATE_OPEN",
+                    "event_start_utc": start,
+                    "long": {"description": "Bbbb", "ask": ask},
+                    "short": {"description": "Aaaa", "ask": round(1.02 - ask, 2)},
+                }
+            )
+            + "\n"
+            for observed, ask in quotes
+        ),
+        encoding="utf-8",
+    )
+    row = {
+        "pick_id": "p",
+        "league": league.upper(),
+        "event_start_utc": start,
+        "market_type": "moneyline",
+        "selection": "home",
+        "line": None,
+        "home_team": "Bbbb",
+        "away_team": "Aaaa",
+        # The decision quote's own time wins over the row's observed_at_utc, as on the ESPN path.
+        "observed_at_utc": "2026-11-21T14:00:00Z",
+        "market_quote_observed_at_utc": "2026-11-21T15:00:00Z",
+        "rationale": f"x ({slug}).",
+    }
+    ledger = _ClosingLedger()
+    sides = [("Bbbb", "Bbbb"), ("Aaaa", "Aaaa")]
+    client = _Client("MARKET_STATE_EXPIRED", [1.0, 0.0], sides)
+    assert _settle_by_resolution(row, ledger, client, data_root=tmp_path)["settled"]
+    return ledger.closing
+
+
+@pytest.mark.parametrize("league", ["ncaab", "ncaaf"])
+def test_resolution_close_observed_before_the_decision_quote_is_never_the_close(
+    tmp_path, monkeypatch, league
+):
+    # Quotes at and before the decision quote (15:00Z) only: no close, never the decision's own price.
+    quotes = [("2026-11-21T14:30:00Z", 0.55), ("2026-11-21T15:00:00Z", 0.56)]
+    assert _resolution_close(tmp_path, monkeypatch, league, quotes) is None
+
+
+@pytest.mark.parametrize("league", ["ncaab", "ncaaf"])
+def test_resolution_close_is_the_last_pre_kickoff_quote_after_the_decision(tmp_path, monkeypatch, league):
+    quotes = [("2026-11-21T14:30:00Z", 0.55), ("2026-11-21T18:50:00Z", 0.62)]
+    assert _resolution_close(tmp_path, monkeypatch, league, quotes) == 0.62
+
+
+def test_resolution_close_for_unlisted_sport_is_unchanged(tmp_path, monkeypatch):
+    quotes = [("2026-11-21T14:30:00Z", 0.55)]
+    assert _resolution_close(tmp_path, monkeypatch, "nba", quotes) == 0.55

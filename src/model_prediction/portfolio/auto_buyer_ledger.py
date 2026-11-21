@@ -1375,19 +1375,33 @@ def _resolve_closing_probability_for_auto_buyer(
     selection: str = "",
     home_team: str = "",
     away_team: str = "",
+    *,
+    decided_at_utc: str | None = None,
 ) -> float | None:
-    """Resolve pregame closing ask probability for an auto-buyer order."""
+    """Resolve pregame closing ask probability for an auto-buyer order.
+
+    For ``CLOSE_AFTER_DECISION_SPORTS`` the close must be observed strictly after
+    ``decided_at_utc`` (the row's ``executed_at_utc``, the fill the entry price came from), the
+    same bound settlement applies, so the buy's own price never comes back as its close. Such a
+    row with no usable decision time, or no quote after it, gets no close, never an earlier one.
+    """
     if not slug or not event_start_utc:
         return None
     try:
         from datetime import timedelta
 
-        from ..data_sources.polymarket_us import PolymarketSnapshotStore
+        from ..data_sources.polymarket_us import CLOSE_AFTER_DECISION_SPORTS, PolymarketSnapshotStore
         from ..domain import EASTERN, parse_utc
         from ..learned_forward import _team_matches
 
         start = parse_utc(event_start_utc)
         sport_dir = sport.lower()
+        after_utc = None
+        if sport_dir in CLOSE_AFTER_DECISION_SPORTS:
+            if not decided_at_utc:
+                logger.info("Auto-buyer CLV left blank for %s: no_decision_time", slug)
+                return None
+            after_utc = parse_utc(decided_at_utc)
         dates_to_try = [
             start.astimezone(EASTERN).date().isoformat(),
             start.date().isoformat(),
@@ -1401,10 +1415,14 @@ def _resolve_closing_probability_for_auto_buyer(
                 continue
             seen.add(d)
             store = PolymarketSnapshotStore.for_sport_date(data_root, sport_dir, d)
-            snap = store.closing_snapshot(slug, event_start_utc)
+            snap = store.closing_snapshot(slug, event_start_utc, after_utc=after_utc)
             if snap is not None:
                 break
         if snap is None:
+            if after_utc is not None:
+                logger.info(
+                    "Auto-buyer CLV left blank for %s: no_pre_kickoff_open_quote_after_decision", slug
+                )
             return None
 
         side_obj = None
@@ -1585,6 +1603,7 @@ def settle_auto_buyer_ledger(
                     selection=sel,
                     home_team=home,
                     away_team=away,
+                    decided_at_utc=r.get("executed_at_utc"),
                 )
                 if c_prob is not None:
                     r["closing_price"] = f"{c_prob:.6f}"
@@ -1796,6 +1815,7 @@ def settle_auto_buyer_ledger(
                     selection=sel,
                     home_team=home,
                     away_team=away,
+                    decided_at_utc=r.get("executed_at_utc"),
                 )
                 if c_prob is not None:
                     r["closing_price"] = f"{c_prob:.6f}"
@@ -2207,6 +2227,7 @@ def settle_auto_buyer_ledger(
                 selection=sel,
                 home_team=home,
                 away_team=away,
+                decided_at_utc=r.get("executed_at_utc"),
             )
             if c_prob is not None:
                 r["closing_price"] = f"{c_prob:.6f}"

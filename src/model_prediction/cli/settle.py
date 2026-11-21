@@ -31,6 +31,7 @@ from ..data_sources.espn_nfl_odds import closing_espn_consensus, consensus_for_s
 from ..data_sources.mlb_market_odds import MarketOddsSnapshotStore
 from ..data_sources.polymarket_execute import _team_name_matches
 from ..data_sources.polymarket_us import (
+    CLOSE_AFTER_DECISION_SPORTS,
     PolymarketSnapshotStore,
     probability_to_american,
 )
@@ -350,19 +351,11 @@ def _settle_all_unsettled(
             slug = _extract_market_slug(str(row.get("rationale", "")), row)
             if slug is not None and data_root is not None:
                 sport_dir = str(row.get("league", "")).lower()
-                # NCAAB and NCAAF only for now: NCAAB's decision quote is the last pre-tip snapshot
-                # unless the buyer's pre-tip capture wrote a later one, so without the bound every
-                # NCAAB close was the row's own price; NCAAF's day-ahead capture (261121-dac) files
-                # D+1/D+2 books observed before the decision. Other sports keep their call unchanged.
-                closing_kwargs: dict[str, Any] = {}
                 if sport_dir == "ncaaf":
                     from ..ncaaf_prekickoff_capture import ncaaf_settlement_slug
 
                     slug = ncaaf_settlement_slug(slug, str(row.get("rationale", "")))
-                if sport_dir in ("ncaab", "ncaaf"):
-                    decision_quote_at = row.get("market_quote_observed_at_utc") or row.get("observed_at_utc")
-                    if decision_quote_at:
-                        closing_kwargs["not_before_utc"] = str(decision_quote_at)
+                closing_kwargs = _close_after_decision_kwargs(row, sport_dir)
                 try:
                     closing_probability, closing_odds = _closing_probability_for_moneyline_pick(
                         data_root,
@@ -609,6 +602,21 @@ def _find_espn_result(
         _, chosen_comp, chosen_away, chosen_home = name_matched[0]
 
     return _extract_espn_record(chosen_comp.get("status", {}).get("type", {}), chosen_away, chosen_home)
+
+
+def _close_after_decision_kwargs(row: dict, sport_dir: str) -> dict[str, Any]:
+    """``not_before_utc`` for ``_closing_probability_for_moneyline_pick``, or nothing.
+
+    Sports in ``CLOSE_AFTER_DECISION_SPORTS`` only: NCAAB's decision quote is the last pre-tip
+    snapshot unless the buyer's pre-tip capture wrote a later one, so without the bound every NCAAB
+    close was the row's own price; NCAAF's day-ahead capture (261121-dac) files D+1/D+2 books
+    observed before the decision. Other sports keep their call unchanged. Shared by the ESPN and
+    the contract-resolution settle paths so they cannot drift apart.
+    """
+    if sport_dir not in CLOSE_AFTER_DECISION_SPORTS:
+        return {}
+    decision_quote_at = row.get("market_quote_observed_at_utc") or row.get("observed_at_utc")
+    return {"not_before_utc": str(decision_quote_at)} if decision_quote_at else {}
 
 
 def _closing_probability_for_moneyline_pick(
@@ -1039,6 +1047,7 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
                 row.get("away_team", ""),
                 row.get("selection", ""),
                 line=row.get("line"),
+                **_close_after_decision_kwargs(row, sport_dir),
             )
         except (OSError, ValueError):
             pass

@@ -887,6 +887,13 @@ def _slug_prefilter(slug: str) -> bool:
     return bool(slug) and json.dumps(slug)[1:-1] == slug
 
 
+# Sport directories whose close must be observed strictly after the decision quote
+# (``closing_snapshot(after_utc=...)``). NCAAB's decision quote was the last pre-tip snapshot and
+# NCAAF's day-ahead capture files books observed before the decision, so an unbounded close was the
+# decision's own price (zero CLV). One list for settlement and the auto-buyer ledger alike.
+CLOSE_AFTER_DECISION_SPORTS = frozenset({"ncaab", "ncaaf"})
+
+
 class PolymarketSnapshotStore:
     """Append-only BBO snapshot store.
 
