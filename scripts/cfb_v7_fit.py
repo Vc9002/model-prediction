@@ -1548,6 +1548,12 @@ def cmd_dryrun(_: argparse.Namespace) -> int:
 def cmd_holdout(args: argparse.Namespace) -> int:
     if HOLDOUT_MARK.exists():
         raise SystemExit(f"holdout already read: {HOLDOUT_MARK.read_text(encoding='utf-8')}")
+    # The marker lives in an untracked directory; the committed report is the durable record of the one read
+    # (2026-11-21T21:12:25Z, e91a843a), so a fresh checkout cannot read the holdout a second time either.
+    if REPORT_JSON.exists() or _git("log", "--oneline", "-1", "--", "outputs/ncaaf/cfb_v7_report.json"):
+        raise SystemExit(
+            "holdout already read: outputs/ncaaf/cfb_v7_report.json exists in the tree or history"
+        )
     pinned = json.loads(RULE_PATH.read_text(encoding="utf-8"))
     sha = rule_sha256()
     if pinned["rule_sha256"] != sha or args.rule_sha != sha or pinned["rule"] != RULE:

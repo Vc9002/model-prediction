@@ -14,6 +14,7 @@ from model_prediction.config import PROJECT_ROOT
 from model_prediction.features import cfb_features_v7 as core
 from model_prediction.models.cfb_structural_v7 import (
     CFB_V7_MODEL_VERSION,
+    NO_CALL_NO_CLASS,
     NO_CALL_PBP_MISSING,
     CFBStructuralV7Model,
     check_pbp_complete,
@@ -78,6 +79,7 @@ def test_serving_reproduces_the_fit_script_parity_fixture(
             neutral=case["neutral"],
             decision=datetime.fromisoformat(case["decision_utc"]),
             covariates=fixture["covariates"] or None,
+            classes=core.season_classes(rows),
             spread_home_line=case["spread_home_line"],
             total_line=case["total_line"],
         )
@@ -104,6 +106,7 @@ def test_probabilities_are_coherent(
         neutral=False,
         decision=datetime.fromisoformat(case["decision_utc"]),
         covariates=fixture["covariates"] or None,
+        classes=core.season_classes(rows),
         spread_home_line=-3.0,
         total_line=51.0,
     )
@@ -125,6 +128,7 @@ def test_unfinished_and_future_games_never_feed_ratings(
         "neutral": case["neutral"],
         "decision": decision,
         "covariates": fixture["covariates"] or None,
+        "classes": core.season_classes(rows),
     }
     base = price_game(model, rows, **kw)
     # A game that kicked off 4 h before the decision (inside the 5 h result buffer) and one in the future: both
@@ -162,6 +166,7 @@ def test_fail_closed_no_rating_and_missing_pbp(
             neutral=False,
             decision=decision,
             covariates=fixture["covariates"] or None,
+            classes={**core.season_classes(rows), ("999999", fixture["season"]): core.FBS},
         )
     assert exc.value.reason == core.NO_CALL_NO_RATING
     late = datetime.fromisoformat(fixture["cases"][-1]["decision_utc"])
@@ -175,3 +180,38 @@ def test_fail_closed_no_rating_and_missing_pbp(
     with pytest.raises(core.V7NoCall) as exc2:
         check_pbp_complete(rows, {team: [*done, "not-crawled"]}, [team], fixture["season"], late)
     assert exc2.value.reason == NO_CALL_PBP_MISSING
+
+
+def test_truncated_history_prices_like_full_history(
+    model: CFBStructuralV7Model, fixture: dict, rows: list[core.TeamGame]
+) -> None:
+    """Serving sees only games before the decision; with the season-level class map supplied, the price is the one
+    the full-history research path produced (and a missing class label fails closed instead of defaulting)."""
+    classes = core.season_classes(rows)
+    for case in fixture["cases"]:
+        decision = datetime.fromisoformat(case["decision_utc"])
+        kw = {
+            "season": fixture["season"],
+            "home_id": case["home_id"],
+            "away_id": case["away_id"],
+            "neutral": case["neutral"],
+            "decision": decision,
+            "covariates": fixture["covariates"] or None,
+            "classes": classes,
+        }
+        past = [r for r in rows if r.kickoff < decision]
+        assert price_game(model, past, **kw) == price_game(model, rows, **kw)
+    case = fixture["cases"][0]
+    with pytest.raises(core.V7NoCall) as exc:
+        price_game(
+            model,
+            rows,
+            season=fixture["season"],
+            home_id=case["home_id"],
+            away_id=case["away_id"],
+            neutral=False,
+            decision=datetime.fromisoformat(case["decision_utc"]),
+            covariates=fixture["covariates"] or None,
+            classes={k: v for k, v in classes.items() if k != (case["home_id"], fixture["season"])},
+        )
+    assert exc.value.reason == NO_CALL_NO_CLASS

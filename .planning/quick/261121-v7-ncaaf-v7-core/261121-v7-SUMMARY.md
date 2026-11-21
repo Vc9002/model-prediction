@@ -61,6 +61,37 @@ on lines read many times before, so it is a hypothesis for the 2027 gate, not ev
 - `docs/CFB_V7_2027_GATE.md` and `outputs/ncaaf/cfb_v7_2027_gate.json` hold the 2027 gate, sha256 of the LF bytes
   `0f79b19884dae28ab0acc693b95fea1e293538f0992c8ba1aec3caf13a9b8f59`.
 
+FBS-FBS only (n 1,694): MAE -0.350 [-0.581, -0.097], Brier -0.0080, log loss -0.0207. FBS-FCS games are 13% of the
+sample and carry about 57% of the headline gain. An FBS-FBS-only early-season cut was not pinned and was not run.
+
+## Post-read changes (serving only; no model number changed)
+
+- `price_game` now requires a season-level `classes` map and fails closed with NO_CALL_V7_NO_CLASS_LABEL. Before
+  this, a week-0 FBS team whose class came only from admitted rows silently got the FCS offset. With classes
+  derived from past rows only, 7 of 12 fixture cases differed; they now no-call. A new test checks that
+  truncated-history pricing equals full-history pricing when the class map is supplied.
+- `holdout` refuses to run when `outputs/ncaaf/cfb_v7_report.json` exists in the tree or in history, because the
+  read marker sits in an untracked directory.
+- FBS/FCS class came from pbp `game_class` (FBS = plays any FBS-FBS game that season), not from
+  `cfb_team_identity`.
+- Windows are the v5 artifact's explicit date boundaries, not a `chronological_split` call. The counts match the
+  recheck: 5,704 / 1,858 / 1,949.
+
+## Untracked inputs (keep; not in git)
+
+- `E:\MP-wt\ncaaf-v7\data\research\ncaaf_v7_work\` holds the walk files (train/validation and `.holdout`),
+  `holdout_read.json`, `v5_replay_rows.jsonl` (the only durable copy of the v5 recheck replay rows, sha256 prefix
+  68caa21f0fc0f4e3) and the dry-run report.
+- `E:\MP\data\research\ncaaf_v7\team_game_pbp.jsonl`, `E:\MP\data\research\ncaaf_v6\history_snapshot.jsonl` and
+  `espn_lines.jsonl`, plus `E:\MP\data\research\ncaaf_v7\cfbd\{team_season_priors,lines}.jsonl`. The rule file
+  pins their sha256.
+
+## Not done
+
+- `docs/ROADMAP.md`, `docs/INDEX.md` and `docs/DEBUG.md` were not updated; other sessions edit them.
+- The PLAN predates the CFBD arms.
+- Two failures in `tests/test_qualification_integrity.py` (MLB) already fail at HEAD 28a4a03e.
+
 ## Caveats
 
 - CFBD values are current-revised (`as_published_verified` false), and 2026 was fetched mid-season, so the CFBD

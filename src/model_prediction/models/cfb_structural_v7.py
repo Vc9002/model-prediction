@@ -34,6 +34,7 @@ CFB_V7_MODEL_VERSION = "cfb-structural-v7"
 CFB_V7_ARTIFACT_PATH = PROJECT_ROOT / "config" / "models" / f"{CFB_V7_MODEL_VERSION}.json"
 NO_CALL_PBP_MISSING = "NO_CALL_V7_PBP_MISSING"
 NO_CALL_NO_CFBD = "NO_CALL_V7_NO_CFBD_PRIOR"
+NO_CALL_NO_CLASS = "NO_CALL_V7_NO_CLASS_LABEL"
 
 
 def load_cfb_structural_v7_artifact(path: str | Path | None = None) -> dict[str, Any]:
@@ -234,19 +235,33 @@ def price_game(
     away_id: str,
     neutral: bool,
     decision: datetime,
-    classes: Mapping[tuple[str, int], str] | None = None,
+    classes: Mapping[tuple[str, int], str],
     covariates: Mapping[str, Mapping[str, float]] | None = None,
     spread_home_line: float | None = None,
     total_line: float | None = None,
 ) -> V7Pricing:
     """Ratings as of ``decision`` from ``rows`` (this season's admitted rows + last season's rows for the finals),
     then the artifact's pricing. ``covariates`` is ``core.standardise_covariates`` of this season's CFBD prior rows
-    (required when the artifact's prior arm uses CFBD). Raises ``V7NoCall`` (fail closed)."""
+    (required when the artifact's prior arm uses CFBD). Raises ``V7NoCall`` (fail closed).
+
+    ``classes`` is a SEASON-LEVEL (team, season) -> FBS/FCS map from the schedule (the research labels came from
+    each season's full schedule via ``core.season_classes``). It is required: derived from admitted rows alone, a
+    week-0 FBS team would carry no label and silently get the FCS offset. Both teams and every team in this
+    season's admitted rows must carry a label for ``season`` (NO_CALL_V7_NO_CLASS_LABEL otherwise)."""
     if decision.tzinfo is None:
         raise ValueError("decision must be timezone-aware")
     if model.uses_cfbd and not covariates:
         raise core.V7NoCall(NO_CALL_NO_CFBD, f"season {season}")
-    cls = dict(classes) if classes is not None else core.season_classes(rows)
+    cls = dict(classes)
+    needed = {home_id, away_id} | {
+        t
+        for r in rows
+        if r.season == season and core.admitted(r.kickoff, decision)
+        for t in (r.team_id, r.opponent_id)
+    }
+    missing = sorted(t for t in needed if (t, season) not in cls)
+    if missing:
+        raise core.V7NoCall(NO_CALL_NO_CLASS, f"season {season}: {missing[:5]}")
     prev_rows = [r for r in rows if r.season == season - 1]
     finals = core.fit_finals(prev_rows, season - 1, cls) if prev_rows else None
     state = core.fit_state(rows, season, decision, cls, finals, model.params, (home_id, away_id), covariates)
