@@ -1,0 +1,182 @@
+{
+  "diag": {
+    "exp_def": {
+      "lambda_games": 7.694,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.4398,
+      "sigma2": 0.000969,
+      "tau2": 0.000126,
+      "tau2_raw": 0.000207
+    },
+    "exp_off": {
+      "lambda_games": 6.635,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.412,
+      "sigma2": 0.000969,
+      "tau2": 0.000146,
+      "tau2_raw": 0.000227
+    },
+    "plays_def": {
+      "lambda_games": 8.525,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.4591,
+      "sigma2": 72.70786,
+      "tau2": 8.529066,
+      "tau2_raw": 14.588055
+    },
+    "plays_off": {
+      "lambda_games": 7.739,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.4492,
+      "sigma2": 72.70786,
+      "tau2": 9.395488,
+      "tau2_raw": 15.454476
+    },
+    "ppd_def": {
+      "lambda_games": 5.021,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.6278,
+      "sigma2": 0.856805,
+      "tau2": 0.170629,
+      "tau2_raw": 0.24203
+    },
+    "ppd_off": {
+      "lambda_games": 4.144,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.5906,
+      "sigma2": 0.856805,
+      "tau2": 0.206771,
+      "tau2_raw": 0.278172
+    },
+    "pts_def": {
+      "lambda_games": 4.405,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.6352,
+      "sigma2": 95.858609,
+      "tau2": 21.763425,
+      "tau2_raw": 29.751643
+    },
+    "pts_off": {
+      "lambda_games": 4.126,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.5901,
+      "sigma2": 95.858609,
+      "tau2": 23.233613,
+      "tau2_raw": 31.22183
+    },
+    "sr_def": {
+      "lambda_games": 4.131,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.5681,
+      "sigma2": 0.004789,
+      "tau2": 0.001159,
+      "tau2_raw": 0.001558
+    },
+    "sr_off": {
+      "lambda_games": 3.882,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.618,
+      "sigma2": 0.004789,
+      "tau2": 0.001234,
+      "tau2_raw": 0.001633
+    },
+    "to_def": {
+      "lambda_games": 23.936,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.1689,
+      "sigma2": 0.000229,
+      "tau2": 1e-05,
+      "tau2_raw": 2.9e-05
+    },
+    "to_off": {
+      "lambda_games": 19.143,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.2446,
+      "sigma2": 0.000229,
+      "tau2": 1.2e-05,
+      "tau2_raw": 3.1e-05
+    },
+    "ypp_def": {
+      "lambda_games": 11.172,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.3618,
+      "sigma2": 5.075937,
+      "tau2": 0.45435,
+      "tau2_raw": 0.877345
+    },
+    "ypp_off": {
+      "lambda_games": 8.456,
+      "median_games": 12.0,
+      "n_pairs": 993,
+      "rho": 0.3202,
+      "sigma2": 5.075937,
+      "tau2": 0.600305,
+      "tau2_raw": 1.0233
+    }
+  },
+  "inputs": {
+    "events": 16404,
+    "events_with_pbp": 15533,
+    "pbp_sha256": "10b992fc7b054272e9a09a6ff21f083561411ef8c66b1da6ba6fe84aa4feb3be",
+    "snapshot_sha256": "1fe90e1a11b8e5248003bff92ae62eec5bb17c4bd421a275b2f64ed36f1ced0c",
+    "team_game_rows": 32808
+  },
+  "lam_def": {
+    "exp": 7.693954819151643,
+    "plays": 8.5247149654561,
+    "ppd": 5.021443922152369,
+    "pts": 4.404573581624121,
+    "sr": 4.131436705135223,
+    "to": 23.93642625868464,
+    "ypp": 11.171854490091501
+  },
+  "lam_off": {
+    "exp": 6.635305565578561,
+    "plays": 7.738593627725582,
+    "ppd": 4.1437383601983155,
+    "pts": 4.125858964116593,
+    "sr": 3.882098983245004,
+    "to": 19.142571883161846,
+    "ypp": 8.455592254194643
+  },
+  "note": "finals of seasons 2016-2021 only (all end before TRAIN_END); no validation/holdout season read",
+  "rho_def": {
+    "exp": 0.43984258208101534,
+    "plays": 0.4591208265942465,
+    "ppd": 0.6277921934421966,
+    "pts": 0.635198114276694,
+    "sr": 0.5681008716407389,
+    "to": 0.168948246124455,
+    "ypp": 0.36183165206088963
+  },
+  "rho_off": {
+    "exp": 0.4120449018561131,
+    "plays": 0.44923302909447976,
+    "ppd": 0.5906242090843308,
+    "pts": 0.5900795550768387,
+    "sr": 0.61796251217807,
+    "to": 0.24455373678834832,
+    "ypp": 0.32022737122932093
+  },
+  "seasons_used": [
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2021
+  ]
+}
