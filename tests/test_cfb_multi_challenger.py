@@ -394,7 +394,6 @@ def _run_forecast(tmp_path: Path, monkeypatch, contracts: list[dict]) -> tuple[d
         gated_ledger=ledgers["gated"],
         flat_ledger=ledgers["flat"],
         main_ledger=ledgers["main"],
-        force=True,
     )
     return result, ledgers
 
@@ -404,7 +403,7 @@ def test_v5_main_v62_flat_and_v7_flat_rows_land_with_distinct_identities(
 ) -> None:
     from model_prediction.cli.settle import _extract_market_slug
     from model_prediction.data_sources.polymarket_execute import _extract_market_slug as ticket_slug
-    from model_prediction.ncaaf_prekickoff_capture import ncaaf_settlement_slug
+    from model_prediction.ncaaf_prekickoff_capture import _row_slug, ncaaf_settlement_slug
 
     v62_rows = build_v62_contracts(
         v62_model,
@@ -445,6 +444,10 @@ def test_v5_main_v62_flat_and_v7_flat_rows_land_with_distinct_identities(
                 ncaaf_settlement_slug(_extract_market_slug(row["rationale"], row), row["rationale"]) == slug
             )
             assert ticket_slug(row["rationale"]) == slug
+            assert _row_slug(None, None, row["rationale"]) == slug
+        # v7 gets v6.2's Flat treatment: every emitted row is a Flat CALL with ledger-sized units.
+        for row in by_model[V62] + by_model[V7]:
+            assert row["decision"] == "CALL" and float(row["units"]) > 0, row["market_type"]
 
 
 def test_v7_no_call_leaves_v5_and_v62_ledger_rows_identical(
@@ -607,6 +610,7 @@ def test_slate_hook_runs_each_challenger_in_route_order_and_isolates_v7(tmp_path
     for events in seen:
         assert set(events[0]) == set(EventQuotes.__dataclass_fields__)
         EventQuotes(**events[0])
+        assert events == seen[0]  # the same event dicts in every arm, v7 routed or not
 
     def v62_boom(*_a):
         raise RuntimeError("v6.2 down")
@@ -617,3 +621,15 @@ def test_slate_hook_runs_each_challenger_in_route_order_and_isolates_v7(tmp_path
     assert dumps({"priced_contracts": v62_failed["priced_contracts"][: len(champion)]}) == dumps(
         {"priced_contracts": champion}
     )
+
+
+def test_v62_still_routes_every_market_and_neither_challenger_can_be_bought() -> None:
+    from model_prediction.models.cfb_structural_v7_challenger import routed_markets as v7_routed_markets
+    from model_prediction.models.cfb_structural_v62 import routed_markets as v62_routed_markets
+    from model_prediction.portfolio.auto_executor import DEFAULT_WHITELIST_MODELS
+
+    # v6.2 reads registry.challenger() (the primary): it must stay first in each list to keep its markets.
+    assert v62_routed_markets() == ["moneyline", "spread", "total"]
+    assert v7_routed_markets() == ["moneyline", "spread", "total"]
+    assert V5 in DEFAULT_WHITELIST_MODELS
+    assert V62 not in DEFAULT_WHITELIST_MODELS and V7 not in DEFAULT_WHITELIST_MODELS
