@@ -96,6 +96,9 @@ from .forecast_market_select import (
     _select_wnba_spread_market,
     _select_wnba_total_market,
 )
+from .forecast_nba_anchor_v10 import log_nba_anchor_v10
+from .forecast_nba_anchor_v10 import spread_inputs as nba_anchor_v10_spread_inputs
+from .forecast_nba_anchor_v10 import total_inputs as nba_anchor_v10_total_inputs
 from .forecast_nfl_moneyline_shadow import (
     log_nfl_margin_moneyline_shadow,
     moneyline_shadow_input,
@@ -2097,6 +2100,13 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             }
         )
 
+    # v10 challenger inputs, collected after v9's contracts are final; never touches them.
+    try:
+        anchor_v10_inputs = nba_anchor_v10_spread_inputs(predictions, market_by_event_id, events)
+    except Exception:  # challenger inputs are best-effort by design
+        logger.warning("nba-anchor-v10 spread inputs unavailable", exc_info=True)
+        anchor_v10_inputs = []
+
     return {
         "sport": "nba_spread",
         "model_name": "NBA Spread (composite margin normal CDF)",
@@ -2108,6 +2118,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         "priced_contracts": priced_contracts,
         "unmatched": unmatched,
         "observed_at_utc": observed_at.isoformat(),
+        "anchor_v10_inputs": anchor_v10_inputs,
     }
 
 
@@ -2124,7 +2135,7 @@ def _forecast_nba_spread_sport(
     """Log NBA spread picks to Main (CALL only) + Flat (every candidate)."""
     forecast = _forecast_nba_spread_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
-    return _log_basketball_spread_picks(
+    result = _log_basketball_spread_picks(
         league=League.NBA,
         forecast=forecast,
         tag="nba_spread",
@@ -2137,6 +2148,42 @@ def _forecast_nba_spread_sport(
         main_ledger=main_ledger,
         flat_ledger=flat_ledger,
     )
+    return _with_nba_anchor_v10(
+        result,
+        "spread",
+        data_root=data_root,
+        args_date=args_date,
+        config=config,
+        registry=registry,
+        bans=bans,
+        flat_ledger=flat_ledger,
+    )
+
+
+def _with_nba_anchor_v10(
+    result: dict, market: str, *, data_root, args_date: str, config: dict, registry, bans, flat_ledger
+) -> dict:
+    """Log the nba-anchor-v10 Flat challenger AFTER v9 has been logged (Flat only, never Main).
+
+    Contained: a v10 failure is logged and reported here and never reaches the v9 rows.
+    """
+    try:
+        if flat_ledger is not None:
+            result["anchor_v10"] = log_nba_anchor_v10(
+                forecast=result,
+                market=market,
+                data_root=data_root,
+                args_date=args_date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                flat_ledger=flat_ledger,
+            )
+    except Exception:  # challenger logging is best-effort by design
+        logger.warning("nba-anchor-v10 %s challenger failed to log", market, exc_info=True)
+        result["anchor_v10"] = {"status": "error", "logged": 0}
+    result.pop("anchor_v10_inputs", None)
+    return result
 
 
 def _log_basketball_spread_picks(
@@ -2578,6 +2625,15 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             }
         )
 
+    # v10 challenger inputs (v9.1 totals engine), collected after v9's contracts are final.
+    try:
+        anchor_v10_inputs = nba_anchor_v10_total_inputs(
+            history, upcoming, predictions, market_by_event_id, events
+        )
+    except Exception:  # challenger inputs are best-effort by design
+        logger.warning("nba-anchor-v10 total inputs unavailable", exc_info=True)
+        anchor_v10_inputs = []
+
     return {
         "sport": "nba_total",
         "model_name": "NBA Total (composite trend/team normal CDF)",
@@ -2590,6 +2646,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         "unmatched": unmatched,
         "calibration": calibration_decision,
         "observed_at_utc": observed_at.isoformat(),
+        "anchor_v10_inputs": anchor_v10_inputs,
     }
 
 
@@ -2606,7 +2663,7 @@ def _forecast_nba_total_sport(
     """Log NBA total picks to Main (CALL only) + Flat (every candidate)."""
     forecast = _forecast_nba_total_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
-    return _log_basketball_total_picks(
+    result = _log_basketball_total_picks(
         league=League.NBA,
         forecast=forecast,
         tag="nba_total",
@@ -2619,6 +2676,16 @@ def _forecast_nba_total_sport(
         registry=registry,
         bans=bans,
         main_ledger=main_ledger,
+        flat_ledger=flat_ledger,
+    )
+    return _with_nba_anchor_v10(
+        result,
+        "total",
+        data_root=data_root,
+        args_date=args_date,
+        config=config,
+        registry=registry,
+        bans=bans,
         flat_ledger=flat_ledger,
     )
 

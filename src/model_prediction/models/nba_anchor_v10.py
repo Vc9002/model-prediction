@@ -32,7 +32,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from ..domain import parse_utc
@@ -92,12 +92,17 @@ class CapturedAnchorSource:
     """
 
     quotes: Mapping[tuple[str, str], Sequence[AnchorQuote]]
+    # Older captures are not an anchor at all (a previous run's line must not price this one).
+    max_age: timedelta | None = None
 
     def anchor(self, event_id: str, market: str, decision_time: datetime) -> AnchorQuote | None:
+        oldest = None if self.max_age is None else decision_time - self.max_age
         eligible = [
             q
             for q in self.quotes.get((event_id, market), ())
-            if q.observed_at_utc is not None and parse_utc(q.observed_at_utc) <= decision_time
+            if q.observed_at_utc is not None
+            and parse_utc(q.observed_at_utc) <= decision_time
+            and (oldest is None or parse_utc(q.observed_at_utc) >= oldest)
         ]
         return max(eligible, key=lambda q: parse_utc(q.observed_at_utc or ""), default=None)
 
