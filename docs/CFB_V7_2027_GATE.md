@@ -1,7 +1,7 @@
 # cfb-structural-v7: pre-registered 2027 forward gate (NCAAF overhaul plan, Step 5)
 
 Pinned 2026-11-21, before the 2027 season. The binding text is `outputs/ncaaf/cfb_v7_2027_gate.json`
-(sha256 `0f79b19884dae28ab0acc693b95fea1e293538f0992c8ba1aec3caf13a9b8f59`). This page summarises it; when they
+(sha256 of the committed LF bytes `0f79b19884dae28ab0acc693b95fea1e293538f0992c8ba1aec3caf13a9b8f59`). This page summarises it; when they
 differ, the JSON wins. Changing a threshold after 2027 data exists makes the gate void; a new gate needs a new id
 and a fresh count.
 
