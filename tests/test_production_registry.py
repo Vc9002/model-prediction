@@ -224,8 +224,9 @@ def test_real_production_yaml_resolves_every_model() -> None:
     ncaab = registry.entries["ncaab-tempo-v1"]
     assert ncaab.implementation == IMPLEMENTATION_CODE_BACKED
     assert ncaab.entry == "model_prediction.models.basketball_leagues:ncaab_model"
-    # Promoted 2026-11-21 (quick 261120-nip); ncaab-spread-v6 is the rollback.
-    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-spread-v7"
+    # Spread promoted 2026-11-21 (quick 261120-nip; rollback ncaab-spread-v6); moneyline moved to the
+    # margin-only v7m the same day (quick 261121-hmc; rollback ncaab-spread-v7).
+    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-moneyline-v7m"
     assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v7"
     assert registry.champion("NCAAB", "total").model_id == "ncaab-total-v6"
 
@@ -499,8 +500,8 @@ def test_ncaab_v7_entry_is_registered_with_v6_as_rollback() -> None:
     assert entry.rollback_model == "ncaab-spread-v6"
 
 
-def test_ncaab_moneyline_v7m_entry_is_a_moneyline_only_candidate() -> None:
-    """Registered (not promoted): moneyline only, so it can never be promoted onto the spread route."""
+def test_ncaab_moneyline_v7m_entry_is_moneyline_only() -> None:
+    """Moneyline only, so it can never be promoted onto the spread route."""
     registry = ProductionModelRegistry.load(REPO)
     entry = registry.entries["ncaab-moneyline-v7m"]
     assert entry.implementation == IMPLEMENTATION_CODE_BACKED
@@ -513,10 +514,9 @@ def test_ncaab_moneyline_v7m_entry_is_a_moneyline_only_candidate() -> None:
         assert registry.champion("NCAAB", market).model_id != "ncaab-moneyline-v7m"
 
 
-# FAILS UNTIL PROMOTION (2026-11-21): passes only after `model_promotion promote --new ncaab-spread-v7`
-# has run for NCAAB moneyline and spread.
-def test_ncaab_v7_is_the_spread_champion_after_promotion() -> None:
+def test_ncaab_v7_spread_and_v7m_moneyline_champions() -> None:
     registry = ProductionModelRegistry.load(REPO)
-    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-spread-v7"
+    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-moneyline-v7m"
+    assert registry.rollback("NCAAB", "moneyline").model_id == "ncaab-spread-v7"
     assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v7"
     assert registry.rollback("NCAAB", "spread").model_id == "ncaab-spread-v6"

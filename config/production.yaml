@@ -989,7 +989,7 @@ prediction_service:
     rollback_model: null
   champions:
     NCAAB:
-      moneyline: ncaab-spread-v7
+      moneyline: ncaab-moneyline-v7m
       spread: ncaab-spread-v7
       total: ncaab-total-v6
     WNBA:
