@@ -1,0 +1,829 @@
+{
+  "by_season_class": {
+    "2016|FBS-FBS": {
+      "drives_plays_share": 0.9166666666666666,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 181,
+      "median_scrimmage": 140,
+      "usable_share": 0.9166666666666666
+    },
+    "2016|FBS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.9166666666666666,
+      "games": 12,
+      "median_plays": 173.0,
+      "median_scrimmage": 132.0,
+      "usable_share": 0.8333333333333334
+    },
+    "2016|FCS-FCS": {
+      "drives_plays_share": 0.9166666666666666,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 186,
+      "median_scrimmage": 141,
+      "usable_share": 0.9166666666666666
+    },
+    "2017|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 173.0,
+      "median_scrimmage": 135.0,
+      "usable_share": 1.0
+    },
+    "2017|FBS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 173.5,
+      "median_scrimmage": 131.0,
+      "usable_share": 1.0
+    },
+    "2017|FCS-FCS": {
+      "drives_plays_share": 0.75,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.8888888888888888,
+      "games": 12,
+      "median_plays": 188,
+      "median_scrimmage": 143,
+      "usable_share": 0.6666666666666666
+    },
+    "2018|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 184.5,
+      "median_scrimmage": 138.5,
+      "usable_share": 1.0
+    },
+    "2018|FBS-FCS": {
+      "drives_plays_share": 0.9166666666666666,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 189,
+      "median_scrimmage": 144,
+      "usable_share": 0.9166666666666666
+    },
+    "2018|FCS-FCS": {
+      "drives_plays_share": 0.75,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 190,
+      "median_scrimmage": 148,
+      "usable_share": 0.75
+    },
+    "2019|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 176.5,
+      "median_scrimmage": 136.5,
+      "usable_share": 1.0
+    },
+    "2019|FBS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 177.5,
+      "median_scrimmage": 133.5,
+      "usable_share": 1.0
+    },
+    "2019|FCS-FCS": {
+      "drives_plays_share": 0.9166666666666666,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.9090909090909091,
+      "games": 12,
+      "median_plays": 190,
+      "median_scrimmage": 146,
+      "usable_share": 0.8333333333333334
+    },
+    "2020|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 176.0,
+      "median_scrimmage": 130.5,
+      "usable_share": 1.0
+    },
+    "2020|FBS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 166.0,
+      "median_scrimmage": 130.5,
+      "usable_share": 1.0
+    },
+    "2020|FCS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 173.5,
+      "median_scrimmage": 134.5,
+      "usable_share": 1.0
+    },
+    "2021|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 182.5,
+      "median_scrimmage": 138.0,
+      "usable_share": 1.0
+    },
+    "2021|FBS-FCS": {
+      "drives_plays_share": 0.8333333333333334,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 167.0,
+      "median_scrimmage": 127.5,
+      "usable_share": 0.8333333333333334
+    },
+    "2021|FCS-FCS": {
+      "drives_plays_share": 0.8333333333333334,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.8,
+      "games": 12,
+      "median_plays": 171.0,
+      "median_scrimmage": 126.0,
+      "usable_share": 0.6666666666666666
+    },
+    "2022|FBS-FBS": {
+      "drives_plays_share": 0.8333333333333334,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 178.5,
+      "median_scrimmage": 134.0,
+      "usable_share": 0.8333333333333334
+    },
+    "2022|FBS-FCS": {
+      "drives_plays_share": 0.8333333333333334,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.8,
+      "games": 12,
+      "median_plays": 174.0,
+      "median_scrimmage": 131.0,
+      "usable_share": 0.6666666666666666
+    },
+    "2022|FCS-FCS": {
+      "drives_plays_share": 0.75,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.8888888888888888,
+      "games": 12,
+      "median_plays": 172,
+      "median_scrimmage": 129,
+      "usable_share": 0.6666666666666666
+    },
+    "2023|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 178.5,
+      "median_scrimmage": 132.5,
+      "usable_share": 1.0
+    },
+    "2023|FBS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.8333333333333334,
+      "games": 12,
+      "median_plays": 164.0,
+      "median_scrimmage": 122.5,
+      "usable_share": 0.8333333333333334
+    },
+    "2023|FCS-FCS": {
+      "drives_plays_share": 0.9166666666666666,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 170,
+      "median_scrimmage": 128,
+      "usable_share": 0.9166666666666666
+    },
+    "2024|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.8333333333333334,
+      "games": 12,
+      "median_plays": 171.0,
+      "median_scrimmage": 127.5,
+      "usable_share": 0.8333333333333334
+    },
+    "2024|FBS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 165.5,
+      "median_scrimmage": 123.0,
+      "usable_share": 1.0
+    },
+    "2024|FCS-FCS": {
+      "drives_plays_share": 0.9166666666666666,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.7272727272727273,
+      "games": 12,
+      "median_plays": 164,
+      "median_scrimmage": 125,
+      "usable_share": 0.6666666666666666
+    },
+    "2025|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 0.8333333333333334,
+      "games": 12,
+      "median_plays": 182.0,
+      "median_scrimmage": 132.0,
+      "usable_share": 0.8333333333333334
+    },
+    "2025|FBS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 171.5,
+      "median_scrimmage": 130.0,
+      "usable_share": 1.0
+    },
+    "2025|FCS-FCS": {
+      "drives_plays_share": 0.8333333333333334,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 172.0,
+      "median_scrimmage": 133.5,
+      "usable_share": 0.8333333333333334
+    },
+    "2026|FBS-FBS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 180.0,
+      "median_scrimmage": 134.5,
+      "usable_share": 1.0
+    },
+    "2026|FBS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 10,
+      "median_plays": 179.5,
+      "median_scrimmage": 132.5,
+      "usable_share": 1.0
+    },
+    "2026|FCS-FCS": {
+      "drives_plays_share": 1.0,
+      "fields_ok_share": 1.0,
+      "final_score_match_share": 1.0,
+      "games": 12,
+      "median_plays": 172.5,
+      "median_scrimmage": 127.5,
+      "usable_share": 1.0
+    }
+  },
+  "failures": [
+    {
+      "event_id": "400869156",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FBS-FBS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2016
+    },
+    {
+      "event_id": "400869181",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FCS",
+      "n_plays": 184,
+      "n_scrimmage": 139,
+      "season": 2016
+    },
+    {
+      "event_id": "400869605",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": true,
+      "game_class": "FBS-FCS",
+      "n_plays": 84,
+      "n_scrimmage": 64,
+      "season": 2016
+    },
+    {
+      "event_id": "400872784",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2016
+    },
+    {
+      "event_id": "400951538",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2017
+    },
+    {
+      "event_id": "400950940",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FCS-FCS",
+      "n_plays": 181,
+      "n_scrimmage": 143,
+      "season": 2017
+    },
+    {
+      "event_id": "400953999",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2017
+    },
+    {
+      "event_id": "400954010",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2017
+    },
+    {
+      "event_id": "401021675",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FBS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2018
+    },
+    {
+      "event_id": "401030456",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2018
+    },
+    {
+      "event_id": "401030482",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2018
+    },
+    {
+      "event_id": "401030454",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2018
+    },
+    {
+      "event_id": "401127224",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FCS-FCS",
+      "n_plays": 169,
+      "n_scrimmage": 131,
+      "season": 2019
+    },
+    {
+      "event_id": "401136596",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2019
+    },
+    {
+      "event_id": "401309600",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FBS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2021
+    },
+    {
+      "event_id": "401310696",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FBS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2021
+    },
+    {
+      "event_id": "401334821",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2021
+    },
+    {
+      "event_id": "401328053",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FCS-FCS",
+      "n_plays": 183,
+      "n_scrimmage": 152,
+      "season": 2021
+    },
+    {
+      "event_id": "401332294",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FCS-FCS",
+      "n_plays": 149,
+      "n_scrimmage": 115,
+      "season": 2021
+    },
+    {
+      "event_id": "401328245",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2021
+    },
+    {
+      "event_id": "401416618",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FBS-FBS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2022
+    },
+    {
+      "event_id": "401415250",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FBS-FBS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2022
+    },
+    {
+      "event_id": "401416568",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FCS",
+      "n_plays": 167,
+      "n_scrimmage": 127,
+      "season": 2022
+    },
+    {
+      "event_id": "401413256",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FBS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2022
+    },
+    {
+      "event_id": "401423439",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FCS",
+      "n_plays": 145,
+      "n_scrimmage": 123,
+      "season": 2022
+    },
+    {
+      "event_id": "401409241",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FBS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2022
+    },
+    {
+      "event_id": "401424417",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2022
+    },
+    {
+      "event_id": "401423001",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2022
+    },
+    {
+      "event_id": "401435074",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FCS-FCS",
+      "n_plays": 211,
+      "n_scrimmage": 151,
+      "season": 2022
+    },
+    {
+      "event_id": "401425429",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2022
+    },
+    {
+      "event_id": "401525461",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FCS",
+      "n_plays": 170,
+      "n_scrimmage": 129,
+      "season": 2023
+    },
+    {
+      "event_id": "401525545",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FCS",
+      "n_plays": 186,
+      "n_scrimmage": 137,
+      "season": 2023
+    },
+    {
+      "event_id": "401540252",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2023
+    },
+    {
+      "event_id": "401628468",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FBS",
+      "n_plays": 162,
+      "n_scrimmage": 120,
+      "season": 2024
+    },
+    {
+      "event_id": "401643760",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FBS",
+      "n_plays": 184,
+      "n_scrimmage": 147,
+      "season": 2024
+    },
+    {
+      "event_id": "401654505",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2024
+    },
+    {
+      "event_id": "401628641",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FCS-FCS",
+      "n_plays": 202,
+      "n_scrimmage": 151,
+      "season": 2024
+    },
+    {
+      "event_id": "401634007",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FCS-FCS",
+      "n_plays": 170,
+      "n_scrimmage": 132,
+      "season": 2024
+    },
+    {
+      "event_id": "401638693",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FCS-FCS",
+      "n_plays": 164,
+      "n_scrimmage": 125,
+      "season": 2024
+    },
+    {
+      "event_id": "401754638",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FBS",
+      "n_plays": 218,
+      "n_scrimmage": 150,
+      "season": 2025
+    },
+    {
+      "event_id": "401757173",
+      "fetch_status": "ok",
+      "fields_ok": true,
+      "final_score_match": false,
+      "game_class": "FBS-FBS",
+      "n_plays": 160,
+      "n_scrimmage": 131,
+      "season": 2025
+    },
+    {
+      "event_id": "401767659",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2025
+    },
+    {
+      "event_id": "401767497",
+      "fetch_status": "no_plays",
+      "fields_ok": false,
+      "final_score_match": null,
+      "game_class": "FCS-FCS",
+      "n_plays": 0,
+      "n_scrimmage": 0,
+      "season": 2025
+    }
+  ],
+  "fbs_involved": {
+    "drives_plays_share": 0.9694656488549618,
+    "fields_ok_share": 1.0,
+    "final_score_match_share": 0.9645669291338582,
+    "games": 262,
+    "median_plays": 176.0,
+    "median_scrimmage": 133.0,
+    "usable_share": 0.9312977099236641
+  },
+  "fcs_fcs": {
+    "drives_plays_share": 0.8712121212121212,
+    "fields_ok_share": 1.0,
+    "final_score_match_share": 0.9304347826086956,
+    "games": 132,
+    "median_plays": 174,
+    "median_scrimmage": 133,
+    "usable_share": 0.8106060606060606
+  },
+  "field_presence_mean": {
+    "clock": 1.0,
+    "distance": 1.0,
+    "down": 0.9996638527585022,
+    "period": 1.0,
+    "score": 1.0,
+    "start_team": 0.9999789920379824,
+    "statYardage": 1.0,
+    "yardsToEndzone": 1.0
+  },
+  "gap_cells_below_90pct": [
+    "2016|FBS-FCS",
+    "2017|FCS-FCS",
+    "2018|FCS-FCS",
+    "2019|FCS-FCS",
+    "2021|FBS-FCS",
+    "2021|FCS-FCS",
+    "2022|FBS-FBS",
+    "2022|FBS-FCS",
+    "2022|FCS-FCS",
+    "2023|FBS-FCS",
+    "2024|FBS-FBS",
+    "2024|FCS-FCS",
+    "2025|FBS-FBS",
+    "2025|FCS-FCS"
+  ],
+  "generated_at_utc": "2026-11-21T04:34:59Z",
+  "overall": {
+    "drives_plays_share": 0.9365482233502538,
+    "fields_ok_share": 1.0,
+    "final_score_match_share": 0.9539295392953929,
+    "games": 394,
+    "median_plays": 175,
+    "median_scrimmage": 133,
+    "usable_share": 0.8908629441624365
+  },
+  "per_cell": 6,
+  "play_type_census": {
+    "12|Kickoff Return (Offense)": 571,
+    "14|Punt Return": 121,
+    "15|Two Point Pass": 2,
+    "16|Two Point Rush": 2,
+    "17|Blocked Punt": 30,
+    "18|Blocked Field Goal": 33,
+    "20|Safety": 22,
+    "21|Timeout": 2322,
+    "24|Pass Reception": 12076,
+    "26|Pass Interception Return": 419,
+    "29|Fumble Recovery (Opponent)": 271,
+    "2|End Period": 879,
+    "32|Kickoff Return Touchdown": 20,
+    "34|Punt Return Touchdown": 11,
+    "36|Interception Return Touchdown": 52,
+    "37|Blocked Punt Touchdown": 4,
+    "38|Blocked Field Goal Touchdown": 4,
+    "39|Fumble Return Touchdown": 21,
+    "3|Pass Incompletion": 8259,
+    "4|Pass Completion": 15,
+    "52|Punt": 3343,
+    "53|Kickoff": 3472,
+    "59|Field Goal Good": 711,
+    "5|Rush": 23948,
+    "60|Field Goal Missed": 243,
+    "63|Interception": 145,
+    "65|End of Half": 310,
+    "66|End of Game": 249,
+    "67|Passing Touchdown": 1209,
+    "68|Rushing Touchdown": 1256,
+    "69|Fumble": 12,
+    "70|Coin Toss": 3,
+    "79|End of Regulation": 9,
+    "7|Sack": 1330,
+    "8|Penalty": 3390,
+    "9|Fumble Recovery (Own)": 332,
+    "None|None": 6
+  },
+  "sample_seed": 20261121,
+  "usable_definition": "drives present, >= 80 scrimmage plays, period/score/down/distance/yardsToEndzone/clock/start.team/statYardage on >= 95% of scrimmage plays, last play's running score equals the known final"
+}

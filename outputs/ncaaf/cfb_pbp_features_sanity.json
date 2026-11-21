@@ -1,0 +1,71 @@
+{
+  "by_class": {
+    "ALL": {
+      "box_turnover_match_share": 0.7563131313131313,
+      "box_yards_abs_diff_median": 7,
+      "box_yards_within_10_share": 0.5757575757575758,
+      "explosive_rate": 0.06666287900308694,
+      "garbage_play_share": 0.15251027403745998,
+      "plays_per_team_game": 66.67045454545455,
+      "points_for_vs_drive_points_mean": 2.3964646464646466,
+      "points_per_drive": 2.0942118226600983,
+      "sec_per_play": 27.023848460878632,
+      "success_rate": 0.4200708293089408,
+      "success_rate_ng": 0.4223463687150838,
+      "team_games": 792,
+      "yards_per_play": 5.785125845122436
+    },
+    "FBS-FBS": {
+      "box_turnover_match_share": 0.7671232876712328,
+      "box_yards_abs_diff_median": 5,
+      "box_yards_within_10_share": 0.6301369863013698,
+      "explosive_rate": 0.06820149747873479,
+      "garbage_play_share": 0.08699638363979012,
+      "plays_per_team_game": 67.23630136986301,
+      "points_for_vs_drive_points_mean": 2.256849315068493,
+      "points_per_drive": 2.0671578350807596,
+      "sec_per_play": 26.81946686972024,
+      "success_rate": 0.4227576019966383,
+      "success_rate_ng": 0.42270571827057185,
+      "team_games": 292,
+      "yards_per_play": 5.799775887536291
+    },
+    "FBS-FCS": {
+      "box_turnover_match_share": 0.7481481481481481,
+      "box_yards_abs_diff_median": 8,
+      "box_yards_within_10_share": 0.5740740740740741,
+      "explosive_rate": 0.0675553547220967,
+      "garbage_play_share": 0.2639516493447809,
+      "plays_per_team_game": 65.57037037037037,
+      "points_for_vs_drive_points_mean": 2.6555555555555554,
+      "points_per_drive": 2.18955223880597,
+      "sec_per_play": 27.489582685680325,
+      "success_rate": 0.4227293267058292,
+      "success_rate_ng": 0.4296677154477784,
+      "team_games": 270,
+      "yards_per_play": 5.855512878445549
+    },
+    "FCS-FCS": {
+      "box_turnover_match_share": 0.7521739130434782,
+      "box_yards_abs_diff_median": 10,
+      "box_yards_within_10_share": 0.508695652173913,
+      "explosive_rate": 0.06368809000387948,
+      "garbage_play_share": 0.10810810810810811,
+      "plays_per_team_game": 67.24347826086957,
+      "points_for_vs_drive_points_mean": 2.2695652173913046,
+      "points_per_drive": 2.0160558464223386,
+      "sec_per_play": 26.736592738799466,
+      "success_rate": 0.4136169662485452,
+      "success_rate_ng": 0.4149630274032188,
+      "team_games": 230,
+      "yards_per_play": 5.6859562912194495
+    }
+  },
+  "events_without_plays": 25,
+  "explosive_definition": "non-turnover scrimmage play gaining >= 20 yards",
+  "team_game_rows": 792,
+  "unknown_play_types": {
+    "": 6,
+    "fumble": 15
+  }
+}
