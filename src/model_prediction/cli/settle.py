@@ -695,6 +695,8 @@ def _closing_probability_for_moneyline_pick(
             ask = side.get("ask")
             if ask is not None and 0 < float(ask) < 1:
                 return round(float(ask), 6), probability_to_american(float(ask))
+        reason = "close_ask_unusable" if side is not None else "close_spread_side_unresolved"
+        logger.info("CLV left blank for %s (%s): %s", slug, event_start_utc, reason)
         return None, None
 
     # 2. Binary Yes/No or Over/Under markets (common in soccer, totals, spreads).
@@ -726,10 +728,14 @@ def _closing_probability_for_moneyline_pick(
         # the same fabricated-market-evidence class as the 2026-08-29 NCAAF ask.
         # A blank CLV is a missing measurement; a guessed one is a wrong
         # measurement that reads as real.
+        logger.info(
+            "CLV left blank for %s (%s): close_side_unresolved selection=%s", slug, event_start_utc, selection
+        )
         return None, None
     side = snapshot.get("long" if matches_long else "short") or {}
     ask = side.get("ask")
     if ask is None or not 0 < float(ask) < 1:
+        logger.info("CLV left blank for %s (%s): close_ask_unusable", slug, event_start_utc)
         return None, None
     return round(float(ask), 6), probability_to_american(float(ask))
 

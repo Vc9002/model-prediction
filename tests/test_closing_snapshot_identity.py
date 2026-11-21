@@ -99,3 +99,51 @@ def test_settlement_close_is_blank_when_the_contract_line_is_not_the_rows_line(t
     assert _closing_probability_for_moneyline_pick(
         tmp_path, "ncaaf", _SLUG, "2026-10-24T16:00Z", "Home", "Away", "under", line=56.5
     ) == (None, None)
+
+
+def test_settlement_close_of_double_chance_is_blank_not_the_yes_side_of_the_away_win_market(
+    tmp_path, caplog
+) -> None:
+    """2026-10-20 Pereira v Boyaca Chico: a 1X pick priced on the away-win market's No (76c)
+    closed at that market's Yes ask (25c), the old default for an unmapped selection."""
+    store = PolymarketSnapshotStore.for_sport_date(tmp_path, "soccer", "2026-10-20")
+    store.append(
+        {
+            "market_slug": "atc-lco-per-byc-2026-10-20-byc",
+            "event_start_utc": "2026-10-20T21:30:00Z",
+            "observed_at_utc": "2026-10-20T20:00:00Z",
+            "market_state": "MARKET_STATE_OPEN",
+            "market_type": "team_win",
+            "long": {"description": "Yes", "ask": 0.25},
+            "short": {"description": "No", "ask": 0.76},
+        }
+    )
+
+    with caplog.at_level("INFO", logger="model_prediction.cli"):
+        result = _closing_probability_for_moneyline_pick(
+            tmp_path,
+            "soccer",
+            "atc-lco-per-byc-2026-10-20-byc",
+            "2026-10-20T21:30Z",
+            "Deportivo Pereira",
+            "Boyaca Chico FC",
+            "1x",
+        )
+
+    assert result == (None, None)
+    assert "close_side_unresolved" in caplog.text
+
+
+def test_settlement_close_blank_reasons_are_logged(tmp_path, caplog) -> None:
+    _write_contract_history(tmp_path, line=57.5)
+
+    with caplog.at_level("INFO", logger="model_prediction.cli"):
+        _closing_probability_for_moneyline_pick(
+            tmp_path, "ncaaf", _SLUG, "2026-10-24T16:00Z", "Home", "Away", "under", line=56.5
+        )
+        _closing_probability_for_moneyline_pick(
+            tmp_path, "ncaaf", _SLUG, "2026-10-24T11:00Z", "Home", "Away", "under", line=56.5
+        )
+
+    assert "close_line_mismatch" in caplog.text
+    assert "no_pre_kickoff_open_quote" in caplog.text
