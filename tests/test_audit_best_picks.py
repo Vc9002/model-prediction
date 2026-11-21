@@ -240,8 +240,8 @@ def test_unverified_bucket_evidence_stays_qualified_moderate(db):
 
 
 def test_verified_bucket_and_verified_candidate_confirms_best(db):
-    # Test 2: same five rows, now verified provenance, and a verified candidate.
-    _bucket_rows(db, 5, provenance=abp.VERIFIED_QUOTE_PROVENANCE)
+    # Test 2: 30 verified WIN rows (the CONFIRM_MIN_GRADED floor), and a verified candidate.
+    _bucket_rows(db, 30, provenance=abp.VERIFIED_QUOTE_PROVENANCE)
     engine = abp.HistoricalAuditEngine(db)
     result = engine.audit_candidate(
         sport="mlb",
@@ -257,8 +257,8 @@ def test_verified_bucket_and_verified_candidate_confirms_best(db):
 
 
 def test_verified_bucket_with_unverified_candidate_quote_is_withheld(db):
-    # Test 3: verified winning bucket, candidate quote is indicative_slate (unverified).
-    _bucket_rows(db, 5, provenance=abp.VERIFIED_QUOTE_PROVENANCE)
+    # Test 3: 30-win verified bucket, candidate quote is indicative_slate (unverified).
+    _bucket_rows(db, 30, provenance=abp.VERIFIED_QUOTE_PROVENANCE)
     engine = abp.HistoricalAuditEngine(db)
     result = engine.audit_candidate(
         sport="mlb",
@@ -340,8 +340,8 @@ def test_malformed_payload_counts_as_unverified_without_raising(db):
 
 def test_open_picks_end_to_end_gate(db, capsys):
     # Test 6: two open future picks against a verified winning bucket; one carries a
-    # verified quote, the other indicative_slate.
-    _bucket_rows(db, 5, provenance=abp.VERIFIED_QUOTE_PROVENANCE)
+    # verified quote, the other indicative_slate. 30 verified wins so the bucket confirms.
+    _bucket_rows(db, 30, provenance=abp.VERIFIED_QUOTE_PROVENANCE)
     _add(
         db,
         pick_id="open-verified",
@@ -456,11 +456,12 @@ def test_ncaab_moneyline_thin_unverified_bucket_not_confirmed(db):
 
 
 def test_nba_total_direction_bucket_not_pooled_total(db):
-    # Test 10: nba total, 5.0-7.9% bucket, four verified over WINs and four verified under
+    # Test 10: nba total, 5.0-7.9% bucket, 30 verified over WINs and four verified under
     # LOSSes. The verdict must come from the direction bucket, not the pooled total record.
+    # Trap detection still starts at MIN_GRADED (4); only confirmation needs 30.
     _bucket_rows(
         db,
-        4,
+        30,
         result="win",
         provenance=abp.VERIFIED_QUOTE_PROVENANCE,
         sport="nba",
@@ -883,3 +884,225 @@ def test_rows_created_at_or_after_start_never_first_sight(db):
     assert bucket.verified.total_graded == 1
     assert engine.first_sight_edge("mlb", "evt-late", "moneyline", "home", "m1") is None
     assert engine.first_sight_edge("mlb", "evt-ok", "moneyline", "home", "m1") == pytest.approx(0.09)
+
+
+# --- quick-261120-w6i: confirmation gates (30 decisions, Wilson vs price, CLV, family) ----
+
+
+def _moved_key(
+    db_path,
+    *,
+    event_id,
+    first_price,
+    close_price,
+    edge,
+    sport,
+    market_type,
+    selection,
+    model_id="m1",
+    line=None,
+    result="win",
+):
+    # First sight at first_price (superseded), then the settled last pre-game row at the same
+    # line and close_price. The first row is graded through that same-line settled sibling
+    # with a price-derived pnl.
+    common = {
+        "event_id": event_id,
+        "sport": sport,
+        "market_type": market_type,
+        "selection": selection,
+        "model_id": model_id,
+        "line": line,
+        "edge": edge,
+        "provenance": abp.VERIFIED_QUOTE_PROVENANCE,
+    }
+    _add(
+        db_path,
+        market_prob=first_price,
+        result=None,
+        status="superseded",
+        created_at="2026-01-01T14:00:00Z",
+        **common,
+    )
+    _add(
+        db_path,
+        market_prob=close_price,
+        result=result,
+        status="settled",
+        created_at="2026-01-01T22:00:00Z",
+        **common,
+    )
+
+
+def test_confirm_requires_30_verified_decisions(db):
+    _bucket_rows(db, 29, provenance=VERIFIED)
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="mlb", market_type="moneyline", selection="home", edge=0.09)
+    assert res["verdict"] == "QUALIFIED_MODERATE"
+    assert res["bucket_verdict"] == "QUALIFIED_MODERATE"
+    assert any("needs 30" in f for f in res["flags"])
+
+    _bucket_rows(db, 1, provenance=VERIFIED)
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="mlb", market_type="moneyline", selection="home", edge=0.09)
+    assert res["verdict"] == "CONFIRMED_BEST"
+
+
+def test_confirm_requires_wilson_bound_above_bucket_mean_price(db):
+    # 19W-11L at 50 cents: 63.3% WR and +26.7% ROI clear every flat hurdle, but the 95% lower
+    # bound (about 48.3%) is not above the 50 cent price, so the sample cannot confirm.
+    _bucket_rows(db, 19, result="win", pnl=1.0, provenance=VERIFIED)
+    _bucket_rows(db, 11, result="loss", pnl=-1.0, provenance=VERIFIED)
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="mlb", market_type="moneyline", selection="home", edge=0.09)
+    assert res["verdict"] == "QUALIFIED_MODERATE"
+    assert res["bucket_verdict"] == "QUALIFIED_MODERATE"
+    assert res["wilson_lb"] == pytest.approx(0.4833, abs=1e-3)
+    assert res["wilson_lb"] == pytest.approx(abp.wilson_lower_bound(19, 30))
+    assert res["mean_price"] == pytest.approx(0.5)
+    v = res["evidence"].verified
+    assert v.win_rate >= 60.0 and v.roi >= abp.BEST_MIN_ROI
+
+
+def test_confirm_compares_bucket_mean_price_not_candidate_price(db):
+    # 21W-9L at 60 cents: bound 55.1% beats the candidate's 50 cents but not the bucket's 60
+    # cent mean, and the bucket is what the evidence is made of.
+    _bucket_rows(db, 21, result="win", pnl=0.4 / 0.6, provenance=VERIFIED, edge=0.09, market_prob=0.6)
+    _bucket_rows(db, 9, result="loss", pnl=-1.0, provenance=VERIFIED, edge=0.09, market_prob=0.6)
+    engine = abp.HistoricalAuditEngine(db)
+    res = engine.audit_candidate("mlb", "moneyline", "home", 0.09, 0.59, 0.5, "m1", VERIFIED)
+    v = res["evidence"].verified
+    assert v.roi >= abp.BEST_MIN_ROI
+    assert res["wilson_lb"] == pytest.approx(0.5506, abs=1e-3)
+    assert res["wilson_lb"] > 0.5
+    assert res["mean_price"] == pytest.approx(0.6)
+    assert res["verdict"] == "QUALIFIED_MODERATE"
+
+    # Stake weighting: one 40 cent win at 1 unit and one 70 cent win at 2 units average to 60.
+    sw = {"sport": "nfl", "market_type": "spread", "selection": "away", "provenance": VERIFIED}
+    _add(db, market_prob=0.4, units=1.0, **sw)
+    _add(db, market_prob=0.7, units=2.0, **sw)
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="nfl", market_type="spread", selection="away", edge=0.09)
+    assert res["evidence"].verified.mean_price == pytest.approx(0.6)
+
+
+def test_underdog_bucket_confirms_without_flat_win_rate_hurdle(db):
+    # 16W-14L at 35 cents: 53.3% WR is below both the dropped 60% gate and the 55% trap
+    # hurdle, yet +52.4% ROI and a 38.7% lower bound above the 35 cent price make it a real
+    # edge. Confirmation takes precedence over the trap rule.
+    kw = {"sport": "wnba", "selection": "away", "provenance": VERIFIED, "edge": 0.09, "market_prob": 0.35}
+    _bucket_rows(db, 16, result="win", pnl=0.65 / 0.35, **kw)
+    _bucket_rows(db, 14, result="loss", pnl=-1.0, **kw)
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="wnba", market_type="moneyline", selection="away", edge=0.09)
+    assert res["evidence"].verified.win_rate < abp.TRAP_WIN_RATE
+    assert res["wilson_lb"] == pytest.approx(0.387, abs=1e-3)
+    assert res["verdict"] == "CONFIRMED_BEST"
+
+
+def test_clv_negative_bucket_is_unproven(db):
+    mlb = {"sport": "mlb", "selection": "home", "edge": 0.09}
+    nfl = {"sport": "nfl", "selection": "home", "edge": 0.09}
+    _bucket_rows(db, 30, provenance=VERIFIED, **mlb)
+    for i in range(7):
+        _moved_key(db, event_id=f"mv-{i}", first_price=0.5, close_price=0.47, market_type="moneyline", **mlb)
+    _bucket_rows(db, 30, provenance=VERIFIED, **nfl)
+    for i in range(8):
+        _moved_key(
+            db, event_id=f"nfl-up-{i}", first_price=0.5, close_price=0.53, market_type="moneyline", **nfl
+        )
+
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="mlb", market_type="moneyline", selection="home", edge=0.09)
+    assert res["verdict"] == "CONFIRMED_BEST"
+    assert res["clv_unproven"] is False
+
+    _moved_key(db, event_id="mv-7", first_price=0.5, close_price=0.47, market_type="moneyline", **mlb)
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="mlb", market_type="moneyline", selection="home", edge=0.09)
+    assert res["verdict"] == "QUALIFIED_MODERATE"
+    assert res["bucket_verdict"] == "QUALIFIED_MODERATE"
+    assert res["clv_unproven"] is True
+    assert res["family_under_review"] is False
+    flag = next(f for f in res["flags"] if "UNPROVEN" in f)
+    assert "closed at worse prices" in flag
+    assert "-3.0¢" in flag
+    assert "+0/-8" in flag
+
+    # A bucket whose closes moved UP is untouched.
+    up = _audit(engine, sport="nfl", market_type="moneyline", selection="home", edge=0.09)
+    assert up["verdict"] == "CONFIRMED_BEST"
+    assert up["clv_unproven"] is False
+
+
+def test_clv_uses_last_same_line_verified_row_before_start(db):
+    common = {
+        "event_id": "evt-clv",
+        "sport": "nba",
+        "market_type": "total",
+        "selection": "over",
+        "model_id": "m1",
+        "edge": 0.065,
+        "event_start": "2026-01-02T00:00:00Z",
+        "status": "superseded",
+        "result": None,
+    }
+    v = abp.VERIFIED_QUOTE_PROVENANCE
+    _add(db, market_prob=0.50, line=230.5, provenance=v, created_at="2026-01-01T14:00:00Z", **common)
+    _add(db, market_prob=0.53, line=230.5, provenance=v, created_at="2026-01-01T18:00:00Z", **common)
+    # Different line: not the same market, so not a close for the first row.
+    _add(db, market_prob=0.30, line=231.5, provenance=v, created_at="2026-01-01T20:00:00Z", **common)
+    # Same line but unverified quote.
+    _add(db, market_prob=0.60, line=230.5, provenance="", created_at="2026-01-01T21:00:00Z", **common)
+    # Same line, verified, but created after the event started: never a pre-game close.
+    settled = {**common, "status": "settled", "result": "win"}
+    _add(
+        db,
+        market_prob=0.40,
+        line=230.5,
+        provenance=v,
+        created_at="2026-01-02T01:00:00Z",
+        payload_extra={"home_score": "120", "away_score": "115"},
+        **settled,
+    )
+    engine = abp.HistoricalAuditEngine(db)
+    ver = engine.stats_by_sport_dir_bucket[("nba", "over", "5.0% - 7.9%")].verified
+    assert ver.wins == 1
+    assert ver.clv_moved == 1
+    assert ver.clv_sum == pytest.approx(0.03)
+    assert (ver.clv_up, ver.clv_down) == (1, 0)
+
+
+def test_model_family_negative_clv_blocks_confirmation(db):
+    nba_over = {"sport": "nba", "market_type": "total", "selection": "over", "model_id": "m1"}
+    _bucket_rows(db, 30, provenance=VERIFIED, edge=0.09, **nba_over)
+    _bucket_rows(db, 30, provenance=VERIFIED, edge=0.09, sport="nba", market_type="total", selection="under")
+    # Closes in another edge bucket (2-4.9%) so the 8-12% bucket's own CLV stays clean and
+    # only the family veto can act.
+    for i in range(19):
+        _moved_key(
+            db,
+            event_id=f"fam-{i}",
+            first_price=0.5,
+            close_price=0.48,
+            edge=0.03,
+            line=220.5,
+            **nba_over,
+        )
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="nba", market_type="total", selection="over", edge=0.09)
+    assert res["verdict"] == "CONFIRMED_BEST"
+    assert res["family_under_review"] is False
+
+    _moved_key(db, event_id="fam-19", first_price=0.5, close_price=0.48, edge=0.03, line=220.5, **nba_over)
+    engine = abp.HistoricalAuditEngine(db)
+    res = _audit(engine, sport="nba", market_type="total", selection="over", edge=0.09)
+    assert res["verdict"] == "QUALIFIED_MODERATE"
+    assert res["clv_unproven"] is False
+    assert res["family_under_review"] is True
+    assert any("under review" in f for f in res["flags"])
+    # The over family never touches the under family.
+    under = _audit(engine, sport="nba", market_type="total", selection="under", edge=0.09)
+    assert under["verdict"] == "CONFIRMED_BEST"
+    assert under["family_under_review"] is False

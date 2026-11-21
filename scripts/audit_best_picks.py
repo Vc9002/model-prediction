@@ -20,21 +20,34 @@ Pillars 3 (current-season sample maturity) and 4 (market disagreement bounds) ar
 checks described in docs/BEST_PICKS_AUDIT_FRAMEWORK.md; this script does not enforce them.
 
 Classification Verdicts:
-- CONFIRMED_BEST: evidence counts only verified-quote rows (see VERIFIED_QUOTE_PROVENANCE
-  below) in the candidate's bucket, reaching >= BEST_MIN_WIN_RATE WR and >= BEST_MIN_ROI
-  ROI, AND the candidate's own quote is itself verified. A mechanical bucket verdict of
-  CONFIRMED_BEST computed from an unverified candidate quote is withheld and reported as
-  QUALIFIED_MODERATE instead (the bucket_verdict key still carries the mechanical verdict).
+- CONFIRMED_BEST needs ALL of, on verified-quote rows only (see VERIFIED_QUOTE_PROVENANCE
+  below) in the candidate's bucket: >= CONFIRM_MIN_GRADED verified decisions; a one-sided 95%
+  Wilson lower bound on the win rate strictly above the bucket's stake-weighted mean
+  first-sight price; ROI >= BEST_MIN_ROI; non-negative bucket closing-line value (CLV) and no
+  model-family veto (below); AND the candidate's own quote is itself verified. A mechanical
+  bucket verdict of CONFIRMED_BEST computed from an unverified candidate quote is withheld
+  and reported as QUALIFIED_MODERATE instead (the bucket_verdict key carries the mechanical
+  verdict). MIN_GRADED only picks the evidence basis (own model vs pooled) and detects traps.
+- The old flat 60% win-rate gate is dropped: it is the even-price vig heuristic, so it blocks
+  profitable underdog buckets and is looser than the price comparator for favourite buckets.
+  The Wilson bound above the mean price is its price-aware form.
+- CLV per decision is the last verified pre-start same-line price minus the first-sight price,
+  averaged over keys whose close moved. A bucket with >= CLV_MIN_MOVED moved keys and a
+  negative mean is flagged UNPROVEN and cannot confirm. The candidate model's family (sport,
+  market, over/under direction, model) with >= CLV_FAMILY_MIN_MOVED moved keys and mean CLV
+  <= 0 is flagged "under review" and none of its buckets confirm. Both vetoes leave the
+  verdict at QUALIFIED_MODERATE unless the bucket is a trap.
 - QUALIFIED_MODERATE: neither confirmed nor a trap -- positive or inconclusive evidence,
   normal sizing recommended.
 - DOWNGRADE_TRAP: verified WR < TRAP_WIN_RATE or verified ROI < TRAP_ROI, or negative
-  nominal edge.
+  nominal edge. A bucket that is statistically confirmed is never a trap.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sqlite3
 import zoneinfo
 from collections import defaultdict
@@ -53,11 +66,43 @@ ET_TZ = zoneinfo.ZoneInfo("America/New_York")
 # any verdict evidence -- this is a literal operator rule, not a quality heuristic to widen.
 VERIFIED_QUOTE_PROVENANCE = "decision_time_executable_quote"
 
+# MIN_GRADED now only picks the evidence basis (own model vs pooled) and detects traps; it no
+# longer confirms anything. Confirmation needs CONFIRM_MIN_GRADED below.
 MIN_GRADED = 4
-BEST_MIN_WIN_RATE = 60.0
 BEST_MIN_ROI = 15.0
 TRAP_WIN_RATE = 55.0
 TRAP_ROI = 5.0
+
+# Tracker picks confirmed from buckets with fewer than 10 graded decisions claimed a 76% win
+# rate and hit 34% (12-23, -18.18U): picking the luckiest of hundreds of small buckets is a
+# winner's curse, so confirmation needs a sample large enough for the interval to mean something.
+CONFIRM_MIN_GRADED = 30
+# One-sided 95% confidence for the Wilson lower bound.
+CONFIRM_Z = 1.645
+# A bucket (or model family) must show at least this many keys whose close moved before its
+# mean closing-line value is allowed to veto confirmation; below that the mean is noise.
+CLV_MIN_MOVED = 8
+CLV_FAMILY_MIN_MOVED = 20
+# A close within this of the first-sight price counts as unmoved (float noise, not movement).
+CLV_MOVE_EPS = 1e-9
+# The old flat 60% win-rate hurdle was dropped on purpose: it is the even-price vig heuristic,
+# so it blocks profitable underdog buckets and is looser than the price comparator for
+# favourite buckets. The Wilson lower bound above the bucket's mean price is the price-aware
+# form of the same hurdle.
+
+
+def wilson_lower_bound(wins: int, n: int, z: float = CONFIRM_Z) -> float:
+    """Wilson score lower bound on a win probability, as a fraction (0.0 when n == 0).
+
+    Compare it to a price fraction, never to `EdgeTierStats.win_rate`, which is a percent.
+    """
+    if n <= 0:
+        return 0.0
+    p = wins / n
+    z2 = z * z
+    centre = p + z2 / (2.0 * n)
+    margin = z * math.sqrt(p * (1.0 - p) / n + z2 / (4.0 * n * n))
+    return (centre - margin) / (1.0 + z2 / n)
 
 
 @dataclass
@@ -67,6 +112,16 @@ class EdgeTierStats:
     pushes: int = 0
     pnl: float = 0.0
     staked: float = 0.0
+    # Stake-weighted first-sight price, accumulated over exactly the rows that carried a valid
+    # price (so a push counts in both terms).
+    price_x_stake: float = 0.0
+    priced_staked: float = 0.0
+    # Closing-line value over keys whose close moved: last verified pre-start same-line price
+    # minus first-sight price, in probability units. Unmoved keys add nothing.
+    clv_moved: int = 0
+    clv_sum: float = 0.0
+    clv_up: int = 0
+    clv_down: int = 0
 
     @property
     def total_graded(self) -> int:
@@ -79,6 +134,14 @@ class EdgeTierStats:
     @property
     def roi(self) -> float:
         return (self.pnl / self.staked * 100.0) if self.staked > 0 else 0.0
+
+    @property
+    def mean_price(self) -> float | None:
+        return (self.price_x_stake / self.priced_staked) if self.priced_staked > 0 else None
+
+    @property
+    def mean_clv(self) -> float | None:
+        return (self.clv_sum / self.clv_moved) if self.clv_moved > 0 else None
 
 
 def get_edge_bucket(edge: float) -> str:
@@ -217,6 +280,8 @@ class HistoricalAuditEngine:
         self.stats_by_model_dir_bucket: dict[tuple[str, str, str, str], BucketStats] = defaultdict(
             BucketStats
         )
+        # Model family across every edge bucket, for the closing-line-value veto (gate C).
+        self.stats_by_model_family: dict[tuple[str, str, str, str], BucketStats] = defaultdict(BucketStats)
         # Last-run basis (the old behaviour): the settled row, i.e. the last pre-game rerun.
         # Kept as context only; it never decides a verdict.
         self.last_run_by_sport_mkt_bucket: dict[tuple[str, str, str], BucketStats] = defaultdict(BucketStats)
@@ -284,7 +349,9 @@ class HistoricalAuditEngine:
         return entries
 
     @staticmethod
-    def _add_result(entry: EdgeTierStats, res: str, pnl: float, staked: float) -> None:
+    def _add_result(
+        entry: EdgeTierStats, res: str, pnl: float, staked: float, price: float | None = None
+    ) -> None:
         if res == "WIN":
             entry.wins += 1
         elif res == "LOSS":
@@ -293,23 +360,66 @@ class HistoricalAuditEngine:
             entry.pushes += 1
         entry.pnl += pnl
         entry.staked += staked
+        if price is not None and 0.0 < price < 1.0:
+            entry.price_x_stake += price * staked
+            entry.priced_staked += staked
+
+    @staticmethod
+    def _add_clv(entry: EdgeTierStats, clv: float) -> None:
+        # Unmoved keys add nothing: 1,747 of 2,143 live keys never move between the first row
+        # and the last pre-game same-line row, and averaging them in drags the mean toward 0.
+        if abs(clv) <= CLV_MOVE_EPS:
+            return
+        entry.clv_moved += 1
+        entry.clv_sum += clv
+        if clv > 0:
+            entry.clv_up += 1
+        else:
+            entry.clv_down += 1
+
+    @staticmethod
+    def _family_key(r: sqlite3.Row) -> tuple[str, str, str, str]:
+        # The model family a candidate belongs to, across ALL edge buckets: (sport, market,
+        # direction for over/under totals, model). Direction stays in the key so an over family
+        # never absorbs an under family's closes.
+        mkt = str(r["market_type"] or "").lower()
+        sel = str(r["selection"] or "").lower()
+        return (
+            str(r["sport"] or "").lower(),
+            mkt,
+            sel if mkt == "total" and sel in ("over", "under") else "",
+            str(r["model_id"] or "").lower(),
+        )
 
     def _count_first_sight(
-        self, r: sqlite3.Row, res: str, pnl: float, staked: float, *, to_all: bool, to_verified: bool
+        self,
+        r: sqlite3.Row,
+        res: str,
+        pnl: float,
+        staked: float,
+        *,
+        to_all: bool,
+        to_verified: bool,
+        clv: float | None = None,
     ) -> None:
         edge = float(r["model_probability"] or 0.0) - float(r["market_probability"] or 0.0)
-        for bs in self._entries(
+        price = float(r["market_probability"] or 0.0)
+        entries = self._entries(
             r,
             edge,
             self.stats_by_sport_mkt_bucket,
             self.stats_by_sport_dir_bucket,
             self.stats_by_model_mkt_bucket,
             self.stats_by_model_dir_bucket,
-        ):
+        )
+        entries.append(self.stats_by_model_family[self._family_key(r)])
+        for bs in entries:
             if to_all:
-                self._add_result(bs.all_rows, res, pnl, staked)
+                self._add_result(bs.all_rows, res, pnl, staked, price)
             if to_verified:
-                self._add_result(bs.verified, res, pnl, staked)
+                self._add_result(bs.verified, res, pnl, staked, price)
+                if clv is not None:
+                    self._add_clv(bs.verified, clv)
 
     def _load_historical_settlements(self) -> None:
         if not self.db_path.exists():
@@ -402,6 +512,7 @@ class HistoricalAuditEngine:
         # conditions on line movement AFTER the pick was first offered: winners whose edge
         # grew and losers whose edge shrank migrate between buckets and inflate the band.
         first_any: dict[tuple[str, str, str, str, str], sqlite3.Row] = {}
+        verified_rows_by_key: dict[tuple[str, str, str, str, str], list[sqlite3.Row]] = defaultdict(list)
 
         def eligible(r: sqlite3.Row) -> bool:
             # Point-in-time: a row created at/after its own event start is an in-game decision,
@@ -436,6 +547,10 @@ class HistoricalAuditEngine:
                 # superseded rows are the same bad decision (16 of 22 such keys have live rows).
                 continue
             first_any.setdefault(key, r)
+            if r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE:
+                # Eligibility already guarantees created strictly before this row's own start,
+                # so any of these is a legitimate pre-game close candidate.
+                verified_rows_by_key[key].append(r)
 
         # The verified record must be the same decision population as all_rows: a key counts
         # as verified only when its FIRST row is verified. Letting the earliest verified row
@@ -448,9 +563,20 @@ class HistoricalAuditEngine:
             if g is None:
                 self.ungraded_first_sight_keys += 1
                 continue
-            self._count_first_sight(
-                r, *g, to_all=True, to_verified=r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE
-            )
+            first_verified = r["quote_provenance"] == VERIFIED_QUOTE_PROVENANCE
+            clv: float | None = None
+            if first_verified:
+                # Closing-line value: the last verified pre-start row at the FIRST row's line,
+                # minus the first-sight price. Only graded keys with a verified first row take
+                # part, matching the verified evidence population; an open key's last pre-game
+                # row is not yet a close.
+                first_price = float(r["market_probability"] or 0.0)
+                for close in reversed(verified_rows_by_key[key]):
+                    close_price = float(close["market_probability"] or 0.0)
+                    if _same_line(close["line"], r["line"]) and 0.0 < close_price < 1.0:
+                        clv = close_price - first_price
+                        break
+            self._count_first_sight(r, *g, to_all=True, to_verified=first_verified, clv=clv)
 
     @staticmethod
     def _grade_first_sight(
@@ -542,15 +668,47 @@ class HistoricalAuditEngine:
 
         v = evidence.verified
         a = evidence.all_rows
+        family = self.stats_by_model_family.get(
+            (sp, mkt, sel if is_directional_total else "", mid), BucketStats()
+        )
+        fam = family.verified
+        lb = wilson_lower_bound(v.wins, v.total_graded)
+        mean_price = v.mean_price
+        mean_clv = v.mean_clv
+        fam_clv = fam.mean_clv
+        # Bucket veto is strictly negative; the family must show POSITIVE closing-line value to
+        # clear, so a flat or negative family (<= 0) is under review.
+        clv_unproven = v.clv_moved >= CLV_MIN_MOVED and mean_clv is not None and mean_clv < 0
+        family_under_review = fam.clv_moved >= CLV_FAMILY_MIN_MOVED and fam_clv is not None and fam_clv <= 0
+        statistically_confirmed = (
+            v.total_graded >= CONFIRM_MIN_GRADED
+            and mean_price is not None
+            and lb > mean_price
+            and v.roi >= BEST_MIN_ROI
+        )
         if v.total_graded >= MIN_GRADED:
-            if v.win_rate >= BEST_MIN_WIN_RATE and v.roi >= BEST_MIN_ROI:
-                verdict = "CONFIRMED_BEST"
+            if statistically_confirmed:
+                # Precedence: a statistically confirmed bucket is never a trap. The 55% trap
+                # hurdle is a vig heuristic that mislabels profitable underdog buckets. A CLV
+                # or family veto leaves it at the default QUALIFIED_MODERATE.
+                if not (clv_unproven or family_under_review):
+                    verdict = "CONFIRMED_BEST"
             elif v.win_rate < TRAP_WIN_RATE or v.roi < TRAP_ROI:
                 verdict = "DOWNGRADE_TRAP"
+            bound = (
+                f"95% lower bound {lb * 100:.1f}% vs mean price {mean_price * 100:.1f}¢"
+                if mean_price is not None
+                else f"95% lower bound {lb * 100:.1f}% vs mean price n/a"
+            )
             flags.append(
                 f"Bucket {bucket_label} ({basis}): verified {v.win_rate:.1f}% WR, {v.roi:+.1f}% ROI "
-                f"({v.wins}W-{v.losses}L, {v.total_graded} verified of {a.total_graded} graded)."
+                f"({v.wins}W-{v.losses}L, {v.total_graded} verified of {a.total_graded} graded); {bound}."
             )
+            if v.total_graded < CONFIRM_MIN_GRADED:
+                flags.append(
+                    f"confirmation needs {CONFIRM_MIN_GRADED} verified decisions; this bucket has "
+                    f"{v.total_graded}."
+                )
         else:
             flags.append(
                 f"insufficient verified history in bucket {bucket_label} ({basis}): {v.total_graded} verified of {a.total_graded} graded; all-rows record {a.wins}W-{a.losses}L"
@@ -572,6 +730,20 @@ class HistoricalAuditEngine:
         elif use_model and pooled.verified.total_graded:
             flags.append(
                 f"Context, all models pooled: verified {pooled.verified.win_rate:.1f}% WR, {pooled.verified.roi:+.1f}% ROI ({pooled.verified.wins}W-{pooled.verified.losses}L)."
+            )
+
+        # Raised whenever the condition holds, whatever the verdict; they never upgrade a trap.
+        if clv_unproven and mean_clv is not None:
+            flags.append(
+                f"UNPROVEN: picks in this bucket closed at worse prices; mean CLV {mean_clv * 100:+.1f}¢ "
+                f"over {v.clv_moved} moved keys (+{v.clv_up}/-{v.clv_down})."
+            )
+        if family_under_review and fam_clv is not None:
+            fam_label = f"total {sel}" if is_directional_total else mkt
+            flags.append(
+                f"{model_id or 'unnamed model'} family ({sp} {fam_label}) under review: mean CLV "
+                f"{fam_clv * 100:+.1f}¢ over {fam.clv_moved} moved keys (+{fam.clv_up}/-{fam.clv_down}) "
+                "across all edge buckets; no bucket in this family confirms until it turns positive."
             )
 
         current_bucket = get_edge_bucket(edge)
@@ -610,6 +782,11 @@ class HistoricalAuditEngine:
             "quote_provenance": prov,
             "quote_verified": quote_verified,
             "bucket_edge": edge if bucket_edge is None else bucket_edge,
+            "clv_unproven": clv_unproven,
+            "family_under_review": family_under_review,
+            "family": family,
+            "wilson_lb": lb,
+            "mean_price": mean_price,
         }
 
 
@@ -634,10 +811,16 @@ def _evidence_line(p: dict[str, Any]) -> str:
     v = p["evidence"].verified
     a = p["evidence"].all_rows
     prov = p["quote_provenance"] or "missing"
+    mean_clv = v.mean_clv
+    clv = (
+        f" | CLV {v.clv_moved} moved, mean {mean_clv * 100:+.1f}¢ (+{v.clv_up}/-{v.clv_down})"
+        if mean_clv is not None
+        else " | CLV none moved"
+    )
     return (
         f"      >>> live evidence ({p['basis']}): verified {v.wins}W-{v.losses}L "
         f"({v.total_graded} verified of {a.total_graded} graded), {v.win_rate:.1f}% WR, "
-        f"{v.roi:+.1f}% ROI | quote: {prov}"
+        f"{v.roi:+.1f}% ROI | quote: {prov}{clv}"
     )
 
 
@@ -747,7 +930,9 @@ def audit_open_picks(
     print("=" * 80)
 
     print(
-        f"\n[1] CONFIRMED BEST PICKS ({len(best_picks)} picks; verified bucket evidence and verified candidate quote)"
+        f"\n[1] CONFIRMED BEST PICKS ({len(best_picks)} picks; >= {CONFIRM_MIN_GRADED} verified decisions, "
+        f"95% Wilson bound above bucket mean price, ROI >= {BEST_MIN_ROI:.0f}%, non-negative "
+        "closing-line value, verified candidate quote)"
     )
     print("-" * 80)
     if not best_picks:
