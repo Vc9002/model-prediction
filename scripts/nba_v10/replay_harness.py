@@ -6,6 +6,7 @@
   python scripts/nba_v10/replay_harness.py ablate NAME...  # compact train/val table
   python scripts/nba_v10/replay_harness.py fit NAME...     # B6/B7 fits on train rows
   python scripts/nba_v10/replay_harness.py g1              # gate G1 + nba-anchor-v10 artifact
+  python scripts/nba_v10/replay_harness.py v91-artifacts   # write the v9.1 research artifacts
 
 Inputs are read from the main data root (--data-root, default E:/MP/data). Cached replay
 rows go to <data-root>/research/nba_v10/harness/ (untracked); the golden v9 rows and the
@@ -336,11 +337,70 @@ def cmd_g1(data_root: Path, draws: int) -> None:
     print(f"wrote {ANCHOR_ARTIFACT}")
 
 
+V91_ARTIFACTS = {
+    "spread": (
+        "v91_spread_final",
+        "nba-spread-margin-v9.json",
+        "nba-spread-margin-v9-1.json",
+        "expected_total",
+    ),
+    "total": ("v91_total_final", "nba-total-margin-v9.json", "nba-total-margin-v9-1.json", "expected_margin"),
+}
+
+
+def cmd_v91_artifacts() -> None:
+    """Write the v9.1 research artifacts from the final harness configs.
+
+    Engine parameters come from the v9 spread artifact (the v9 total artifact omits them and
+    relies on identical engine defaults); descriptive fields (method, positive_class,
+    prediction_formula) come from the market's own v9 artifact. The engine built from each file
+    must equal the engine the harness replayed.
+    """
+    from model_prediction.models.nba_v91 import NBAStructuralV91Engine
+    from model_prediction.production_registry import compute_artifact_hash
+
+    models = REPO / "config" / "models"
+    spread_v9 = json.loads((models / "nba-spread-margin-v9.json").read_text(encoding="utf-8"))
+    configs = json.loads((OUT_DIR / "v91_configs.json").read_text(encoding="utf-8"))
+    for market, (config_name, v9_name, out_name, drop_prefix) in V91_ARTIFACTS.items():
+        own_v9 = json.loads((models / v9_name).read_text(encoding="utf-8"))
+        art = {**spread_v9, **own_v9, **configs[config_name]}
+        for key in [k for k in art if k.startswith(drop_prefix)] + [
+            "artifact_hash",
+            "qualification",
+            "note",
+        ]:
+            art.pop(key, None)
+        art.update(
+            {
+                "model_version": f"nba-{market}-margin-v9-1",
+                "status": "research",
+                "serving": f"not registered, not whitelisted; research challenger to nba-{market}-margin-v9",
+                "engine": "model_prediction.models.nba_v91.NBAStructuralV91Engine",
+                "evidence": {
+                    "harness": "scripts/nba_v10/replay_harness.py (outputs/nba/v10_harness/V91_ABLATION.md)",
+                    "split": "train < 2025-11-03 <= validation < 2026-02-23; holdout not replayed; exploratory",
+                    "fits": "rolling_baseline_games tuned on validation {75,150,300}; fatigue and playoff "
+                    "offset fit on train only",
+                },
+            }
+        )
+        art["artifact_hash"] = compute_artifact_hash(art)
+        replayed = NBAStructuralV91Engine.from_artifact({**spread_v9, **configs[config_name]})
+        built = NBAStructuralV91Engine.from_artifact(art)
+        if vars(replayed) != vars(built):
+            sys.exit(f"{out_name}: engine differs from the replayed config")
+        (models / "research" / out_name).write_text(json.dumps(art, indent=2, sort_keys=True) + "\n")
+        print(f"wrote {out_name} {art['artifact_hash'][:12]}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["golden", "replay", "diff", "score", "ablate", "fit", "g1"])
+    parser.add_argument(
+        "command", choices=["golden", "replay", "diff", "score", "ablate", "fit", "g1", "v91-artifacts"]
+    )
     parser.add_argument("names", nargs="*")
     parser.add_argument("--data-root", type=Path, default=Path("E:/MP/data"))
     parser.add_argument("--draws", type=int, default=2000)
@@ -357,6 +417,8 @@ def main() -> None:
         cmd_fit(args.names, args.data_root)
     elif args.command == "g1":
         cmd_g1(args.data_root, args.draws)
+    elif args.command == "v91-artifacts":
+        cmd_v91_artifacts()
     else:
         cmd_score(args.names, args.data_root, args.draws)
 

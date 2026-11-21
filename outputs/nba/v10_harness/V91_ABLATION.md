@@ -33,8 +33,19 @@ Artifacts (research, not registered, not whitelisted): `config/models/research/n
 
 Totals bias by season (actual - model): v9 2023-24 -3.87, 2024-25 +1.81, 2025-26 +3.83;
 v9.1 -1.49, +1.43, -0.01. Early 2025-26 months: v9 Oct +7.83, Nov +6.20, Dec +5.87; v9.1 +2.66,
-+0.72, +1.29. The bias fixes are real; correlation with the line gap stays at zero, so they
-remove a systematic loss (the unders) but do not create edge. Both still lose to the line on RMSE.
++0.72, +1.29. The bias fix is real, but validation totals Brier is still 0.2656 (worse than a
+coin flip at 0.2500), correlation with the line gap stays at zero, and both markets still lose to
+the line on RMSE. Bias fixes alone do not create edge.
+
+Caveats:
+- B6 as specified (one fatigue model across margin and total) worsened validation spreads; what
+  ships is a totals-only variant chosen per market on a 0.04 RMSE / 0.0002 Brier gain. The strict
+  reading (drop B6 entirely) is the B5-only total row: RMSE 19.068, bias +0.64, Brier 0.2658.
+- B1 was dropped on +0.006 RMSE without a CI. The replay measures only the overtime-bump half;
+  v9.1's `current_season_games_min` feature-basis field stays lifetime, so the forecast.py
+  thin-sample Over floor (B2) remains a separate serving fix.
+- B5: W = 300 was the largest window tried.
+- B7: validation has no playoff games; the only evidence is the train-internal season-out check.
 
 ## All configs (train and validation)
 

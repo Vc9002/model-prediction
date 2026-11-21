@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "f7420ee4940485a303b2bb174c6fcd880780a0217c0bd7223af5066089a127fa",
+  "artifact_hash": "f2fa79e9644e08e0ca1d6357ab132ffcc8626da1fb1cb58f98a821cf73345018",
   "b2b_pace_drag": 0.8,
   "b2b_penalty_away": 1.5,
   "b2b_penalty_home": 2.0,
@@ -17,6 +17,7 @@
     "harness": "scripts/nba_v10/replay_harness.py (outputs/nba/v10_harness/V91_ABLATION.md)",
     "split": "train < 2025-11-03 <= validation < 2026-02-23; holdout not replayed; exploratory"
   },
+  "expected_margin_detail": "Unified NBA Structural v9. Calibrated modern HCA (1.75 pts), early-season Elo weighting (0.70), empirical B2B fatigue (-2.0 home, -1.5 away), schedule density drag (-0.8 home, -1.2 away), stabilized variance (dynamic_volatility=False), and replacement-aware player availability.",
   "expected_margin_formula": "0.70 * elo_margin + 0.30 * trend_margin + 0.15 * rest_diff + availability_points_gap",
   "expected_margin_source": "nba_structural_v9_joint_engine",
   "half_pace_additive": true,

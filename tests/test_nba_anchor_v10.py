@@ -149,3 +149,20 @@ def test_fallback_source_prefers_consensus_then_polymarket_mid() -> None:
     spread = source.anchor("e1", "spread", DECISION)
     assert total is not None and total.line == 221.0
     assert spread is not None and spread.line == 4.0
+
+
+def test_lambda_zero_can_reach_main_when_anchor_is_off_the_contract_line() -> None:
+    # Consensus total 224.5 vs a Polymarket contract at 220.5: the anchored over price beats the ask
+    # with no model weight at all (plan track T-B). Eligibility depends only on the net edge.
+    call = price_market(
+        "e1",
+        "total",
+        200.0,
+        _quote("total", 224.5),
+        ContractQuote(line=220.5, asks={"over": 0.52, "under": 0.49}),
+        _params(lam=0.0, min_edge=0.02),
+        decision_time=DECISION,
+        serving=True,
+    )
+    assert call.side == "over" and call.edge is not None and call.edge > 0.02
+    assert call.main_eligible and REASON_LAMBDA_ZERO in call.reason_codes

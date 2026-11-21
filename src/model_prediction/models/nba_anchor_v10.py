@@ -14,10 +14,13 @@ RMS residual around the anchored prediction on train. Both live in the artifact
 (``config/models/research/nba-anchor-v10.json``); nothing is hardcoded here.
 
 Operator requirement: EVERY game gets a side and a probability (the Flat ledger calls
-everything). Only Main eligibility depends on the blended edge. With lambda = 0 and the contract
-at the anchor line the anchored probability is exactly 50%; the side then follows the raw model
-direction (``ANCHORED_COIN_FLIP_SIDE_FROM_MODEL``) and the call is Main-ineligible
-(``NO_EDGE_LAMBDA_ZERO``).
+everything). Only Main eligibility depends on the blended edge: net edge at or above the
+artifact's ``main_min_edge`` (set on validation; ``None`` means nothing is Main yet) with a
+servable anchor. With lambda = 0 and the contract at the anchor line the anchored probability is
+exactly 50%, so the edge is negative; the side then follows the raw model direction
+(``ANCHORED_COIN_FLIP_SIDE_FROM_MODEL``). Lambda = 0 does not block Main by itself: when the
+anchor (sportsbook consensus) sits off the Polymarket contract line, the anchored price can
+still clear the ask, which is plan track T-B (``NO_EDGE_LAMBDA_ZERO`` is recorded either way).
 
 Anchor sources are pluggable (``AnchorSource``). Archived closing lines carry no capture time
 and are BENCHMARK-ONLY: ``price_game(..., serving=True)`` refuses them, and refuses any anchor
@@ -244,7 +247,6 @@ def price_market(
     main_eligible = (
         anchor is not None
         and not anchor.benchmark_only
-        and mp.lambda_ > 0.0
         and mp.main_min_edge is not None
         and edge is not None
         and edge >= mp.main_min_edge
