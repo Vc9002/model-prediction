@@ -1851,10 +1851,17 @@ def parity_fixture(cand: dict[str, Any]) -> dict[str, Any]:
     for i, day in enumerate(("2023-08-26", "2023-09-16", "2023-10-14", "2023-11-11")):
         decision = parse_utc(f"{day}T12:00:00Z")
         state = core.fit_state(rows, FIXTURE_SEASON, decision, classes, finals, params, ordered, covs)
-        for j in range(3):
-            home, away = ordered[(3 * i + 2 * j) % len(ordered)], ordered[(3 * i + 2 * j + 7) % len(ordered)]
-            neutral = j == 2
-            mf = core.matchup_features(state, home, away, neutral=neutral, classes=classes)
+        made = 0
+        for k in range(len(ordered)):
+            if made == 3:
+                break
+            home, away = ordered[(3 * i + 2 * k) % len(ordered)], ordered[(3 * i + 2 * k + 7) % len(ordered)]
+            neutral = made == 2
+            try:
+                mf = core.matchup_features(state, home, away, neutral=neutral, classes=classes)
+            except core.V7NoCall:
+                continue  # an unrated team in the small universe; the serving test covers no-calls separately
+            made += 1
             walk_row = {
                 "home_e": mf.home.values,
                 "away_e": mf.away.values,

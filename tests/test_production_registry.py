@@ -102,11 +102,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert registry.schema_version == "3"
     # 2026-11-21 (quick-261121-v62): +1 enabled entry, the cfb-structural-v6.2 NCAAF challenger.
     # 2026-11-21 (quick-261121-hmc): +1 enabled entry, the ncaab-moneyline-v7m candidate.
-    assert len(registry.entries) == 92
+    # 2026-11-21 (quick-261121-v7): +1 enabled entry, cfb-structural-v7, registered but not routed.
+    assert len(registry.entries) == 93
     # Scope 2026-11-13: the 40 entries for switched-off sports are enabled: false and
     # therefore unavailable by decision, not by a failed contract. Every in-scope entry
     # must still resolve, so a healthy registry has zero *failed* entries.
-    assert len(registry.available_entries()) == 52
+    assert len(registry.available_entries()) == 53
     problems = registry.problem_entries()
     assert len(problems) == 40
     assert all(not e.enabled and e.load_error is None for e in problems)
@@ -146,6 +147,9 @@ def test_real_production_yaml_resolves_every_model() -> None:
         assert registry.challenger("NCAAF", market).model_id == "cfb-structural-v6.2"
         assert registry.lifecycle_contract("NCAAF", market).challenger_model_id == "cfb-structural-v6.2"
     assert registry.entries["cfb-structural-v6.2"].serving_status == "shadow"
+    # v7 is registered (hash-verified, shadow) but routed nowhere (quick-261121-v7).
+    assert registry.entries["cfb-structural-v7"].serving_status == "shadow"
+    assert registry.entries["cfb-structural-v7"].load_error is None
     assert registry.lifecycle_contract("NCAAF", "total").rollback_model_id == "cfb-structural-v4"
     assert registry.champion("MLB", "spread").model_id == "mlb-structural-runline-v4"
     assert registry.champion("MLB", "spread").rollback_model == "measured-edge-margin-v3"

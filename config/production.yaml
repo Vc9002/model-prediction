@@ -604,6 +604,19 @@ prediction_service:
     evidence_status: unverified
     replacement_priority: low
     rollback_model: null
+  # quick-261121-v7: research challenger, registered but NOT routed (challengers.NCAAF holds one model per
+  # market, v6.2). Never champion, never Main, never the auto-buyer; the 2027 forward gate decides
+  # (docs/CFB_V7_2027_GATE.md).
+  - model_id: cfb-structural-v7
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v7.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: unverified
+    replacement_priority: low
+    rollback_model: null
   - model_id: cs2-tiered-elo-v6
     sport: CS2
     market: moneyline
@@ -1193,6 +1206,7 @@ prediction_service:
   - cfb-spread-v1
   - cfb-total-v1
   - cfb-structural-v6.2
+  - cfb-structural-v7
   - cs2-tiered-elo-v6
   - dota2-tiered-elo-v6
   - lol-tiered-elo-v6
@@ -1272,6 +1286,7 @@ prediction_service:
     cfb-spread-v1: config/models/cfb-spread-v1.json
     cfb-total-v1: config/models/cfb-total-v1.json
     cfb-structural-v6.2: config/models/cfb-structural-v6.2.json
+    cfb-structural-v7: config/models/cfb-structural-v7.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
     dota2-tiered-elo-v6: config/models/dota2-tiered-elo-v6.json
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json
