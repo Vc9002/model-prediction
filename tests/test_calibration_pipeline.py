@@ -154,6 +154,44 @@ def test_ncaab_pools_are_engine_pure(monkeypatch, tmp_path: Path):
     assert grouped[("ncaab", "spread", "ncaab-spread-v7", "main")][0] == [0.63, 0.64, 0.65]
 
 
+def test_ncaab_moneyline_v7m_pool_is_its_own_rows_only(monkeypatch, tmp_path: Path):
+    """v7's moneyline rows are the Elo/margin blend; v7m's are margin-only. They must never pool."""
+    from model_prediction.calibration_pipeline import (
+        CALIBRATION_POOL_SOURCES,
+        extract_settled_model_predictions,
+        serving_guard_reason,
+    )
+
+    ml = {"market": "moneyline"}
+    rows = [
+        _ncaab_row("ncaab-spread-v7", "v7", raw=0.61, served=0.61, result="win", **ml),
+        _ncaab_row("ncaab-spread-v6", "v7", raw=0.62, served=0.62, result="loss", **ml),
+        _ncaab_row("ncaab-moneyline-v7m", "v7", raw=0.63, served=0.63, result="win", **ml),
+    ]
+    _patch_ledgers(monkeypatch, rows)
+    grouped = extract_settled_model_predictions(data_root=tmp_path)
+    assert grouped[("ncaab", "moneyline", "ncaab-moneyline-v7m", "main")][0] == [0.63]
+    assert grouped[("ncaab", "moneyline", "ncaab-spread-v7", "main")][0] == [0.61, 0.62]
+    assert "ncaab-moneyline-v7m" not in CALIBRATION_POOL_SOURCES
+
+    base = {
+        "market": "moneyline",
+        "model_version": "ncaab-moneyline-v7m",
+        "champion_method": "beta",
+        "sample_size": 300,
+        "baseline_brier": 0.25,
+        "calibrated_oof_brier": 0.24,
+        "fit_source": "settled_live_rows",
+    }
+
+    def reason(fit):
+        return serving_guard_reason({**base, "fit_model_versions": fit}, "ncaab-moneyline-v7m", "moneyline")
+
+    assert reason(["ncaab-moneyline-v7m"]) is None
+    assert reason(["ncaab-moneyline-v7m", "ncaab-spread-v7"]) == "foreign_fit_provenance"
+    assert reason(["ncaab-spread-v7"]) == "foreign_fit_provenance"
+
+
 def test_ncaab_calibrators_fit_on_raw_not_served_probability(monkeypatch, tmp_path: Path):
     from model_prediction.calibration_pipeline import extract_settled_model_predictions
 

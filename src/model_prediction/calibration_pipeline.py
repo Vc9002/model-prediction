@@ -47,6 +47,7 @@ ESPORTS_CALIBRATION_TITLES = frozenset({"cs2", "dota2", "lol", "valorant", "rain
 # the v6 calibrator, which keeps rollback calibrated, sees only v6-engine rows.
 NCAAB_SPREAD_V6_ID = "ncaab-spread-v6"
 NCAAB_SPREAD_V7_ID = "ncaab-spread-v7"
+NCAAB_MONEYLINE_V7M_ID = "ncaab-moneyline-v7m"
 # The one declared exception to "a calibrator is fitted on its own model's rows": the serving guard
 # accepts fit_model_versions within {model} + these source labels, nothing wider.
 CALIBRATION_POOL_SOURCES: dict[str, tuple[str, ...]] = {NCAAB_SPREAD_V7_ID: (NCAAB_SPREAD_V6_ID,)}
@@ -58,6 +59,9 @@ CALIBRATION_POOL_NOTES: dict[str, str] = {
     NCAAB_SPREAD_V6_ID: (
         "engine-pure: ncaab-spread-v6 rows whose decision snapshot features.margin_engine is 'v6' or missing"
     ),
+    # Deliberately absent from CALIBRATION_POOL_SOURCES: ncaab-spread-v7 moneyline rows are the Elo/margin
+    # blend, a different raw probability from v7m's margin-only one, so they must never fit its calibrator.
+    NCAAB_MONEYLINE_V7M_ID: "own rows only: ncaab-moneyline-v7m moneyline rows (no v7 blended rows)",
 }
 
 

@@ -12,6 +12,7 @@ import yaml
 
 from model_prediction.production_canary import _compute_artifact_hash, health_check
 from model_prediction.production_registry import (
+    CODE_BACKED_ENTRYPOINTS,
     IMPLEMENTATION_CODE_BACKED,
     IMPLEMENTATION_JSON_ARTIFACT,
     ProductionModelRegistry,
@@ -100,11 +101,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
 
     assert registry.schema_version == "3"
     # 2026-11-21 (quick-261121-v62): +1 enabled entry, the cfb-structural-v6.2 NCAAF challenger.
-    assert len(registry.entries) == 91
+    # 2026-11-21 (quick-261121-hmc): +1 enabled entry, the ncaab-moneyline-v7m candidate.
+    assert len(registry.entries) == 92
     # Scope 2026-11-13: the 40 entries for switched-off sports are enabled: false and
     # therefore unavailable by decision, not by a failed contract. Every in-scope entry
     # must still resolve, so a healthy registry has zero *failed* entries.
-    assert len(registry.available_entries()) == 51
+    assert len(registry.available_entries()) == 52
     problems = registry.problem_entries()
     assert len(problems) == 40
     assert all(not e.enabled and e.load_error is None for e in problems)
@@ -491,6 +493,20 @@ def test_ncaab_v7_entry_is_registered_with_v6_as_rollback() -> None:
     assert entry.entry == "model_prediction.models.ncaab_spread_v6:ncaab_spread_v7_model"
     assert entry.enabled and entry.load_error is None
     assert entry.rollback_model == "ncaab-spread-v6"
+
+
+def test_ncaab_moneyline_v7m_entry_is_a_moneyline_only_candidate() -> None:
+    """Registered (not promoted): moneyline only, so it can never be promoted onto the spread route."""
+    registry = ProductionModelRegistry.load(REPO)
+    entry = registry.entries["ncaab-moneyline-v7m"]
+    assert entry.implementation == IMPLEMENTATION_CODE_BACKED
+    assert entry.entry == "model_prediction.models.ncaab_spread_v6:ncaab_moneyline_v7m_model"
+    assert (entry.sport, entry.market) == ("NCAAB", "moneyline")
+    assert entry.enabled and entry.load_error is None
+    assert entry.rollback_model == "ncaab-spread-v7"
+    assert CODE_BACKED_ENTRYPOINTS["ncaab-moneyline-v7m"] == entry.entry
+    for market in ("spread", "total"):
+        assert registry.champion("NCAAB", market).model_id != "ncaab-moneyline-v7m"
 
 
 # FAILS UNTIL PROMOTION (2026-11-21): passes only after `model_promotion promote --new ncaab-spread-v7`

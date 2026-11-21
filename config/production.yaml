@@ -784,6 +784,16 @@ prediction_service:
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: ncaab-spread-v6
+  - model_id: ncaab-moneyline-v7m
+    sport: NCAAB
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.ncaab_spread_v6:ncaab_moneyline_v7m_model
+    enabled: true
+    serving_status: candidate
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: ncaab-spread-v7
   - model_id: ncaab-total-v6
     sport: NCAAB
     market: total
@@ -1201,6 +1211,7 @@ prediction_service:
   - ncaab-tempo-v3
   - ncaab-spread-v6
   - ncaab-spread-v7
+  - ncaab-moneyline-v7m
   - ncaab-total-v6
   - ncaab-spread-v5
   - ncaab-total-v5

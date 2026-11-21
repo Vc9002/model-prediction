@@ -24,7 +24,13 @@ from .features.base import FeatureStore
 from .ledger import DuplicatePickError, defer_sqlite_xlsx_exports
 from .models.basketball import UpcomingGame
 from .models.ncaab_spread_v5 import ncaab_spread_v5_model
-from .models.ncaab_spread_v6 import NCAAB_SPREAD_V7_VERSION, ncaab_spread_v6_model, ncaab_spread_v7_model
+from .models.ncaab_spread_v6 import (
+    NCAAB_MONEYLINE_V7M_VERSION,
+    NCAAB_SPREAD_V7_VERSION,
+    ncaab_moneyline_v7m_model,
+    ncaab_spread_v6_model,
+    ncaab_spread_v7_model,
+)
 from .models.ncaab_total_v6 import ncaab_total_v6_model
 from .production_registry import ProductionModelRegistry
 
@@ -44,16 +50,49 @@ def _main_sample_eligible(current_season_sample: object, required_games: int) ->
     )
 
 
-def _ncaab_spread_champion_id(registry: ProductionModelRegistry) -> str | None:
-    """The one spread-model id serving NCAAB moneyline AND spread (both price off one instance).
+def _ncaab_champion_ids(registry: ProductionModelRegistry) -> tuple[str | None, str | None]:
+    """(moneyline, spread) champion ids; one spread-model instance prices both markets.
 
-    Serving follows the champion map, so model_promotion promote/rollback alone switches the margin
-    engine (ncaab-spread-v7 = v7 factory); see cfb_model() for the NCAAF precedent.
+    The spread champion selects the engine (ncaab-spread-v7 = v7 factory). The moneyline champion is
+    either the same id or ncaab-moneyline-v7m, which is the ncaab-spread-v7 instance with a margin-only
+    moneyline and so exists only over a v7 spread champion; any other pairing fails closed. Serving
+    follows the champion map, so model_promotion promote/rollback alone switches it; see cfb_model()
+    for the NCAAF precedent.
     """
     ids = {m: getattr(registry.champion("NCAAB", m), "model_id", None) for m in ("moneyline", "spread")}
-    if ids["moneyline"] != ids["spread"]:
-        raise ValueError(f"NCAAB moneyline and spread champions must name one spread model, got {ids}")
-    return ids["spread"]
+    same = ids["moneyline"] == ids["spread"] and ids["spread"] != NCAAB_MONEYLINE_V7M_VERSION
+    margin_only_over_v7 = (
+        ids["moneyline"] == NCAAB_MONEYLINE_V7M_VERSION and ids["spread"] == NCAAB_SPREAD_V7_VERSION
+    )
+    if not (same or margin_only_over_v7):
+        raise ValueError(
+            "NCAAB moneyline and spread champions must name one spread model, or "
+            f"{NCAAB_MONEYLINE_V7M_VERSION} over {NCAAB_SPREAD_V7_VERSION}, got {ids}"
+        )
+    return ids["moneyline"], ids["spread"]
+
+
+def _ncaab_serving_spread_model(registry: ProductionModelRegistry) -> Any:
+    """The one instance that prices NCAAB moneyline and spread, chosen by the champion map."""
+    moneyline_champion_id, spread_champion_id = _ncaab_champion_ids(registry)
+    if moneyline_champion_id == NCAAB_MONEYLINE_V7M_VERSION:
+        return ncaab_moneyline_v7m_model()
+    if spread_champion_id == NCAAB_SPREAD_V7_VERSION:
+        return ncaab_spread_v7_model()
+    if ncaab_model in (ncaab_spread_v5_model, ncaab_spread_v6_model):
+        return ncaab_spread_model()
+    return ncaab_model()
+
+
+def _market_identity(model: Any, kind: str) -> tuple[str, str]:
+    """(model_version, model_artifact_hash) that rows of market ``kind`` carry.
+
+    ncaab-moneyline-v7m serves the moneyline off the ncaab-spread-v7 instance under its own id and
+    hash; every other row is labelled with the instance's own version and hash.
+    """
+    if kind == "moneyline" and getattr(model, "moneyline_version", None):
+        return str(model.moneyline_version), str(getattr(model, "moneyline_artifact_hash", "") or "")
+    return str(model.version), str(getattr(model, "model_artifact_hash", "") or "")
 
 
 def _load_ncaab_calibrators(
@@ -463,19 +502,19 @@ def forecast_ncaab_sport(
 ):
     board = ESPNClient().scoreboard("NCAAB", args_date)
     registry = ProductionModelRegistry.load(PROJECT_ROOT)
-    spread_champion_id = _ncaab_spread_champion_id(registry)
-    if spread_champion_id == NCAAB_SPREAD_V7_VERSION:
-        spread_model = ncaab_spread_v7_model()
-    else:
-        spread_model = (
-            ncaab_spread_model()
-            if ncaab_model in (ncaab_spread_v5_model, ncaab_spread_v6_model)
-            else ncaab_model()
-        )
+    spread_model = _ncaab_serving_spread_model(registry)
     total_model = ncaab_total_model()
     result: dict[str, Any] = {
         "sport": "ncaab",
-        "model_version": f"{spread_model.version}+{total_model.version}",
+        "model_version": "+".join(
+            dict.fromkeys(
+                (
+                    _market_identity(spread_model, "moneyline")[0],
+                    _market_identity(spread_model, "spread")[0],
+                    total_model.version,
+                )
+            )
+        ),
         "scheduled_games": len(board.get("events", [])),
         "logged": 0,
         "flat_logged": 0,
@@ -509,9 +548,10 @@ def forecast_ncaab_sport(
         ("total", total_model),
     ):
         champion = registry.champion("NCAAB", market)
-        if champion is None or not champion.available or champion.model_id != expected_model.version:
+        expected_version = _market_identity(expected_model, market)[0]
+        if champion is None or not champion.available or champion.model_id != expected_version:
             raise ValueError(
-                f"NCAAB {market} champion {champion.model_id if champion else None} does not match executable model {expected_model.version}"
+                f"NCAAB {market} champion {champion.model_id if champion else None} does not match executable model {expected_version}"
             )
     policy = config.get("models", {}).get("NCAAB", {})
     # The champion id selects the margin engine (ncaab-spread-v7 = v7, ncaab-spread-v6 = v6) since the
@@ -697,7 +737,7 @@ def forecast_ncaab_sport(
         prediction = pred_lookup.get((game_key, kind))
         if prediction is None:
             continue
-        model_version = total_model.version if kind == "total" else spread_model.version
+        model_version = _market_identity(total_model if kind == "total" else spread_model, kind)[0]
         basis = getattr(prediction, "feature_basis", None) or {}
         candidate_probabilities[slug] = {
             "model_version": model_version,
@@ -719,7 +759,7 @@ def forecast_ncaab_sport(
     calibrators, calibration_decisions = _load_ncaab_calibrators(
         archive_root,
         {
-            kind_key: total_model.version if kind_key == "total" else spread_model.version
+            kind_key: _market_identity(total_model if kind_key == "total" else spread_model, kind_key)[0]
             for kind_key in ("moneyline", "spread", "total")
         },
     )
@@ -810,7 +850,7 @@ def forecast_ncaab_sport(
                 ),
             )
         model_inst = total_model if kind == "total" else spread_model
-        model_version = model_inst.version
+        model_version, model_artifact_hash = _market_identity(model_inst, kind)
         calibrator = calibrators.get(kind, IdentityCalibrator(model_version))
 
         selection = best_side["selection"]
@@ -874,6 +914,7 @@ def forecast_ncaab_sport(
                 "decision_line": decision_line,
                 "model_inst": model_inst,
                 "model_version": model_version,
+                "model_artifact_hash": model_artifact_hash,
                 "calibrator": calibrator,
                 "decline_reason": decline_reason,
             }
@@ -911,6 +952,7 @@ def forecast_ncaab_sport(
             decision_line = decision["decision_line"]
             model_inst = decision["model_inst"]
             model_version = decision["model_version"]
+            model_artifact_hash = decision["model_artifact_hash"]
             calibrator = decision["calibrator"]
             identity = decision["identity"]
             away = decision["away"]
@@ -972,7 +1014,7 @@ def forecast_ncaab_sport(
                 line=decision_line,
                 probability=float(probability),
                 observed_at_utc=observed.isoformat(),
-                artifact_hash=str(getattr(model_inst, "model_artifact_hash", "") or ""),
+                artifact_hash=model_artifact_hash,
             )
             cal_meta = getattr(calibrator, "metadata", None)
             cal_method = cal_meta.calibration_method if cal_meta else "identity"
@@ -1001,7 +1043,7 @@ def forecast_ncaab_sport(
                 model_probability=probability,
                 model_uncertainty=prediction.uncertainty,
                 model_version=model_version,
-                model_artifact_hash=str(getattr(model_inst, "model_artifact_hash", "") or ""),
+                model_artifact_hash=model_artifact_hash,
                 rationale=rationale,
                 risks=(
                     "Paper model; executable quote is a predecision snapshot, not a guaranteed fill."

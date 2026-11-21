@@ -70,6 +70,7 @@ CODE_BACKED_ENTRYPOINTS: dict[str, str] = {
     "ncaab-total-v5": "model_prediction.models.ncaab_total_v5:ncaab_total_v5_model",
     "ncaab-spread-v6": "model_prediction.models.ncaab_spread_v6:ncaab_spread_v6_model",
     "ncaab-spread-v7": "model_prediction.models.ncaab_spread_v6:ncaab_spread_v7_model",
+    "ncaab-moneyline-v7m": "model_prediction.models.ncaab_spread_v6:ncaab_moneyline_v7m_model",
     "ncaab-total-v6": "model_prediction.models.ncaab_total_v6:ncaab_total_v6_model",
     "eurolg-tempo-v2": "model_prediction.models.basketball_leagues:euroleague_v2_model",
     "nbl-tempo-v2": "model_prediction.models.basketball_leagues:nbl_v2_model",

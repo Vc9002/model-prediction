@@ -150,6 +150,7 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     # NCAAB decommissioned per operator directive 2026-11-09:
     "ncaab-spread-v6",
     "ncaab-spread-v7",
+    "ncaab-moneyline-v7m",
     "ncaab-spread-v5",
     "ncaab-total-v6",
     "ncaab-total-v5",

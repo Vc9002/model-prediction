@@ -774,6 +774,143 @@ def test_ncaab_split_spread_champions_fail_closed(tmp_path, monkeypatch):
         forecast_ncaab_sport(data_root=tmp_path, args_date=day, config={"models": {"NCAAB": {}}})
 
 
+def test_ncaab_v7m_moneyline_champion_labels_moneyline_rows_with_its_own_id(tmp_path, monkeypatch):
+    """ncaab-moneyline-v7m over a v7 spread champion: one instance, moneyline rows carry v7m's id/hash."""
+    day = _routing_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ProductionModelRegistry.load",
+        _registry("ncaab-spread-v7", moneyline_id="ncaab-moneyline-v7m"),
+    )
+    plain_factory, built = _fake_spread_model("ncaab-spread-v7", "h7", "v7")
+
+    def factory():
+        model = plain_factory()
+        model.moneyline_version = "ncaab-moneyline-v7m"
+        model.moneyline_artifact_hash = "h7m"
+        return model
+
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_moneyline_v7m_model", factory)
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ncaab_spread_v7_model", _unexpected_factory
+    )
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_model", _unexpected_factory)
+    flat = MultiSportPickLedger(tmp_path, flat=True)
+    config = {"models": {"NCAAB": {"decline_non_d1": False}}}
+    report = forecast_ncaab_sport(data_root=tmp_path, args_date=day, config=config, flat_ledger=flat)
+    assert not report["errors"]
+    assert report["flat_logged"] == 1
+    assert len(built) == 1
+    assert report["model_version"] == "ncaab-moneyline-v7m+ncaab-spread-v7+ncaab-total-v6"
+    # The moneyline calibrator is looked up under v7m's own id, so v7's blended pool never serves it.
+    assert report["calibration"]["moneyline"]["model_version"] == "ncaab-moneyline-v7m"
+    assert report["calibration"]["spread"]["model_version"] == "ncaab-spread-v7"
+    rows = flat.rows()
+    assert [r["model_version"] for r in rows] == ["ncaab-moneyline-v7m"]
+    assert rows[0]["model_artifact_hash"] == "h7m"
+    snapshot = json.loads(rows[0]["model_input_snapshot_json"])
+    assert snapshot["artifact_hash"] == "h7m"
+
+
+@pytest.mark.parametrize(
+    ("moneyline_id", "spread_id"),
+    [
+        ("ncaab-moneyline-v7m", "ncaab-spread-v6"),  # v7m exists only over the v7 engine
+        ("ncaab-moneyline-v7m", "ncaab-spread-v5"),
+        ("ncaab-moneyline-v7m", "ncaab-moneyline-v7m"),  # v7m is not a spread model
+        ("ncaab-spread-v7", "ncaab-moneyline-v7m"),
+    ],
+)
+def test_ncaab_v7m_unsupported_champion_pairs_fail_closed(tmp_path, monkeypatch, moneyline_id, spread_id):
+    day = _routing_fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ProductionModelRegistry.load",
+        _registry(spread_id, moneyline_id=moneyline_id),
+    )
+    for name in ("ncaab_moneyline_v7m_model", "ncaab_spread_v7_model", "ncaab_spread_model"):
+        monkeypatch.setattr(f"model_prediction.college_basketball_forward.{name}", _unexpected_factory)
+    with pytest.raises(ValueError, match="one spread model"):
+        forecast_ncaab_sport(data_root=tmp_path, args_date=day, config={"models": {"NCAAB": {}}})
+
+
+def _real_v7_pair(margins):
+    """The production v7 and v7m factories with the v7 engine replaced by fixed per-event margins."""
+    from model_prediction.models.ncaab_spread_v6 import ncaab_moneyline_v7m_model, ncaab_spread_v7_model
+
+    serving = SimpleNamespace(margins=lambda history, upcoming: dict(margins))
+    v7, v7m = ncaab_spread_v7_model(), ncaab_moneyline_v7m_model()
+    v7.v7_serving = serving
+    v7m.v7_serving = serving
+    return v7, v7m
+
+
+def test_ncaab_v7m_moneyline_is_the_margin_probability_and_spread_is_v7():
+    """A_ml_w0: p_home = P_t8(margin >= 1) under v7's served mean/scale, Elo weight 0; spread untouched."""
+    from scipy import stats
+
+    from model_prediction.models.basketball import UpcomingGame
+
+    now = datetime.now(UTC)
+    teams = ("Duke Blue Devils", "Kansas Jayhawks", "Gonzaga Bulldogs", "Purdue Boilermakers")
+    history = [
+        GameRecord(
+            f"h{i}",
+            (now - timedelta(days=60 - i)).isoformat(),
+            "NCAAB",
+            teams[i % 4],
+            teams[(i + 1) % 4],
+            60 + (i * 7) % 19,
+            62 + (i * 5) % 23,
+        )
+        for i in range(40)
+    ]
+    start = (now + timedelta(hours=6)).isoformat()
+    upcoming = [
+        UpcomingGame("g1", start, teams[0], teams[1], spread_away_line=3.5, league="NCAAB"),
+        UpcomingGame(
+            "g2", start, teams[2], teams[3], spread_away_line=-4.0, league="NCAAB", neutral_site=True
+        ),
+        # no v7 margin for g3: the v6 fallback path; v7m still reads the moneyline off the margin alone
+        UpcomingGame("g3", start, teams[1], teams[2], spread_away_line=1.5, league="NCAAB"),
+    ]
+    margins = {"g1": SimpleNamespace(mean=6.3, scale=9.1), "g2": SimpleNamespace(mean=-2.2, scale=10.4)}
+    v7, v7m = _real_v7_pair(margins)
+    base = {(p.event_id, p.market_type): p for p in v7.predict_games(history, upcoming)}
+    new = {(p.event_id, p.market_type): p for p in v7m.predict_games(history, upcoming)}
+    assert base.keys() == new.keys()
+    for event_id in ("g1", "g2", "g3"):
+        spread_old, spread_new = base[(event_id, "spread")], new[(event_id, "spread")]
+        assert spread_new == spread_old  # every field: probabilities, mean/scale, feature basis, version
+        assert spread_new.model_version == "ncaab-spread-v7"
+        ml_old, ml_new = base[(event_id, "moneyline")], new[(event_id, "moneyline")]
+        assert ml_new.model_version == "ncaab-moneyline-v7m"
+        assert ml_new.inference_inputs == ml_old.inference_inputs
+        assert ml_new.feature_basis == {**ml_old.feature_basis, "moneyline_rule": "margin_only"}
+        mean = float(spread_new.inference_inputs["mean"])
+        scale = float(spread_new.inference_inputs["scale"])
+        expected = min(0.9999, max(0.0001, float(stats.t.sf(0.5, df=8.0, loc=mean, scale=scale))))
+        assert ml_new.probabilities["home"] == pytest.approx(round(expected, 6), abs=1e-12)
+        assert ml_new.probabilities["away"] == pytest.approx(round(1.0 - expected, 6), abs=1e-12)
+        # the v7 blend puts half the weight on Elo, so the served v7 moneyline differs
+        assert abs(ml_old.probabilities["home"] - ml_new.probabilities["home"]) > 1e-4
+    assert new[("g1", "moneyline")].feature_basis["margin_engine"] == "v7"
+    assert new[("g3", "moneyline")].feature_basis["margin_engine"] == "v6"
+
+
+def test_ncaab_v7m_factory_identity():
+    from model_prediction.models.ncaab_spread_v6 import (
+        ncaab_moneyline_v7m_artifact_hash,
+        ncaab_moneyline_v7m_model,
+        ncaab_spread_v7_model,
+    )
+
+    v7, v7m = ncaab_spread_v7_model(), ncaab_moneyline_v7m_model()
+    assert (v7m.version, v7m.model_artifact_hash) == (v7.version, v7.model_artifact_hash)
+    assert (v7.moneyline_margin_only, v7.moneyline_version, v7.moneyline_artifact_hash) == (False, None, "")
+    assert v7m.moneyline_margin_only and v7m.moneyline_version == "ncaab-moneyline-v7m"
+    assert v7m.moneyline_artifact_hash == ncaab_moneyline_v7m_artifact_hash(v7.model_artifact_hash)
+    assert v7m.moneyline_artifact_hash not in ("", v7.model_artifact_hash)
+
+
 def _write_calibrator(tmp_path, *, sample_size: int, temperature: float = 2.0) -> None:
     path = tmp_path / "calibration" / "models" / "ncaab-spread-v6.moneyline_calibrator.json"
     path.parent.mkdir(parents=True, exist_ok=True)
