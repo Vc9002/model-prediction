@@ -654,6 +654,57 @@ def test_capture_time_budget_reaches_every_scope_league_before_any_out_of_scope_
     assert clock.now <= 1003.0
 
 
+def test_capture_time_budget_gives_every_event_its_moneyline_before_any_second_line(
+    tmp_path, monkeypatch
+) -> None:
+    """Kickoff order alone kept an event's markets together, so a cut budget left late
+    kickoffs with no quote at all (NCAAF Saturdays: ~470 /book contracts, ~357 per run)."""
+    _FakeClock(monkeypatch)
+    monkeypatch.setattr(polymarket_us, "CAPTURE_MIN_REQUEST_INTERVAL_SECONDS", 1.0, raising=False)
+    now = datetime(2026, 11, 21, 15, tzinfo=UTC)
+
+    def _line(slug: str, market_type: str, long_price: float) -> dict:
+        return {
+            "market_slug": slug,
+            "market_type": market_type,
+            "sides": [{"is_long": True, "price_probability": long_price}],
+        }
+
+    def _game(event_id: str, hours: float) -> dict:
+        return {
+            "event_id": event_id,
+            "event_start_utc": (now + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "markets": [
+                {"market_slug": f"{event_id}-ml", "market_type": "moneyline"},
+                _line(f"{event_id}-spread-alt", "spread", 0.80),
+                _line(f"{event_id}-spread-main", "spread", 0.51),
+                _line(f"{event_id}-total-main", "total", 0.49),
+            ],
+        }
+
+    source = _Recorder()
+    capture_slate_snapshots(
+        source,
+        {"NCAAF": [_game("early", 1), _game("mid", 2), _game("late", 3)]},
+        tmp_path,
+        "2026-11-21",
+        now=now,
+        priority_leagues=frozenset({"NCAAF"}),
+        max_workers=1,
+        max_capture_seconds=5.5,
+    )
+
+    assert source.calls == [
+        "early-ml",
+        "mid-ml",
+        "late-ml",
+        # Then each event's most balanced spread and total, before any alternate rung.
+        "early-spread-main",
+        "early-total-main",
+        "mid-spread-main",
+    ]
+
+
 def test_capture_secondary_tier_has_its_own_short_budget(tmp_path) -> None:
     now = datetime(2026, 11, 14, 15, tzinfo=UTC)
 
@@ -1266,7 +1317,8 @@ def test_priority_league_shortlists_each_game_before_other_sports(tmp_path) -> N
         priority_leagues=frozenset({"NBA"}),
         max_workers=1,
     )
-    assert client.slate_calls[:4] == ["near", "close", "near2", "close2"]
+    # Breadth-first: each game's most balanced line, then each game's second line.
+    assert client.slate_calls[:4] == ["close", "near2", "near", "close2"]
     assert client.slate_calls[-1] == "mlb"
     assert result["skipped_ladder_alternates"] == 2
     assert result["nba_missing_quote_event_ids"]["spread"] == []

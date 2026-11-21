@@ -1115,24 +1115,58 @@ def _round_robin_by_kickoff(entries: list[_CaptureEntry], now: datetime) -> list
 
     One kickoff-ordered queue across leagues let early soccer, tennis and esports
     games use up the budget before a later-kicking sport got anything (NCAAF on
-    2026-11-14). Upcoming games go before started ones within a league; the sort
-    is stable, so an event's markets keep their slate order.
+    2026-11-14). Upcoming games go before started ones within a league.
+
+    Within a league the queue is breadth-first over rungs: every event's
+    moneyline, then every event's most balanced line of each other market type,
+    then the next lines. Ordering by kickoff alone kept an event's markets
+    together, so when the time budget ran out the late kickoffs lost every
+    market, moneyline included (NCAAF is /book-only since 329c9efe, and a
+    full Saturday slate is more contracts than one 600 s run reaches). The
+    sort is stable, so equal rungs keep their slate order.
     """
-    by_league: dict[str, list[_CaptureEntry]] = {}
-    for entry in entries:
-        by_league.setdefault(entry[0].upper(), []).append(entry)
+    rungs = _capture_rungs(entries)
+    by_league: dict[str, list[tuple[int, _CaptureEntry]]] = {}
+    for rung, entry in zip(rungs, entries, strict=True):
+        by_league.setdefault(entry[0].upper(), []).append((rung, entry))
     queues = [
-        sorted(
-            by_league[league],
-            key=lambda entry: (
-                _has_started(entry[2], now),
-                str(entry[2].get("event_start_utc") or ""),
-                str(entry[2].get("event_id") or ""),
-            ),
-        )
+        [
+            entry
+            for _rung, entry in sorted(
+                by_league[league],
+                key=lambda item: (
+                    _has_started(item[1][2], now),
+                    item[0],
+                    str(item[1][2].get("event_start_utc") or ""),
+                    str(item[1][2].get("event_id") or ""),
+                ),
+            )
+        ]
         for league in sorted(by_league)
     ]
     return [entry for group in zip_longest(*queues) for entry in group if entry is not None]
+
+
+def _capture_rungs(entries: list[_CaptureEntry]) -> list[int]:
+    """Breadth-first rung of each entry: 0 for a moneyline, else 1 + its rank among
+    the same event's contracts of that market type, most balanced cached price first.
+    """
+    groups: dict[tuple[str, str, str], list[tuple[float, int]]] = {}
+    for index, (league, _sport, event, market) in enumerate(entries):
+        market_type = str(market.get("market_type") or "")
+        if market_type == "moneyline":
+            continue
+        key = (
+            league.upper(),
+            str(event.get("event_id") or event.get("event_slug") or id(event)),
+            market_type,
+        )
+        groups.setdefault(key, []).append((_long_side_distance(market), index))
+    rungs = [0] * len(entries)
+    for members in groups.values():
+        for rank, (_distance, index) in enumerate(sorted(members)):
+            rungs[index] = 1 + rank
+    return rungs
 
 
 def _capture_tiers(
