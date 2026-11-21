@@ -1,0 +1,5 @@
+{
+  "cbbd_vs_espn_scores_2021_history_only_season": {"same": 4285, "diff": 0},
+  "stats_root_coverage_by_season": {"2014": 0.9971, "2015": 0.999, "2016": 0.9985, "2017": 0.9985, "2018": 0.9988, "2019": 0.9985, "2020": 1.0, "2021": 1.0, "2022": 0.9983},
+  "note": "scores compared only on 2021 (history only); identity/box agreement 2016-2021 in history_audit.json"
+}

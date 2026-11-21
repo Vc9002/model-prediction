@@ -1,0 +1,107 @@
+{
+  "pin_id": "ncaab-research-protocol-261120-confirmation-A_ml_w0",
+  "pin_sha256": "1fbaabb741a44ce37b19c48e65f7256fbc0e529af0cbde6a6c07a4069a12d25c",
+  "window": "confirmation",
+  "seasons": [
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2022
+  ],
+  "shuffled_outcomes": false,
+  "grid_name": "A_ml_w0",
+  "candidate": "A_ml_w0: p_home = P_t8(margin >= 1) under served v7 (Elo weight 0)",
+  "predictions_sha256": "d1c0f45a15ad6249300e0d28871a54d3c4814f5aaeb10433a385479e76c2d930",
+  "coverage_by_season": {
+    "2015": 1.0,
+    "2016": 1.0,
+    "2017": 1.0,
+    "2018": 1.0,
+    "2019": 1.0,
+    "2020": 1.0,
+    "2022": 1.0
+  },
+  "d1_vs_d1_events_by_season": {
+    "2015": 5494,
+    "2016": 5514,
+    "2017": 5520,
+    "2018": 5533,
+    "2019": 5597,
+    "2020": 5328,
+    "2022": 5485
+  },
+  "primary_moneyline_logloss_delta_vs_v7": {
+    "n": 38471,
+    "days": 989,
+    "delta": -0.004627,
+    "upper_one_sided_95": -0.003872,
+    "ci95_two_sided": [
+      -0.005521,
+      -0.003731
+    ],
+    "logloss_cand": 0.524668,
+    "logloss_v7": 0.529295
+  },
+  "verdict": "PASS",
+  "pass_rule": "PASS iff coverage met and upper_one_sided_95 < 0; FAIL otherwise; never re-read",
+  "by_season": {
+    "2015": {
+      "n": 5494,
+      "delta": -0.006604
+    },
+    "2016": {
+      "n": 5514,
+      "delta": -0.006035
+    },
+    "2017": {
+      "n": 5520,
+      "delta": -0.00378
+    },
+    "2018": {
+      "n": 5533,
+      "delta": -0.005929
+    },
+    "2019": {
+      "n": 5597,
+      "delta": -0.004336
+    },
+    "2020": {
+      "n": 5328,
+      "delta": -0.003849
+    },
+    "2022": {
+      "n": 5485,
+      "delta": -0.001824
+    }
+  },
+  "sensitivity_pooled_ex_2015": {
+    "n": 32977,
+    "days": 849,
+    "delta": -0.004298,
+    "upper_one_sided_95": -0.003486,
+    "ci95_two_sided": [
+      -0.005272,
+      -0.003312
+    ],
+    "logloss_cand": 0.525091,
+    "logloss_v7": 0.529389
+  },
+  "moneyline_brier_delta_vs_v7": -0.001233,
+  "lined_secondary_no_verdict": {
+    "line_source": "espn_backfill_261120",
+    "n": 20826,
+    "days": 564,
+    "delta": -0.004036,
+    "upper_one_sided_95": -0.002993,
+    "ci95_two_sided": [
+      -0.005282,
+      -0.002799
+    ],
+    "logloss_cand": 0.529112,
+    "logloss_v7": 0.533147
+  },
+  "generated_at_utc": "2026-11-21T12:09:55Z"
+}
