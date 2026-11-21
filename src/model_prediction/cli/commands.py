@@ -12,6 +12,7 @@ import argparse
 import json
 import logging
 import os
+import time
 from collections.abc import Collection, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -111,12 +112,7 @@ def capture_nfl_polymarket_week_ahead(
 
     poly = client or PolymarketUSClient(max_attempts=2)
     capture = capture_fn or capture_slate_snapshots
-    root = snapshot_root
-    if root is None:
-        root = Path(ledger_path(config)).parent
-        runtime = RuntimePaths.resolve()
-        if root.resolve() == (runtime.repo_root / "data").resolve():
-            root = runtime.runtime_root
+    root = snapshot_root if snapshot_root is not None else _capture_snapshot_root(config)
     first = date.fromisoformat(start_date)
     per_date: dict[str, Any] = {}
     errors: dict[str, str] = {}
@@ -154,6 +150,107 @@ def capture_nfl_polymarket_week_ahead(
         "dates": per_date,
         "errors": errors,
     }
+
+
+# Wall-clock cap for the NCAAF day-ahead capture, slate fetches included. It runs
+# inside the daily job's serialized Polymarket chain, which forecasting waits on, so
+# it adds up to this much to the pre-forecast time of a run with day-ahead games.
+NCAAF_DAY_AHEAD_MAX_SECONDS = 180.0
+# Main rung only: a Saturday is ~115 events, and ML + 2 rungs per type is ~575 /book
+# calls (~290 s at the 0.5 s pacer), past the budget. ML + 1 + 1 is ~345.
+NCAAF_DAY_AHEAD_LADDER_KEEP = 1
+
+
+def capture_ncaaf_polymarket_day_ahead(
+    config: dict,
+    start_date: str,
+    *,
+    days: int = 2,
+    max_seconds: float = NCAAF_DAY_AHEAD_MAX_SECONDS,
+    client: Any | None = None,
+    capture_fn: Any | None = None,
+    snapshot_root: Path | None = None,
+    clock: Any = time.monotonic,
+) -> dict[str, Any]:
+    """Snapshot Polymarket NCAAF books for the next ``days`` Eastern dates (D+1, D+2).
+
+    Until this, every NCAAF quote was taken on game day (the slate capture prices only
+    today), so there was no opener and no line-movement series before kickoff day. Rows
+    come from the same writer as the slate capture and are filed under each game's own
+    Eastern date. ``build_cfb_slate`` never prices a decision off a row observed before
+    00:00 ET of the decision's day, so for the scheduled game-day forecast these rows feed
+    line movement and CLV only.
+
+    One deadline covers every date, slate fetches included (a fetch already in flight
+    can overrun it); a date reached after it is spent is skipped, not captured.
+    """
+    from datetime import timedelta
+
+    deadline = clock() + max_seconds
+    poly = client or PolymarketUSClient(max_attempts=2)
+    capture = capture_fn or capture_slate_snapshots
+    root = snapshot_root if snapshot_root is not None else _capture_snapshot_root(config)
+    first = date.fromisoformat(start_date)
+    per_date: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+    skipped_after_budget: list[str] = []
+    # Offset 0 is the main slate capture's job; start at tomorrow.
+    for offset in range(1, max(2, days + 1)):
+        game_date = (first + timedelta(days=offset)).isoformat()
+        if deadline - clock() <= 0:
+            skipped_after_budget.append(game_date)
+            continue
+        try:
+            events = poly.slate("NCAAF", date.fromisoformat(game_date), "America/New_York")
+        except httpx.HTTPError as exc:
+            errors[game_date] = str(exc)[:200]
+            continue
+        if not events:
+            continue
+        remaining = deadline - clock()
+        if remaining <= 0:
+            skipped_after_budget.append(game_date)
+            continue
+        try:
+            result = capture(
+                poly,
+                {"NCAAF": events},
+                root,
+                game_date,
+                horizon_hours=None,
+                ladder_keep={"NCAAF": NCAAF_DAY_AHEAD_LADDER_KEEP},
+                ladder_leagues=frozenset({"NCAAF"}),
+                priority_leagues=frozenset({"NCAAF"}),
+                max_capture_seconds=remaining,
+            )
+        except Exception as exc:  # noqa: BLE001 -- one date must not stop the next
+            errors[game_date] = f"{type(exc).__name__}: {exc}"[:200]
+            continue
+        summary = result if isinstance(result, dict) else {}
+        per_date[game_date] = {
+            "events": len(events),
+            "captured": summary.get("captured"),
+            "skipped_after_time_budget": summary.get("skipped_after_time_budget"),
+            "source_rate_limited": summary.get("source_rate_limited"),
+        }
+    return {
+        "status": "ok" if not errors else ("partial" if per_date else "error"),
+        "start_date": start_date,
+        "days": days,
+        "max_seconds": max_seconds,
+        "dates": per_date,
+        "errors": errors,
+        "skipped_after_budget": skipped_after_budget,
+    }
+
+
+def _capture_snapshot_root(config: dict) -> Path:
+    """Where capture writes quote archives: the runtime root the forecast readers use, not the checkout."""
+    root = Path(ledger_path(config)).parent
+    runtime = RuntimePaths.resolve()
+    if root.resolve() == (runtime.repo_root / "data").resolve():
+        root = runtime.runtime_root
+    return root
 
 
 def _capture_horizon_hours() -> float | None:

@@ -164,18 +164,40 @@ def _finalize_daily_report(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
-def _serialized_polymarket_captures(slate_capture: Any, week_ahead_capture: Any) -> Any:
-    """Run the slate BBO capture, then the NFL week-ahead book capture, in one thread.
+def _serialized_polymarket_captures(slate_capture: Any, *later_captures: Any) -> Any:
+    """Run the slate BBO capture, then each later book capture in order, in one thread.
 
-    Both draw on one IP-wide gateway rate limit. Run side by side in the daily
+    All draw on one IP-wide gateway rate limit. Run side by side in the daily
     pool (2026-11-14: 34-73 s each, fully overlapping), each one's burst drew
-    429s that ended the other's queue. The week-ahead still runs when the
-    slate capture raises; the slate capture's result or exception is returned.
+    429s that ended the other's queue. The later captures still run when the
+    slate capture raises, and one raising does not stop the next; the slate
+    capture's result or exception is returned.
     """
     try:
         return slate_capture()
     finally:
-        week_ahead_capture()
+        for later_capture in later_captures:
+            try:
+                later_capture()
+            except Exception:
+                logger.warning("Serialized Polymarket capture failed", exc_info=True)
+
+
+def _run_ncaaf_day_ahead_capture(config, game_date: str) -> dict[str, Any]:
+    """Polymarket NCAAF books for D+1 and D+2, so a pre-game-day line series exists (quick 261121-dac).
+
+    Optional by construction: a disabled NCAAF daily forecast skips it, and any failure is returned as a
+    status dict. ``step1n_ncaaf_day_ahead_quotes`` is deliberately not in ``_material_daily_errors``.
+    """
+    try:
+        if not is_sport_daily_enabled(config, "NCAAF"):
+            return {"status": "skipped", "reason": "ncaaf_daily_forecast_disabled"}
+        from .commands import capture_ncaaf_polymarket_day_ahead
+
+        return capture_ncaaf_polymarket_day_ahead(config, game_date)
+    except Exception:
+        logger.warning("NCAAF Polymarket day-ahead capture failed for %s", game_date, exc_info=True)
+        return {"status": "error"}
 
 
 def _run_cfb_pregame_capture(config, data_root, game_date: str) -> dict[str, Any]:
@@ -547,6 +569,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("NFL Polymarket week-ahead capture failed for %s", args.date, exc_info=True)
             nfl_week_ahead_result["polymarket"] = {"status": "error"}
 
+    ncaaf_day_ahead_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_ncaaf_day_ahead_polymarket():
+        nonlocal ncaaf_day_ahead_result
+        ncaaf_day_ahead_result = _run_ncaaf_day_ahead_capture(config, args.date)
+
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
         if not is_sport_daily_enabled(config, "MLB"):
@@ -694,6 +722,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             _serialized_polymarket_captures,
             lambda: _timed("polymarket_slate", _polymarket_slate, slate_args, config),
             lambda: _timed("nfl_week_ahead_polymarket", _capture_nfl_week_ahead_polymarket),
+            # Last, under its own budget: it must never delay today's slate or the NFL books.
+            lambda: _timed("ncaaf_day_ahead_polymarket", _capture_ncaaf_day_ahead_polymarket),
         )
         f1 = io_pool.submit(_timed, "wnba", _capture_wnba)
         f2 = io_pool.submit(_timed, "priors", _build_priors)
@@ -1776,6 +1806,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1k_nfl_weather": nfl_weather_result,
         "step1l_nfl_week_ahead_quotes": nfl_week_ahead_result,
         "step1m_cfb_pregame_capture": cfb_pregame_result,
+        "step1n_ncaaf_day_ahead_quotes": ncaaf_day_ahead_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

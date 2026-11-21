@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import PROJECT_ROOT
-from ..domain import parse_utc, utc_now
+from ..domain import EASTERN, parse_utc, utc_now
 from ..features.base import GameRecord
 from ..features.cfb_features import CFBGameRecord
 from ..pricing import implied_probability
@@ -645,6 +645,51 @@ def _latest_capture_per_market(rows: list[dict[str, Any]]) -> list[dict[str, Any
     return list(latest.values()) + unslugged
 
 
+def _load_decision_snapshot_rows(
+    snapshot_path: Path, iso_date: str, decision_at: datetime
+) -> list[dict[str, Any]]:
+    """Archived quotes that may price a decision on ``iso_date`` made at ``decision_at``.
+
+    A row is kept when it was observed no later than the decision and no earlier than
+    00:00 Eastern on the decision's day (the game date, or the earlier decision date of a
+    forecast run ahead of it). The lower bound exists because the day-ahead capture
+    (quick 261121-dac) files D+1/D+2 books under the game's date: the spread/total
+    selectors take the most balanced rung across slugs with no age bound, so a rung from
+    an earlier day that the decision day's shortlist dropped would outrank the current one
+    and price the pick at a day-old ask. Scheduled runs only ever wrote today's date, so
+    this is the status quo for game-day quotes. Rows without an observation time are kept.
+    """
+    if not snapshot_path.is_file():
+        return []
+    decision_day = min(datetime.fromisoformat(iso_date).date(), decision_at.astimezone(EASTERN).date())
+    window_start = datetime.combine(decision_day, datetime.min.time(), EASTERN)
+    rows: list[dict[str, Any]] = []
+    try:
+        with snapshot_path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                observed_raw = str(row.get("observed_at_utc") or "")
+                if not observed_raw:
+                    rows.append(row)
+                    continue
+                try:
+                    observed = parse_utc(observed_raw)
+                except (ValueError, TypeError):
+                    continue
+                if window_start <= observed <= decision_at:
+                    rows.append(row)
+    except OSError:
+        return []
+    return rows
+
+
 def build_cfb_slate(
     data_root: str | Path,
     game_date: str,
@@ -701,30 +746,7 @@ def build_cfb_slate(
     from ..college_contract_evidence import evidence_root
 
     snapshot_path = evidence_root(root) / "odds" / "ncaaf" / iso_date / "polymarket_snapshots.jsonl"
-    snapshot_rows: list[dict[str, Any]] = []
-    if snapshot_path.is_file():
-        try:
-            with snapshot_path.open(encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-                    try:
-                        r = json.loads(line)
-                        if isinstance(r, dict):
-                            obs_str = str(r.get("observed_at_utc") or "")
-                            if obs_str:
-                                try:
-                                    if parse_utc(obs_str) <= obs:
-                                        snapshot_rows.append(r)
-                                except (ValueError, TypeError):
-                                    pass
-                            else:
-                                snapshot_rows.append(r)
-                    except json.JSONDecodeError:
-                        continue
-        except OSError:
-            snapshot_rows = []
-    snapshot_rows = _latest_capture_per_market(snapshot_rows)
+    snapshot_rows = _latest_capture_per_market(_load_decision_snapshot_rows(snapshot_path, iso_date, obs))
 
     # Polymarket event list, fetched once: the indicative fallback for a market
     # with no captured book, and the inventory for candidate evidence below. Without
