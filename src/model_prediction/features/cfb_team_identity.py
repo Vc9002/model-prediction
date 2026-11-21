@@ -122,3 +122,103 @@ class CFBTeamIdentity:
             self.key(_get_val(row, "home_team") or "", _team_id(row, "home")),
             self.key(_get_val(row, "away_team") or "", _team_id(row, "away")),
         )
+
+
+# ------------------------------------------------------------------ per-season division class
+FBS = "FBS"
+FCS = "FCS"
+UNKNOWN = "UNKNOWN"
+_FBS_FEED = 80
+_FCS_FEED = 81
+
+
+def _feed_groups(row: Any) -> tuple[int, ...]:
+    groups = _get_val(row, "feed_groups")
+    if not groups:
+        return ()
+    try:
+        return tuple(sorted({int(x) for x in groups}))
+    except (TypeError, ValueError):
+        return ()
+
+
+def _resolver_class(key: str) -> str | None:
+    """FBS / FCS from the static team table, for a canonical key only (``ID:`` / ``NAME:`` keys are not in it)."""
+    if key.startswith(("ID:", "NAME:")):
+        return None
+    from ..data_sources.cfb_data import resolve_team
+
+    team = resolve_team(key)
+    if team is None:
+        return None
+    return FCS if team.tier == "FCS" else FBS
+
+
+class CFBTeamClasses:
+    """FBS / FCS label per (team key, season), from the ESPN scoreboard feed that listed each game.
+
+    ``scoreboard_ncaaf_divisions`` records the feed(s) listing each event: 80 only = FBS-FBS, 81 only = a
+    lower-division game, 80 + 81 = FBS-FCS. Division membership is a schedule fact, but the labels are still
+    built only from rows before the decision time. Legacy rows carry no feed groups and are NOT read as FBS:
+    208 of them are FBS-FCS or FCS-FCS games.
+
+    Order: this season's feed evidence, then last season's, then the static team table's tier, else
+    ``UNKNOWN``. The static table alone labelled 1,703 of 1,782 FCS team-seasons FBS (every FCS team missing
+    from it fell back to G6), so ``is_fbs_vs_fcs`` and the Main ``block_fcs`` gate failed open.
+    """
+
+    def __init__(self, labels: dict[tuple[str, int], str]) -> None:
+        self._labels = labels
+
+    @classmethod
+    def from_keyed_rows(cls, keyed_rows: Sequence[tuple[Any, str, str]]) -> CFBTeamClasses:
+        labels: dict[tuple[str, int], str] = {}
+        pairs: list[tuple[str, str, int]] = []
+        for row, home, away in keyed_rows:
+            season = row_season(row)
+            if season is None:
+                continue
+            groups = _feed_groups(row)
+            if groups == (_FCS_FEED,):
+                labels[(home, season)] = FCS
+                labels[(away, season)] = FCS
+            elif groups == (_FBS_FEED,):
+                # A lower-division listing anywhere in the season wins: fail closed on a conflict.
+                labels.setdefault((home, season), FBS)
+                labels.setdefault((away, season), FBS)
+            elif groups == (_FBS_FEED, _FCS_FEED):
+                pairs.append((home, away, season))
+        # An FBS-FCS game has exactly one FBS side: a labelled side labels the other.
+        changed = True
+        while changed:
+            changed = False
+            for home, away, season in pairs:
+                lh, la = labels.get((home, season)), labels.get((away, season))
+                if lh is not None and la is None:
+                    labels[(away, season)] = FCS if lh == FBS else FBS
+                    changed = True
+                elif la is not None and lh is None:
+                    labels[(home, season)] = FCS if la == FBS else FBS
+                    changed = True
+        for home, away, season in pairs:
+            if (home, season) in labels or (away, season) in labels:
+                continue
+            th, ta = _resolver_class(home), _resolver_class(away)
+            if th == FBS and ta != FBS:
+                labels[(home, season)], labels[(away, season)] = FBS, FCS
+            elif ta == FBS and th != FBS:
+                labels[(away, season)], labels[(home, season)] = FBS, FCS
+        return cls(labels)
+
+    def classify(self, key: str, season: int) -> tuple[str, str]:
+        """(FBS | FCS | UNKNOWN, source). Callers treat UNKNOWN as not-FBS."""
+        hit = self._labels.get((key, season))
+        if hit is not None:
+            return hit, "feed"
+        hit = self._labels.get((key, season - 1))
+        if hit is not None:
+            return hit, "previous_season_feed"
+        resolved = _resolver_class(key)
+        if resolved is not None:
+            return resolved, "team_table"
+        return UNKNOWN, "no_class_evidence"

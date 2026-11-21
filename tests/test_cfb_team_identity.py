@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from model_prediction.features.cfb_features import CFBFeatureExtractor, CFBGameRecord
-from model_prediction.features.cfb_team_identity import CFBTeamIdentity
+from model_prediction.features.cfb_team_identity import CFBTeamClasses, CFBTeamIdentity
 
 KICKOFF = datetime(2026, 11, 21, 20, tzinfo=UTC)
 
@@ -108,3 +108,58 @@ def test_identity_ignores_rows_after_the_decision_time() -> None:
         [*history, late], "App State Mountaineers", KICKOFF, 2026, 12
     )
     assert state.games_played == 7
+
+
+# --------------------------------------------------------------------------- per-season FBS / FCS class
+def _features(history, away: str, home: str):
+    return CFBFeatureExtractor().extract_features(
+        history,
+        away_team=away,
+        home_team=home,
+        event_id="slate",
+        game_start_utc=KICKOFF.isoformat(),
+        season_year=2026,
+        week=12,
+    )
+
+
+def test_fcs_team_missing_from_team_table_is_fbs_vs_fcs() -> None:
+    # Maine is not in the static table; before the fix it fell back to G6 and the game read FBS-vs-FBS,
+    # so the Main block_fcs gate and the FBS-vs-FCS SD slice failed open.
+    history = [
+        _game(1, "Maine Black Bears", "Towson Tigers", days_before=14, feed_groups=(81,)),
+        _game(2, "Georgia Bulldogs", "Auburn Tigers", days_before=14, feed_groups=(80,)),
+    ]
+    assert _features(history, "Maine Black Bears", "Georgia Bulldogs").is_fbs_vs_fcs is True
+
+
+def test_unknown_class_opponent_fails_closed(caplog) -> None:
+    caplog.set_level("WARNING", logger="model_prediction.features.cfb_features")
+    feat = _features([], "Nowhere Tech Owls", "Georgia Bulldogs")
+    assert feat.is_fbs_vs_fcs is True
+    assert "Nowhere Tech Owls" in caplog.text and "fail closed" in caplog.text
+
+
+def test_this_seasons_feed_class_beats_a_stale_team_table_tier() -> None:
+    # The static table lists North Dakota State as FCS; in 2026 ESPN lists its games in the FBS-only feed.
+    ndsu = _game(1, "North Dakota State Bison", "Sacramento State Hornets", days_before=14, feed_groups=(80,))
+    other = _game(2, "Georgia Bulldogs", "Auburn Tigers", days_before=14, feed_groups=(80,))
+    assert _features([ndsu, other], "North Dakota State Bison", "Georgia Bulldogs").is_fbs_vs_fcs is False
+    # PIT: the same evidence dated after kickoff is ignored, so the table's FCS tier decides.
+    late = _game(3, "North Dakota State Bison", "Sacramento State Hornets", days_before=-2, feed_groups=(80,))
+    assert _features([late, other], "North Dakota State Bison", "Georgia Bulldogs").is_fbs_vs_fcs is True
+
+
+def test_fbs_fcs_feed_pair_labels_the_side_opposite_a_known_team() -> None:
+    rows = [
+        _game(1, "Maine Black Bears", "Towson Tigers", days_before=30, feed_groups=(81,)),
+        _game(2, "Sacramento State Hornets", "Maine Black Bears", days_before=20, feed_groups=(80, 81)),
+        _game(3, "Foo A&M Rams", "Bar State Owls", days_before=10),  # legacy row: no class evidence
+    ]
+    ident = CFBTeamIdentity.from_rows(rows)
+    keyed = [(r, *ident.row_keys(r)) for r in rows]
+    classes = CFBTeamClasses.from_keyed_rows(keyed)
+    assert classes.classify(ident.key("Sacramento State Hornets"), 2026) == ("FBS", "feed")
+    assert classes.classify(ident.key("Maine Black Bears"), 2026) == ("FCS", "feed")
+    assert classes.classify(ident.key("Maine Black Bears"), 2027) == ("FCS", "previous_season_feed")
+    assert classes.classify(ident.key("Foo A&M Rams"), 2026) == ("UNKNOWN", "no_class_evidence")

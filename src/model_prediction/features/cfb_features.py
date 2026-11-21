@@ -12,6 +12,7 @@ Implements research-grounded point-in-time features for College Football:
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -25,7 +26,9 @@ from ..data_sources.cfb_data import (
 )
 from ..domain import parse_utc
 from ..features.base import GameRecord
-from .cfb_team_identity import CFBTeamIdentity, row_season, row_start
+from .cfb_team_identity import FBS, UNKNOWN, CFBTeamClasses, CFBTeamIdentity, row_season, row_start
+
+_logger = logging.getLogger(__name__)
 
 # (row, home team key, away team key) for one history row before the decision time
 KeyedRow = tuple[Any, str, str]
@@ -320,6 +323,7 @@ class CFBFeatureExtractor:
         *,
         team_key: str | None = None,
         keyed_rows: Sequence[KeyedRow] | None = None,
+        classes: CFBTeamClasses | None = None,
     ) -> CFBTeamState:
         """Compute point-in-time team state using only games before as_of_dt.
 
@@ -330,8 +334,16 @@ class CFBFeatureExtractor:
         if keyed_rows is None or team_key is None:
             identity, keyed_rows = _keyed_past_rows(history, as_of_dt)
             team_key = identity.key(team_name)
+        if classes is None:
+            classes = CFBTeamClasses.from_keyed_rows(keyed_rows)
         team_obj = resolve_team(team_name)
-        tier = team_obj.tier if team_obj else "G6"
+        # Tier follows the season's division class; the static table only says which FBS tier. A team with no
+        # class evidence is not-FBS (fail closed), so an unknown opponent cannot pass as an FBS-vs-FBS game.
+        team_class, _ = classes.classify(team_key, season_year)
+        if team_class == FBS:
+            tier = team_obj.tier if team_obj and team_obj.tier != "FCS" else "G6"
+        else:
+            tier = "FCS"
         conf = team_obj.conference if team_obj else "Mid-American"
 
         # Prior power level from conference tier and historical baseline
@@ -538,6 +550,19 @@ class CFBFeatureExtractor:
         identity, keyed_rows = _keyed_past_rows(history, start_dt)
         away_key = identity.key(away_team, str(away_team_id) if away_team_id else None)
         home_key = identity.key(home_team, str(home_team_id) if home_team_id else None)
+        classes = CFBTeamClasses.from_keyed_rows(keyed_rows)
+        for name, key in ((away_team, away_key), (home_team, home_key)):
+            label, source = classes.classify(key, resolved_season_year)
+            if label == UNKNOWN:
+                _logger.warning(
+                    "NCAAF %s: %r (key %s) has no FBS/FCS class evidence for season %s (%s); "
+                    "treated as not-FBS, so is_fbs_vs_fcs is set (fail closed)",
+                    event_id,
+                    name,
+                    key,
+                    resolved_season_year,
+                    source,
+                )
         away_state = self._compute_team_state(
             history,
             away_team,
@@ -546,6 +571,7 @@ class CFBFeatureExtractor:
             week,
             team_key=away_key,
             keyed_rows=keyed_rows,
+            classes=classes,
         )
         home_state = self._compute_team_state(
             history,
@@ -555,6 +581,7 @@ class CFBFeatureExtractor:
             week,
             team_key=home_key,
             keyed_rows=keyed_rows,
+            classes=classes,
         )
 
         is_fbs_fcs = away_state.tier == "FCS" or home_state.tier == "FCS"
