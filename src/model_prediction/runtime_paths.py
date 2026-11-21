@@ -276,6 +276,20 @@ class RuntimePaths:
         return self.research_root / "research.db"
 
     @property
+    def ncaaf_v7_root(self) -> Path:
+        """Live data for cfb-structural-v7: ESPN play-by-play rows, schedule index, class lists, CFBD priors.
+
+        Written by ``data_sources.cfb_pbp_live`` (daily step and one-time seed), read by
+        ``models.cfb_structural_v7``. The repo's ``data/research/ncaaf_v7`` stays the refit input; this tree
+        is the serving input."""
+        return self.research_root / "ncaaf_v7"
+
+    @property
+    def ncaaf_v7_lock(self) -> Path:
+        """Single-writer lock for the v7 live update (a held lock means skip, never wait)."""
+        return self.lock_root / "ncaaf_v7_pbp.lock"
+
+    @property
     def supervisor_log_root(self) -> Path:
         return self.log_root / "supervisor"
 

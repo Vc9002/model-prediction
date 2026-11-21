@@ -218,6 +218,26 @@ def _run_cfb_pregame_capture(config, data_root, game_date: str) -> dict[str, Any
         return {"status": "error"}
 
 
+def _run_ncaaf_v7_pbp_update(config, data_root) -> dict[str, Any]:
+    """Incremental ESPN play-by-play for cfb-structural-v7 (quick 261121-v7l): scoreboard discovery (FBS and
+    FCS feeds), new final games' summaries, new team-game rows, under the runtime root's ncaaf_v7 tree.
+
+    Runs in the capture pool, which is joined before any forecast. Optional by construction: a disabled NCAAF
+    daily forecast skips it, a failure is returned as a status dict and v7 then no-calls the affected teams
+    (NO_CALL_V7_PBP_MISSING). v5 and v6.2 never read this data. ``step1o_ncaaf_v7_pbp`` is deliberately not in
+    ``_material_daily_errors``.
+    """
+    try:
+        if not is_sport_daily_enabled(config, "NCAAF"):
+            return {"status": "skipped", "reason": "ncaaf_daily_forecast_disabled"}
+        from ..data_sources.cfb_pbp_live import update_from_data_root
+
+        return update_from_data_root(data_root)
+    except Exception:
+        logger.warning("NCAAF v7 play-by-play update failed", exc_info=True)
+        return {"status": "error"}
+
+
 def _skipped_sport_result(sport: str, status: str, reason: str) -> dict[str, Any]:
     """The result dict a daily task records when a sport is not forecast at all."""
     return {"sport": sport, "status": status, "logged": 0, "candidates": [], "reason": reason}
@@ -521,6 +541,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         nonlocal cfb_pregame_result
         cfb_pregame_result = _run_cfb_pregame_capture(config, data_root, args.date)
 
+    ncaaf_v7_pbp_result: dict[str, Any] = {"status": "skipped"}
+
+    def _update_ncaaf_v7_pbp():
+        nonlocal ncaaf_v7_pbp_result
+        ncaaf_v7_pbp_result = _run_ncaaf_v7_pbp_update(config, data_root)
+
     cfb_weather_result: dict[str, Any] = {"status": "skipped"}
 
     def _capture_cfb_weather():
@@ -743,7 +769,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f16 = io_pool.submit(_timed, "nfl_weather", _capture_nfl_weather)
         f17 = io_pool.submit(_timed, "nfl_week_ahead_consensus", _capture_nfl_week_ahead_consensus)
         f18 = io_pool.submit(_timed, "cfb_pregame_capture", _capture_cfb_pregame)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18):
+        # Joined below with the rest of the pool, so it always finishes before NCAAF forecasting starts.
+        f19 = io_pool.submit(_timed, "ncaaf_v7_pbp", _update_ncaaf_v7_pbp)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -1807,6 +1835,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1l_nfl_week_ahead_quotes": nfl_week_ahead_result,
         "step1m_cfb_pregame_capture": cfb_pregame_result,
         "step1n_ncaaf_day_ahead_quotes": ncaaf_day_ahead_result,
+        "step1o_ncaaf_v7_pbp": ncaaf_v7_pbp_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

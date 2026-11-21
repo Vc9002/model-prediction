@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Mapping, Sequence
+from collections import Counter, defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +28,8 @@ import numpy as np
 from scipy.special import ndtr
 
 from ..config import PROJECT_ROOT
+from ..data_sources import cfb_pbp_live as live
+from ..domain import parse_utc
 from ..features import cfb_features_v7 as core
 from ..production_registry import compute_artifact_hash
 
@@ -267,3 +270,247 @@ def price_game(
     state = core.fit_state(rows, season, decision, cls, finals, model.params, (home_id, away_id), covariates)
     feat = core.matchup_features(state, home_id, away_id, neutral=neutral, classes=cls)
     return model.price(feat, spread_home_line=spread_home_line, total_line=total_line)
+
+
+# ------------------------------------------------------------------------------------------------ live data
+@dataclass(frozen=True)
+class V7ServingData:
+    """Everything ``price_game`` needs at one decision time, read from the runtime-root v7 store."""
+
+    season: int
+    decision: datetime
+    rows: list[core.TeamGame]
+    classes: dict[tuple[str, int], str]
+    covariates: dict[str, dict[str, float]] | None
+    expected_games: dict[str, list[str]]  # team -> admitted current-season games that must have pbp rows
+    slate_no_call: tuple[str, str] | None  # (reason, detail) when no game of the slate can be priced
+    stats: dict[str, Any]
+
+
+def _score_only_rows(rec: Mapping[str, Any]) -> list[core.TeamGame]:
+    """Two points-only rows for a final game without play-by-play (``scripts/cfb_v7_fit.py::load_team_games``)."""
+    kick = parse_utc(rec["kickoff_utc"])
+    neutral = bool(rec.get("neutral_site"))
+    out = []
+    for team, opp, pts, home in (
+        (rec["home_id"], rec["away_id"], rec["home_score"], True),
+        (rec["away_id"], rec["home_id"], rec["away_score"], False),
+    ):
+        out.append(
+            core.TeamGame(
+                event_id=str(rec["event_id"]),
+                season=int(rec["season"]),
+                kickoff=kick,
+                team_id=str(team),
+                opponent_id=str(opp),
+                home_sign=0 if neutral else (1 if home else -1),
+                game_class=rec.get("game_class"),
+                values={k: (float(pts) if k == "pts" else None) for k in core.METRICS},
+            )
+        )
+    return out
+
+
+def _live_history_completed(path: Path, season: int, decision: datetime) -> list[tuple[str, str, str]]:
+    """(event, home, away) of completed, admitted ``season`` games in the live NCAAF score history (FBS-involved
+    only). An independent witness: when the v7 update failed, these games still demand play-by-play."""
+    out: list[tuple[str, str, str]] = []
+    if not path.exists():
+        return out
+    with path.open(encoding="utf-8") as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            try:
+                r = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (
+                r.get("status") != "completed"
+                or r.get("season_year") != season
+                or not r.get("event_start_utc")
+            ):
+                continue
+            if not core.admitted(parse_utc(r["event_start_utc"]), decision):
+                continue
+            out.append((str(r.get("event_id")), str(r.get("home_team_id")), str(r.get("away_team_id"))))
+    return out
+
+
+def load_v7_serving_data(
+    data_root: str | Path,
+    decision: datetime,
+    *,
+    team_ids: Iterable[str] = (),
+) -> V7ServingData:
+    """Serving inputs as of ``decision`` from ``RuntimePaths.ncaaf_v7_root`` (resolved from ``data_root`` the way
+    the daily step writes it).
+
+    Rows: pbp rows of this and last season (observed at or before ``decision``) plus points-only rows for final
+    schedule games without play-by-play, which is how the fit script built its spine. Classes: the season FBS
+    lists (last season's too: its finals are the prior). Covariates: this season's CFBD rows. The slate no-calls
+    as a whole when a season date up to the decision was never scanned (unseen games) or a class list is
+    missing; per team, every admitted current-season schedule game must have a pbp row unless ESPN has none."""
+    if decision.tzinfo is None:
+        raise ValueError("decision must be timezone-aware")
+    store = live.store_for(live.v7_paths(data_root))
+    season = live.cfb_season(live.et_date(decision))
+    seasons = (season - 1, season)
+    pbp = live.read_pbp_rows(store, seasons, as_of=decision)
+    rows = [core.team_game_from_row(r) for r in pbp]
+    pbp_events = {r.event_id for r in rows}
+    schedule = live.read_schedule(store, as_of=decision)
+    score_only = 0
+    for rec in schedule.values():
+        if int(rec["season"]) not in seasons or rec["status"] != live.FINAL or rec["event_id"] in pbp_events:
+            continue
+        if rec.get("home_score") is None or rec.get("away_score") is None:
+            continue
+        rows.extend(_score_only_rows(rec))
+        score_only += 1
+    rows.sort(key=lambda r: (r.kickoff, r.event_id, -r.home_sign))
+
+    slate_no_call: tuple[str, str] | None = None
+    fbs = {s: live.read_fbs_teams(store, s, as_of=decision) for s in seasons}
+    teams_by_season: dict[int, set[str]] = defaultdict(set)
+    for r in rows:
+        teams_by_season[r.season].update((r.team_id, r.opponent_id))
+    teams_by_season[season].update(str(t) for t in team_ids if t)
+    classes: dict[tuple[str, int], str] = {}
+    for s, listed in fbs.items():
+        if listed is None:
+            slate_no_call = slate_no_call or (NO_CALL_NO_CLASS, f"no FBS team list for season {s}")
+            continue
+        for t in teams_by_season[s]:
+            classes[(t, s)] = core.FBS if t in listed else core.FCS
+    gap = live.scan_gap(store, season, decision)
+    if gap is not None:
+        slate_no_call = (NO_CALL_PBP_MISSING, gap)
+
+    terminal = live.terminal_without_pbp(store, schedule, as_of=decision)
+    expected: dict[str, set[str]] = defaultdict(set)
+    for rec in schedule.values():
+        if int(rec["season"]) != season or rec["status"] in live.NOT_PLAYED_STATES:
+            continue
+        if rec["event_id"] in terminal or not core.admitted(parse_utc(rec["kickoff_utc"]), decision):
+            continue
+        expected[str(rec["home_id"])].add(str(rec["event_id"]))
+        expected[str(rec["away_id"])].add(str(rec["event_id"]))
+    not_played = {e for e, r in schedule.items() if r["status"] in live.NOT_PLAYED_STATES}
+    witnessed = 0
+    for eid, home, away in _live_history_completed(
+        Path(data_root) / "processed" / "ncaaf" / "games.jsonl", season, decision
+    ):
+        if eid in terminal or eid in not_played:
+            continue
+        witnessed += eid not in expected.get(home, set())
+        expected[home].add(eid)
+        expected[away].add(eid)
+
+    cfbd_rows = live.read_cfbd_rows(store, season)
+    covariates = core.standardise_covariates(cfbd_rows) if cfbd_rows else None
+    return V7ServingData(
+        season=season,
+        decision=decision,
+        rows=rows,
+        classes=classes,
+        covariates=covariates or None,
+        expected_games={t: sorted(v) for t, v in expected.items()},
+        slate_no_call=slate_no_call,
+        stats={
+            "pbp_rows": len(pbp),
+            "score_only_games": score_only,
+            "schedule_events": len(schedule),
+            "terminal_without_pbp": len(terminal),
+            "live_history_only_games": witnessed,
+            "cfbd_rows": len(cfbd_rows),
+            "fbs_teams": {s: (len(v) if v is not None else None) for s, v in fbs.items()},
+        },
+    )
+
+
+def _game_field(game: Any, name: str, default: Any = None) -> Any:
+    if isinstance(game, Mapping):
+        return game.get(name, default)
+    return getattr(game, name, default)
+
+
+def price_v7_slate(
+    data_root: str | Path,
+    decision_time: datetime,
+    games: Sequence[Any],
+    *,
+    model: CFBStructuralV7Model | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """v7 prices (or a NO_CALL reason) for each game of a slate at ``decision_time``.
+
+    ``games`` are mappings or objects with ``event_id``, ``home_team_id``, ``away_team_id`` (ESPN ids),
+    ``is_neutral_site`` and optionally ``spread_home_line`` / ``total_line``. The rating state is fitted once
+    for the slate; per game the arithmetic is ``price_game``'s (tested equal). Never raises ``V7NoCall``."""
+    model = model or cfb_structural_v7_model()
+    team_ids = sorted(
+        {str(t) for g in games for t in (_game_field(g, "home_team_id"), _game_field(g, "away_team_id")) if t}
+    )
+    data = load_v7_serving_data(data_root, decision_time, team_ids=team_ids)
+    season, decision = data.season, data.decision
+    slate_no_call = data.slate_no_call
+    if slate_no_call is None and model.uses_cfbd and not data.covariates:
+        slate_no_call = (NO_CALL_NO_CFBD, f"season {season}")
+    state = None
+    if slate_no_call is None:
+        prev_rows = [r for r in data.rows if r.season == season - 1]
+        finals = core.fit_finals(prev_rows, season - 1, data.classes) if prev_rows else None
+        state = core.fit_state(
+            data.rows, season, decision, data.classes, finals, model.params, team_ids, data.covariates
+        )
+    results: list[dict[str, Any]] = []
+    reasons: Counter[str] = Counter()
+    for g in games:
+        home = _game_field(g, "home_team_id")
+        away = _game_field(g, "away_team_id")
+        out: dict[str, Any] = {
+            "event_id": str(_game_field(g, "event_id")),
+            "home_team_id": None if home is None else str(home),
+            "away_team_id": None if away is None else str(away),
+            "model_version": CFB_V7_MODEL_VERSION,
+            "decision_utc": decision.isoformat(),
+        }
+        try:
+            if slate_no_call is not None:
+                raise core.V7NoCall(*slate_no_call)
+            assert state is not None
+            h, a = str(home), str(away)
+            check_pbp_complete(data.rows, data.expected_games, (h, a), season, decision)
+            feat = core.matchup_features(
+                state, h, a, neutral=bool(_game_field(g, "is_neutral_site")), classes=data.classes
+            )
+            pricing = model.price(
+                feat,
+                spread_home_line=_game_field(g, "spread_home_line"),
+                total_line=_game_field(g, "total_line"),
+            )
+        except core.V7NoCall as exc:
+            out.update(status="no_call", reason=exc.reason, detail=str(exc))
+            reasons[exc.reason] += 1
+        else:
+            out.update(
+                status="ok",
+                mu_margin=pricing.mu_margin,
+                mu_total=pricing.mu_total,
+                margin_sd=pricing.margin_sd,
+                total_sd=pricing.total_sd,
+                early=pricing.early,
+                is_fbs_vs_fcs=pricing.is_fbs_vs_fcs,
+                probabilities=pricing.probabilities,
+            )
+        results.append(out)
+    summary = {
+        "model_version": CFB_V7_MODEL_VERSION,
+        "decision_utc": decision.isoformat(),
+        "season": season,
+        "games": len(results),
+        "priced": sum(1 for r in results if r["status"] == "ok"),
+        "no_call": dict(reasons),
+        "data": data.stats,
+    }
+    return results, summary
