@@ -1,0 +1,306 @@
+{
+  "artifact_hash": "945d35a72f2f861bd720edc039df480c30ca0574a39120e46743aa1731a246d0",
+  "box_prior": {
+    "365": {
+      "delta": [
+        0.158715582335591,
+        0.03468284666975846,
+        0.0558287016246317,
+        -0.025260975858815416,
+        0.060059536055689366,
+        -0.10642312062226933,
+        0.0821770802501722,
+        -0.1460185190516724,
+        -0.9332492533059982,
+        -1.3788276997743223,
+        0.16993961149810383
+      ],
+      "fringe_rates": [
+        17.841642019317174,
+        1.921719621273886,
+        15.13695198081375,
+        3.6530526015103817,
+        3.968411718847635,
+        2.4678850491260853,
+        2.4587442051452952,
+        6.5188500151752296,
+        1.5378041740807085,
+        1.0376286175068585,
+        4.825651493421092
+      ],
+      "gamma": [
+        0.8467478944678737,
+        0.3493522251437308,
+        -0.8315954198140364,
+        -0.3316054667951422,
+        0.4307778749160348,
+        -1.2654011858940475,
+        0.2989114587385432,
+        0.333139644563488,
+        1.7767329526475408,
+        0.44358088813837465,
+        -0.3437578268981366
+      ],
+      "hca": 2.058549752831517,
+      "total_const": -12.921433276765883
+    },
+    "730": {
+      "delta": [
+        0.164258445229754,
+        0.013328133482211688,
+        0.04112657082090421,
+        -0.022783929892277496,
+        0.0853156218768834,
+        -0.18750000309469095,
+        0.08202137955779114,
+        -0.13163872630617748,
+        -0.973513049045454,
+        -1.4083709525241084,
+        0.2080657826624726
+      ],
+      "fringe_rates": [
+        17.841642019317174,
+        1.921719621273886,
+        15.13695198081375,
+        3.6530526015103817,
+        3.968411718847635,
+        2.4678850491260853,
+        2.4587442051452952,
+        6.5188500151752296,
+        1.5378041740807085,
+        1.0376286175068585,
+        4.825651493421092
+      ],
+      "gamma": [
+        0.8544084725469312,
+        0.2855768895192912,
+        -0.8206935512178355,
+        -0.3788757338603239,
+        0.4287612177282717,
+        -1.2111426720240388,
+        0.2552601931440619,
+        0.25958137035282286,
+        1.6964903500475126,
+        0.5032907348035024,
+        -0.33802039991197474
+      ],
+      "hca": 2.0564162529666885,
+      "total_const": -11.811307784657936
+    }
+  },
+  "coefficients": {
+    "avail": {
+      "margin": {
+        "b2b_diff": 2.352877956940487,
+        "home_court": 2.040196420516277,
+        "strength_diff": 0.9233576992561194,
+        "three_in_four_diff": 0.201440168879218
+      },
+      "n_margin": 5149,
+      "n_total": 5149,
+      "sigma_margin": 13.542452007986052,
+      "sigma_total": 18.402187246395318,
+      "total": {
+        "b2b_count": -0.31007757105257144,
+        "intercept": 18.398898482055827,
+        "playoff": -9.109867312766646,
+        "poss_x_eff": 0.92311137282165,
+        "three_in_four_count": -0.5973837671695507
+      },
+      "variant": "avail"
+    },
+    "exavail": {
+      "margin": {
+        "b2b_diff": 2.3657089330661973,
+        "home_court": 2.0237435051806614,
+        "strength_diff": 0.9124660502657966,
+        "three_in_four_diff": 0.3409561099276599
+      },
+      "n_margin": 9961,
+      "n_total": 9961,
+      "sigma_margin": 13.420608020851233,
+      "sigma_total": 18.73041173820244,
+      "total": {
+        "b2b_count": -0.5506566491671474,
+        "intercept": 17.460421774824063,
+        "playoff": -8.45455237721284,
+        "poss_x_eff": 0.9256804333697405,
+        "three_in_four_count": -0.6337188029140622
+      },
+      "variant": "exavail"
+    }
+  },
+  "engine": "model_prediction.models.nba_player_v10",
+  "features": "model_prediction.features.nba_player_ratings",
+  "g1": {
+    "avail/spread": {
+      "corr_val": [
+        0.0092,
+        -0.0471,
+        0.0691
+      ],
+      "g1": "FAIL",
+      "lambda": 0.0,
+      "lambda_train": [
+        0.2831,
+        0.143,
+        0.414
+      ],
+      "lambda_train_v9_window": [
+        0.2667,
+        0.0557,
+        0.5037
+      ],
+      "lambda_val": [
+        0.0298,
+        -0.2529,
+        0.3292
+      ],
+      "n_train": 5147,
+      "n_val": 759,
+      "sigma_anchored_train": 13.398
+    },
+    "avail/total": {
+      "corr_val": [
+        -0.0355,
+        -0.1162,
+        0.0452
+      ],
+      "g1": "FAIL",
+      "lambda": 0.0,
+      "lambda_train": [
+        -0.0344,
+        -0.1446,
+        0.0821
+      ],
+      "lambda_train_v9_window": [
+        -0.05,
+        -0.2345,
+        0.1298
+      ],
+      "lambda_val": [
+        -0.1583,
+        -0.4808,
+        0.1635
+      ],
+      "n_train": 5147,
+      "n_val": 759,
+      "sigma_anchored_train": 17.844
+    },
+    "exavail/spread": {
+      "corr_val": [
+        -0.0197,
+        -0.0794,
+        0.036
+      ],
+      "g1": "FAIL",
+      "lambda": 0.0,
+      "lambda_train": [
+        0.1422,
+        0.0637,
+        0.2256
+      ],
+      "lambda_train_v9_window": [
+        0.1617,
+        -0.0278,
+        0.3474
+      ],
+      "lambda_val": [
+        -0.0845,
+        -0.3439,
+        0.1561
+      ],
+      "n_train": 9958,
+      "n_val": 762,
+      "sigma_anchored_train": 13.145
+    },
+    "exavail/total": {
+      "corr_val": [
+        -0.0506,
+        -0.13,
+        0.0288
+      ],
+      "g1": "FAIL",
+      "lambda": 0.0,
+      "lambda_train": [
+        -0.0315,
+        -0.1128,
+        0.0442
+      ],
+      "lambda_train_v9_window": [
+        -0.0629,
+        -0.2156,
+        0.1005
+      ],
+      "lambda_val": [
+        -0.2039,
+        -0.5083,
+        0.1016
+      ],
+      "n_train": 9958,
+      "n_val": 762,
+      "sigma_anchored_train": 18.13
+    }
+  },
+  "minutes_model": {
+    "blowout_bench": 0.002013722282862211,
+    "blowout_starter": -0.00651294696300818,
+    "p_play": {
+      "available|*": 0.8187,
+      "available|full": 0.9671,
+      "available|low": 0.6577,
+      "available|mid": 0.9089,
+      "available|zero": 0.5515,
+      "doubtful|*": 0.0191,
+      "doubtful|full": 0.0074,
+      "doubtful|low": 0.0308,
+      "doubtful|mid": 0.0331,
+      "doubtful|zero": 0.0,
+      "out|*": 0.0027,
+      "out|full": 0.0109,
+      "out|low": 0.0028,
+      "out|mid": 0.0013,
+      "out|zero": 0.0012,
+      "probable|*": 0.9198,
+      "probable|full": 0.9517,
+      "probable|low": 0.8719,
+      "probable|mid": 0.9338,
+      "probable|zero": 0.7387,
+      "questionable|*": 0.5304,
+      "questionable|full": 0.5321,
+      "questionable|low": 0.4746,
+      "questionable|mid": 0.5837,
+      "questionable|zero": 0.4283,
+      "unknown|*": 0.6743,
+      "unknown|full": 0.926,
+      "unknown|low": 0.3967,
+      "unknown|mid": 0.6748,
+      "unknown|zero": 0.1317,
+      "unlisted|*": 0.7792,
+      "unlisted|full": 0.9658,
+      "unlisted|low": 0.5035,
+      "unlisted|mid": 0.7633,
+      "unlisted|zero": 0.2113
+    }
+  },
+  "model_version": "nba-player-v10",
+  "note": "lambda ships at 0 for every market/variant that failed G1; not re-tuned on validation.",
+  "rating_params": {
+    "margin": {
+      "half_life_days": 730.0,
+      "ridge": "30.0"
+    },
+    "total": {
+      "half_life_days": 365.0,
+      "ridge": "30.0"
+    }
+  },
+  "report": "outputs/nba/v10_player/G1_PLAYER.md",
+  "serving": "none: not registered, not whitelisted, no champion route; research artifact only",
+  "spec": "outputs/nba/v10_player/PREREG.md",
+  "split": {
+    "train": "2017-10-01 .. < 2025-11-03",
+    "validation": "2025-11-03 .. < 2026-02-23"
+  },
+  "status": "research"
+}
