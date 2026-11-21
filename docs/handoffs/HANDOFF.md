@@ -283,7 +283,12 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
   the DraftKings devig (verified on the 16:00 run) and its only edge is T-B (>= 3.0 points). G2 rules
   pinned and amended before any pick scored (plan section 9). v9 keeps Main with edge sizing; Flat
   calls everything.
-- **Open:** v10 spread rows carry `model_artifact_hash` null for the v9 spread source (totals have
+- **Open:** check that in-window pre-tip runs (games inside 25 min of tip) finish under the 300 s
+  supervisor timeout with no new 429s; script:
+  `C:\Users\Vince\AppData\Local\Temp\claude\3c4e37e4a6ec2934\725cd53a-6904-44cd-9660-1dcec21da8a9\scratchpad\check_inwindow.sh`.
+  If they die, fix that before any modelling. `forward_report.py` does not yet compute the
+  test-A paired player-minus-v9 slope that PREREG_FORWARD.md section 5 requires (needed before
+  400 games). v10 spread rows carry `model_artifact_hash` null for the v9 spread source (totals have
   it); upcoming games are treated as regular season in the forward log (fix before April); 2026
   playoff games are absent from `nba_games_all.jsonl`; a pre-existing 311 s capture run (19:50Z
   11-21) brushed the 300 s supervisor timeout.
