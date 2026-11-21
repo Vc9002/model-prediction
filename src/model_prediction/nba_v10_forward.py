@@ -320,6 +320,75 @@ def _schedule_after_holdout(repo_data: Path, before: str) -> list[dict[str, Any]
     return [g for g in games.values() if int(g["home_id"]) <= 30 and int(g["away_id"]) <= 30]
 
 
+# Nothing scheduled captured current-season ESPN summaries before 2026-11-21 (two manual
+# scripts/backfill_nba_boxscores.py runs, regular season only), so every forward record failed
+# closed on NO_CALL_BOX_FEED_STALE. Each worker run tops up the recent completed games instead.
+BOX_CATCHUP_LOOKBACK = timedelta(days=10)
+BOX_CATCHUP_MAX_FETCH = 12
+BOX_CATCHUP_SLEEP_SECONDS = 0.35
+
+
+def catch_up_boxscores(
+    repo_data: Path,
+    *,
+    now: datetime,
+    deadline: float,
+    fetch_summary: Callable[[str], Mapping[str, Any]] | None = None,
+    lookback: timedelta = BOX_CATCHUP_LOOKBACK,
+    max_fetch: int = BOX_CATCHUP_MAX_FETCH,
+    sleep_seconds: float = BOX_CATCHUP_SLEEP_SECONDS,
+) -> dict[str, Any]:
+    """Fetch ESPN summaries for recently completed NBA games that have no capture file yet.
+
+    Same file shape as ``scripts/backfill_nba_boxscores.py`` (``{event_id, payload}``), all
+    non-preseason game types (play-in and playoffs included), written atomically; never
+    overwrites an existing capture.
+    """
+    captures = repo_data / "availability" / "nba" / "espn_boxscores"
+    missing: list[tuple[datetime, str]] = []
+    for r in _read_jsonl(repo_data / "historical" / "nba_games_all.jsonl"):
+        eid = str(r.get("event_id") or "")
+        if not eid or r.get("status") != "completed" or r.get("season_type") in (None, "preseason"):
+            continue
+        try:
+            start = parse_utc(str(r["event_start_utc"]))
+        except (KeyError, ValueError):
+            continue
+        if not (now - lookback <= start <= now) or (captures / f"{eid}.json").exists():
+            continue
+        missing.append((start, eid))
+    missing = sorted(set(missing), reverse=True)  # newest first: those feed the stale gate
+    summary: dict[str, Any] = {"missing": len(missing), "fetched": 0, "failed": 0}
+    if not missing:
+        return summary
+    if fetch_summary is None:
+        from .data_sources.espn import ESPNClient
+
+        client = ESPNClient()
+
+        def fetch_summary(event_id: str) -> Mapping[str, Any]:
+            return client.summary("NBA", event_id)
+
+    captures.mkdir(parents=True, exist_ok=True)
+    for _, eid in missing[:max_fetch]:
+        if time.monotonic() >= deadline:
+            summary["stopped"] = "deadline"
+            break
+        try:
+            payload = fetch_summary(eid)
+        except Exception:  # one game's failure must not stop the rest; retried next run
+            _logger.warning("nba box catch-up failed for %s", eid, exc_info=True)
+            summary["failed"] += 1
+            continue
+        path = captures / f"{eid}.json"
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"event_id": eid, "payload": payload}), encoding="utf-8")
+        os.replace(tmp, path)
+        summary["fetched"] += 1
+        time.sleep(sleep_seconds)
+    return summary
+
+
 def _capture_boxes(repo_data: Path, out_root: Path, schedule: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Player rows per event from the ESPN summary captures, through a parse cache.
 
@@ -1343,6 +1412,12 @@ def run_forward(
                 cfg.injury_root, now=clock, http_get=http_get, deadline=deadline
             ),
         ),
+    )
+
+    out["boxes"] = None
+    _step(
+        "boxes",
+        lambda: out.__setitem__("boxes", catch_up_boxscores(cfg.repo_data, now=clock(), deadline=deadline)),
     )
 
     start_now = clock()

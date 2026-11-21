@@ -443,3 +443,74 @@ def test_verdict_a_is_pending_below_400_and_uses_only_the_first_400():
     assert rep.verdict_a(obs[:399], as_of)["verdict"] == "PENDING"
     v = rep.verdict_a(obs, as_of)
     assert v["verdict"] == "PASS" and v["n"] == 400 and v["after_evaluation"] == 50
+
+
+# --------------------------------------------------------------------------- box catch-up
+def test_box_catch_up_fetches_recent_missing_games_only(tmp_path):
+    hist = tmp_path / "historical"
+    hist.mkdir()
+    caps = tmp_path / "availability" / "nba" / "espn_boxscores"
+    caps.mkdir(parents=True)
+    (caps / "4.json").write_text('{"event_id": "4", "payload": {"kept": true}}', encoding="utf-8")
+    rows = [
+        {
+            "event_id": "1",
+            "status": "completed",
+            "season_type": "regular-season",
+            "event_start_utc": "2026-11-20T00:30Z",
+        },
+        {
+            "event_id": "2",
+            "status": "completed",
+            "season_type": "postseason",
+            "event_start_utc": "2026-11-19T00:30Z",
+        },
+        {
+            "event_id": "3",
+            "status": "completed",
+            "season_type": "regular-season",
+            "event_start_utc": "2026-11-01T00:30Z",
+        },
+        {
+            "event_id": "4",
+            "status": "completed",
+            "season_type": "regular-season",
+            "event_start_utc": "2026-11-20T00:30Z",
+        },
+        {
+            "event_id": "5",
+            "status": "scheduled",
+            "season_type": "regular-season",
+            "event_start_utc": "2026-11-20T00:30Z",
+        },
+        {
+            "event_id": "6",
+            "status": "completed",
+            "season_type": "preseason",
+            "event_start_utc": "2026-11-20T00:30Z",
+        },
+    ]
+    (hist / "nba_games_all.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    seen: list[str] = []
+
+    def fake(eid):
+        seen.append(eid)
+        if eid == "2":
+            raise OSError("espn down")
+        return {"boxscore": eid}
+
+    out = fwd.catch_up_boxscores(
+        tmp_path,
+        now=_utc("2026-11-21T21:00:00"),
+        deadline=time.monotonic() + 30,
+        fetch_summary=fake,
+        sleep_seconds=0,
+    )
+    assert seen == ["1", "2"]  # newest first; old, existing, unfinished and preseason games skipped
+    assert out == {"missing": 2, "fetched": 1, "failed": 1}
+    assert json.loads((caps / "1.json").read_text(encoding="utf-8")) == {
+        "event_id": "1",
+        "payload": {"boxscore": "1"},
+    }
+    assert not (caps / "2.json").exists()
+    assert json.loads((caps / "4.json").read_text(encoding="utf-8"))["payload"] == {"kept": True}
