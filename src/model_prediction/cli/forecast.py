@@ -5726,6 +5726,7 @@ def _forecast_cfb_sport(
             contract_slug = str(contract.get("market_slug") or "")
             # A challenger contract (cfb-structural-v6.2) carries its own artifact hash; champion rows keep v5's.
             contract_artifact_hash = str(contract.get("model_artifact_hash") or serving_artifact_hash)
+            contract_code_revision = str(contract.get("code_revision") or forecast["model_code_hash"])
             rationale_text = str(contract.get("rationale") or "")
             if contract_sportsbook == "polymarket_us" and contract_slug:
                 rationale_text = f"{rationale_text} Executable ask {ask:.4f} ({contract_slug})."
@@ -5756,7 +5757,7 @@ def _forecast_cfb_sport(
                 calibration_version=m_version,
                 calibration_artifact_hash=contract_artifact_hash,
                 feature_schema_version="cfb-v1",
-                code_revision=str(forecast["model_code_hash"]),
+                code_revision=contract_code_revision,
                 model_input_snapshot_json=cfb_snapshot_json,
                 **(contract.get("market_lineage") or {}),
             )

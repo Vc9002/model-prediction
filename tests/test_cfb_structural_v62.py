@@ -11,7 +11,9 @@ import pytest
 from model_prediction.config import PROJECT_ROOT
 from model_prediction.models.cfb_structural_v6 import load_cfb_structural_v6_artifact
 from model_prediction.models.cfb_structural_v62 import (
+    ANCHOR_MAX_AGE_HOURS,
     ANCHOR_MISSING,
+    ANCHOR_STALE,
     ANCHOR_TIMESTAMPED,
     CFB_V62_MODEL_VERSION,
     Anchor,
@@ -21,6 +23,7 @@ from model_prediction.models.cfb_structural_v62 import (
     load_anchor_index,
     load_cfb_structural_v62_artifact,
     select_max_edge,
+    v62_serving_code_hash,
 )
 from model_prediction.production_registry import compute_artifact_hash
 
@@ -566,6 +569,89 @@ def test_v62_rows_reach_flat_and_research_only_with_their_own_hash(
         assert {r["model_artifact_hash"] for r in challenger} == {model.artifact_hash}
         champion = [r for r in rows if r["model_version"] == "cfb-structural-v5"]
         assert len(champion) == 1 and champion[0]["model_artifact_hash"] not in ("", model.artifact_hash)
+        assert {r["code_revision"] for r in challenger} == {v62_serving_code_hash()}
+        assert champion[0]["code_revision"] == "fixture"
     assert v5_hash["artifact_hash"] == model.artifact_hash
     for tier in ("main", "gated"):
         assert all(r["model_version"] != CFB_V62_MODEL_VERSION for r in ledgers[tier].rows()), tier
+
+
+# ----------------------------------------------------------------------------- operator decisions 2026-11-21
+def _quotes_at(observed: str, sportsbook: str = "polymarket_us") -> EventQuotes:
+    q = _quotes(sportsbook)
+    lineage = {"market_quote_observed_at_utc": observed}
+    return EventQuotes(
+        **{
+            **q.__dict__,
+            "moneyline": {**q.moneyline, "lineage": lineage},
+            "spread": {**q.spread, "lineage": lineage},
+            "total": {**q.total, "lineage": lineage},
+        }
+    )
+
+
+def _contracts_at(model, quotes, anchor, decision):
+    return build_contracts(
+        model,
+        quotes,
+        v6_projected_margin=20.0,
+        v6_projected_total=50.0,
+        is_fbs_vs_fcs=False,
+        sample_games=5,
+        anchor=anchor,
+        decision_time=decision,
+        markets=("moneyline", "spread", "total"),
+    )
+
+
+def test_only_a_captured_book_observed_before_the_decision_is_priced(model: CFBStructuralV62Model) -> None:
+    anchor = _anchor(7.0, 51.0)
+    assert _contracts_at(model, _quotes(), anchor, DECISION)  # the captured book prices
+    assert _contracts_at(model, _quotes("polymarket_us_indicative"), anchor, DECISION) == []
+    assert _contracts_at(model, _quotes("espn_consensus"), anchor, DECISION) == []
+    assert (
+        _contracts_at(model, _quotes_at("2026-11-21T15:00:01+00:00"), anchor, DECISION) == []
+    )  # after decision
+    no_time = EventQuotes(**{**_quotes().__dict__, "moneyline": {**_quotes().moneyline, "lineage": None}})
+    assert all(c["market_type"] != "moneyline" for c in _contracts_at(model, no_time, anchor, DECISION))
+
+
+def test_anchor_older_than_the_cap_is_treated_as_absent_on_an_advancing_clock(
+    tmp_path: Path, model: CFBStructuralV62Model
+) -> None:
+    """One capture record at 02:00; the decision clock advances past the 12 h cap and the row falls back."""
+    from datetime import timedelta
+
+    capture = tmp_path / "capture.jsonl"
+    capture.write_text(_record("e1", "2026-11-21T02:00:00+00:00", -7.0, 51.0) + "\n", encoding="utf-8")
+    seen = datetime(2026, 11, 21, 2, 0, tzinfo=UTC)
+    statuses = []
+    for decision in (
+        seen + timedelta(hours=1),
+        seen + timedelta(hours=ANCHOR_MAX_AGE_HOURS),
+        seen + timedelta(hours=ANCHOR_MAX_AGE_HOURS, seconds=1),
+        seen + timedelta(hours=17),
+    ):
+        anchor = load_anchor_index(capture, decision).get("e1")
+        assert anchor is not None  # the index still sees it; the cap applies at pricing
+        rows = _contracts_at(model, _quotes_at(decision.isoformat()), anchor, decision)
+        assert rows
+        fb = rows[0]["feature_basis"]
+        statuses.append(fb["anchor_status"])
+        if fb["anchor_status"] == ANCHOR_STALE:
+            assert fb["effective_margin_sd"] == pytest.approx(
+                model.v6_margin_sd_table["established"], abs=1e-4
+            )
+            assert fb["anchor_age_hours"] >= ANCHOR_MAX_AGE_HOURS  # rounded to 3 decimals
+            assert "older than 12 h" in rows[0]["rationale"]
+    assert statuses == [ANCHOR_TIMESTAMPED, ANCHOR_TIMESTAMPED, ANCHOR_STALE, ANCHOR_STALE]
+    assert ANCHOR_MAX_AGE_HOURS == 12.0
+
+
+def test_v62_rows_carry_their_own_code_revision(model: CFBStructuralV62Model) -> None:
+    from model_prediction.models.college_football import cfb_serving_code_hash
+
+    rows = _contracts_at(model, _quotes(), _anchor(7.0, 51.0), DECISION)
+    assert rows and {r["code_revision"] for r in rows} == {v62_serving_code_hash()}
+    assert v62_serving_code_hash() != cfb_serving_code_hash()
+    assert len(v62_serving_code_hash()) == 16

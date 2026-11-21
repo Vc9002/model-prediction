@@ -43,11 +43,32 @@ CFB_V62_MODEL_VERSION = "cfb-structural-v6.2"
 CFB_V62_ARTIFACT_PATH = PROJECT_ROOT / "config" / "models" / f"{CFB_V62_MODEL_VERSION}.json"
 ANCHOR_TIMESTAMPED = "timestamped_draftkings"
 ANCHOR_MISSING = "model_only_no_timestamped_anchor"
+ANCHOR_STALE = "model_only_anchor_stale"
+# Operator decision 2026-11-21 (quick-261121-v62 review): a DraftKings line observed more than 12 h before the
+# decision is treated as absent. The daily job captures minutes before it forecasts, so a stale anchor means the
+# capture failed, and a day-old line priced against a live ask manufactures edge.
+ANCHOR_MAX_AGE_HOURS = 12.0
 _DRAFTKINGS_NAMES = frozenset({"draftkings"})
-_POLYMARKET_PROVENANCE = {
-    "polymarket_us": "polymarket_executable_ask",
-    "polymarket_us_indicative": "polymarket_indicative_slate",
-}
+# Operator decision 2026-11-21: v6.2 prices ONLY a captured Polymarket book (an executable ask with its own
+# observation time). The event-list indicative price and ESPN consensus are never a v6.2 price.
+_CAPTURED_BOOK = "polymarket_us"
+_V62_SERVING_SOURCES = (
+    Path(__file__).resolve(),
+    Path(__file__).resolve().parent / "cfb_structural_v6.py",
+    Path(__file__).resolve().parents[1] / "features" / "cfb_features_v6.py",
+    Path(__file__).resolve().parents[1] / "features" / "cfb_team_identity.py",
+)
+
+
+def v62_serving_code_hash() -> str:
+    """16-hex digest of the source files that compute a v6.2 price, so v6.2 rows never carry v5's code_revision."""
+    import hashlib
+
+    digest = hashlib.sha256()
+    for path in _V62_SERVING_SOURCES:
+        digest.update(path.name.encode("utf-8"))
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:16]
 
 
 def load_cfb_structural_v62_artifact(path: str | Path | None = None) -> dict[str, Any]:
@@ -375,6 +396,11 @@ def build_contracts(
     """Max-edge contracts for the routed markets; a market is emitted only when its best edge is above zero."""
     v6_margin, v6_total = model.v6_means(v6_projected_margin, v6_projected_total)
     v6_slice = model.v6_slice(is_fbs_vs_fcs=is_fbs_vs_fcs, sample_games=sample_games)
+    stale_anchor: Anchor | None = None
+    if anchor is not None:
+        age_h = (decision_time - parse_utc(anchor.observed_at_utc)).total_seconds() / 3600.0
+        if age_h > ANCHOR_MAX_AGE_HOURS:
+            stale_anchor, anchor = anchor, None
     spread_line = None if quotes.spread is None else float(quotes.spread["home_line"])
     total_line = None if quotes.total is None else float(quotes.total["line"])
     priced = model.price(
@@ -386,12 +412,15 @@ def build_contracts(
         total_line=total_line,
     )
     pr = priced.probabilities
+    seen = anchor if anchor is not None else stale_anchor
     anchor_age_h = None
-    if anchor is not None:
-        anchor_age_h = round((decision_time - parse_utc(anchor.observed_at_utc)).total_seconds() / 3600.0, 3)
+    if seen is not None:
+        anchor_age_h = round((decision_time - parse_utc(seen.observed_at_utc)).total_seconds() / 3600.0, 3)
+    code_revision = v62_serving_code_hash()
     basis_common: dict[str, Any] = {
         "challenger_of": "cfb-structural-v5",
-        "anchor_status": priced.anchor_status,
+        "anchor_status": ANCHOR_STALE if stale_anchor is not None else priced.anchor_status,
+        "anchor_max_age_hours": ANCHOR_MAX_AGE_HOURS,
         "anchor_observed_at_utc": None if anchor is None else anchor.observed_at_utc,
         "anchor_age_hours": anchor_age_h,
         "anchor_margin_home": None if anchor is None else anchor.margin_home,
@@ -412,7 +441,15 @@ def build_contracts(
         "side_selection": "max_edge",
         "decision_time_utc": decision_time.isoformat(),
     }
-    tag = "model-only (no timestamped anchor)" if anchor is None else "anchor-blended"
+    tag = (
+        "anchor-blended"
+        if anchor is not None
+        else (
+            "model-only (anchor older than 12 h)"
+            if stale_anchor is not None
+            else "model-only (no timestamped anchor)"
+        )
+    )
     contracts: list[dict[str, Any]] = []
 
     def emit(
@@ -423,11 +460,16 @@ def build_contracts(
         q: Mapping[str, Any],
     ):
         selection, prob, ask, edge = pick
-        provenance = _POLYMARKET_PROVENANCE.get(str(q.get("sportsbook")))
-        # Only a Polymarket ask is ever a v6.2 price; a sportsbook consensus number is the anchor's world, not an ask.
-        if edge <= 0 or provenance is None:
+        if edge <= 0 or str(q.get("sportsbook")) != _CAPTURED_BOOK:
             return
-        lineage = q.get("lineage")
+        lineage = q.get("lineage") or {}
+        # A captured book must carry its own observation time, at or before the decision; otherwise emit nothing.
+        try:
+            quote_seen = parse_utc(str(lineage["market_quote_observed_at_utc"]))
+        except (KeyError, TypeError, ValueError):
+            return
+        if quote_seen > decision_time:
+            return
         contracts.append(
             {
                 "event_id": quotes.event_id,
@@ -442,7 +484,7 @@ def build_contracts(
                 "weather_inputs_verified": None,
                 "model_version": CFB_V62_MODEL_VERSION,
                 "model_artifact_hash": model.artifact_hash,
-                "feature_basis": {**basis_common, "quote_provenance": provenance},
+                "feature_basis": {**basis_common, "quote_provenance": "polymarket_executable_ask"},
                 "inference_inputs": None,
                 "rationale": (
                     f"CFB v6.2 challenger ({tag}): fair margin {priced.mu_margin:+.2f}, total {priced.mu_total:.2f}, "
@@ -451,12 +493,9 @@ def build_contracts(
                 ),
                 "market_slug": slug,
                 "executable_ask": float(ask),
-                "observed_at_utc": (
-                    lineage["market_quote_observed_at_utc"]
-                    if lineage and lineage.get("market_quote_observed_at_utc")
-                    else decision_time.isoformat()
-                ),
+                "observed_at_utc": str(lineage["market_quote_observed_at_utc"]),
                 "timestamp_valid": True,
+                "code_revision": code_revision,
                 "edge_vs_executable_ask": round(edge, 6),
                 "sportsbook": str(q["sportsbook"]),
                 "market_lineage": lineage,
