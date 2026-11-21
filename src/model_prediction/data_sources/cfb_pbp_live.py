@@ -532,6 +532,18 @@ def _game_class(rec: Mapping[str, Any], fbs: frozenset[str] | None) -> str:
     return "FBS-FCS" if groups else "UNKNOWN"
 
 
+def _with_game_class(store: Store, parsed: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Label each scanned event FBS-FBS / FBS-FCS / FCS-FCS from its season's class list (feed groups when the
+    list is missing). Informational, like the research rows' ``game_class``: serving labels come from the lists."""
+    lists: dict[int, frozenset[str] | None] = {}
+    for rec in parsed.values():
+        season = int(rec["season"])
+        if season not in lists:
+            lists[season] = read_fbs_teams(store, season)
+        rec["game_class"] = _game_class(rec, lists[season])
+    return parsed
+
+
 def fetch_summary(
     fetcher: Fetcher, store: Store, rec: Mapping[str, Any], game_class: str, now_fn: Callable[[], datetime]
 ) -> dict[str, Any]:
@@ -761,7 +773,7 @@ def _update_locked(
                 report["errors"].append(f"scoreboard {day}: {type(exc).__name__}")
                 continue
             observed = now_fn()
-            parsed = parse_scoreboard_events(payloads, day)
+            parsed = _with_game_class(store, parse_scoreboard_events(payloads, day))
             new_records += _append_jsonl(store.schedule, _schedule_updates(parsed, known, observed))
             key = day.isoformat()
             prev = ledger.get(key) or {}
@@ -951,7 +963,7 @@ def _sweep_season(
             day += timedelta(days=1)
             continue
         observed = now_fn()
-        parsed = parse_scoreboard_events(payloads, day)
+        parsed = _with_game_class(store, parse_scoreboard_events(payloads, day))
         records += _append_jsonl(store.schedule, _schedule_updates(parsed, known, observed))
         ledger[day.isoformat()] = {
             "first_scanned_at_utc": _iso(observed),

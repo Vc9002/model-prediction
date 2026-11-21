@@ -11,6 +11,11 @@ analytic (no RNG). It is registered but not routed: ``challengers.NCAAF`` holds 
 Serving fails closed (``V7NoCall`` with a ``NO_CALL_*`` reason) when a team has no rating history, when a team id is
 unknown, when the artifact's prior uses CFBD and no covariates were supplied, or when a completed current-season game of either team has no play-by-play row yet (the crawl is behind),
 because ratings built on a partial season would silently differ from the ones the artifact was validated on.
+
+Live inputs come from ``RuntimePaths.ncaaf_v7_root``, kept current by the daily step ``step1o_ncaaf_v7_pbp``
+(``data_sources/cfb_pbp_live.py``): ``price_v7_slate(data_root, decision_time, games)`` loads them as of the
+decision time (``load_v7_serving_data``) and prices a slate, one result per game. Refits keep reading the research
+copies (``scripts/cfb_v7_fit.py``).
 """
 
 from __future__ import annotations
