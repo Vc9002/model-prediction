@@ -488,8 +488,9 @@ def log_nba_anchor_v10(
                 # parenthesised token with a dash, so no other dashed token sits in parentheses.
                 f"Market-anchored v10 {market}: anchor {call.anchor_source} observed "
                 f"{call.anchor_observed_at_utc}; model mean {call.model_mean:.1f} from "
-                f"{entry.get('model_source')} at weight {call.lambda_:g}. P({call.side} at "
-                f"{call.contract_line:g}) {_pct(call.probability)} vs ask {_pct(call.ask)}, net edge "
+                f"{entry.get('model_source')} at weight {call.lambda_:g}. P({call.side} "
+                f"{_selection_line(market, call.side, float(entry['contract_line'])):g}) "
+                f"{_pct(call.probability)} vs ask {_pct(call.ask)}, net edge "
                 f"{_pct(call.edge)}; {tb_note}. market_slug={entry.get('market_slug')}"
             ),
             risks=(
