@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
@@ -539,6 +540,9 @@ def test_the_inertness_probe_detects_a_loaded_module() -> None:
 
 
 def test_no_module_under_src_imports_or_names_v6_and_no_config_routes_to_it() -> None:
+    """v6 itself is never routed. Since quick-261121-v62 its frozen ratings serve the cfb-structural-v6.2 CHALLENGER:
+    only cfb_structural_v62.py may import v6, the only other mentions are the v6.2 names (the lazy challenger hook in
+    college_football.py, the qualification map), and config routes v6.2, never bare v6."""
     src = PROJECT_ROOT / "src" / "model_prediction"
     # cfb_structural_v61.py is the inert v6.1 subclass (quick-261115-183): it must name v6 to wrap it, and its own
     # inertness is pinned in tests/test_cfb_structural_v61.py
@@ -546,21 +550,23 @@ def test_no_module_under_src_imports_or_names_v6_and_no_config_routes_to_it() ->
         src / "models" / "cfb_structural_v6.py",
         src / "features" / "cfb_features_v6.py",
         src / "models" / "cfb_structural_v61.py",
+        src / "models" / "cfb_structural_v62.py",
     }
+    bare_v6 = re.compile(r"cfb_structural_v6(?!\d)|cfb_features_v6")
     offenders = [
         str(p.relative_to(PROJECT_ROOT))
         for p in src.rglob("*.py")
-        if p not in own
-        and any(name in p.read_text(encoding="utf-8") for name in ("cfb_structural_v6", "cfb_features_v6"))
+        if p not in own and bare_v6.search(p.read_text(encoding="utf-8"))
     ]
     assert offenders == []
     learned_forward = (src / "learned_forward.py").read_text(encoding="utf-8")
     for name in ("cfb_structural_v6", "cfb_features_v6", "cfb-structural-v6"):
         assert name not in learned_forward
+    bare_v6_id = re.compile(r"cfb-structural-v6(?![.\d])|cfb_structural_v6(?!\d)")
     for rel in ("config/production.yaml", "config/model.yaml"):
         text = (PROJECT_ROOT / rel).read_text(encoding="utf-8")
-        assert "cfb-structural-v6" not in text and "cfb_structural_v6" not in text, rel
-        assert "cfb-structural-v6" not in json.dumps(yaml.safe_load(text)), rel
+        assert not bare_v6_id.search(text), rel
+        assert not bare_v6_id.search(json.dumps(yaml.safe_load(text))), rel
 
 
 def test_v6_feature_module_imports_nothing_from_the_v5_feature_module() -> None:

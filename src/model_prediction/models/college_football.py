@@ -652,6 +652,7 @@ def build_cfb_slate(
     observed_at: datetime | None = None,
     model: CFBStructuralV4Model | None = None,
     polymarket_events: list[dict[str, Any]] | None = None,
+    price_challenger: bool | None = None,
 ) -> dict[str, Any]:
     """Build prospective slate for College Football (Moneyline, Spread, Total).
 
@@ -662,6 +663,9 @@ def build_cfb_slate(
     Polymarket event list's indicative price, ESPN's sportsbook consensus. The event
     list is fetched live when ``client`` is None (production); ``polymarket_events``
     supplies one already observed no later than ``observed_at``.
+
+    ``price_challenger`` (default: production only, i.e. ``client`` is None) also prices the routed NCAAF
+    challenger (cfb-structural-v6.2) and appends its contracts after the champion's.
     """
     from ..data_sources.espn import ESPNClient
     from ..features.cfb_qb_availability import (
@@ -748,6 +752,7 @@ def build_cfb_slate(
     priced_contracts: list[dict[str, Any]] = []
     unmatched: list[dict[str, Any]] = []
     candidate_bases: list[dict[str, Any]] = []
+    challenger_events: list[dict[str, Any]] = []
 
     for ev in events:
         competition = (ev.get("competitions") or [{}])[0]
@@ -835,6 +840,46 @@ def build_cfb_slate(
                 if tot_sportsbook == "polymarket_us"
                 else _indicative_quote_lineage(listed_observed.isoformat())
             )
+
+        # The v6.2 challenger is priced against these Polymarket quotes only (never ESPN consensus).
+        challenger_events.append(
+            {
+                "event_id": event_id,
+                "event_start_utc": event_start_utc,
+                "away_team": away_team,
+                "home_team": home_team,
+                "is_neutral_site": is_neutral,
+                "moneyline": None
+                if pm_ml_home_prob is None or pm_ml is None
+                else {
+                    "home_ask": pm_ml_home_prob,
+                    "away_ask": pm_ml_away_prob,
+                    "slug_base": str(pm_ml.get("market_slug")),
+                    "sportsbook": ml_sportsbook,
+                    "lineage": pm_ml_lineage,
+                },
+                "spread": None
+                if pm_sp is None
+                else {
+                    "home_line": pm_spread_home_line,
+                    "home_ask": pm_spread_home_prob,
+                    "away_ask": pm_spread_away_prob,
+                    "slug": str(pm_sp.get("market_slug")),
+                    "sportsbook": sp_sportsbook,
+                    "lineage": pm_spread_lineage,
+                },
+                "total": None
+                if pm_tot is None
+                else {
+                    "line": pm_total_line,
+                    "over_ask": pm_total_over_prob,
+                    "under_ask": pm_total_under_prob,
+                    "slug": str(pm_tot.get("market_slug")),
+                    "sportsbook": tot_sportsbook,
+                    "lineage": pm_total_lineage,
+                },
+            }
+        )
 
         # 3b. Extract fallback sportsbook odds if available from ESPN
         odds_list = competition.get("odds", [])
@@ -1346,6 +1391,22 @@ def build_cfb_slate(
         except Exception as exc:  # noqa: BLE001
             candidate_capture = {"status": "capture_error", "reason": f"{type(exc).__name__}: {exc}"}
 
+    # Challenger (quick-261121-v62): v6.2 contracts are appended AFTER the champion's and after the candidate
+    # evidence, so v5's contracts and evidence are untouched; _forecast_cfb_sport sends any version outside
+    # v2-v5 to the research and Flat tiers only. A challenger failure never blocks the champion.
+    challenger_pricing: dict[str, Any] = {"status": "not_requested"}
+    if (client is None) if price_challenger is None else price_challenger:
+        try:
+            from .cfb_structural_v62 import price_challenger_slate
+
+            challenger_contracts, challenger_pricing = price_challenger_slate(root, obs, challenger_events)
+            priced_contracts.extend(challenger_contracts)
+        except Exception as exc:
+            import logging
+
+            logging.getLogger(__name__).warning("NCAAF v6.2 challenger pricing failed", exc_info=True)
+            challenger_pricing = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+
     return {
         "game_date": iso_date,
         "sport": "ncaaf",
@@ -1353,6 +1414,7 @@ def build_cfb_slate(
         "status": "research",
         "model_version": MODEL_VERSION,
         "model_code_hash": code_hash,
+        "challenger_pricing": challenger_pricing,
         "priced_contracts": priced_contracts,
         "unmatched_events": unmatched,
         "event_count": len(events),

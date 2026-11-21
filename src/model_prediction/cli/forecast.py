@@ -5724,6 +5724,8 @@ def _forecast_cfb_sport(
             )
             contract_sportsbook = str(contract.get("sportsbook") or "espn_consensus")
             contract_slug = str(contract.get("market_slug") or "")
+            # A challenger contract (cfb-structural-v6.2) carries its own artifact hash; champion rows keep v5's.
+            contract_artifact_hash = str(contract.get("model_artifact_hash") or serving_artifact_hash)
             rationale_text = str(contract.get("rationale") or "")
             if contract_sportsbook == "polymarket_us" and contract_slug:
                 rationale_text = f"{rationale_text} Executable ask {ask:.4f} ({contract_slug})."
@@ -5749,10 +5751,10 @@ def _forecast_cfb_sport(
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_enabled=model_enabled(model_config),
                 observed_at_utc=contract_obs,
-                model_artifact_hash=serving_artifact_hash,
+                model_artifact_hash=contract_artifact_hash,
                 calibration_method="cfb_key_number_engine",
                 calibration_version=m_version,
-                calibration_artifact_hash=serving_artifact_hash,
+                calibration_artifact_hash=contract_artifact_hash,
                 feature_schema_version="cfb-v1",
                 code_revision=str(forecast["model_code_hash"]),
                 model_input_snapshot_json=cfb_snapshot_json,

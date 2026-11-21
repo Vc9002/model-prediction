@@ -594,6 +594,16 @@ prediction_service:
     evidence_status: degraded
     replacement_priority: low
     rollback_model: null
+  - model_id: cfb-structural-v6.2
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v6.2.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: unverified
+    replacement_priority: low
+    rollback_model: null
   - model_id: cs2-tiered-elo-v6
     sport: CS2
     market: moneyline
@@ -994,9 +1004,9 @@ prediction_service:
       spread: wnba-spread-structural-v3
       total: wnba-total-possession-v3
     NCAAF:
-      moneyline: null
-      spread: null
-      total: null
+      moneyline: cfb-structural-v6.2
+      spread: cfb-structural-v6.2
+      total: cfb-structural-v6.2
     NBA: {}
     NFL:
       moneyline: null
@@ -1007,19 +1017,19 @@ prediction_service:
     market: moneyline
     incumbent: cfb-structural-v5
     replacement_priority: low
-    challenger: null
+    challenger: cfb-structural-v6.2
     evidence_status: predictively_qualified
   - sport: NCAAF
     market: spread
     incumbent: cfb-structural-v5
     replacement_priority: low
-    challenger: null
+    challenger: cfb-structural-v6.2
     evidence_status: predictively_qualified
   - sport: NCAAF
     market: total
     incumbent: cfb-structural-v5
     replacement_priority: low
-    challenger: null
+    challenger: cfb-structural-v6.2
     evidence_status: predictively_qualified
   - sport: MLB
     market: total
@@ -1172,6 +1182,7 @@ prediction_service:
   - cfb-structural-v2
   - cfb-spread-v1
   - cfb-total-v1
+  - cfb-structural-v6.2
   - cs2-tiered-elo-v6
   - dota2-tiered-elo-v6
   - lol-tiered-elo-v6
@@ -1249,6 +1260,7 @@ prediction_service:
     cfb-structural-v2: config/models/cfb-structural-v2.json
     cfb-spread-v1: config/models/cfb-spread-v1.json
     cfb-total-v1: config/models/cfb-total-v1.json
+    cfb-structural-v6.2: config/models/cfb-structural-v6.2.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
     dota2-tiered-elo-v6: config/models/dota2-tiered-elo-v6.json
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json

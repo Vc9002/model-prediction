@@ -99,11 +99,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 90
+    # 2026-11-21 (quick-261121-v62): +1 enabled entry, the cfb-structural-v6.2 NCAAF challenger.
+    assert len(registry.entries) == 91
     # Scope 2026-11-13: the 40 entries for switched-off sports are enabled: false and
     # therefore unavailable by decision, not by a failed contract. Every in-scope entry
     # must still resolve, so a healthy registry has zero *failed* entries.
-    assert len(registry.available_entries()) == 50
+    assert len(registry.available_entries()) == 51
     problems = registry.problem_entries()
     assert len(problems) == 40
     assert all(not e.enabled and e.load_error is None for e in problems)
@@ -138,6 +139,11 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert registry.champion("NCAAF", "spread").model_id == "cfb-structural-v5"
     assert registry.lifecycle_contract("NCAAF", "spread").rollback_model_id == "cfb-structural-v4"
     assert registry.champion("NCAAF", "total").model_id == "cfb-structural-v5"
+    # The v6.2 challenger is routed for all three NCAAF markets; the champion is untouched (quick-261121-v62).
+    for market in ("moneyline", "spread", "total"):
+        assert registry.challenger("NCAAF", market).model_id == "cfb-structural-v6.2"
+        assert registry.lifecycle_contract("NCAAF", market).challenger_model_id == "cfb-structural-v6.2"
+    assert registry.entries["cfb-structural-v6.2"].serving_status == "shadow"
     assert registry.lifecycle_contract("NCAAF", "total").rollback_model_id == "cfb-structural-v4"
     assert registry.champion("MLB", "spread").model_id == "mlb-structural-runline-v4"
     assert registry.champion("MLB", "spread").rollback_model == "measured-edge-margin-v3"

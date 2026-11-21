@@ -41,6 +41,7 @@ def _is_challenger_implemented(chall_id: str | None) -> bool:
         return False
     mappings = {
         "cfb-structural-v2": "model_prediction.models.cfb_structural_v2",
+        "cfb-structural-v6.2": "model_prediction.models.cfb_structural_v62",
         "mlb-structural-runline-v4": "model_prediction.models.mlb_runline_v4",
         "wnba-spread-structural-v3": "model_prediction.models.wnba_structural_v3",
         "wnba-total-possession-v3": "model_prediction.models.wnba_structural_v3",
