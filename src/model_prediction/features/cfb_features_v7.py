@@ -29,6 +29,7 @@ Fail closed: a team with neither a previous-season final nor an admitted current
 from __future__ import annotations
 
 import math
+import statistics
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -143,6 +144,44 @@ def decision_time_for(kickoff: datetime) -> datetime:
 
 def admitted(kickoff: datetime, decision: datetime) -> bool:
     return kickoff + timedelta(hours=RESULT_BUFFER_HOURS) <= decision
+
+
+# ------------------------------------------------------------------------------------------------ CFBD covariates
+# Preseason covariates (CFBD team_season_priors.jsonl field names). portal IN is never read: its destination is
+# as-of-fetch and leaks post-kickoff commitments; the current-season talent composite has no publication date.
+CFBD_FIELDS: dict[str, str] = {
+    "ret": "returning_off_ppa_pct",
+    "tal": "talent_prev_season",
+    "rec": "recruiting_points_4yr_weighted",
+    "pout": "portal_out_stars_sum",
+}
+CFBD_MIN_TEAMS = 20
+
+
+def standardise_covariates(season_rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, float]]:
+    """ESPN team id -> z-scored covariates for ONE season's CFBD prior rows (all preseason values).
+
+    A field with fewer than 20 non-null teams, or no spread, is dropped; a team's missing field is absent (the
+    prior reads it as 0, the season mean)."""
+    teams: dict[str, dict[str, float]] = {}
+    for r in season_rows:
+        tid = r.get("espn_team_id")
+        if not tid:
+            continue
+        teams[str(tid)] = {k: float(r[src]) for k, src in CFBD_FIELDS.items() if r.get(src) is not None}
+    z: dict[str, dict[str, float]] = {t: {} for t in teams}
+    for k in CFBD_FIELDS:
+        vals = [v[k] for v in teams.values() if k in v]
+        if len(vals) < CFBD_MIN_TEAMS:
+            continue
+        mean = statistics.fmean(vals)
+        sd = statistics.pstdev(vals)
+        if sd <= 0:
+            continue
+        for t, v in teams.items():
+            if k in v:
+                z[t][k] = (v[k] - mean) / sd
+    return z
 
 
 # ------------------------------------------------------------------------------------------------ parameters

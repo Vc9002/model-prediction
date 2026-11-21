@@ -66,7 +66,7 @@ TRAIN_END = "2022-11-11"
 VAL_END = "2024-11-14"
 PRIOR_FIT_LAST_SEASON = 2021  # finals of seasons <= 2021 end before TRAIN_END (bowls in Jan 2022)
 MIN_GAMES_FOR_PRIOR_FIT = 6
-LAMBDA_MULTIPLIERS = (0.5, 1.0, 2.0)
+LAMBDA_MULTIPLIERS = (0.25, 0.5, 1.0, 2.0)  # 0.25 added after 0.5 won at the grid edge (validation only)
 HALF_LIVES: tuple[float | None, ...] = (None, 45.0)
 FEATURE_SETS: dict[str, tuple[str, ...]] = {
     "full": ("e_sr", "e_ypp", "e_exp", "e_ppd", "e_pts", "e_plays", "e_to"),
@@ -249,39 +249,14 @@ def load_cfbd_covariates() -> dict[int, dict[str, dict[str, float]]]:
     current-season composite has no known publication date), rec = recruiting_points_4yr_weighted, pout =
     portal_out_stars_sum (point-in-time on transferDate; 2021+ only). portal IN is never used: its destination is
     as-of-fetch and leaks post-kickoff commitments. Every CFBD value is current-revised (as_published_verified
-    false); 2026 was fetched mid-season."""
-    fields = {
-        "ret": "returning_off_ppa_pct",
-        "tal": "talent_prev_season",
-        "rec": "recruiting_points_4yr_weighted",
-        "pout": "portal_out_stars_sum",
-    }
-    raw: dict[int, dict[str, dict[str, float]]] = defaultdict(dict)
+    false); 2026 was fetched mid-season. The standardisation is the rating core's (shared with serving)."""
+    by_season: dict[int, list[dict[str, Any]]] = defaultdict(list)
     with CFBD_PRIORS.open(encoding="utf-8") as f:
         for ln in f:
-            if not ln.strip():
-                continue
-            r = json.loads(ln)
-            tid = r.get("espn_team_id")
-            if not tid:
-                continue
-            vals = {k: float(r[src]) for k, src in fields.items() if r.get(src) is not None}
-            raw[int(r["season"])][str(tid)] = vals
-    out: dict[int, dict[str, dict[str, float]]] = {}
-    for season, teams in raw.items():
-        z: dict[str, dict[str, float]] = {t: {} for t in teams}
-        for k in fields:
-            vals = [v[k] for v in teams.values() if k in v]
-            if len(vals) < 20:
-                continue
-            m, sd = statistics.fmean(vals), statistics.pstdev(vals)
-            if sd <= 0:
-                continue
-            for t, v in teams.items():
-                if k in v:
-                    z[t][k] = (v[k] - m) / sd
-        out[season] = z
-    return out
+            if ln.strip():
+                r = json.loads(ln)
+                by_season[int(r["season"])].append(r)
+    return {season: core.standardise_covariates(rows) for season, rows in by_season.items()}
 
 
 def estimate_prior(
@@ -526,7 +501,8 @@ def walk_combo(args: tuple[str, float, float | None]) -> dict[str, Any]:
 
 
 def cmd_walk(args: argparse.Namespace) -> int:
-    combos = [(a, m, h) for a in args.arms.split(",") for m in LAMBDA_MULTIPLIERS for h in HALF_LIVES]
+    mults = [float(x) for x in args.mults.split(",")] if args.mults else list(LAMBDA_MULTIPLIERS)
+    combos = [(a, m, h) for a in args.arms.split(",") for m in mults for h in HALF_LIVES]
     if args.only:
         combos = [c for c in combos if combo_key(c[1], c[2], c[0]) == args.only]
     WORK.mkdir(parents=True, exist_ok=True)
@@ -873,6 +849,7 @@ RULE: dict[str, Any] = {
     },
     "bootstrap": "paired v7 - v5 deltas, resampling game dates (2000 resamples, seed 11), 95% percentile CI",
     "gate_beats_v5_on_outcomes": {
+        "applies_to": "each scored v7 arm (selected and alt) separately, v7 minus v5 on the same games",
         "coverage": "v7 calls >= 97% of the holdout v5 rows",
         "significant_improvement": "margin MAE delta CI high < 0, or moneyline log loss delta CI high < 0",
         "no_point_regression": {
@@ -881,9 +858,15 @@ RULE: dict[str, Any] = {
             "ml_log_loss_at_most": 0.0015,
         },
         "verdict": {
-            "PASS -> WIRE AS CHALLENGER": "coverage and significant_improvement and no_point_regression",
-            "FAILED": "margin MAE delta CI low > 0, or moneyline Brier delta CI low > 0 (v7 significantly worse)",
-            "RESEARCH ONLY": "otherwise",
+            "PASS -> WIRE AS CHALLENGER": (
+                "the CORE arm (no CFBD) passes coverage, significant_improvement and no_point_regression; the "
+                "CFBD arm is packaged only if it passes as well, otherwise the core arm is packaged"
+            ),
+            "FAILED": "core arm: margin MAE delta CI low > 0, or moneyline Brier delta CI low > 0 (significantly worse)",
+            "RESEARCH ONLY": (
+                "otherwise; if only the CFBD arm passes, RESEARCH ONLY (its gain cannot be separated from "
+                "current-revised CFBD values, which are also current-revised in the validation seasons)"
+            ),
         },
     },
     "secondary_reported_not_gating": [
@@ -902,6 +885,18 @@ RULE: dict[str, Any] = {
         "totals": "same four on totals",
         "MARKET_SKILL_if": "orthogonalised slope CI low > 0 AND corr CI low > 0 (per market); else NO_MARKET_SKILL",
     },
+    "grid_history": (
+        "lambda multipliers started at (0.5, 1, 2); 0.5 won on validation at the grid edge, so 0.25 was added "
+        "before this pin (0.5 still won). The half-life grid (none, 45 days) was NOT extended although 45 won: the "
+        "validation difference between them is about 0.015 points of margin MAE. Every grid change happened on "
+        "train/validation numbers only; the holdout was unread."
+    ),
+    "pre_read_steps": (
+        "v5 reproduction (`v5repro`, no v7 file opened) must pass; the consensus pmf is fit on train and stored in "
+        "the spec before the pin; the identical scoring path runs once on validation (`dryrun`); script, spec, "
+        "prior files, the v5 reproduction and this rule are committed and unmodified; the read marker is written "
+        "immediately before the first holdout file is opened."
+    ),
     "cfbd_arm": (
         "The CFBD preseason prior landed before this pin, so core and CFBD arms compete on validation and the holdout "
         "is read once for both (selected arm gates; the other family is reported as v7_alt). CFBD values are "
@@ -1306,61 +1301,95 @@ def consensus_probs(
     return out
 
 
-def cmd_holdout(args: argparse.Namespace) -> int:
-    if HOLDOUT_MARK.exists():
-        raise SystemExit(f"holdout already read: {HOLDOUT_MARK.read_text(encoding='utf-8')}")
-    pinned = json.loads(RULE_PATH.read_text(encoding="utf-8"))
-    sha = rule_sha256()
-    if pinned["rule_sha256"] != sha or args.rule_sha != sha or pinned["rule"] != RULE:
-        raise SystemExit("pinned rule sha256 mismatch")
-    if not _committed_unmodified(RULE_PATH):
-        raise SystemExit("pinned rule file is not committed or has local changes")
-    spec = json.loads(SPEC.read_text(encoding="utf-8"))
-    if pinned["spec_sha256"] != file_sha256(SPEC):
-        raise SystemExit("spec changed after the pin")
-    combo = spec["selected"]["combo"]
-    for p in sorted(WORK.glob("walk_*.holdout.jsonl")):
-        if pinned["holdout_walk_files_sha256"].get(p.name) != file_sha256(p):
-            raise SystemExit(f"holdout walk file {p.name} changed after the pin")
-    if CFBD_LINES.exists() and pinned["cfbd_lines_sha256"] != file_sha256(CFBD_LINES):
-        raise SystemExit("CFBD lines changed after the pin")
-    mark = {
-        "read_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "rule_sha256": sha,
-        "head": _git("rev-parse", "HEAD"),
-        "cfbd_present_at_read": CFBD_DIR.is_dir() and any(CFBD_DIR.iterdir()),
-    }
-    HOLDOUT_MARK.write_text(json.dumps(mark, indent=2) + "\n", encoding="utf-8")
+V5_REPRO = OUT / "cfb_v7_v5_repro.json"
+DRYRUN_JSON = WORK / "dryrun_validation_report.json"
+DRYRUN_MD = WORK / "dryrun_validation_report.md"
 
+
+def cmd_v5repro(_: argparse.Namespace) -> int:
+    """v5 on every holdout replay row (no v7 file is opened). Its holdout numbers are already published in the v5
+    recheck, so this is a reproduction, not a v7 read; ``holdout`` refuses to run unless it passed."""
     lines = load_lines()
-    evals = {r["event_id"]: r for r in load_eval_rows()}
-    v5_hold = [r for r in evals.values() if window_of(r["date"]) == "holdout"]
-    v5_hold.sort(key=lambda r: (r["start_utc"], r["event_id"]))
-    # ---- 1. v5 reproduction on every holdout replay row
-    v5_all = v5_arm(v5_hold, lines)
-    games_all = [
-        {"date": r["date"], "margin": r["margin"], "total": r["total"], "v5": v}
-        for r, v in zip(v5_hold, v5_all, strict=True)
-    ]
-    rep_v5 = arm_summary(games_all, "v5")
-    req = RULE["v5_reproduction_required"]
-    repro_ok = (
-        rep_v5["n"] == req["n"]
-        and abs(rep_v5["margin_mae"] - req["margin_mae"][0]) <= req["margin_mae"][1]
-        and abs(rep_v5["ml_brier"] - req["ml_brier"][0]) <= req["ml_brier"][1]
+    v5_hold = sorted(
+        (r for r in load_eval_rows() if window_of(r["date"]) == "holdout"),
+        key=lambda r: (r["start_utc"], r["event_id"]),
     )
-    v5_by_id = {r["event_id"]: v for r, v in zip(v5_hold, v5_all, strict=True)}
-    # ---- 2. v7 on the holdout
-    walk_tv = load_walk(combo)
-    tr_called = called([r for r in walk_tv if r["window"] == "train"])
-    hold = load_walk(combo, holdout=True)
-    hold_called = called(hold)
-    s2, pmf, tsd = spec["stage2"], spec["margin_pmf"], spec["total_sds"]
-    pr = v7_probabilities(hold_called, s2, pmf, tsd)
+    vals = v5_arm(v5_hold, lines)
+    games = [
+        {"date": r["date"], "margin": r["margin"], "total": r["total"], "v5": v}
+        for r, v in zip(v5_hold, vals, strict=True)
+    ]
+    got = arm_summary(games, "v5")
+    req = RULE["v5_reproduction_required"]
+    ok = (
+        got["n"] == req["n"]
+        and abs(got["margin_mae"] - req["margin_mae"][0]) <= req["margin_mae"][1]
+        and abs(got["ml_brier"] - req["ml_brier"][0]) <= req["ml_brier"][1]
+    )
+    V5_REPRO.write_text(
+        json.dumps(
+            {
+                "got": got,
+                "required": req,
+                "pass": ok,
+                "per_event": {r["event_id"]: v for r, v in zip(v5_hold, vals, strict=True)},
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    print("v5 reproduction", "PASS" if ok else "FAIL", got)
+    return 0 if ok else 1
+
+
+def cmd_consensus(_: argparse.Namespace) -> int:
+    """Train-only fit of the consensus baseline's cover-balanced keyed pmf, stored in the spec before the pin."""
+    spec = json.loads(SPEC.read_text(encoding="utf-8"))
+    tr = called([r for r in load_walk(spec["selected"]["combo"]) if r["window"] == "train"])
+    spec["consensus_pmf"] = consensus_fit(tr, load_lines())
+    SPEC.write_text(json.dumps(spec, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print("consensus pmf", spec["consensus_pmf"]["sd_coef"], spec["consensus_pmf"]["train_lined_n"])
+    return 0
+
+
+def gate_for(pv: dict[str, Any], coverage: float) -> dict[str, Any]:
+    g = RULE["gate_beats_v5_on_outcomes"]["no_point_regression"]
+    checks = {
+        "coverage": coverage >= 0.97,
+        "significant_improvement": pv["margin_mae"]["ci_95"][1] < 0 or pv["ml_log_loss"]["ci_95"][1] < 0,
+        "no_point_regression": (
+            pv["margin_mae"]["delta"] <= g["margin_mae_at_most"]
+            and pv["ml_brier"]["delta"] <= g["ml_brier_at_most"]
+            and pv["ml_log_loss"]["delta"] <= g["ml_log_loss_at_most"]
+        ),
+    }
+    return {
+        "checks": checks,
+        "pass": all(checks.values()),
+        "significantly_worse": pv["margin_mae"]["ci_95"][0] > 0 or pv["ml_brier"]["ci_95"][0] > 0,
+    }
+
+
+def score_window(window: str, spec: dict[str, Any], v5_by_id: dict[str, Any]) -> dict[str, Any]:
+    """Scores every arm on ``window`` (validation for the dry run, holdout for the one read)."""
+    lines = load_lines()
+    cfbd = load_cfbd_lines()
+    evals = {r["event_id"]: r for r in load_eval_rows()}
+    n_v5 = sum(1 for r in evals.values() if window_of(r["date"]) == window)
+
+    def rows_of(combo: str) -> list[dict[str, Any]]:
+        if window == "holdout":
+            return load_walk(combo, holdout=True)
+        return [r for r in load_walk(combo) if r["window"] == window]
+
+    rows = rows_of(spec["selected"]["combo"])
+    rows_called = called(rows)
+    pr = v7_probabilities(rows_called, spec["stage2"], spec["margin_pmf"], spec["total_sds"])
     alt_by_id: dict[str, Any] = {}
-    if spec.get("alt"):
-        alt = spec["alt"]
-        alt_rows = called(load_walk(alt["candidate"]["combo"], holdout=True))
+    alt = spec.get("alt")
+    if alt:
+        alt_rows = called(rows_of(alt["candidate"]["combo"]))
         pa = v7_probabilities(alt_rows, alt["stage2"], alt["margin_pmf"], alt["total_sds"])
         for i, r in enumerate(alt_rows):
             alt_by_id[r["event_id"]] = {
@@ -1368,11 +1397,10 @@ def cmd_holdout(args: argparse.Namespace) -> int:
                 "tot": float(pa["tot"][i]),
                 "p": float(pa["p_home"][i]),
             }
-    cfit = consensus_fit(tr_called, lines)
-    cons = consensus_probs(hold_called, lines, cfit)
-    cfbd = load_cfbd_lines()
+    cfit = spec["consensus_pmf"]
+    cons = consensus_probs(rows_called, lines, cfit)
     games = []
-    for i, r in enumerate(hold_called):
+    for i, r in enumerate(rows_called):
         ev = evals[r["event_id"]]
         ln = lines.get(r["event_id"]) or {}
         cb = cfbd.get(r["event_id"]) or {}
@@ -1406,13 +1434,13 @@ def cmd_holdout(args: argparse.Namespace) -> int:
         "postseason": [g for g in games if g["band"] == "postseason"],
         "fbs_vs_fbs": [g for g in games if not g["fcs"]],
         "fbs_vs_fcs": [g for g in games if g["fcs"]],
-        "seasons_2024_2025": [g for g in games if g["season"] <= 2025],
-        "season_2026": [g for g in games if g["season"] == 2026],
         "lined_all": [g for g in games if g["consensus"] is not None],
         "lined_weeks_0_4": [g for g in games if g["consensus"] is not None and g["band"] == "weeks_0_4"],
         "cfbd_lined": [g for g in games if g["cfbd_close"] is not None],
         "opener_lined": [g for g in games if g["opener"] is not None],
     }
+    for season in sorted({g["season"] for g in games}):
+        subsets[f"season_{season}"] = [g for g in games if g["season"] == season]
     outcomes: dict[str, Any] = {}
     for name, sub in subsets.items():
         blk: dict[str, Any] = {
@@ -1442,43 +1470,42 @@ def cmd_holdout(args: argparse.Namespace) -> int:
         arm: {m: market_block(games, arm, m, source="cfbd") for m in ("spread", "total")}
         for arm in arms_present
     }
-    # ---- 3. pinned gate
-    g = RULE["gate_beats_v5_on_outcomes"]
-    pv = outcomes["all"]["paired_v7_minus_v5"]
-    coverage = len(hold_called) / max(1, len(v5_hold))
-    checks = {
-        "v5_reproduced": repro_ok,
-        "coverage": coverage >= 0.97,
-        "significant_improvement": pv["margin_mae"]["ci_95"][1] < 0 or pv["ml_log_loss"]["ci_95"][1] < 0,
-        "no_point_regression": (
-            pv["margin_mae"]["delta"] <= g["no_point_regression"]["margin_mae_at_most"]
-            and pv["ml_brier"]["delta"] <= g["no_point_regression"]["ml_brier_at_most"]
-            and pv["ml_log_loss"]["delta"] <= g["no_point_regression"]["ml_log_loss_at_most"]
-        ),
-    }
-    worse = pv["margin_mae"]["ci_95"][0] > 0 or pv["ml_brier"]["ci_95"][0] > 0
-    if not checks["v5_reproduced"]:
-        verdict = "INVALID (v5 not reproduced)"
-    elif checks["coverage"] and checks["significant_improvement"] and checks["no_point_regression"]:
+    # ---- pinned gate: core must pass; the CFBD arm is packaged only if it passes too
+    coverage = len(rows_called) / max(1, n_v5)
+    gates = {"v7": gate_for(outcomes["all"]["paired_v7_minus_v5"], coverage)}
+    if alt_by_id:
+        gates["v7_alt"] = gate_for(outcomes["all"]["paired_v7_alt_minus_v5"], coverage)
+    arm_of = {"v7": spec["selected"]["arm"], "v7_alt": (alt or {}).get("candidate", {}).get("arm")}
+    core_key = next((k for k in gates if arm_of[k] == "core"), None)
+    cfbd_key = next((k for k in gates if arm_of[k] not in (None, "core")), None)
+    package = None
+    if core_key is None:
+        verdict = "INVALID (no core arm scored)"
+    elif gates[core_key]["pass"]:
         verdict = "PASS -> WIRE AS CHALLENGER"
-    elif worse:
+        package = cfbd_key if cfbd_key is not None and gates[cfbd_key]["pass"] else core_key
+    elif gates[core_key]["significantly_worse"]:
         verdict = "FAILED"
     else:
         verdict = "RESEARCH ONLY"
-    report = {
-        "as_of_utc": mark["read_at_utc"],
-        "holdout_read": mark,
-        "rule_sha256": sha,
+        if cfbd_key is not None and gates[cfbd_key]["pass"]:
+            verdict += (
+                " (only the CFBD arm passed; its gain cannot be separated from current-revised CFBD values)"
+            )
+    return {
+        "window": window,
         "spec_selected": spec["selected"],
+        "alt_candidate": (alt or {}).get("candidate"),
         "counts": {
-            "v5_holdout_rows": len(v5_hold),
-            "v7_holdout_rows": len(hold),
-            "v7_called": len(hold_called),
-            "v7_no_call": len(hold) - len(hold_called),
-            "no_facts": len(v5_hold) - len(hold),
+            "v5_rows": n_v5,
+            "v7_rows": len(rows),
+            "v7_called": len(rows_called),
+            "v7_no_call": len(rows) - len(rows_called),
+            "no_facts": n_v5 - len(rows),
             "lined_spread_and_total": len(subsets["lined_all"]),
+            "cfbd_lined": len(subsets["cfbd_lined"]),
+            "opener_lined": len(subsets["opener_lined"]),
         },
-        "v5_reproduction": {"got": rep_v5, "required": req, "pass": repro_ok},
         "consensus_fit_train": cfit,
         "outcomes": outcomes,
         "favourite_buckets": fav,
@@ -1486,15 +1513,79 @@ def cmd_holdout(args: argparse.Namespace) -> int:
         "market_weeks_0_4": market_early,
         "market_vs_cfbd_close": market_cfbd,
         "gate": {
-            "checks": checks,
-            "v7_significantly_worse": worse,
+            "per_arm": gates,
+            "arm_of": arm_of,
+            "core_arm": core_key,
+            "cfbd_arm": cfbd_key,
             "coverage": round(coverage, 4),
             "verdict": verdict,
+            "package_arm": package,
+            "package_arm_prior": arm_of.get(package) if package else None,
         },
+    }
+
+
+def cmd_dryrun(_: argparse.Namespace) -> int:
+    """The holdout scoring and report path run on VALIDATION rows (no mark, no holdout file opened)."""
+    spec = json.loads(SPEC.read_text(encoding="utf-8"))
+    lines = load_lines()
+    v5_rows = [r for r in load_eval_rows() if window_of(r["date"]) == "validation"]
+    v5_by_id = {r["event_id"]: v for r, v in zip(v5_rows, v5_arm(v5_rows, lines), strict=True)}
+    rep = score_window("validation", spec, v5_by_id)
+    rep["holdout_read"] = {
+        "read_at_utc": "DRY RUN (validation)",
+        "head": _git("rev-parse", "HEAD"),
+        "cfbd_present_at_read": True,
+    }
+    rep["rule_sha256"] = rule_sha256()
+    rep["v5_reproduction"] = {"got": {"n": "-", "margin_mae": "-", "ml_brier": "-"}, "pass": True}
+    DRYRUN_JSON.write_text(json.dumps(rep, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    DRYRUN_MD.write_text(render_md(rep, spec), encoding="utf-8")
+    print("dry run verdict on validation:", rep["gate"]["verdict"])
+    return 0
+
+
+def cmd_holdout(args: argparse.Namespace) -> int:
+    if HOLDOUT_MARK.exists():
+        raise SystemExit(f"holdout already read: {HOLDOUT_MARK.read_text(encoding='utf-8')}")
+    pinned = json.loads(RULE_PATH.read_text(encoding="utf-8"))
+    sha = rule_sha256()
+    if pinned["rule_sha256"] != sha or args.rule_sha != sha or pinned["rule"] != RULE:
+        raise SystemExit("pinned rule sha256 mismatch")
+    for path in (RULE_PATH, SPEC, Path(__file__).resolve(), PRIOR_JSON, PRIOR_ARMS_JSON, V5_REPRO):
+        if not _committed_unmodified(path):
+            raise SystemExit(f"{path.name} is not committed or has local changes")
+    spec = json.loads(SPEC.read_text(encoding="utf-8"))
+    if pinned["spec_sha256"] != file_sha256(SPEC) or "consensus_pmf" not in spec:
+        raise SystemExit("spec changed after the pin, or has no train-fit consensus pmf")
+    repro = json.loads(V5_REPRO.read_text(encoding="utf-8"))
+    if not repro["pass"]:
+        raise SystemExit("v5 reproduction did not pass")
+    for p in sorted(WORK.glob("walk_*.holdout.jsonl")):
+        if pinned["holdout_walk_files_sha256"].get(p.name) != file_sha256(p):
+            raise SystemExit(f"holdout walk file {p.name} changed after the pin")
+    if CFBD_LINES.exists() and pinned["cfbd_lines_sha256"] != file_sha256(CFBD_LINES):
+        raise SystemExit("CFBD lines changed after the pin")
+    if not DRYRUN_JSON.exists():
+        raise SystemExit("run the validation dry run first")
+    mark = {
+        "read_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "rule_sha256": sha,
+        "head": _git("rev-parse", "HEAD"),
+        "cfbd_present_at_read": CFBD_DIR.is_dir() and any(CFBD_DIR.iterdir()),
+    }
+    HOLDOUT_MARK.write_text(json.dumps(mark, indent=2) + "\n", encoding="utf-8")  # just before the first read
+    rep = score_window("holdout", spec, repro["per_event"])
+    report = {
+        "as_of_utc": mark["read_at_utc"],
+        "holdout_read": mark,
+        "rule_sha256": sha,
+        "v5_reproduction": {k: repro[k] for k in ("got", "required", "pass")},
+        **rep,
     }
     REPORT_JSON.write_text(json.dumps(report, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
     REPORT_MD.write_text(render_md(report, spec), encoding="utf-8")
-    print(verdict)
+    print(report["gate"]["verdict"], "package:", report["gate"]["package_arm"])
     return 0
 
 
@@ -1517,7 +1608,10 @@ def render_md(rep: dict[str, Any], spec: dict[str, Any]) -> str:
     L.append("")
     L.append(
         f"Verdict: **{rep['gate']['verdict']}** under rule `{RULE['id']}` (sha256 `{rep['rule_sha256'][:16]}...`, "
-        "pinned and committed before this read). Checks: " + json.dumps(rep["gate"]["checks"]) + "."
+        f"pinned and committed before this read). Package arm: {rep['gate']['package_arm']} "
+        f"({rep['gate']['package_arm_prior']}). Arms: {json.dumps(rep['gate']['arm_of'])}. Per-arm gate: "
+        + json.dumps(rep["gate"]["per_arm"])
+        + ". CFBD values are current-revised, so any CFBD-arm gain is an upper bound."
     )
     L.append("")
     L.append(
@@ -1622,6 +1716,201 @@ def render_md(rep: dict[str, Any], spec: dict[str, Any]) -> str:
     return "\n".join(L) + "\n"
 
 
+# ================================================================================================ artifact
+FIXTURE_SEASON = 2023  # validation window; the fixture never touches holdout rows
+FIXTURE_TEAMS = 30
+FIXTURE_FIELDS = (
+    "event_id",
+    "season",
+    "kickoff_utc",
+    "team_id",
+    "opponent_id",
+    "is_home",
+    "neutral_site",
+    "game_class",
+    "points_for",
+    "off_plays",
+    "off_plays_ng",
+    "off_success_rate_ng",
+    "off_yards_per_play_ng",
+    "off_explosive_rate_ng",
+    "off_points_per_drive_ng",
+    "off_turnovers",
+)
+
+
+def artifact_payload(cand: dict[str, Any], report: dict[str, Any]) -> dict[str, Any]:
+    from model_prediction.production_registry import compute_artifact_hash
+
+    sel = cand["candidate"]
+    prior = load_prior(sel["arm"])
+    mult = float(sel["lambda_multiplier"])
+    payload: dict[str, Any] = {
+        "model_version": "cfb-structural-v7",
+        "league": "NCAAF",
+        "sport": "ncaaf",
+        "schema_version": "1",
+        "method": "cfb_v7_pit_pbp_ridge_ratings_linear_points_keyed_margin_pmf",
+        "note": (
+            "RESEARCH CHALLENGER (quick-261121-v7), never a champion, never Main, never the auto-buyer. Registered, "
+            "not routed (challengers.NCAAF holds one model per market). Fit on train only, selected on validation, "
+            "holdout read once under the pinned rule; market-relative numbers are design-informed."
+        ),
+        "point_in_time": {
+            "result_buffer_hours": core.RESULT_BUFFER_HOURS,
+            "research_decision_time": "min(kickoff, 08:00 America/New_York on the kickoff's ET date)",
+            "rule": "a game feeds ratings only if kickoff + result_buffer_hours <= decision time",
+        },
+        "prior": {
+            "arm": sel["arm"],
+            "rho_off": prior["rho_off"],
+            "rho_def": prior["rho_def"],
+            "lam_off": {k: mult * v for k, v in prior["lam_off"].items()},
+            "lam_def": {k: mult * v for k, v in prior["lam_def"].items()},
+            "cov_off": prior.get("cov_off") or {},
+            "cov_def": prior.get("cov_def") or {},
+            "half_life_days": sel["half_life_days"],
+            "lambda_multiplier": mult,
+            "finals_team_lambda": core.FINALS_TEAM_LAMBDA,
+            "league_lambda": core.LEAGUE_LAMBDA,
+            "cfbd_fields": dict(core.CFBD_FIELDS) if sel["arm"] != "core" else {},
+            "cfbd_values": "current-revised (as_published_verified false); preseason rows only",
+        },
+        "stage2": cand["stage2"],
+        "margin_distribution": {
+            "support": MARGIN_SUPPORT,
+            "key_max": KEY_MAX,
+            "recentre_iterations": RECENTRE_ITERATIONS,
+            "centring": "mean",
+            "key_log_multipliers": cand["margin_pmf"]["theta"],
+            "sd_coef": cand["margin_pmf"]["sd_coef"],
+            "sd_terms": cand["margin_pmf"]["sd_terms"],
+            "sd_scale": SD_SCALE,
+            "sd_total_centre": SD_TOTAL_CENTRE,
+            "early_games": EARLY_GAMES,
+        },
+        "total_distribution": {
+            "support": TOTAL_SUPPORT,
+            "buckets": [list(b) for b in TOTAL_BUCKETS],
+            "bucket_sds": cand["total_sds"],
+        },
+        "training": {
+            "spec_sha256": file_sha256(SPEC),
+            "rule_sha256": rule_sha256(),
+            "report_sha256": file_sha256(REPORT_JSON),
+            "train_end": TRAIN_END,
+            "validation_end": VAL_END,
+            "selected": sel,
+            "holdout_verdict": report["gate"]["verdict"],
+        },
+        "qualification": {
+            "status": "challenger",
+            "qualified": False,
+            "note": "Research only; the 2027 forward gate (docs/CFB_V7_2027_GATE.md) decides; promotion only via "
+            "model_promotion promote.",
+        },
+        "frozen_at_utc": datetime.now(UTC).replace(microsecond=0).isoformat(),
+        "promotion_protocol_hash": rule_sha256(),
+    }
+    payload["artifact_hash"] = compute_artifact_hash(payload)
+    return payload
+
+
+def parity_fixture(cand: dict[str, Any]) -> dict[str, Any]:
+    """A small real universe (30 FBS teams, their mutual 2022-2023 games) priced by this script's pipeline."""
+    from model_prediction.domain import parse_utc
+
+    raw = []
+    with PBP.open(encoding="utf-8") as f:
+        for ln in f:
+            if ln.strip():
+                r = json.loads(ln)
+                if r["season"] in (FIXTURE_SEASON - 1, FIXTURE_SEASON):
+                    raw.append(r)
+    counts: dict[str, int] = defaultdict(int)
+    for r in raw:
+        if r["game_class"] == "FBS-FBS" and r["season"] == FIXTURE_SEASON:
+            counts[r["team_id"]] += 1
+    teams = set(sorted(counts, key=lambda t: (-counts[t], int(t)))[:FIXTURE_TEAMS])
+    sub = [
+        {k: r.get(k) for k in FIXTURE_FIELDS}
+        for r in raw
+        if r["team_id"] in teams and r["opponent_id"] in teams
+    ]
+    rows = sorted(
+        (core.team_game_from_row(r) for r in sub), key=lambda r: (r.kickoff, r.event_id, -r.home_sign)
+    )
+    classes = core.season_classes(rows)
+    sel = cand["candidate"]
+    params = prior_params(load_prior(sel["arm"]), float(sel["lambda_multiplier"]), sel["half_life_days"])
+    covs = load_cfbd_covariates().get(FIXTURE_SEASON, {}) if sel["arm"] != "core" else {}
+    covs = {t: z for t, z in covs.items() if t in teams}
+    finals = core.fit_finals([r for r in rows if r.season == FIXTURE_SEASON - 1], FIXTURE_SEASON - 1, classes)
+    ordered = sorted(teams, key=int)
+    cases = []
+    for i, day in enumerate(("2023-08-26", "2023-09-16", "2023-10-14", "2023-11-11")):
+        decision = parse_utc(f"{day}T12:00:00Z")
+        state = core.fit_state(rows, FIXTURE_SEASON, decision, classes, finals, params, ordered, covs)
+        for j in range(3):
+            home, away = ordered[(3 * i + 2 * j) % len(ordered)], ordered[(3 * i + 2 * j + 7) % len(ordered)]
+            neutral = j == 2
+            mf = core.matchup_features(state, home, away, neutral=neutral, classes=classes)
+            walk_row = {
+                "home_e": mf.home.values,
+                "away_e": mf.away.values,
+                "home_games": mf.home_games,
+                "away_games": mf.away_games,
+                "is_fcs": mf.is_fbs_vs_fcs,
+            }
+            pr = v7_probabilities([walk_row], cand["stage2"], cand["margin_pmf"], cand["total_sds"])
+            pt = total_pmf(pr["tot"], pr["tsd"])[0]
+            pm = pr["pmf"][0]
+            cases.append(
+                {
+                    "decision_utc": decision.isoformat(),
+                    "home_id": home,
+                    "away_id": away,
+                    "neutral": neutral,
+                    "spread_home_line": -3.5,
+                    "total_line": 50.5,
+                    "expected": {
+                        "mu_margin": float(pr["mu"][0]),
+                        "mu_total": float(pr["tot"][0]),
+                        "margin_sd": float(pr["sd"][0]),
+                        "total_sd": float(pr["tsd"][0]),
+                        "home_win": float(pr["p_home"][0]),
+                        "home_cover": float(pm[M_GRID > 3.5].sum()),
+                        "over": float(pt[T_GRID > 50.5].sum()),
+                    },
+                }
+            )
+    return {
+        "season": FIXTURE_SEASON,
+        "spec_sha256": file_sha256(SPEC),
+        "rows": sub,
+        "covariates": covs,
+        "cases": cases,
+    }
+
+
+def cmd_artifact(_: argparse.Namespace) -> int:
+    report = json.loads(REPORT_JSON.read_text(encoding="utf-8"))
+    if not str(report["gate"]["verdict"]).startswith("PASS"):
+        raise SystemExit(f"verdict {report['gate']['verdict']}: no artifact is written")
+    spec = json.loads(SPEC.read_text(encoding="utf-8"))
+    pkg = report["gate"]["package_arm"]
+    cand = (
+        {k: spec[k] for k in ("stage2", "margin_pmf", "total_sds")} | {"candidate": spec["selected"]}
+        if pkg == "v7"
+        else spec["alt"]
+    )
+    payload = artifact_payload(cand, report)
+    ARTIFACT.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    FIXTURE.write_text(json.dumps(parity_fixture(cand), sort_keys=True) + "\n", encoding="utf-8")
+    print(ARTIFACT, payload["artifact_hash"])
+    return 0
+
+
 # ================================================================================================ main
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -1633,12 +1922,17 @@ def main() -> int:
     w.add_argument("--workers", type=int, default=6)
     w.add_argument("--only", default=None)
     w.add_argument("--arms", default="core")
+    w.add_argument("--mults", default=None)
     w.set_defaults(func=cmd_walk)
     sub.add_parser("fit").set_defaults(func=cmd_fit)
     sub.add_parser("pin").set_defaults(func=cmd_pin)
     h = sub.add_parser("holdout")
     h.add_argument("--rule-sha", required=True)
     h.set_defaults(func=cmd_holdout)
+    sub.add_parser("v5repro").set_defaults(func=cmd_v5repro)
+    sub.add_parser("consensus").set_defaults(func=cmd_consensus)
+    sub.add_parser("dryrun").set_defaults(func=cmd_dryrun)
+    sub.add_parser("artifact").set_defaults(func=cmd_artifact)
     args = ap.parse_args()
     return int(args.func(args))
 
