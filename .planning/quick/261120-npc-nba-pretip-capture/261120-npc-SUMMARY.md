@@ -15,7 +15,7 @@ key-files:
   modified:
     - src/model_prediction/run_supervisor.py
     - scripts/register_windows_tasks.ps1
-commits: 3
+commits: 5
 plan_head_before: a3cbdac7
 ---
 
@@ -29,7 +29,10 @@ Scheduled every 10 minutes from 11:00 to 02:00 ET, each game gets captures about
 
 - `2db631de` feat: devig helper, capture module, worker entry point, tests and fixtures
 - `c89e7adc` feat: `WORKERS` entry (300 s timeout) and the task definition in `register_windows_tasks.ps1`
-- docs commit with this plan and summary
+- `85af3746` docs: this plan and summary
+- test commit: pin `polymarket_us.utc_now` to the test clock in the end-to-end test (it failed once real
+  time passed the fixture's tip; proved by forcing utc_now to 2026-12-15, failing before, passing after)
+- docs commit: this summary update
 
 ## Storage
 
@@ -53,6 +56,7 @@ Equal-priced spread/total pairs are identical under both.
 ## Verification
 
 - `pytest tests/test_nba_pretip_capture.py -o addopts='' -q`: 12 passed. `ruff check src/ tests/` clean.
+- Open NBA pick slug lookup against the runtime root returns 27 slugs, no warning in the hand run.
 - `tests/test_run_supervisor.py tests/test_system_health.py`: 35 passed, 1 failed
   (`test_worker_registry_commands_exist_on_disk`): the worktree has no `.venv`, so the existing production
   worker's interpreter path does not exist here. Not caused by this change (it only checks
@@ -61,7 +65,8 @@ Equal-priced spread/total pairs are identical under both.
   validation; nothing tips within 25 minutes at that hour, so these are not T-10 rows): 6 games, 6 ESPN
   records, 6/6 Polymarket events matched, 440 snapshot rows (385 event-detail, 46 /book, 9 /bbo), 0
   failures, one 429 pause, 152 s. That run used 3 rungs per ladder (55 /book calls); `NBA_LADDER_KEEP`
-  was then cut to 1 so a busy T-10 slot stays well inside 10 minutes.
+  was then cut to 1 so a busy T-10 slot stays well inside 10 minutes; the committed value of 1 has run
+  only under tests so far.
 
 ## API limitations
 
@@ -76,3 +81,4 @@ Equal-priced spread/total pairs are identical under both.
 
 - The scheduled task is defined but not registered. Until it runs once, `system_health` reports
   "worker 'nba-pretip-capture' has never run" (after merge).
+- A failed last run of the night (about 02:00) leaves `system_health` down until the 11:00 run.
