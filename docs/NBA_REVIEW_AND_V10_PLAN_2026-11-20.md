@@ -258,6 +258,20 @@ Its output feeds Phase 2 as `model`; it only influences prices through a lambda 
   the status of a player averaging at least 20 minutes, measured against the Polymarket mid
   before and after.
 - **G1 / G2:** as written in section 6; not re-tuned after results are seen.
+- **G2 scoring rules (pinned 2026-11-21, before any v10 pick settled;
+  `src/model_prediction/nba_v10_g2.py`, `scripts/nba_v10/g2_report.py`):**
+  - G2 pick: while `nba-anchor-v10`'s `main_min_edge` is null (lambda = 0), a pick is a
+    consensus-anchored row where consensus probability minus Polymarket ask is at least 3.0 points
+    (the T-B rule above). Mid-anchored rows never count. If `main_min_edge` is ever set, the rule
+    becomes net edge at or above it.
+  - T-10 benchmark: the latest ESPN capture with `decision_time < observed_at <= tip - 10 min`.
+    It is excluded as stale if older than tip - 40 min.
+  - Scoring: picks are scored only after tip. v9 pairs only with a row from the same run (decisions
+    at most 15 min apart).
+  - Criteria 3 and 4: criterion 3 passes on a mean paired v10 - v9 CLV above 0. Criterion 4 uses
+    the benchmark-scored picks.
+  - Verdicts and confidence intervals: PENDING below 150 picks; FAIL at 150-299; KILL at 300+.
+    CIs are a cluster bootstrap by game.
 
 ## 10. Progress (2026-11-21)
 
