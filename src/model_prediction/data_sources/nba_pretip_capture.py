@@ -64,6 +64,11 @@ ESPN_ODDS_FILENAME = "espn_odds.jsonl"
 SCHEMA_VERSION = "1"
 USER_AGENT = "Mozilla/5.0"
 DEFAULT_WINDOW_MINUTES = 25.0
+# ESPN odds for the rest of the slate: one scoreboard call per date, no Polymarket cost. The daily
+# forecast runs hours before tip, and nba-anchor-v10 only accepts a consensus anchor up to 90 minutes
+# old, so a capture limited to the T-25 window left most daily-run rows anchored on the Polymarket mid
+# and track T-B (consensus vs Polymarket ask) almost never evaluated.
+DEFAULT_ESPN_WINDOW_MINUTES = 720.0
 # Sized /book quotes per spread/total ladder: the most balanced rung (plus the rungs at the ESPN lines and
 # open picks, kept regardless). The event-detail pass already quotes bid/ask on every rung, so /book only
 # adds depth. The daily capture keeps 3, but 3 cost 55 /book calls and 152 s with one 429 pause for the
@@ -387,11 +392,62 @@ _CAPTURE_SUMMARY_KEYS = (
 )
 
 
+def _espn_record(game: dict[str, Any], method: str) -> dict[str, Any] | None:
+    providers = [parse_provider_odds(item, method) for item in game["odds_items"]]
+    if not providers:
+        return None
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "source": "espn_scoreboard_odds",
+        "sport": "nba",
+        "event_id": game["event_id"],
+        "event_start_utc": game["event_start_utc"],
+        "home_team": game["home_team"],
+        "away_team": game["away_team"],
+        "home_abbr": game["home_abbr"],
+        "away_abbr": game["away_abbr"],
+        "observed_at_utc": _iso(game["_observed"]),
+        "minutes_to_tip": round((game["_tip"] - game["_observed"]).total_seconds() / 60, 1),
+        "content_sha256": game["_sha"],
+        "devig_method": method,
+        "providers": providers,
+        "consensus": consensus(providers, method),
+        "polymarket": None,
+    }
+
+
+def _write_espn_only(
+    data_root: str | Path, games: list[dict[str, Any]], method: str, errors: list[dict[str, str]]
+) -> int:
+    """Write ESPN records for games outside the Polymarket window (no Polymarket link, no quote calls)."""
+    written = 0
+    for game in games:
+        try:
+            record = _espn_record(game, method)
+        except Exception as exc:  # noqa: BLE001 -- one malformed game must not stop the rest
+            errors.append({"kind": "espn_event", "error": f"{type(exc).__name__}: {exc}"[:160]})
+            continue
+        if record is None:
+            continue
+        record["record_hash"] = _record_hash(record)
+        path = espn_odds_path(data_root, game["_tip"].astimezone(EASTERN).date().isoformat())
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+        except OSError as exc:
+            errors.append({"kind": "write", "error": f"{type(exc).__name__}: {exc}"[:160]})
+            continue
+        written += 1
+    return written
+
+
 # --------------------------------------------------------------------------- capture
 def capture_nba_pretip(
     data_root: str | Path,
     *,
     window_minutes: float = DEFAULT_WINDOW_MINUTES,
+    espn_window_minutes: float | None = None,
     now: Clock | None = None,
     http_get: HttpGet | None = None,
     polymarket_client: Any | None = None,
@@ -402,6 +458,8 @@ def capture_nba_pretip(
 ) -> dict[str, Any]:
     """Capture ESPN odds and Polymarket quotes for every NBA game tipping within ``window_minutes``.
 
+    ESPN odds are also written for games tipping within ``espn_window_minutes`` (default: the same
+    window); Polymarket quotes stay limited to ``window_minutes``.
     ``now`` is a clock callable read again after every response. ``http_get`` (ESPN),
     ``polymarket_client`` and ``capture_fn`` are injectable for tests. Never raises.
     """
@@ -409,6 +467,7 @@ def capture_nba_pretip(
         return _capture(
             data_root,
             window_minutes=window_minutes,
+            espn_window_minutes=max(window_minutes, espn_window_minutes or window_minutes),
             clock=now or (lambda: datetime.now(UTC)),
             http_get=http_get or _default_http_get,
             polymarket_client=polymarket_client,
@@ -426,6 +485,7 @@ def _capture(
     data_root: str | Path,
     *,
     window_minutes: float,
+    espn_window_minutes: float,
     clock: Clock,
     http_get: HttpGet,
     polymarket_client: Any | None,
@@ -436,11 +496,13 @@ def _capture(
 ) -> dict[str, Any]:
     started = clock()
     window_end = started + timedelta(minutes=window_minutes)
+    espn_window_end = started + timedelta(minutes=espn_window_minutes)
     errors: list[dict[str, str]] = []
     # ESPN files a game under its Eastern date, so a window crossing midnight ET needs both dates.
-    dates = sorted({started.astimezone(EASTERN).date(), window_end.astimezone(EASTERN).date()})
+    dates = sorted({started.astimezone(EASTERN).date(), espn_window_end.astimezone(EASTERN).date()})
 
     games: list[dict[str, Any]] = []
+    espn_only: list[dict[str, Any]] = []
     seen: set[str] = set()
     counts = {"skipped_not_scheduled": 0, "skipped_started": 0, "beyond_window": 0}
     scoreboards_ok = 0
@@ -480,11 +542,15 @@ def _capture(
                 counts["skipped_not_scheduled"] += 1
             elif tip <= observed:
                 counts["skipped_started"] += 1
-            elif tip > window_end:
+            elif tip > espn_window_end:
                 counts["beyond_window"] += 1
+            elif tip > window_end:
+                espn_only.append({**game, "_tip": tip, "_observed": observed, "_sha": sha})
             else:
                 games.append({**game, "_tip": tip, "_observed": observed, "_sha": sha})
     games.sort(key=lambda g: (g["_tip"], g["event_id"]))
+    espn_only.sort(key=lambda g: (g["_tip"], g["event_id"]))
+    espn_only_written = _write_espn_only(data_root, espn_only, method, errors)
 
     if not games:
         return {
@@ -494,6 +560,7 @@ def _capture(
             "dates": [d.isoformat() for d in dates],
             "games_in_window": 0,
             "espn_records_written": 0,
+            "espn_only_records_written": espn_only_written,
             **counts,
             "games": [],
             "polymarket": {"status": "not_requested", "reason": "no NBA game in window"},
@@ -579,6 +646,7 @@ def _capture(
         "dates": [d.isoformat() for d in dates],
         "games_in_window": len(games),
         "espn_records_written": written,
+        "espn_only_records_written": espn_only_written,
         **counts,
         "games": list(game_status.values()),
         "polymarket": polymarket_summary,
@@ -708,6 +776,7 @@ def _run_polymarket_capture(
 
 
 __all__ = [
+    "DEFAULT_ESPN_WINDOW_MINUTES",
     "DEFAULT_WINDOW_MINUTES",
     "ESPN_ODDS_FILENAME",
     "capture_nba_pretip",

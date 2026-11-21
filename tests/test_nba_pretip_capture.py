@@ -248,6 +248,47 @@ def test_capture_writes_espn_records_and_canonical_polymarket_snapshots(tmp_path
     assert f"/v1/markets/{LAC_DAL_ML}/book" in calls
 
 
+def test_espn_window_writes_whole_slate_without_polymarket_calls(tmp_path) -> None:
+    # 17:00Z: MIL @ PHI tips in 60 minutes, LAC @ DAL and MEM @ MIN in 8 hours -- all outside the
+    # 25-minute Polymarket window, all inside a 12-hour ESPN window. A daily run at this hour needs
+    # a fresh consensus anchor for every game, so ESPN odds are written for all three.
+    clock = _Clock(datetime(2026, 11, 21, 17, 0, tzinfo=UTC))
+    calls: list[str] = []
+    result = cap.capture_nba_pretip(
+        tmp_path,
+        window_minutes=25,
+        espn_window_minutes=720,
+        now=clock,
+        http_get=_espn_get(_scoreboard()),
+        polymarket_client=_polymarket_client(calls),
+    )
+    assert result["games_in_window"] == 0
+    assert result["espn_only_records_written"] == 3
+    assert calls == []
+    records = [
+        json.loads(line)
+        for line in (tmp_path / "odds" / "nba" / "2026-11-21" / "espn_odds.jsonl")
+        .read_text("utf-8")
+        .splitlines()
+    ]
+    assert len(records) == 3 and len({r["event_id"] for r in records}) == 3
+    for record in records:
+        assert record["polymarket"] is None
+        assert record["record_hash"] == cap._record_hash(record)
+        assert datetime.fromisoformat(record["observed_at_utc"]) < datetime.fromisoformat(
+            record["event_start_utc"]
+        )
+
+
+def test_espn_window_defaults_to_the_polymarket_window(tmp_path) -> None:
+    clock = _Clock(datetime(2026, 11, 21, 17, 0, tzinfo=UTC))
+    result = cap.capture_nba_pretip(
+        tmp_path, window_minutes=25, now=clock, http_get=_espn_get(_scoreboard()), polymarket_client=None
+    )
+    assert result["espn_only_records_written"] == 0
+    assert not (tmp_path / "odds").exists()
+
+
 def test_no_game_in_window_makes_no_polymarket_request(tmp_path) -> None:
     clock = _Clock(datetime(2026, 11, 21, 4, 26, tzinfo=UTC))  # recorded: games final or live
     calls: list[str] = []

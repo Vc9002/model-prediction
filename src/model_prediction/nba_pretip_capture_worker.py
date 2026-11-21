@@ -17,6 +17,7 @@ import json
 import logging
 
 from .data_sources.nba_pretip_capture import (
+    DEFAULT_ESPN_WINDOW_MINUTES,
     DEFAULT_POLYMARKET_MAX_SECONDS,
     DEFAULT_WINDOW_MINUTES,
     capture_nba_pretip,
@@ -46,6 +47,12 @@ def main(argv: list[str] | None = None) -> int:
         help="capture games tipping within this many minutes (default %(default)s)",
     )
     parser.add_argument(
+        "--espn-window-minutes",
+        type=float,
+        default=DEFAULT_ESPN_WINDOW_MINUTES,
+        help="also write ESPN odds for games tipping within this many minutes (default %(default)s)",
+    )
+    parser.add_argument(
         "--polymarket-max-seconds",
         type=float,
         default=DEFAULT_POLYMARKET_MAX_SECONDS,
@@ -57,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     result = capture_nba_pretip(
         paths.data_root,
         window_minutes=args.window_minutes,
+        espn_window_minutes=args.espn_window_minutes,
         keep_slugs=_open_nba_pick_slugs(paths.data_root),
         polymarket_max_seconds=args.polymarket_max_seconds,
     )
