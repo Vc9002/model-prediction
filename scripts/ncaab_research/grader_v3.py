@@ -361,12 +361,12 @@ def score_totals(
 ) -> dict[str, Any]:
     """Development read of a totals candidate against the served v6 total (LOSO 2023-2026, espn_archive)."""
     load_addendum_v3()
+    pred = grader.load_predictions(predictions)  # refuses locked rows before any score or line is read
     a = archive if archive is not None else grader.load_archive(grader.DEV_SEASONS, shuffle_seed=shuffle_seed)
     if a.attrs.get("line_source", {}).get("name") != grader.DEV_LINE_SOURCE:
         raise grader.SubmissionError(
             f"development archive must come from load_archive({grader.DEV_LINE_SOURCE})"
         )
-    pred = grader.load_predictions(predictions)
     if pred["mu_total"].isna().all():
         raise grader.SubmissionError("a totals candidate must submit mu_total")
     grader.validate_echo(pred, a)
@@ -429,15 +429,27 @@ def score_totals(
         "paired_vs_v6": paired,
         "generated_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
-    card["verdict"] = verdict_v3(info["family"], info["registered"], paired, cov_ok, flags)
-    if info["registered"] and read_count is not None and read_count > 1:
-        card["verdict"] = {
-            "status": "REREAD_NO_VERDICT",
-            "reason": f"read {read_count} of grid name {meta['grid_name']}: only the first file carries a verdict",
-            "would_have_been": card["verdict"],
-        }
+    card["verdict"] = reread_guard(
+        verdict_v3(info["family"], info["registered"], paired, cov_ok, flags),
+        info["registered"],
+        read_count,
+        meta["grid_name"],
+    )
     card["edge_dev_total"] = blocks["cand"]["rule1_total"]["edge_eligible"]
     return card
+
+
+def reread_guard(
+    v: dict[str, Any], registered: bool, read_count: int | None, grid_name: str
+) -> dict[str, Any]:
+    """Only the first predictions file read under a grid name (per window) carries a verdict."""
+    if registered and read_count is not None and read_count > 1:
+        return {
+            "status": "REREAD_NO_VERDICT",
+            "reason": f"read {read_count} of grid name {grid_name}: only the first file carries a verdict",
+            "would_have_been": v,
+        }
+    return v
 
 
 # --------------------------------------------------------------------------------------------- reproduction

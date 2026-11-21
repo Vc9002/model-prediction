@@ -1,0 +1,32 @@
+{
+ "checks": {
+  "closing_total_all": true,
+  "k_is_v1_20": true,
+  "market_total": true,
+  "over": true,
+  "rule1_total": true,
+  "total_all": true,
+  "total_by_games_played": true
+ },
+ "got": {
+  "bias": -1.0201,
+  "closing_bias": 0.8318,
+  "closing_rmse": 16.5193,
+  "corr": 0.01807,
+  "n": 22946,
+  "over_brier": 0.25836,
+  "over_logloss": 0.71096,
+  "rmse": 17.0295,
+  "rule1_mse_delta": 0.053861140811125335,
+  "rule1_mse_delta_ci_adj_k20": [
+   -0.055550068611313216,
+   0.15003314141318166
+  ],
+  "slope": 0.06771,
+  "slope_ci95": [
+   0.01735,
+   0.11822
+  ]
+ },
+ "passed": true
+}
