@@ -1,0 +1,42 @@
+{
+  "id": "cfb-v7-2027-forward-gate-1",
+  "pinned_at": "2026-11-21, before the 2027 season and before any 2027 data exists",
+  "model": "cfb-structural-v7 (the artifact frozen at the start of 2027 week 0; any refit during the season is a new version and restarts the count)",
+  "comparators": {
+    "consensus_only": "fair = the timestamped DraftKings anchor at decision time (the cfb-structural-v6.2 w = 1 arm); same pick rule, same asks",
+    "v5": "cfb-structural-v5 (champion) as served",
+    "opener": "DraftKings opening line from the forward ESPN pregame capture (first observed record per event)"
+  },
+  "scope": "FBS-involved games from 2027 week 0 through the last bowl; Flat tier only; picks never routed to Main or the auto-buyer",
+  "pick_rule": "max-edge side per market (moneyline, spread, total) against the captured Polymarket executable ask; emit only when fair - ask > 0; one pick per event-market (the first decision-time row of the day)",
+  "primary": {
+    "metric": "CLV in probability points = close_prob(same contract, same side) - decision-time ask",
+    "close": "last captured Polymarket book for the contract with observed_at in [kickoff - 90 min, kickoff), market OPEN, never a post-resolution or post-kickoff price; mid = (best bid + best ask) / 2 when both sides exist, else the ask",
+    "secondary_close": "DraftKings close from the forward pregame capture (last record before kickoff): line CLV in points signed toward the pick, reported alongside",
+    "min_picks_with_valid_close": 300,
+    "min_close_coverage": "valid close for >= 70% of picks; below that the gate is INSUFFICIENT_DATA (capture problem, not a model verdict)",
+    "pass": "mean CLV > 0 with the date-clustered bootstrap (2000 resamples, seed 11) 95% CI low > 0, AND mean CLV(v7) >= mean CLV(consensus_only) - 0.25 probability points",
+    "fail": "mean CLV 95% CI high < 0"
+  },
+  "secondary": {
+    "mae_vs_opener": "paired margin MAE delta (v7 - DraftKings opener) on games with a captured opener (n >= 400); passes if the 95% CI high < 0",
+    "orthogonalised_slope": "coefficient on (v7 - close) in OLS of (result - close) on [1, close, v7 - close], spreads and totals separately, ESPN/DraftKings pre-kickoff close; passes if the date-clustered 95% CI low > 0 with n >= 600",
+    "pass": "at least one secondary passes"
+  },
+  "tertiary": {
+    "metric": "moneyline Brier and log loss, v7 vs v5 and vs consensus_only, all FBS-involved games",
+    "pass": "Brier delta (v7 - v5) <= +0.001 and log loss delta <= +0.003"
+  },
+  "decision": {
+    "PROMOTION_ELIGIBLE": "primary pass AND secondary pass AND tertiary pass; the operator then decides via `python -m model_prediction.model_promotion promote` (never automatic)",
+    "FAIL": "primary fail, OR (primary not pass and both secondaries' point estimates on the wrong side)",
+    "CONTINUE": "anything else; the evaluation carries into 2028 with the same thresholds and a fresh count",
+    "INSUFFICIENT_DATA": "fewer than 300 picks with a valid close, or close coverage below 70%, at the end of the 2027 bowls"
+  },
+  "context": {
+    "ats_power": "a 53% ATS rate needs about 1,100 bets to separate from 50%; CLV converges faster, so it is primary",
+    "holdout_history": "every ESPN lined window 2017-2025 and the 2024-11-15+ holdout were read before (v5/v6/v6.1/v6.2/v7); 2027 is the first clean market-relative test",
+    "v5": "v5 keeps serving and picking throughout; nothing is disabled"
+  },
+  "reporting": "monthly descriptive tables are allowed and non-binding; the verdict is computed once, after the last 2027 bowl, from this file (sha256 recorded in docs/CFB_V7_2027_GATE.md and the quick-261121-v7 SUMMARY)"
+}
