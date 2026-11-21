@@ -1,0 +1,149 @@
+{
+  "addendum_sha256": "75241bc7885378f266ba66ce383f3b50fe58869e9b699ae90f0ddd9c8ead6317",
+  "candidate": "B2: v7 F1 combiner + bucket t8 scales refit LOSO on margin clipped to +-25",
+  "cap": 25.0,
+  "code_files_sha256": {
+    "scripts/ncaab_research/candidates/ab_common_261120.py": "ad63f398f43b19935d757851e1bbc55c9d9bc1f4f160881b3182f3908f6ef66c",
+    "scripts/ncaab_research/candidates/b2_target_cap.py": "087b2f86b6c27dbbd1a23b216ebadcf0eb5dfde01df6faa4b5ef0dcfb6b2772c"
+  },
+  "code_sha256": "24e925fe98be6f2a7984fe83b97f88a3a3165119b69a90647ce57c3a215201ba",
+  "data_sources": {
+    "data/research/ncaab_market/scoreboard.jsonl": "ee5394da02380ae9ca4780813ba9cfa851f450d87d94206031c7be81a5d8d1a7",
+    "data/research/ncaab_market/v7ms_components.jsonl": "cf1b90760618bd90869a121c5fca12ef24a0327670c0016200dce3b13175fe94",
+    "data/research/ncaab_market/v7ms_loso_fit_preds.jsonl": "347f32e4fb7686fa7d4e87d8ced95f369ef9d46bdac9ecf9ae3950c116e2b3da",
+    "outputs/ncaab/ncaab_v7_multiseason_frozen.json": "6c4676ffaf3c16aeee756cf748a4af3f6da617ceb794ad5d07643cff99bc8bdb"
+  },
+  "disclosure": "delta vs served v7 mixes the cap with a 3-season refit; uncapped 3-season coefs reported",
+  "fit_seasons_by_predicted_season": {
+    "2023": [
+      2024,
+      2025,
+      2026
+    ],
+    "2024": [
+      2023,
+      2025,
+      2026
+    ],
+    "2025": [
+      2023,
+      2024,
+      2026
+    ],
+    "2026": [
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "fitted_params_by_fold": {
+    "2023": {
+      "cap": 25.0,
+      "coef": [
+        0.9053642927861485,
+        -0.3745941971433233
+      ],
+      "n_train": 17242,
+      "scales": [
+        8.425958999335538,
+        9.01599692311298,
+        9.619318270328069,
+        9.364452407200009
+      ],
+      "uncapped_same_rows": {
+        "coef": [
+          0.965381427164845,
+          0.24587629158516341
+        ],
+        "scales": [
+          12.068481785660193,
+          10.84138482131462,
+          10.841850447077146,
+          10.004197571036723
+        ]
+      }
+    },
+    "2024": {
+      "cap": 25.0,
+      "coef": [
+        0.9047654636642165,
+        -0.3837976536399267
+      ],
+      "n_train": 17237,
+      "scales": [
+        8.577081671360219,
+        9.2033353529364,
+        9.664665377685939,
+        9.336331655064
+      ],
+      "uncapped_same_rows": {
+        "coef": [
+          0.9653087285608124,
+          0.22378238986011081
+        ],
+        "scales": [
+          11.98835706111312,
+          11.09108620928798,
+          10.837982850772665,
+          9.967772440760037
+        ]
+      }
+    },
+    "2025": {
+      "cap": 25.0,
+      "coef": [
+        0.8956600494805809,
+        -0.34647571456063614
+      ],
+      "n_train": 17199,
+      "scales": [
+        8.562252956619627,
+        9.237937362090147,
+        9.720599469059632,
+        9.379465813921314
+      ],
+      "uncapped_same_rows": {
+        "coef": [
+          0.9537050644844987,
+          0.24355905733647193
+        ],
+        "scales": [
+          11.726432433983103,
+          10.983357545314256,
+          10.80869962383618,
+          9.988482517298976
+        ]
+      }
+    },
+    "2026": {
+      "cap": 25.0,
+      "coef": [
+        0.9127293095381475,
+        -0.4024103837795297
+      ],
+      "n_train": 17211,
+      "scales": [
+        8.291619490819379,
+        9.29832005222099,
+        9.733682705393385,
+        9.366504757876545
+      ],
+      "uncapped_same_rows": {
+        "coef": [
+          0.9705583077504877,
+          0.16583526726369482
+        ],
+        "scales": [
+          11.578022776927842,
+          10.85935466668051,
+          10.742469648670127,
+          9.963728973544388
+        ]
+      }
+    }
+  },
+  "grid_name": "B2_target_cap",
+  "history_cutoff": "strictly before Eastern midnight of the game day",
+  "predictions_file_sha256": "5bd5d66dbb1fd8b3226facb98e83771a91ed6fec92b36190043272e418993515",
+  "protocol_sha256": "72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813"
+}

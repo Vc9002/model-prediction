@@ -1,0 +1,64 @@
+{
+  "candidate": "D1 prior-season ridge regressed to conference mean (fitted r) as v7 ridge prior, F1 refit v1",
+  "grid_name": "D1_prior_regression",
+  "protocol_sha256": "72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813",
+  "code_sha256": "9a6da576333d2247f0ff1562ff59d7c860bf66b2f0e85b4d6ac5476c0ef879c6",
+  "fit_seasons_by_predicted_season": {
+    "2023": [
+      2024,
+      2025,
+      2026
+    ],
+    "2024": [
+      2023,
+      2025,
+      2026
+    ],
+    "2025": [
+      2023,
+      2024,
+      2026
+    ],
+    "2026": [
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "history_cutoff": "strictly before Eastern midnight of the game day",
+  "data_sources": {
+    "data\\research\\ncaab_market\\v7ms_components.jsonl": "cf1b90760618bd90869a121c5fca12ef24a0327670c0016200dce3b13175fe94",
+    "data\\research\\ncaab_market\\scoreboard.jsonl": "ee5394da02380ae9ca4780813ba9cfa851f450d87d94206031c7be81a5d8d1a7",
+    "outputs\\ncaab\\research_261120\\D1_prior_regression\\d1_components.jsonl": "8b0ad211acf0204530673d7d6dd5676305071ff59828696e408f76005ac3dd8d"
+  },
+  "pinned_knobs": {
+    "R_GRID": [
+      0.0,
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95,
+      1.0
+    ],
+    "MIN_PREV_GAMES": 10,
+    "MIN_CONF_TEAMS": 3,
+    "carry": 0.1,
+    "lambda": 2.0,
+    "kappa": 1.4
+  }
+}

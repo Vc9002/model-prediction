@@ -1,0 +1,225 @@
+{
+  "id": "ncaab-research-protocol-261120",
+  "program": "quick 261120-nip, lane B (shared closing-line grader + pre-registration)",
+  "written_before_outcome_join": "Written and hashed 2026-11-21 ~04:10Z (2026-11-20 ~23:10 ET) before any outcome was joined for any candidate of this program. The baseline scorecard (served v7, v6 as-of, closing line) is read after this hash is fixed; it is the only outcome read of this lane.",
+  "hash_rule": "sha256 of json.dumps(<this object>, sort_keys=True, separators=(',', ':')); the grader hard-codes it and refuses to run on mismatch. Any change is an amendment: new id suffix, new hash, written before the affected outcomes are joined, and every K below incremented by the number of candidates added.",
+  "season_convention": "ESPN season year = spring calendar year (2025 = 2024-25). Game date = Eastern calendar day of tip (the 'day' field of the component archive).",
+  "pinned_inputs_sha256": {
+    "data/research/ncaab_market/scoreboard.jsonl": "ee5394da02380ae9ca4780813ba9cfa851f450d87d94206031c7be81a5d8d1a7",
+    "data/research/ncaab_market/espn_lines.jsonl": "3386b8d1f1f8d50fa59bbfb9af0f2c015afff3866ec1a668611147d839e8a4f4",
+    "data/research/ncaab_market/v7ms_components.jsonl": "cf1b90760618bd90869a121c5fca12ef24a0327670c0016200dce3b13175fe94",
+    "data/research/ncaab_market/v7ms_loso_fit_preds.jsonl": "347f32e4fb7686fa7d4e87d8ced95f369ef9d46bdac9ecf9ae3950c116e2b3da",
+    "outputs/ncaab/ncaab_v7_multiseason_frozen.json": "6c4676ffaf3c16aeee756cf748a4af3f6da617ceb794ad5d07643cff99bc8bdb",
+    "src/model_prediction/models/ncaab_v7_serving.py": "3b6b1f704c384fdad38cf6b52353abb6dc8032bcea65f2a4091c38d55b7ec6c0"
+  },
+  "lock": {
+    "rule": "REFUSE any game with season_year >= 2027 OR Eastern game date >= 2026-07-01. Enforced before any outcome or line is loaded: the grader filters event ids by season year and date first and only then reads scores and lines for the surviving ids. A prediction row for a locked game makes the whole call fail.",
+    "locked_window": "2026-27 season to date (November 2026 on), the program's forward holdout",
+    "unlock": "Not before 2027-04-15 (after the 2026-27 season), once, only for candidates that passed the confirmation window, with the operator's written go-ahead; scored with the same statistics and plain 95% bounds. Until then no 2026-27 outcome x line x model number is produced by any tool of this program."
+  },
+  "windows": {
+    "development": {
+      "design": "leave-one-season-out (LOSO) over season years [2023, 2024, 2025, 2026]: for each held-out season every free parameter of the candidate (coefficients, scales, blend weights, hyperparameter choices) is fit on the other three seasons only; per-game inputs are point-in-time (history strictly before Eastern midnight of the game day). Statistics are pooled over the four held-out seasons.",
+      "season_years": [2023, 2024, 2025, 2026],
+      "why": "No never-read season exists in the current archive. 2024-25 was read for 12 spread / 11 total models (1m8 nine per market, m5r three/two); 2025-26 shaped v7's design (1m7) but its line-joined numbers were never produced (m5r kept them unspent); 2022-23 and 2023-24 are v7's fit seasons. Pooling all four with LOSO maximises n for a market-relative statistic whose signal is tiny, and the multiplicity below charges every earlier read. A development pass therefore means ELIGIBLE FOR CONFIRMATION, never 'beats v7'.",
+      "late_fold_consistency": "Every statistic is also reported per held-out season. A development pass additionally requires the primary statistic's point estimate pooled over the 2025 and 2026 held-out folds alone to favour the candidate (a guard against a pass carried only by the backcast folds 2023-24).",
+      "contamination_labels": {
+        "2023": "v7 fit season (served v7 is in-sample here; the baseline uses the m5r leave-one-season-out v7 predictions, v7ms_loso_fit_preds.jsonl); rule-1 fit window",
+        "2024": "v7 fit season (same LOSO treatment); rule-1 fit window",
+        "2025": "v7 decision window; market-relative read for 12 spread / 11 total / 5 win-probability models before this protocol",
+        "2026": "shaped v7's design (1m7, line-free reads); FIRST line-joined read is this lane's baseline scorecard"
+      },
+      "nesting_caveat": "In the rule-1 LOSO ridge (below) the training-season candidate predictions are themselves LOSO predictions whose fits included the held-out season. This second-order leak affects only the ridge's single scale coefficient; the primary paired statistic (correlation difference) involves no fitting at all."
+    },
+    "confirmation_backcast": {
+      "status": "SEALED, PENDING ARCHIVE",
+      "season_years": [2018, 2019, 2020, 2022],
+      "history_only_season_years": [2016, 2017, 2021],
+      "why": "Never scored by any model in this repo. A 2026-11-21 probe of ESPN's odds endpoint found multi-provider closing spread and total lines for events in 2013-14, 2015-16, 2016-17, 2017-18, 2018-19, 2019-20, 2020-21 and 2021-22. 2020-21 (COVID: empty arenas, reduced home edge, irregular schedules) is history only. 2021-22 outcomes were used only as rating history, never as a scored target, and its lines were never fetched.",
+      "archive": "scripts/ncaab_research/espn_backfill_261120.py writes data/research/ncaab_market/backfill_261120/ (scoreboard.jsonl, espn_lines.jsonl, progress.json) with the unchanged ncaab-espn-lines-rule-1 selection logic, single worker, generic User-Agent, resumable, never joining outcomes. Its outcome-free coverage summary (sha256 of both files) is recorded before any confirmation read.",
+      "design": "Backcast: each candidate's structure and hyperparameters are frozen from development; coefficients/scales are refit once on all four development seasons and applied to the confirmation games, whose per-game inputs are point-in-time from the backfilled history. Baselines (v7 with its frozen served constants, v6 as-of, closing line) are replayed on the same games.",
+      "read_policy": "Only candidates whose development verdict is ELIGIBLE are scored, each exactly once, logged in outputs/ncaab/research_261120/read_log.jsonl. Pass = the same primary statistic with the plain one-sided 95% bound on the right side of zero (lower bound > 0 for gains, upper bound < 0 for losses).",
+      "caveats": "Line source differs (offshore books 5Dimes/BetOnline/Bovada pre-2018, Caesars/Westgate/CG Technology 2018-20, a different median than 2023-26); conference realignment ids before 2022 may be unknown to the as-of conference map (which raises), so the v7 replay may need an id table extension, recorded as an amendment before the read."
+    },
+    "forward_final": {
+      "season_years": [2027],
+      "status": "LOCKED (see lock.unlock)"
+    }
+  },
+  "multiplicity": {
+    "prior_reads": {
+      "spread_market_relative": 12,
+      "total_market_relative": 11,
+      "win_probability": 5,
+      "cover_calibration": 5
+    },
+    "grid_size": 9,
+    "K": {
+      "spread_market_relative": 21,
+      "total_market_relative": 20,
+      "moneyline": 14,
+      "cover_calibration": 14
+    },
+    "adjusted_interval": "percentile bootstrap interval at alpha = 0.025 / K per tail (Bonferroni across the family), as in ncaab-residual-rule-1; the plain 95% interval is reported alongside",
+    "rereads": "Every score call is appended to the read log with the predictions file sha256. A second, different predictions file under the same grid name is a re-read; the scorecard reports the read count and a verdict is only valid for the FIRST read of a grid name unless an amendment registered the change."
+  },
+  "candidate_grid": {
+    "A_ml_w0": {
+      "family": "moneyline",
+      "spec": "p_home = w * Elo + (1 - w) * P(margin >= 1) with the SERVED v7 margin distribution and v6's Elo win probability, w = 0 (pure margin distribution). The w = 0.5 arm IS the served v7 baseline; this lane does not emit the w = 0 arm.",
+      "changes": ["p_home_ml"],
+      "free_parameters": "none",
+      "primary": "moneyline_logloss_delta_vs_v7"
+    },
+    "B1_scale_linear_mu": {
+      "family": "scale",
+      "spec": "v7 mean unchanged; t(8) scale = a + b * |mu| (optionally per games-played bucket a_b), a, b by maximum likelihood on the training seasons' D1-vs-D1 residuals.",
+      "changes": ["scale_margin"],
+      "free_parameters": "a (or a_b), b",
+      "primary": "cover_logloss_delta_vs_v7"
+    },
+    "B2_target_cap": {
+      "family": "mean",
+      "spec": "Refit the v7 F1 combiner (and scales) on a blowout-compressed target: margin clipped to [-25, +25] (one pre-registered cap, no grid). Mean and scales re-estimated on the training seasons; predictions are on the uncapped scale (the fitted combiner is applied as is).",
+      "changes": ["mu_margin", "scale_margin"],
+      "free_parameters": "combiner coefficients, bucket scales",
+      "primary": "spread_corr_delta_vs_v7"
+    },
+    "B3_early_scale_floor": {
+      "family": "scale",
+      "spec": "v7 mean unchanged; scale = max(v7 bucket scale, c0 * (1 + c1 * max(0, 1 - s/8))) with s = games_played_min; c0, c1 by t(8) maximum likelihood on the training seasons.",
+      "changes": ["scale_margin"],
+      "free_parameters": "c0, c1",
+      "primary": "cover_logloss_delta_vs_v7"
+    },
+    "C1_ppp_adjusted": {
+      "family": "mean",
+      "spec": "Opponent-adjusted per-possession offense/defense ratings (ridge on points per 100 possessions, possessions = FGA - OREB + TOV + 0.44 FTA where box scores exist, else FGA + 0.44 FTA attempts proxy, declared per season), venue-adjusted, point-in-time; home pts/100 = ORtg_h + DRtg_a - league mean, away likewise, margin = (home pts/100 - away pts/100) x projected possessions / 100 + HCA. Ridge strength and carryover chosen by LOSO on the training seasons only. Standalone margin; scale by t(8) MLE per games-played bucket.",
+      "changes": ["mu_margin", "scale_margin", "mu_total (optional)"],
+      "free_parameters": "ridge strength, carryover, HCA, bucket scales",
+      "primary": "spread_corr_delta_vs_v7"
+    },
+    "C2_ppp_into_v7": {
+      "family": "mean",
+      "spec": "OLS combiner of v7 ridge, v7 tail and the C1 margin (no intercept), fit on the training seasons; scales re-fit per bucket.",
+      "changes": ["mu_margin", "scale_margin"],
+      "free_parameters": "3 combiner coefficients, bucket scales",
+      "primary": "spread_corr_delta_vs_v7"
+    },
+    "D1_prior_regression": {
+      "family": "mean",
+      "spec": "Replace the v7 conference-tier prior with a preseason prior = prior-season final ridge rating regressed toward the conference mean by a fitted factor (plus AP rank as in v7). Returning-minutes is NOT in the grid: no player data in the archive (re-register by amendment if lane C supplies it).",
+      "changes": ["mu_margin", "scale_margin"],
+      "free_parameters": "regression factor, combiner, bucket scales",
+      "primary": "spread_corr_delta_vs_v7"
+    },
+    "D2_massey_pit": {
+      "family": "mean",
+      "spec": "Kaggle Massey ordinals composite (median ordinal across systems published with RankingDayNum strictly before the game day), mapped to a rating difference and added as a third combiner input to v7 (ridge, tail, massey); fail closed when the crosswalk or the ordinal is missing (the game is then predicted by v7 and the coverage rule applies).",
+      "changes": ["mu_margin", "scale_margin"],
+      "free_parameters": "mapping slope, combiner, bucket scales",
+      "primary": "spread_corr_delta_vs_v7"
+    },
+    "D3_torvik_pit": {
+      "family": "mean",
+      "spec": "Torvik (via cbbdata API, operator key) adjusted efficiency margin as of the day before the game, as a third combiner input to v7; fail closed without the key or a dated snapshot. Registered now, implemented when data exists.",
+      "changes": ["mu_margin", "scale_margin"],
+      "free_parameters": "mapping slope, combiner, bucket scales",
+      "primary": "spread_corr_delta_vs_v7"
+    }
+  },
+  "cohort": {
+    "games": "completed events in the window with both teams Division I as of the season (component archive d1_home and d1_away) AND a non-null closing spread line; every model is scored on the SAME game set (the intersection of the candidate and the three baselines).",
+    "coverage_rule": "a candidate must predict at least 99.0% of the baseline cohort in EVERY held-out season; otherwise the verdict is INCOMPLETE (declining games cannot help a candidate). Unlined D1 games are counted but not scored.",
+    "totals": "spread cohort games with a non-null closing total line, for candidates that submit mu_total"
+  },
+  "lines": {
+    "source": "data/research/ncaab_market/espn_lines.jsonl selected block, ncaab-espn-lines-rule-1 (median of non-live providers, CLOSING benchmark, no observed_at)",
+    "spread": "implied home margin L = -home_spread_line; y = actual home margin - L",
+    "total": "T = total_line; y = actual total - T",
+    "no_prices": "no moneyline price exists in the archive; moneyline is compared with a spread-implied probability (below). Never American odds."
+  },
+  "distributions": {
+    "t8": "Student-t, 8 degrees of freedom, location mu, scale = scale_margin",
+    "normal": "Normal, mean mu, standard deviation = scale_margin",
+    "p_home_from_margin": "P(margin >= 1) = 1 - F(0.5); basketball margins are integers and never tie",
+    "home_cover": "half-point line: 1 - F(L); integer line: push mass excluded, p = (1 - F(L + 0.5)) / ((1 - F(L + 0.5)) + F(L - 0.5)); push games are dropped from cover scoring",
+    "over": "same construction on the total with scale_total"
+  },
+  "statistics": {
+    "market_primary": {
+      "x": "model - line (spread: mu_margin - L; total: mu_total - T)",
+      "plain": "OLS slope of y on x and Pearson correlation of y and x, pooled over held-out seasons, with day-cluster bootstrap intervals",
+      "rule_1_loso": "ncaab-residual-rule-1 machinery under this hash: for each held-out season, ridge (alpha 1000, standardised on the training rows, single feature x) fit on the other development seasons' rows predicting y, prediction = 0.5 x ridge prediction, baseline b = training-row mean of y; pooled over seasons the slope of (y - b) on the shrunk prediction and the MSE delta (baseline - model) with K-adjusted and plain bounds (scripts/ncaab_residual.py ridge_fit / ridge_predict / window_stats reused unchanged)",
+      "edge_dev": "EDGE-ELIGIBLE iff the rule-1 slope K-adjusted lower bound > 0 AND the rule-1 MSE delta K-adjusted lower bound > 0 (K = spread or total family size). An edge claim additionally needs the confirmation window and the forward final; this protocol authorises no staking and no promotion."
+    },
+    "paired_vs_v7": {
+      "spread_corr_delta_vs_v7": "corr(y, cand - L) - corr(y, v7 - L) on identical games, day-cluster bootstrap (correlation is scale free, so shrinking or stretching toward the line cannot game it)",
+      "cover_logloss_delta_vs_v7": "mean log loss of P(home covers) at the closing line, candidate minus served v7, identical games, pushes dropped, p clipped to [1e-6, 1 - 1e-6]",
+      "moneyline_logloss_delta_vs_v7": "mean log loss of p_home on the home-win outcome, candidate minus served v7 (0.5 Elo blend)",
+      "margin_rmse_delta_vs_v7": "RMSE(cand) - RMSE(v7) on identical games",
+      "total_corr_delta_vs_v6": "for totals: corr delta against the served total (v6)"
+    },
+    "secondary": {
+      "rmse_bias_by_games_played": "buckets on games_played_min: 0 | 1-2 | 3-7 | 8+; bias = mean(actual - prediction)",
+      "rmse_bias_by_abs_closing_line": "|L| buckets: <5 | 5-10 | 10-20 | 20+",
+      "cover_calibration": "Brier and log loss of P(home covers) at the closing line, reliability on the favoured side in bins 0.5-0.6, 0.6-0.7, 0.7-0.8, 0.8-1.0",
+      "moneyline": "Brier and log loss of p_home; the same against the closing-spread-implied win probability p_line = 1 - Phi((0.5 - L) / sigma), sigma = standard deviation of (actual margin - L) on the lined D1 cohort of the TRAINING seasons of the fold (estimated, not a fixed number); market-relative moneyline correlation corr(win - p_line, p_model - p_line)",
+      "totals": "RMSE/bias by games played, over-probability Brier/log loss at the closing total, market slope and correlation"
+    },
+    "bootstrap": {
+      "resamples": 4000,
+      "seed": 17,
+      "cluster": "Eastern game day (all games of one day resampled together), days pooled across held-out seasons",
+      "interval": "percentile"
+    }
+  },
+  "beats_v7_rule": {
+    "development": {
+      "mean_family": "DEV-ELIGIBLE iff (i) spread_corr_delta_vs_v7 K-adjusted lower bound > 0 (K = 21), (ii) margin_rmse_delta_vs_v7 point <= 0, (iii) the pooled 2025+2026 folds' corr delta point > 0, (iv) no leak flag, (v) coverage rule met.",
+      "scale_family": "mu_margin must equal v7's served mean within 1e-6 on every game (else it is scored as mean family). DEV-ELIGIBLE iff cover_logloss_delta_vs_v7 K-adjusted upper bound < 0 (K = 14), moneyline Brier delta point <= 0, the 2025+2026 folds' cover log loss delta point < 0, no leak flag, coverage met.",
+      "moneyline_family": "DEV-ELIGIBLE iff moneyline_logloss_delta_vs_v7 K-adjusted upper bound < 0 (K = 14), moneyline Brier delta point <= 0, the 2025+2026 folds' log loss delta point < 0, no leak flag, coverage met."
+    },
+    "beats_v7": "ONLY a DEV-ELIGIBLE candidate that then passes its primary statistic on the confirmation window (plain one-sided 95% bound, one read) 'beats v7'. It may then be registered as a shadow challenger under a new pin; promotion stays a separate operator decision through model_promotion.",
+    "not_beats": "Anything else, including point improvements, is reported as a forecast-quality observation without a 'beats v7' label."
+  },
+  "leak_flags": {
+    "rmse_below_line": "candidate margin RMSE on a held-out season below the closing line's RMSE on the same games",
+    "market_corr": "|corr(y, x)| > 0.15 on any held-out season for spread or total",
+    "fit_includes_predicted": "sidecar lists the predicted season among its fit seasons (hard refusal)",
+    "action": "a flagged candidate gets verdict LEAK_SUSPECT and no eligibility until the producing code is reviewed"
+  },
+  "submission": {
+    "predictions_jsonl_fields": {
+      "event_id": "ESPN event id (string)",
+      "season": "ESPN season year (int)",
+      "game_date": "Eastern calendar day YYYY-MM-DD",
+      "home_team": "ESPN display name as in scoreboard.jsonl",
+      "away_team": "ESPN display name",
+      "neutral": "bool, as in scoreboard.jsonl",
+      "mu_margin": "expected home margin (home minus away points)",
+      "scale_margin": "t8 scale or normal SD",
+      "dist": "t8 | normal",
+      "p_home_ml": "optional; when absent derived as P(margin >= 1) from the margin distribution",
+      "mu_total": "optional expected total points",
+      "scale_total": "optional; required with mu_total (normal SD or t8 scale by dist)",
+      "games_played_min": "min of the two teams' prior current-season games, point-in-time"
+    },
+    "sidecar_meta_json": {
+      "candidate": "free label",
+      "grid_name": "one of candidate_grid (else UNREGISTERED: exploratory, no verdict)",
+      "protocol_sha256": "this protocol's hash",
+      "code_sha256": "sha256 of the producing script(s)",
+      "fit_seasons_by_predicted_season": "e.g. {\"2023\": [2024, 2025, 2026], ...}; the predicted season may never appear",
+      "history_cutoff": "must state 'strictly before Eastern midnight of the game day'",
+      "data_sources": "list of inputs with sha256"
+    },
+    "validation": "season, game_date, home_team, away_team and neutral are checked against the archive by event_id; any mismatch fails the call"
+  },
+  "baselines": {
+    "v7_served": "D1-vs-D1 only. mean = 0.9592933 x ridge rg_c010_l02_k14 + 0.1610939 x sign(v6) max(|v6 as-of mean| - 12, 0), t(8) scale by games-played bucket (11.271 / 10.873 / 10.711 / 9.967), constants imported from models/ncaab_v7_serving.py. Seasons 2023 and 2024 use the m5r leave-one-season-out v7 predictions (served constants were fit there). Moneyline = 0.5 x v6 Elo win probability + 0.5 x P(margin >= 1) under v7 (served blend; Elo probability reconstructed from the component archive's v6_p_home and gated outcome-free against the Elo formula). Total = served v6 total (the served path never applies v7 to totals), normal with the v6 total SD.",
+    "v6_asof": "v6 served parameters replayed with the as-of conference map (component archive v6_mean, v6_scale t(8), v6_p_home, v6_total normal with v6_total_sd).",
+    "closing_line": "mean = L, normal SD sigma from the fold's training seasons; moneyline p_line; no slope, correlation or cover probability (N/A by construction).",
+    "reproduction_gate": "Before the baseline read, served v7 on 2025 must reproduce the published m5r numbers: D1 n 5764, lined 5763, margin RMSE 11.50, home-cover Brier 0.2585, plain slope -0.085 [-0.215, +0.052], closing-line RMSE 11.19 (tolerance 0.005 RMSE / 0.0005 Brier / 0.001 slope). A miss aborts."
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "addendum_sha256": "75241bc7885378f266ba66ce383f3b50fe58869e9b699ae90f0ddd9c8ead6317",
+  "candidate": "B1: t8 scale = a_bucket + b*|mu| on served v7 mean, LOSO t8 MLE",
+  "code_files_sha256": {
+    "scripts/ncaab_research/candidates/ab_common_261120.py": "ad63f398f43b19935d757851e1bbc55c9d9bc1f4f160881b3182f3908f6ef66c",
+    "scripts/ncaab_research/candidates/b1_scale_linear_mu.py": "f6b539e8c8312758f3cea71b515e26f90d2953402dbca75ce7173421d95b38d4"
+  },
+  "code_sha256": "1bb50ed4a288ff586f8ebb67bb785ee7320799a54199877905e79426b0b87cc9",
+  "data_sources": {
+    "data/research/ncaab_market/scoreboard.jsonl": "ee5394da02380ae9ca4780813ba9cfa851f450d87d94206031c7be81a5d8d1a7",
+    "data/research/ncaab_market/v7ms_components.jsonl": "cf1b90760618bd90869a121c5fca12ef24a0327670c0016200dce3b13175fe94",
+    "data/research/ncaab_market/v7ms_loso_fit_preds.jsonl": "347f32e4fb7686fa7d4e87d8ced95f369ef9d46bdac9ecf9ae3950c116e2b3da",
+    "outputs/ncaab/ncaab_v7_multiseason_frozen.json": "6c4676ffaf3c16aeee756cf748a4af3f6da617ceb794ad5d07643cff99bc8bdb"
+  },
+  "disclosure": "served v7 mean on training rows was fit with 2023/2024 data (protocol nesting caveat)",
+  "fit_seasons_by_predicted_season": {
+    "2023": [
+      2024,
+      2025,
+      2026
+    ],
+    "2024": [
+      2023,
+      2025,
+      2026
+    ],
+    "2025": [
+      2023,
+      2024,
+      2026
+    ],
+    "2026": [
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "fitted_params_by_fold": {
+    "2023": {
+      "a": [
+        11.738364956302693,
+        10.54813301998631,
+        10.624120978061306,
+        9.830687253653105
+      ],
+      "a_b0_init": [
+        12.14117826523902,
+        10.829617150973995,
+        10.843158406307673,
+        10.002380116059143
+      ],
+      "b": 0.02479548514418068,
+      "b_at_bound": false,
+      "converged": true,
+      "floor_binding_rows": 0,
+      "n_train": 17242,
+      "nll": 66570.05103627115,
+      "nll_b0": 66573.36408318403
+    },
+    "2024": {
+      "a": [
+        11.561648376059175,
+        10.766932246919861,
+        10.598351527918275,
+        9.770256203622402
+      ],
+      "a_b0_init": [
+        12.00894335700999,
+        11.092040659616522,
+        10.83959285418041,
+        9.965784493108647
+      ],
+      "b": 0.028395502284685226,
+      "b_at_bound": false,
+      "converged": true,
+      "floor_binding_rows": 0,
+      "n_train": 17237,
+      "nll": 66520.57880789557,
+      "nll_b0": 66524.9209142173
+    },
+    "2025": {
+      "a": [
+        11.35513500845042,
+        10.686944646796002,
+        10.602865752502868,
+        9.815912235611886
+      ],
+      "a_b0_init": [
+        11.762161290628427,
+        10.97424048255547,
+        10.814815510743742,
+        9.988773723056045
+      ],
+      "b": 0.02517104040728022,
+      "b_at_bound": false,
+      "converged": true,
+      "floor_binding_rows": 0,
+      "n_train": 17199,
+      "nll": 66355.3213495805,
+      "nll_b0": 66358.53893086736
+    },
+    "2026": {
+      "a": [
+        11.189235670553492,
+        10.565975194780366,
+        10.515666909563157,
+        9.78008969251235
+      ],
+      "a_b0_init": [
+        11.620258167772391,
+        10.854149543445764,
+        10.738467361793926,
+        9.963888463175874
+      ],
+      "b": 0.02714012963514249,
+      "b_at_bound": false,
+      "converged": true,
+      "floor_binding_rows": 0,
+      "n_train": 17211,
+      "nll": 66343.44840329025,
+      "nll_b0": 66347.04245956699
+    }
+  },
+  "form": "per-bucket a_b + common b (declared before the read)",
+  "grid_name": "B1_scale_linear_mu",
+  "history_cutoff": "strictly before Eastern midnight of the game day",
+  "predictions_file_sha256": "09e5eba438e3cbb10204bb3fe51c3951ad6c66a545fdf07c923702d56d9939dc",
+  "protocol_sha256": "72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813"
+}

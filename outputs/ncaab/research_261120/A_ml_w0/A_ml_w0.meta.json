@@ -1,0 +1,37 @@
+{
+  "addendum_sha256": "75241bc7885378f266ba66ce383f3b50fe58869e9b699ae90f0ddd9c8ead6317",
+  "candidate": "A_ml_w0: p_home = P_t8(margin >= 1) under served v7 (Elo weight 0)",
+  "code_files_sha256": {
+    "scripts/ncaab_research/candidates/a_ml_w0.py": "5bcf29cecd858ff055c679905ed25d5d55ef13940862ac2b42e9a6b45129a58b",
+    "scripts/ncaab_research/candidates/ab_common_261120.py": "ad63f398f43b19935d757851e1bbc55c9d9bc1f4f160881b3182f3908f6ef66c"
+  },
+  "code_sha256": "97664bdeab360cb37b203ccc02e3743d47144f35b4de3977a14a8d3af142a0c7",
+  "data_sources": {
+    "data/research/ncaab_market/scoreboard.jsonl": "ee5394da02380ae9ca4780813ba9cfa851f450d87d94206031c7be81a5d8d1a7",
+    "data/research/ncaab_market/v7ms_components.jsonl": "cf1b90760618bd90869a121c5fca12ef24a0327670c0016200dce3b13175fe94",
+    "data/research/ncaab_market/v7ms_loso_fit_preds.jsonl": "347f32e4fb7686fa7d4e87d8ced95f369ef9d46bdac9ecf9ae3950c116e2b3da",
+    "outputs/ncaab/ncaab_v7_multiseason_frozen.json": "6c4676ffaf3c16aeee756cf748a4af3f6da617ceb794ad5d07643cff99bc8bdb"
+  },
+  "elo_weight": 0.0,
+  "fit_seasons_by_predicted_season": {
+    "2023": [
+      2024
+    ],
+    "2024": [
+      2023
+    ],
+    "2025": [
+      2023,
+      2024
+    ],
+    "2026": [
+      2023,
+      2024
+    ]
+  },
+  "free_parameters": "none; mu/scale are served v7 (fit seasons are v7's own, as in the export)",
+  "grid_name": "A_ml_w0",
+  "history_cutoff": "strictly before Eastern midnight of the game day",
+  "predictions_file_sha256": "4d0282d93951a7ed43a7dfabb60209108f0e1478b70e29f744dd98f6575cae5c",
+  "protocol_sha256": "72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813"
+}

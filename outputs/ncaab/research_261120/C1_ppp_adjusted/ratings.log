@@ -1,0 +1,46 @@
+28449 component rows -> E:\MP\outputs\ncaab\research_261120\C1_ppp_adjusted\c1_components.jsonl.gz
+{
+ "drops": {
+  "no_box": 25,
+  "poss_out_of_range": 1
+ },
+ "n_fit_rows": 28423,
+ "n_teams": 368,
+ "seasons": {
+  "2022": {
+   "fit_games": 5474,
+   "hca_points_at_mean_poss": 2.579,
+   "league_eff": 103.01,
+   "league_poss_intercept": 67.96,
+   "mean_game_poss": 68.08
+  },
+  "2023": {
+   "fit_games": 5714,
+   "hca_points_at_mean_poss": 3.278,
+   "league_eff": 104.39,
+   "league_poss_intercept": 67.83,
+   "mean_game_poss": 67.91
+  },
+  "2024": {
+   "fit_games": 5724,
+   "hca_points_at_mean_poss": 2.853,
+   "league_eff": 106.27,
+   "league_poss_intercept": 68.24,
+   "mean_game_poss": 68.4
+  },
+  "2025": {
+   "fit_games": 5759,
+   "hca_points_at_mean_poss": 3.066,
+   "league_eff": 107.38,
+   "league_poss_intercept": 67.74,
+   "mean_game_poss": 67.88
+  },
+  "2026": {
+   "fit_games": 5752,
+   "hca_points_at_mean_poss": 2.771,
+   "league_eff": 109.66,
+   "league_poss_intercept": 67.96,
+   "mean_game_poss": 68.17
+  }
+ }
+}
