@@ -74,3 +74,27 @@ No fitted constant, calibration table or artifact changed.
     12.1 to 11.3).
 - `test_cfb_structural_v2.py::test_cfb_structural_v2_calibrated_dispersion` already fails at base a3cbdac7.
 - v5's FBS-vs-FCS margin SD slice was fit under the old fail-open labels.
+
+## Arm E: sign flip (549b5ef2, operator-requested follow-up)
+
+`adj_scored = s_pts + opp_offset*0.35`, `adj_allowed = a_pts - opp_offset*0.35`. The new direction test
+fails at b148ae24.
+
+- 2026-11-21 slate, moneyline moves (games moved at all / >=1pt / >=3pts, mean pp):
+  - E vs HEAD: 54/27/7, mean 2.4pp.
+  - E vs D: 53/28/8, mean 2.5pp.
+- The large moves are the FBS-vs-FCS games, all in the sensible direction:
+  - Tennessee Tech @ Mississippi State: home 36.0 -> 64.5 (HEAD projected the SEC home team losing by 5.1).
+  - Samford @ Auburn: 75.3 -> 91.2.
+  - Chattanooga @ Alabama: 78.7 -> 94.5.
+  - Wofford @ Ole Miss: 74.1 -> 89.4.
+- 427 settled games:
+  - Brier: 0.2174 at HEAD, 0.2148 under D, 0.2149 under E.
+  - Brier on the same 419 FBS-vs-FBS games: 0.2191 at HEAD, 0.2168 under D, 0.2170 under E.
+  - Calibrated margin MAE: 13.39 at HEAD, 13.06 under D, 13.06 under E. E is neutral on FBS-vs-FBS games.
+- v5 margin calibration on the same games (artifact slope 1.3189, intercept -0.41):
+  - Regressing the actual margin on the raw margin gives slope 1.53 under both D and E.
+  - Favourites by calibrated size, projected vs actual margin under E: 0-3 pts 1.5 vs 0.2; 3-7 pts 4.8 vs 5.8;
+    7-14 pts 9.8 vs 10.8; 14-21 pts 16.6 vs 17.0; 21+ pts 28.3 vs 32.8.
+  - Projections remain mildly compressed for favourites of 3 pts or more. This is n=427 in a single season,
+    which is not enough to refit. No constant was changed.
