@@ -68,6 +68,25 @@ def ncaaf_contract_slug(slug: str) -> str:
     return match.group(1) if match else slug
 
 
+_CONTRACT_PREFIXES = ("atc", "tsc", "asc", "mkt", "aec")
+
+
+def ncaaf_settlement_slug(slug: str, rationale: str) -> str:
+    """The contract an NCAAF row's close is looked up on, from settlement's extracted slug.
+
+    The shared ``cli.settle._extract_market_slug`` takes the first hyphenated parenthesized token,
+    and the v6.2 rationale reads "challenger (anchor-blended): ... (aec-cfb-...)", so all 336 v6.2
+    rows extracted "anchor-blended" and never had a close (2026-11-21). A contract-prefixed token
+    from the rationale replaces a slug that is not one. Kept local to NCAAF settlement: the shared
+    extractor also feeds the real-money ticket gate, which is the operator's call to change.
+    """
+    if not slug.startswith(_CONTRACT_PREFIXES):
+        better = _row_slug(None, None, rationale)
+        if better is not None and better.startswith(_CONTRACT_PREFIXES):
+            slug = better
+    return ncaaf_contract_slug(slug)
+
+
 def _iso(moment: datetime) -> str:
     return moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
 

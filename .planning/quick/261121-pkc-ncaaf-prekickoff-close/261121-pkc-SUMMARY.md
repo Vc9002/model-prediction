@@ -39,10 +39,17 @@ No champion change, no ledger mutation, no order. Task added to
      `ncaaf_contract_slug`, which drops a trailing `-home`/`-away` only from an
      `aec-cfb-...-YYYY-MM-DD` slug.
   2. The v6.2 rationale reads `challenger (anchor-blended): ... (aec-cfb-...)`.
-     `_extract_market_slug`, and its mirror `_row_slug`, took the first hyphenated
-     parenthesized token, so all 336 v6.2 rows had the slug `anchor-blended`. Both
-     now prefer a contract-prefixed token (`atc/tsc/asc/mkt/aec`) and fall back to
-     any hyphenated token, as before.
+     The shared `_extract_market_slug` takes the first hyphenated parenthesized
+     token, so all 336 v6.2 rows had the slug `anchor-blended`. This is fixed
+     locally:
+     - NCAAF settlement maps the slug through `ncaaf_settlement_slug`. A
+       contract-prefixed rationale token (`atc/tsc/asc/mkt/aec`) replaces a
+       non-contract slug, and then the moneyline suffix is dropped.
+     - `_row_slug`, which only feeds captures, prefers contract-prefixed tokens.
+     - The shared `_extract_market_slug` is unchanged. The first commit changed
+       it and the follow-up commit restored it, because it also feeds the
+       real-money ticket gate (`polymarket_execute.py:427`) and
+       `auto_executor.py:607`.
 
 ## Verification
 
@@ -60,13 +67,15 @@ No champion change, no ledger mutation, no order. Task added to
   - The archive fallback runs when the event list returns 503.
   - An idle run makes zero requests.
   - Slug resolution; worker registration and exit codes.
-- Mutation proof (`pkc_mutate.py` in the session scratchpad): all 11 mutations
+- Mutation proof (`pkc_mutate.py` in the session scratchpad): all 12 mutations
   were killed.
   - Capture: keep-slugs dropped, lower bound made inclusive, upper bound made
     exclusive, no clock re-read, no archive fallback, ML suffix kept, wrong sport
     dir, no idle gate.
-  - Settle: ML suffix kept, first-hyphen extractor.
+  - Settle: NCAAF slug mapping skipped, non-contract token kept, ML suffix kept.
   - Pretip: first-hyphen extractor.
+- mypy is clean on both new modules. `test_system_health_start_offsets` and
+  `test_system_health` pass.
 - Targeted files (no MODEL_PREDICTION_* env): this file plus
   `test_pretip_close_capture`, `test_ncaaf_settlement_clv_bound`,
   `test_nba_pretip_capture`, `test_nba_anchor_v10_wiring`,
@@ -101,10 +110,25 @@ open rows kicking off at 20:30Z:
 
 - Register the task after merge (exact line in `register_windows_tasks.ps1`).
 - Already-settled rows keep their blank closes; no backfill was done.
-- `_extract_market_slug` is also used by the real-money ticket gate
-  (`polymarket_execute.py:427`, the slug must equal the priced contract). For a
-  v6.2 row the gate previously compared against `anchor-blended` and refused
-  every ticket. It now compares against the real contract slug.
+- Decision: fix `_extract_market_slug` globally so the contract-prefixed token
+  comes first? Not done here. Its effects:
+  - The real-money ticket gate would compare a v6.2 row against its real
+    contract. Today it compares against `anchor-blended`, so it refuses every
+    v6.2 ticket by accident.
+  - `_open_pick_slugs` and `auto_executor` would keep v6.2 rungs in ladder
+    capture.
+- Root causes left in place:
+  - the `-home|-away` suffix at `models/college_football.py:1108` (v5) and in
+    v6.2;
+  - the v6.2 rationale tag.
+
+  Either fix them at the source or keep the settlement mapping.
+- 429 load: 56 of the 120 requests in the 20:05Z run got a 429. The IP is shared
+  with the Daily, the NBA capture and the buyer, and every run restarts at the
+  capture's 0.5 s spacing. A slower starting interval is an option once
+  registered runs show the real contention.
+- Health: `system_health` reports "never run" for the new worker until the task
+  is registered, so merge and register together.
 - Busy Saturday clusters (the noon wave) can exceed the 240 s budget on the first
   look. Held contracts go first, and the next run 10 minutes later picks up the
   rest.

@@ -461,7 +461,13 @@ def test_no_game_in_the_window_makes_no_request(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- slugs
 def test_ledger_slugs_resolve_to_the_contract():
     rationale = V62_ML.format(slug="aec-cfb-byu-kan-2026-11-21")
-    assert settle_module._extract_market_slug(rationale, {}) == "aec-cfb-byu-kan-2026-11-21-home"
+    # The shared extractor is unchanged (it also feeds the real-money ticket gate); NCAAF
+    # settlement corrects its "anchor-blended" pick locally.
+    assert settle_module._extract_market_slug(rationale, {}) == "anchor-blended"
+    assert cap.ncaaf_settlement_slug("anchor-blended", rationale) == "aec-cfb-byu-kan-2026-11-21"
+    assert cap.ncaaf_settlement_slug("ncaaf-ml-401752-home", "ESPN consensus (no contract)") == (
+        "ncaaf-ml-401752-home"
+    )
     assert _row_slug(None, None, rationale) == "aec-cfb-byu-kan-2026-11-21-home"
     assert cap.ncaaf_contract_slug("aec-cfb-byu-kan-2026-11-21-home") == "aec-cfb-byu-kan-2026-11-21"
     assert cap.ncaaf_contract_slug("aec-cfb-byu-kan-2026-11-21-away") == "aec-cfb-byu-kan-2026-11-21"

@@ -356,9 +356,9 @@ def _settle_all_unsettled(
                 # D+1/D+2 books observed before the decision. Other sports keep their call unchanged.
                 closing_kwargs: dict[str, Any] = {}
                 if sport_dir == "ncaaf":
-                    from ..ncaaf_prekickoff_capture import ncaaf_contract_slug
+                    from ..ncaaf_prekickoff_capture import ncaaf_settlement_slug
 
-                    slug = ncaaf_contract_slug(slug)
+                    slug = ncaaf_settlement_slug(slug, str(row.get("rationale", "")))
                 if sport_dir in ("ncaab", "ncaaf"):
                     decision_quote_at = row.get("market_quote_observed_at_utc") or row.get("observed_at_utc")
                     if decision_quote_at:
@@ -789,15 +789,8 @@ def _extract_market_slug(rationale: str, row: dict | None = None) -> str | None:
     match = re.search(r"market_slug=([a-z0-9_\-]+)", rationale)
     if match:
         return match.group(1)
-    candidates = re.findall(r"\(([a-z0-9_\-]+)\)", rationale)
-    # A contract-prefixed token wins over any other hyphenated one: the NCAAF v6.2 rationale
-    # reads "challenger (anchor-blended): ... (aec-cfb-...)", and taking the first hyphenated
-    # token gave every v6.2 row the slug "anchor-blended" and so never a close (2026-11-21).
-    for m in candidates:
-        if m.startswith(("atc", "tsc", "asc", "mkt", "aec")):
-            return m
-    for m in candidates:
-        if "-" in m:
+    for m in re.findall(r"\(([a-z0-9_\-]+)\)", rationale):
+        if "-" in m or m.startswith(("atc", "tsc", "asc", "mkt", "aec")):
             return m
     # No candidate looked like a real slug (e.g. only "(home)"/"(away)" in
     # parens) -- returning that garbage caused repeated 404s against
