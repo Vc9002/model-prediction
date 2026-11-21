@@ -1,11 +1,11 @@
 {
  "calls": {
-  "ledger_after": 89,
-  "ledger_before": 87,
+  "ledger_after": 92,
+  "ledger_before": 89,
   "note": "/info does not consume quota (two back-to-back /info calls left remainingCalls unchanged)",
   "remaining_after": 2749,
   "remaining_before": 2749,
-  "this_run_http_attempts": 2
+  "this_run_http_attempts": 3
  },
  "datasets": {
   "lines_2014": {
@@ -384,7 +384,7 @@
    "status": "cached"
   }
  },
- "generated_at_utc": "2026-11-21T19:55:19Z",
+ "generated_at_utc": "2026-11-21T20:04:07Z",
  "ledger": {
   "attempts_by_endpoint": {
    "lines": 13,
@@ -397,10 +397,10 @@
    "teams": 1
   },
   "attempts_excluding_info": 79,
-  "attempts_total": 89,
+  "attempts_total": 92,
   "first_at_utc": "2026-11-21T19:40:15.305704+00:00",
   "first_remaining_seen": 2824,
-  "last_at_utc": "2026-11-21T19:55:24.406852+00:00",
+  "last_at_utc": "2026-11-21T20:04:14.808810+00:00",
   "last_remaining_seen": 2749,
   "non_200_attempts": [
    {
@@ -463,11 +463,19 @@
    },
    "lines_rows": 2303,
    "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_open_close_sign_conflict": 0,
    "lines_rows_with_ml": 0,
    "lines_rows_with_open_spread": 0,
+   "lines_sign_check": {
+    "formatted_spread_checked": 2285,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.67,
+    "total_close_vs_points_corr": 0.45
+   },
    "observed_at_utc": "2014-08-27T23:00:00Z",
    "portal": null,
    "portal_transfer_dates": null,
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 231,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -505,11 +513,19 @@
    },
    "lines_rows": 2320,
    "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_open_close_sign_conflict": 0,
    "lines_rows_with_ml": 0,
    "lines_rows_with_open_spread": 0,
+   "lines_sign_check": {
+    "formatted_spread_checked": 2286,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.689,
+    "total_close_vs_points_corr": 0.481
+   },
    "observed_at_utc": "2015-09-03T22:00:00Z",
    "portal": null,
    "portal_transfer_dates": null,
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 248,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -548,11 +564,19 @@
    },
    "lines_rows": 2347,
    "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_open_close_sign_conflict": 0,
    "lines_rows_with_ml": 0,
    "lines_rows_with_open_spread": 0,
+   "lines_sign_check": {
+    "formatted_spread_checked": 2333,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.664,
+    "total_close_vs_points_corr": 0.436
+   },
    "observed_at_utc": "2016-08-27T02:00:00Z",
    "portal": null,
    "portal_transfer_dates": null,
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 250,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -590,11 +614,19 @@
    },
    "lines_rows": 2400,
    "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_open_close_sign_conflict": 0,
    "lines_rows_with_ml": 0,
    "lines_rows_with_open_spread": 0,
+   "lines_sign_check": {
+    "formatted_spread_checked": 2377,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.696,
+    "total_close_vs_points_corr": 0.416
+   },
    "observed_at_utc": "2017-08-26T18:30:00Z",
    "portal": null,
    "portal_transfer_dates": null,
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 234,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -633,11 +665,19 @@
    },
    "lines_rows": 3034,
    "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_open_close_sign_conflict": 0,
    "lines_rows_with_ml": 0,
    "lines_rows_with_open_spread": 0,
+   "lines_sign_check": {
+    "formatted_spread_checked": 3003,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.673,
+    "total_close_vs_points_corr": 0.481
+   },
    "observed_at_utc": "2018-08-25T21:30:00Z",
    "portal": null,
    "portal_transfer_dates": null,
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 250,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -678,11 +718,19 @@
    },
    "lines_rows": 3506,
    "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_open_close_sign_conflict": 0,
    "lines_rows_with_ml": 0,
    "lines_rows_with_open_spread": 0,
+   "lines_sign_check": {
+    "formatted_spread_checked": 3478,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.719,
+    "total_close_vs_points_corr": 0.405
+   },
    "observed_at_utc": "2019-08-24T23:00:00Z",
    "portal": null,
    "portal_transfer_dates": null,
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 244,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -727,11 +775,19 @@
    },
    "lines_rows": 2752,
    "lines_rows_ml_spread_sign_conflict": 0,
+   "lines_rows_open_close_sign_conflict": 0,
    "lines_rows_with_ml": 0,
    "lines_rows_with_open_spread": 0,
+   "lines_sign_check": {
+    "formatted_spread_checked": 2726,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.646,
+    "total_close_vs_points_corr": 0.384
+   },
    "observed_at_utc": "2020-09-04T00:00:00Z",
    "portal": null,
    "portal_transfer_dates": null,
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 239,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -775,8 +831,15 @@
    },
    "lines_rows": 3541,
    "lines_rows_ml_spread_sign_conflict": 23,
+   "lines_rows_open_close_sign_conflict": 5,
    "lines_rows_with_ml": 739,
    "lines_rows_with_open_spread": 878,
+   "lines_sign_check": {
+    "formatted_spread_checked": 3510,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.708,
+    "total_close_vs_points_corr": 0.359
+   },
    "observed_at_utc": "2021-08-28T17:20:00Z",
    "portal": {
     "after_cutoff": 0,
@@ -789,6 +852,9 @@
     "first": "2020-08-01",
     "last": "2021-07-31"
    },
+   "portal_zero_fbs_rows": [
+    "Florida International"
+   ],
    "priors_espn_matched": 236,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -830,8 +896,15 @@
    },
    "lines_rows": 4310,
    "lines_rows_ml_spread_sign_conflict": 32,
+   "lines_rows_open_close_sign_conflict": 2,
    "lines_rows_with_ml": 728,
    "lines_rows_with_open_spread": 852,
+   "lines_sign_check": {
+    "formatted_spread_checked": 4270,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.701,
+    "total_close_vs_points_corr": 0.446
+   },
    "observed_at_utc": "2022-08-27T16:00:00Z",
    "portal": {
     "after_cutoff": 1,
@@ -844,6 +917,7 @@
     "first": "2021-08-01",
     "last": "2022-09-07"
    },
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 238,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -887,8 +961,15 @@
    },
    "lines_rows": 3072,
    "lines_rows_ml_spread_sign_conflict": 50,
+   "lines_rows_open_close_sign_conflict": 11,
    "lines_rows_with_ml": 1505,
    "lines_rows_with_open_spread": 1605,
+   "lines_sign_check": {
+    "formatted_spread_checked": 3049,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.689,
+    "total_close_vs_points_corr": 0.382
+   },
    "observed_at_utc": "2023-08-26T18:30:00Z",
    "portal": {
     "after_cutoff": 0,
@@ -901,6 +982,7 @@
     "first": "2020-11-29",
     "last": "2023-07-06"
    },
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 243,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -941,8 +1023,15 @@
    },
    "lines_rows": 3172,
    "lines_rows_ml_spread_sign_conflict": 61,
+   "lines_rows_open_close_sign_conflict": 13,
    "lines_rows_with_ml": 2339,
    "lines_rows_with_open_spread": 2334,
+   "lines_sign_check": {
+    "formatted_spread_checked": 3150,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.671,
+    "total_close_vs_points_corr": 0.296
+   },
    "observed_at_utc": "2024-08-24T16:00:00Z",
    "portal": {
     "after_cutoff": 0,
@@ -955,6 +1044,7 @@
     "first": "2022-12-18",
     "last": "2024-05-16"
    },
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 193,
    "priors_fbs_espn_matched": 137,
    "priors_fbs_rows": 137,
@@ -994,8 +1084,15 @@
    },
    "lines_rows": 3289,
    "lines_rows_ml_spread_sign_conflict": 40,
+   "lines_rows_open_close_sign_conflict": 11,
    "lines_rows_with_ml": 2375,
    "lines_rows_with_open_spread": 2495,
+   "lines_sign_check": {
+    "formatted_spread_checked": 3262,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.723,
+    "total_close_vs_points_corr": 0.342
+   },
    "observed_at_utc": "2025-08-23T16:00:00Z",
    "portal": {
     "after_cutoff": 0,
@@ -1008,6 +1105,7 @@
     "first": "2024-10-01",
     "last": "2025-08-23"
    },
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 231,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -1015,7 +1113,7 @@
    "priors_with": {
     "portal": 232,
     "preseason_ap": 25,
-    "recruiting_4yr": 175,
+    "recruiting_4yr": 176,
     "returning": 134,
     "sp_prev_season": 134,
     "talent": 134,
@@ -1047,8 +1145,15 @@
    },
    "lines_rows": 2304,
    "lines_rows_ml_spread_sign_conflict": 39,
+   "lines_rows_open_close_sign_conflict": 4,
    "lines_rows_with_ml": 1886,
    "lines_rows_with_open_spread": 2281,
+   "lines_sign_check": {
+    "formatted_spread_checked": 2296,
+    "formatted_spread_sign_mismatch": 0,
+    "spread_close_vs_away_margin_corr": 0.735,
+    "total_close_vs_points_corr": 0.399
+   },
    "observed_at_utc": "2026-08-27T22:00:00Z",
    "portal": {
     "after_cutoff": 18,
@@ -1061,6 +1166,7 @@
     "first": "2025-09-25",
     "last": "2026-10-14"
    },
+   "portal_zero_fbs_rows": [],
    "priors_espn_matched": 220,
    "priors_fbs_espn_matched": 138,
    "priors_fbs_rows": 138,
@@ -1068,7 +1174,7 @@
    "priors_with": {
     "portal": 221,
     "preseason_ap": 25,
-    "recruiting_4yr": 182,
+    "recruiting_4yr": 183,
     "returning": 136,
     "sp_prev_season": 136,
     "talent": 138,

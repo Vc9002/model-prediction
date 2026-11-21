@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 
@@ -497,7 +497,7 @@ RECRUITING_WEIGHTS = {0: 0.15, 1: 0.25, 2: 0.30, 3: 0.30}  # key = season - clas
 
 
 def recruiting_window(
-    recruiting: Mapping[tuple[int, str], tuple[int | None, float | None]], season: int, school: str
+    recruiting: Mapping[tuple[int, Any], tuple[int | None, float | None]], season: int, school: Any
 ) -> dict[str, Any]:
     """Classes Y..Y-3 for season Y. One missing class is renormalised over; two or more -> None."""
     points = {k: (recruiting.get((season - k, school)) or (None, None))[1] for k in RECRUITING_WEIGHTS}
@@ -518,6 +518,30 @@ def recruiting_window(
         out["recruiting_points_4yr_weighted"] = None
         out["recruiting_points_4yr_mean"] = None
     return out
+
+
+TeamKey = int | str  # resolved CFBD team id, else "name:<school>" for a name CFBD /teams cannot place
+_V = TypeVar("_V")
+
+
+def _team_key(directory: CFBDTeamDirectory, name: str) -> TeamKey:
+    match = directory.resolve(name)
+    return match.cfbd_team_id if match.cfbd_team_id is not None else f"name:{name}"
+
+
+def _rekey(
+    table: Mapping[tuple[int, str], _V], directory: CFBDTeamDirectory
+) -> tuple[dict[tuple[int, TeamKey], _V], dict[tuple[int, TeamKey], str]]:
+    """(year, school name) -> (year, team key). Two names on one key in one year: the first (sorted)
+    wins; the backfill checked that this never happens in the fetched tables."""
+    out: dict[tuple[int, TeamKey], _V] = {}
+    names: dict[tuple[int, TeamKey], str] = {}
+    for (year, name), value in sorted(table.items(), key=lambda item: item[0]):
+        key = (year, _team_key(directory, name))
+        if key not in out:
+            out[key] = value
+            names[key] = name
+    return out, names
 
 
 @dataclass(frozen=True)
@@ -558,22 +582,46 @@ def build_team_season_priors(
     """One row per school with any of: this season's returning production, talent or recruiting class,
     last season's SP+, or a preseason poll rank. Portal-only schools (mostly non-D1 destinations) get no
     row; their portal counts are reported separately."""
-    schools = {s for (y, s) in inputs.returning if y == season}
-    schools |= {s for (y, s) in inputs.talent if y == season}
-    schools |= {s for (y, s) in inputs.recruiting if y == season}
-    schools |= {s for (y, s) in inputs.sp if y == season - 1}
-    entries: list[tuple[str, TeamMatch]] = [(s, directory.resolve(s)) for s in sorted(schools)]
-    matched_ids = {m.cfbd_team_id for _, m in entries if m.cfbd_team_id is not None}
-    for tid in sorted(set(inputs.polls) - matched_ids):
-        team = directory.teams.get(tid)
-        entries.append((str(team["school"]) if team else f"cfbd:{tid}", directory.by_id(tid)))
+    # Join on the resolved CFBD team id, not the name: the tables spell some schools differently from
+    # year to year and from the portal ("Southeastern Louisiana" / "SE Louisiana", "Saint Francis (PA)"
+    # / "Saint Francis"), and a name join turns those into silent zeros or nulls.
+    returning, names = _rekey(inputs.returning, directory)
+    talent, talent_names = _rekey(inputs.talent, directory)
+    recruiting, rec_names = _rekey(inputs.recruiting, directory)
+    sp, sp_names = _rekey(inputs.sp, directory)
+    for table in (talent_names, rec_names, sp_names):
+        for k, v in table.items():
+            names.setdefault(k, v)
+    keys = {k for (y, k) in returning if y == season}
+    keys |= {k for (y, k) in talent if y == season}
+    keys |= {k for (y, k) in recruiting if y == season}
+    keys |= {k for (y, k) in sp if y == season - 1}
+    keys |= set(inputs.polls)  # ranked but absent from every table: still emit, keyed by id
+    portal: dict[TeamKey, PortalAgg] = {}
+    for name, agg in (inputs.portal or {}).items():
+        total = portal.setdefault(_team_key(directory, name), PortalAgg())
+        total.out_count += agg.out_count
+        total.in_count += agg.in_count
+        total.out_stars_sum += agg.out_stars_sum
+        total.in_stars_sum += agg.in_stars_sum
+        total.excluded_after_cutoff += agg.excluded_after_cutoff
+
+    def label(key: TeamKey) -> str:
+        for year in (season, season - 1, season - 2, season - 3):
+            if (year, key) in names:
+                return names[(year, key)]
+        if isinstance(key, int) and key in directory.teams:
+            return str(directory.teams[key]["school"])
+        return str(key)
 
     rows: list[dict[str, Any]] = []
-    for school, match in entries:
-        team = directory.teams.get(match.cfbd_team_id) if match.cfbd_team_id is not None else None
-        poll = inputs.polls.get(match.cfbd_team_id, {}) if match.cfbd_team_id is not None else {}
-        returning = inputs.returning.get((season, school)) or {}
-        sp_prev = inputs.sp.get((season - 1, school)) or {}
+    for key in sorted(keys, key=lambda k: (label(k), str(k))):
+        school = label(key)
+        match = directory.by_id(key) if isinstance(key, int) else directory.resolve(school)
+        team = directory.teams.get(key) if isinstance(key, int) else None
+        poll = inputs.polls.get(key, {}) if isinstance(key, int) else {}
+        ret = returning.get((season, key)) or {}
+        sp_prev = sp.get((season - 1, key)) or {}
         row: dict[str, Any] = {
             "season": season,
             "cfbd_team": school,
@@ -583,15 +631,15 @@ def build_team_season_priors(
             "espn_match_note": match.note,
             "classification_current": team.get("classification") if team else None,
             "conference_current": team.get("conference") if team else None,
-            "returning_off_ppa_pct": returning.get("returning_off_ppa_pct"),
-            "returning_off_passing_ppa_pct": returning.get("returning_off_passing_ppa_pct"),
-            "returning_off_rushing_ppa_pct": returning.get("returning_off_rushing_ppa_pct"),
-            "returning_off_receiving_ppa_pct": returning.get("returning_off_receiving_ppa_pct"),
-            "returning_off_usage_pct": returning.get("returning_off_usage_pct"),
+            "returning_off_ppa_pct": ret.get("returning_off_ppa_pct"),
+            "returning_off_passing_ppa_pct": ret.get("returning_off_passing_ppa_pct"),
+            "returning_off_rushing_ppa_pct": ret.get("returning_off_rushing_ppa_pct"),
+            "returning_off_receiving_ppa_pct": ret.get("returning_off_receiving_ppa_pct"),
+            "returning_off_usage_pct": ret.get("returning_off_usage_pct"),
             "returning_def_pct": None,  # CFBD publishes no defensive returning production
-            "talent": inputs.talent.get((season, school)),
-            "talent_prev_season": inputs.talent.get((season - 1, school)),
-            **recruiting_window(inputs.recruiting, season, school),
+            "talent": talent.get((season, key)),
+            "talent_prev_season": talent.get((season - 1, key)),
+            **recruiting_window(recruiting, season, key),
             "sp_prev_season_rating": sp_prev.get("rating"),
             "sp_prev_season_offense": sp_prev.get("offense"),
             "sp_prev_season_defense": sp_prev.get("defense"),
@@ -609,7 +657,7 @@ def build_team_season_priors(
                 portal_excluded_after_cutoff=None,
             )
         else:
-            agg = inputs.portal.get(school, PortalAgg())
+            agg = portal.get(key, PortalAgg())
             row.update(
                 portal_available=True,
                 portal_out_count=agg.out_count,
@@ -706,6 +754,13 @@ def parse_lines(
                 if fair is None or spread_close is None or spread_close == 0
                 else (fair > 0.5) != (spread_close < 0)
             )
+            # 46 rows open and close a field goal or more on opposite sides (one 2026 game opens at
+            # -19.5 and closes at +19.5): almost surely a sign error in one of the two numbers.
+            open_close_conflict = (
+                None
+                if spread_open is None or spread_close is None
+                else abs(spread_open) >= 3 and abs(spread_close) >= 3 and spread_open * spread_close < 0
+            )
             rows.append(
                 {
                     "season": int(game["season"]),
@@ -739,6 +794,7 @@ def parse_lines(
                     "away_ml_implied_prob_close": away_p,
                     "home_ml_novig_prob_close": fair,
                     "ml_spread_sign_conflict": conflict,
+                    "open_close_sign_conflict": open_close_conflict,
                     "observed_at_utc": iso_utc(start),
                     "observed_at_rule": "kickoff (close and open carry no timestamp; open is earlier)",
                     "as_published_verified": False,

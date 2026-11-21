@@ -259,3 +259,23 @@ def test_team_season_prior_row():
     # ranked but in no table (LSU, CFBD id 99) still gets a row, keyed by id
     lsu = next(r for r in rows if r["cfbd_team_id"] == 99)
     assert lsu["preseason_ap_rank"] == 5 and lsu["espn_match_status"] == cfbd.NO_CALL_ESPN_ID_UNSEEN
+
+
+def test_tables_join_on_team_id_not_name():
+    # CFBD calls UAlbany "Albany" in some years and sources and "UAlbany" in others
+    directory = cfbd.CFBDTeamDirectory(_fixture("teams.json"), ESPN_IDS)
+    inputs = cfbd.SeasonInputs(
+        returning={(2023, "UAlbany"): {"returning_off_ppa_pct": 0.5}},
+        talent={(2022, "Albany"): 500.0, (2023, "UAlbany"): 510.0},
+        recruiting={(2023 - k, "Albany" if k % 2 else "UAlbany"): (90, 100.0 + k) for k in range(4)},
+        sp={(2022, "Albany"): {"rating": -10.0, "offense": None, "defense": None}},
+        polls={},
+        portal={"Albany": cfbd.PortalAgg(out_count=3, in_count=1)},
+    )
+    rows = cfbd.build_team_season_priors(2023, datetime(2023, 8, 26, tzinfo=UTC), directory, inputs)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["cfbd_team_id"] == 399 and row["espn_team_id"] == "399" and row["cfbd_team"] == "UAlbany"
+    assert row["talent"] == 510.0 and row["talent_prev_season"] == 500.0
+    assert row["recruiting_classes_present"] == 4 and row["sp_prev_season_rating"] == -10.0
+    assert row["portal_out_count"] == 3 and row["portal_net"] == -2

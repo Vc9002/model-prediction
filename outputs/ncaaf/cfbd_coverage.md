@@ -1,6 +1,6 @@
 # CFBD coverage (NCAAF v7 research priors and lines)
 
-Generated 2026-11-21T19:55:19Z by `scripts/cfbd_backfill.py`. Normalized outputs:
+Generated 2026-11-21T20:04:07Z by `scripts/cfbd_backfill.py`. Normalized outputs:
 
 * `E:\MP\data\research\ncaaf_v7\cfbd\team_season_priors.jsonl`
 * `E:\MP\data\research\ncaaf_v7\cfbd\lines.jsonl`
@@ -80,8 +80,8 @@ was public before that season's kickoff. Field by field:
 | 2022 | 239 | 238 (99.6%) | 138/138 | 130 | 233 | 220 | 187 | 130 | 25 | 239 |
 | 2023 | 244 | 243 (99.6%) | 138/138 | 131 | 238 | 230 | 169 | 131 | 25 | 244 |
 | 2024 | 194 | 193 (99.5%) | 137/137 | 133 | 134 | 187 | 171 | 133 | 25 | 194 |
-| 2025 | 232 | 231 (99.6%) | 138/138 | 134 | 134 | 134 | 175 | 134 | 25 | 232 |
-| 2026 | 221 | 220 (99.5%) | 138/138 | 136 | 138 | 134 | 182 | 136 | 25 | 221 |
+| 2025 | 232 | 231 (99.6%) | 138/138 | 134 | 134 | 134 | 176 | 134 | 25 | 232 |
+| 2026 | 221 | 220 (99.5%) | 138/138 | 136 | 138 | 134 | 183 | 136 | 25 | 221 |
 
 Unmatched prior names (no ESPN id): [('Grand Valley State', 'NO_CALL_ESPN_ID_UNSEEN')]
 
@@ -107,16 +107,38 @@ Name cross-check of matched ids: 265 of 265 (school, ESPN id) pairs have an ESPN
 
 Before 2016 the ESPN history is empty, so 2014-2015 games are unmatched by design: CFBD game ids are ESPN event ids, but the backfill only passes one on after the history has confirmed it. The unmatched 2026 games are later than the history snapshot or not yet played.
 
+### Sign checks (home-side spread)
+
+| season | close spread vs away margin (corr) | close total vs points (corr) | formattedSpread favourite vs spread sign: mismatches / checked | open and close >= 3 on opposite sides (rows) |
+|---|---|---|---|---|
+| 2014 | 0.67 | 0.45 | 0 / 2285 | 0 |
+| 2015 | 0.689 | 0.481 | 0 / 2286 | 0 |
+| 2016 | 0.664 | 0.436 | 0 / 2333 | 0 |
+| 2017 | 0.696 | 0.416 | 0 / 2377 | 0 |
+| 2018 | 0.673 | 0.481 | 0 / 3003 | 0 |
+| 2019 | 0.719 | 0.405 | 0 / 3478 | 0 |
+| 2020 | 0.646 | 0.384 | 0 / 2726 | 0 |
+| 2021 | 0.708 | 0.359 | 0 / 3510 | 5 |
+| 2022 | 0.701 | 0.446 | 0 / 4270 | 2 |
+| 2023 | 0.689 | 0.382 | 0 / 3049 | 11 |
+| 2024 | 0.671 | 0.296 | 0 / 3150 | 13 |
+| 2025 | 0.723 | 0.342 | 0 / 3262 | 11 |
+| 2026 | 0.735 | 0.399 | 0 / 2296 | 4 |
+
+Rows with conflicting signs are flagged per row (`ml_spread_sign_conflict`, `open_close_sign_conflict`), never dropped.
+
 ## Portal (per season, cutoff = first kickoff)
 
-| season | entries | dated after cutoff (excluded) | counted with no destination | transferDate range |
-|---|---|---|---|---|
-| 2021 | 1770 | 0 | 717 (40.5%) | 2020-08-01 .. 2021-07-31 |
-| 2022 | 2273 | 1 | 906 (39.9%) | 2021-08-01 .. 2022-09-07 |
-| 2023 | 2502 | 0 | 895 (35.8%) | 2020-11-29 .. 2023-07-06 |
-| 2024 | 3378 | 0 | 724 (21.4%) | 2022-12-18 .. 2024-05-16 |
-| 2025 | 4499 | 0 | 729 (16.2%) | 2024-10-01 .. 2025-08-23 |
-| 2026 | 4484 | 18 | 975 (21.8%) | 2025-09-25 .. 2026-10-14 |
+| season | entries | dated after cutoff (excluded) | counted with no destination | transferDate range | current-FBS rows with zero portal activity |
+|---|---|---|---|---|---|
+| 2021 | 1770 | 0 | 717 (40.5%) | 2020-08-01 .. 2021-07-31 | Florida International |
+| 2022 | 2273 | 1 | 906 (39.9%) | 2021-08-01 .. 2022-09-07 | none |
+| 2023 | 2502 | 0 | 895 (35.8%) | 2020-11-29 .. 2023-07-06 | none |
+| 2024 | 3378 | 0 | 724 (21.4%) | 2022-12-18 .. 2024-05-16 | none |
+| 2025 | 4499 | 0 | 729 (16.2%) | 2024-10-01 .. 2025-08-23 | none |
+| 2026 | 4484 | 18 | 975 (21.8%) | 2025-09-25 .. 2026-10-14 | none |
+
+Joins between tables (and to the portal) use the resolved CFBD team id, not the school name: CFBD spells three FCS schools differently across years and sources (Albany / UAlbany, Southeastern Louisiana / SE Louisiana, Saint Francis (PA) / Saint Francis). FIU's zero in 2021 is in the data: CFBD's 2021 portal list has no FIU entry under any name.
 
 ## Semantics
 

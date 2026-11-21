@@ -26,6 +26,7 @@ import argparse
 import json
 import logging
 import os
+import statistics
 import subprocess
 import sys
 from collections import Counter, defaultdict
@@ -308,10 +309,49 @@ def _season_summary(
         "lines_rows_with_open_spread": sum(r["spread_home_open"] is not None for r in lines),
         "lines_rows_with_ml": sum(r["home_ml_implied_prob_close"] is not None for r in lines),
         "lines_rows_ml_spread_sign_conflict": sum(bool(r["ml_spread_sign_conflict"]) for r in lines),
+        "lines_rows_open_close_sign_conflict": sum(bool(r["open_close_sign_conflict"]) for r in lines),
         "lines_providers": dict(Counter(r["provider"] for r in lines)),
         "lines_game_espn_status": dict(game_status),
+        "lines_sign_check": _sign_check(games, lines),
         "espn_history_games": espn_games,
         "portal": None if portal_stats is None else vars(portal_stats),
+        "portal_zero_fbs_rows": sorted(
+            r["cfbd_team"]
+            for r in fbs
+            if r["portal_available"] and r["portal_out_count"] + r["portal_in_count"] == 0
+        ),
+    }
+
+
+def _sign_check(games: list[dict[str, Any]], lines: list[dict[str, Any]]) -> dict[str, Any]:
+    """Home-side sign of the spread: closing spread vs final margin, total vs points, and the raw
+    ``formattedSpread`` favourite vs the spread's sign."""
+    done = [r for r in lines if r["completed"] and r["spread_home_close"] is not None]
+    totals = [r for r in done if r["total_close"] is not None]
+    mismatch = checked = 0
+    for game in games:
+        for line in game.get("lines") or []:
+            text, spread = line.get("formattedSpread"), line.get("spread")
+            if not text or spread in (None, 0):
+                continue
+            fav_home = str(text).startswith(f"{game['homeTeam']} ")
+            if fav_home == str(text).startswith(f"{game['awayTeam']} "):
+                continue
+            checked += 1
+            mismatch += fav_home != (spread < 0)
+
+    def corr(a: list[float], b: list[float]) -> float | None:
+        return round(statistics.correlation(a, b), 3) if len(a) >= 20 else None
+
+    return {
+        "spread_close_vs_away_margin_corr": corr(
+            [r["spread_home_close"] for r in done], [r["away_score"] - r["home_score"] for r in done]
+        ),
+        "total_close_vs_points_corr": corr(
+            [r["total_close"] for r in totals], [r["away_score"] + r["home_score"] for r in totals]
+        ),
+        "formatted_spread_checked": checked,
+        "formatted_spread_sign_mismatch": mismatch,
     }
 
 
@@ -501,10 +541,35 @@ def _render_md(report: dict[str, Any]) -> str:
             "unmatched 2026 games are later than the history snapshot or not yet played."
         ),
         "",
+        "### Sign checks (home-side spread)",
+        "",
+        (
+            "| season | close spread vs away margin (corr) | close total vs points (corr) | formattedSpread "
+            "favourite vs spread sign: mismatches / checked | open and close >= 3 on opposite sides (rows) |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    for year in sorted(seasons, key=int):
+        sc = seasons[year]["lines_sign_check"]
+        out.append(
+            f"| {year} | {sc['spread_close_vs_away_margin_corr']} | {sc['total_close_vs_points_corr']} | "
+            f"{sc['formatted_spread_sign_mismatch']} / {sc['formatted_spread_checked']} | "
+            f"{seasons[year]['lines_rows_open_close_sign_conflict']} |"
+        )
+    out += [
+        "",
+        (
+            "Rows with conflicting signs are flagged per row (`ml_spread_sign_conflict`, "
+            "`open_close_sign_conflict`), never dropped."
+        ),
+        "",
         "## Portal (per season, cutoff = first kickoff)",
         "",
-        "| season | entries | dated after cutoff (excluded) | counted with no destination | transferDate range |",
-        "|---|---|---|---|---|",
+        (
+            "| season | entries | dated after cutoff (excluded) | counted with no destination | "
+            "transferDate range | current-FBS rows with zero portal activity |"
+        ),
+        "|---|---|---|---|---|---|",
     ]
     for year in sorted(seasons, key=int):
         p = seasons[year].get("portal")
@@ -514,8 +579,17 @@ def _render_md(report: dict[str, Any]) -> str:
         out.append(
             f"| {year} | {p['entries']} | {p['after_cutoff']} | {p['counted_no_destination']} "
             f"({_pct(p['counted_no_destination'], p['counted'])}) | {dates.get('first')} .. "
-            f"{dates.get('last')} |"
+            f"{dates.get('last')} | {', '.join(seasons[year]['portal_zero_fbs_rows']) or 'none'} |"
         )
+    out += [
+        "",
+        (
+            "Joins between tables (and to the portal) use the resolved CFBD team id, not the school name: "
+            "CFBD spells three FCS schools differently across years and sources (Albany / UAlbany, "
+            "Southeastern Louisiana / SE Louisiana, Saint Francis (PA) / Saint Francis). FIU's zero in 2021 "
+            "is in the data: CFBD's 2021 portal list has no FIU entry under any name."
+        ),
+    ]
     out += [
         "",
         "## Semantics",
