@@ -21,11 +21,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from model_prediction.domain import EASTERN
 from model_prediction.features.base import FeatureStore
+from model_prediction.models.nba_v91 import POSTSEASON_TYPES
 from model_prediction.nba_replay_harness import (
     DEFAULT_LINES_PATH,
     EngineSpec,
+    assign_splits,
     diff_golden,
     file_sha256,
     golden_rows,
@@ -137,11 +141,116 @@ def cmd_score(names: list[str], data_root: Path, draws: int) -> None:
         print(md)
 
 
+def _split_rows(name: str, data_root: Path) -> dict[str, list[dict[str, Any]]]:
+    rows = read_rows(_cache_dir(data_root) / f"{name}.jsonl")
+    assign_splits(rows, PINNED_VAL_START, PINNED_HOLDOUT_START)
+    return {
+        "train": [r for r in rows if r["split"] == "train"],
+        "val": [r for r in rows if r["split"] == "val"],
+    }
+
+
+def _metrics(rows: list[dict[str, Any]]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for market, sign in (("spread", -1), ("total", 1)):
+        act = np.array([r["home_score"] + sign * r["away_score"] for r in rows], float)
+        key = "model_margin" if market == "spread" else "model_total"
+        line_key = "line_margin" if market == "spread" else "line_total"
+        prob_key = "p_away_cover" if market == "spread" else "p_over"
+        model = np.array([r[key] for r in rows], float)
+        line = np.array([r[line_key] for r in rows], float)
+        p = np.array([r[prob_key] for r in rows], float)
+        hit = (act < line) if market == "spread" else (act > line)
+        keep = act != line
+        out[f"{market}_rmse"] = float(np.sqrt(np.mean((act - model) ** 2)))
+        out[f"{market}_bias"] = float(np.mean(act - model))
+        out[f"{market}_brier"] = float(np.mean((p[keep] - hit[keep]) ** 2))
+        out[f"{market}_corr"] = float(np.corrcoef(model - line, act - line)[0, 1])
+    return out
+
+
+def cmd_ablate(names: list[str], data_root: Path) -> None:
+    """Compact train/validation table: RMSE, bias (actual - model), Brier, corr per market."""
+    header = (
+        "| engine | split | n | spread RMSE | spread bias | spread Brier | spread corr | total RMSE | "
+        "total bias | total Brier | total corr |"
+    )
+    lines = [header, "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for name in names:
+        for split, rows in _split_rows(name, data_root).items():
+            m = _metrics(rows)
+            lines.append(
+                f"| {name} | {split} | {len(rows)} | {m['spread_rmse']:.3f} | {m['spread_bias']:+.2f} | "
+                f"{m['spread_brier']:.4f} | {m['spread_corr']:+.3f} | {m['total_rmse']:.3f} | "
+                f"{m['total_bias']:+.2f} | {m['total_brier']:.4f} | {m['total_corr']:+.3f} |"
+            )
+    print("\n".join(lines))
+
+
+def fit_fatigue(train: list[dict[str, Any]]) -> dict[str, float]:
+    """B6: symmetric per-team fatigue points, fitted on TRAIN regular-season rows of a
+    ``fatigue_mode=fitted`` replay with all penalties at 0.
+
+    Total residual ~ (def - off) * tired_count; margin residual ~ (off + def) * (away_tired -
+    home_tired). Intercepts absorb level bias and are not applied.
+    """
+    rows = [r for r in train if r["season_type"] not in POSTSEASON_TYPES]
+    b = [r["basis"] for r in rows]
+    hb = np.array([x["home_b2b"] for x in b], float)
+    ab = np.array([x["away_b2b"] for x in b], float)
+    h34 = np.array([x["home_3in4"] and not x["home_b2b"] for x in b], float)
+    a34 = np.array([x["away_3in4"] and not x["away_b2b"] for x in b], float)
+    r_total = np.array([r["home_score"] + r["away_score"] - r["model_total"] for r in rows], float)
+    r_margin = np.array([r["home_score"] - r["away_score"] - r["model_margin"] for r in rows], float)
+    ones = np.ones(len(rows))
+    c_total = np.linalg.lstsq(np.column_stack([ones, hb + ab, h34 + a34]), r_total, rcond=None)[0]
+    c_margin = np.linalg.lstsq(np.column_stack([ones, ab - hb, a34 - h34]), r_margin, rcond=None)[0]
+    fit = {
+        "b2b_offense_penalty": float((c_margin[1] - c_total[1]) / 2.0),
+        "b2b_defense_penalty": float((c_margin[1] + c_total[1]) / 2.0),
+        "three_in_four_offense_penalty": float((c_margin[2] - c_total[2]) / 2.0),
+        "three_in_four_defense_penalty": float((c_margin[2] + c_total[2]) / 2.0),
+    }
+    print(
+        f"B6 fit on {len(rows)} train games: total coef b2b {c_total[1]:+.3f} 3in4 {c_total[2]:+.3f}; "
+        f"margin coef b2b {c_margin[1]:+.3f} 3in4 {c_margin[2]:+.3f}; b2b games home {int(hb.sum())} "
+        f"away {int(ab.sum())}"
+    )
+    return {k: round(v, 3) for k, v in fit.items()}
+
+
+def fit_playoff_offset(train: list[dict[str, Any]]) -> float:
+    """B7: mean(actual - model) total on TRAIN postseason rows, with a season-out check
+    (fit on the earlier postseason, score the later one; both inside train)."""
+    post = [r for r in train if r["season_type"] in POSTSEASON_TYPES]
+    resid = {r["event_id"]: r["home_score"] + r["away_score"] - r["model_total"] for r in post}
+    years = sorted({r["date"][:4] for r in post})
+    offset = float(np.mean(list(resid.values())))
+    print(f"B7 fit on {len(post)} train postseason games: offset {offset:+.2f}")
+    if len(years) >= 2:
+        early = [resid[r["event_id"]] for r in post if r["date"][:4] == years[0]]
+        late = np.array([resid[r["event_id"]] for r in post if r["date"][:4] == years[-1]])
+        off_early = float(np.mean(early))
+        print(
+            f"  season-out: fit {years[0]} ({len(early)} games) {off_early:+.2f}; {years[-1]} ({len(late)}) "
+            f"RMSE raw {np.sqrt(np.mean(late**2)):.2f} -> with {years[0]} offset "
+            f"{np.sqrt(np.mean((late - off_early) ** 2)):.2f}"
+        )
+    return round(offset, 2)
+
+
+def cmd_fit(names: list[str], data_root: Path) -> None:
+    for name in names:
+        train = _split_rows(name, data_root)["train"]
+        print(name, json.dumps(fit_fatigue(train)) if name.endswith("zero") else "", flush=True)
+        fit_playoff_offset(train)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["golden", "replay", "diff", "score"])
+    parser.add_argument("command", choices=["golden", "replay", "diff", "score", "ablate", "fit"])
     parser.add_argument("names", nargs="*")
     parser.add_argument("--data-root", type=Path, default=Path("E:/MP/data"))
     parser.add_argument("--draws", type=int, default=2000)
@@ -152,6 +261,10 @@ def main() -> None:
         cmd_replay(args.names, args.data_root)
     elif args.command == "diff":
         cmd_diff(args.names, args.data_root)
+    elif args.command == "ablate":
+        cmd_ablate(args.names, args.data_root)
+    elif args.command == "fit":
+        cmd_fit(args.names, args.data_root)
     else:
         cmd_score(args.names, args.data_root, args.draws)
 
