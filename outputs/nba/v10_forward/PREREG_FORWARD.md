@@ -159,3 +159,11 @@ The moneyline mid moves are logged and reported descriptively, not gated.
   pre-register a T-C2 paper track, not to trade.
 - FAIL is final for that statistic on this data; collection is not extended to fish for
   significance.
+
+## 5. Amendment (2026-11-21 ~17:10 ET, before any test-A observation is scored)
+
+x and y in test A both subtract the same decision-time line L_t, so noise or lag in L_t alone (a
+single-book DraftKings feed) makes corr(x, y) positive for a model with no information. PASS for
+test A therefore also requires the paired difference: on the same games, slope(player avail) minus
+slope(v9 comparator) > 0, with the 95% game-cluster bootstrap CI lower bound > 0. If the v9
+comparator also passes the section 2 rule on its own, that is read as a feed artifact, not skill.
