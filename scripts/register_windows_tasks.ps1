@@ -66,3 +66,12 @@ Register-WorkerTask 'ModelPrediction-AutoBuyer' 'auto-buyer' $autoBuyerTriggers 
 $nbaPretipTrigger = New-ScheduledTaskTrigger -Daily -At '11:00'
 $nbaPretipTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At '11:00' -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Hours 15)).Repetition
 Register-WorkerTask 'ModelPrediction-NbaPretipCapture' 'nba-pretip-capture' $nbaPretipTrigger 'model-prediction NBA pre-tip ESPN odds and Polymarket quote capture'
+
+# NCAAF pre-kickoff close capture: every 10 minutes from 09:05 to 01:05 local (Eastern), so each
+# game's own contracts plus its moneyline and most balanced spread/total are quoted two or three
+# times in the last 25 minutes before kickoff (settlement's close; quick 261121-pkc). Offset 5
+# minutes from the NBA capture, which shares the gateway's per-IP rate limit. Off-days are free:
+# a run with no game in its window makes no exchange request.
+$ncaafPrekickoffTrigger = New-ScheduledTaskTrigger -Daily -At '09:05'
+$ncaafPrekickoffTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At '09:05' -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Hours 16)).Repetition
+Register-WorkerTask 'ModelPrediction-NcaafPrekickoffCapture' 'ncaaf-prekickoff-capture' $ncaafPrekickoffTrigger 'model-prediction NCAAF pre-kickoff Polymarket close capture'

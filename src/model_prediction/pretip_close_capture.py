@@ -71,8 +71,13 @@ def _row_slug(explicit: Any, snapshot: Any, rationale: Any) -> str | None:
     match = re.search(r"market_slug=([a-z0-9_\-]+)", text)
     if match:
         return match.group(1)
-    for found in re.findall(r"\(([a-z0-9_\-]+)\)", text):
-        if "-" in found or found.startswith(("atc", "tsc", "asc", "mkt", "aec")):
+    candidates = re.findall(r"\(([a-z0-9_\-]+)\)", text)
+    # Contract-prefixed tokens first, as settlement does ("(anchor-blended)" in NCAAF v6.2 text).
+    for found in candidates:
+        if found.startswith(("atc", "tsc", "asc", "mkt", "aec")):
+            return found
+    for found in candidates:
+        if "-" in found:
             return found
     return None
 

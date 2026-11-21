@@ -100,6 +100,13 @@ WORKERS: dict[str, list[str]] = {
         "-m",
         "model_prediction.nba_pretip_capture_worker",
     ],
+    # Every 10 minutes 09:05-01:05 ET: Polymarket closes for NCAAF games kicking off within 25
+    # minutes, so settlement has a pre-kickoff close after the decision. No daily lock; appends only.
+    "ncaaf-prekickoff-capture": [
+        _VENV_PYTHON,
+        "-m",
+        "model_prediction.ncaaf_prekickoff_capture_worker",
+    ],
 }
 
 _RUN_STATUSES = ("started", "completed", "failed", "skipped")
@@ -114,6 +121,8 @@ DEFAULT_WORKER_TIMEOUTS: dict[str, float] = {
     "calibrate": 1800.0,  # 30 minutes max
     # Polymarket capture is budgeted at 180 s; the rest covers ESPN and slow starts.
     "nba-pretip-capture": 300.0,
+    # Capture is budgeted at 240 s and writes only at the end; under the 10-minute cadence.
+    "ncaaf-prekickoff-capture": 360.0,
     "daily": 3600.0,  # 60 minutes max
     "rebuild-shadow": 3600.0,  # 60 minutes max
 }
