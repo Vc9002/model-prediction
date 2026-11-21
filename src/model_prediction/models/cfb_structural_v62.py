@@ -204,6 +204,8 @@ class CFBStructuralV62Model:
         g[absm == 0] = 0.0
         self.key_multipliers = g
         self.recentre_iterations = int(md["recentre_iterations"])
+        if md.get("centring") != {"anchored": "cover_balanced_at_anchor_line", "model_only": "mean"}:
+            raise ValueError("cfb v6.2 artifact centring rule is not the one this module implements")
         self.sd_params = tuple(float(v) for v in md["sd_params"])
         self.sd_total_centre = float(md["sd_total_centre"])
         self.sd_scale = float(md["sd_scale"])
@@ -252,16 +254,27 @@ class CFBStructuralV62Model:
                 return sd
         return self.total_bucket_sds[-1]
 
-    def margin_pmf(self, mu: float, sd: float) -> np.ndarray:
-        """Key-weighted discretised normal re-centred so its mean is ``mu`` (fixed Newton steps, as fitted)."""
+    def margin_pmf(self, mu: float, sd: float, *, balanced: bool = True) -> np.ndarray:
+        """Key-weighted discretised normal located by fixed Newton steps, exactly as fitted.
+
+        ``balanced`` (anchored rows): P(m > mu) = P(m < mu), which is what a sportsbook line means; a mean-centred
+        keyed pmf put the median below a line next to a key number and leaned to the dog (train, line 7.5: favourite
+        cover 45.0% predicted vs 57.6% actual). Otherwise (model-only rows): E[m] = mu, a model mean.
+        """
         grid, g = self.margin_grid, self.key_multipliers
         loc = float(mu)
+        sign = np.sign(grid - mu)
         for _ in range(self.recentre_iterations):
             w = _interval_mass(grid, loc, sd) * g
             p = w / w.sum()
             mean = float(p @ grid)
-            var = float(p @ (grid**2)) - mean**2
-            loc = loc + (mu - mean) * sd**2 / var
+            if balanced:
+                gap = float(p @ sign)
+                slope = (float(p @ (sign * grid)) - gap * mean) / sd**2
+                loc = loc - gap / slope
+            else:
+                var = float(p @ (grid**2)) - mean**2
+                loc = loc + (mu - mean) * sd**2 / var
         w = _interval_mass(grid, loc, sd) * g
         return w / w.sum()
 
@@ -307,7 +320,8 @@ class CFBStructuralV62Model:
             mu_m, mu_t = v6_margin, v6_total
             sd_m, sd_t = self.v6_margin_sd_table[v6_slice], self.v6_total_sd_table[v6_slice]
             status = ANCHOR_MISSING
-        pm, pt = self.margin_pmf(mu_m, sd_m), self.total_pmf(mu_t, sd_t)
+        pm = self.margin_pmf(mu_m, sd_m, balanced=anchor is not None)
+        pt = self.total_pmf(mu_t, sd_t)
         return V62Pricing(
             mu_m, mu_t, sd_m, sd_t, status, self.market_probabilities(pm, pt, spread_home_line, total_line)
         )

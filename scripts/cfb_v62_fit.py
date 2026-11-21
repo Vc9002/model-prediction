@@ -80,7 +80,13 @@ RIDGE_GRID = (1.0, 10.0, 100.0)
 # hash: what was fitted, on which window, and how the one validation choice is made.
 # --------------------------------------------------------------------------------------------------------------
 RULE: dict[str, Any] = {
-    "id": "cfb-v62-fit-rule-1",
+    "id": "cfb-v62-fit-rule-2",
+    "supersedes": (
+        "cfb-v62-fit-rule-1 (mean-centred margin pmf). Changed AFTER rule-1's single holdout read: on train the "
+        "mean-centred keyed pmf under-predicted favourite cover at half-point lines near key numbers (7.5: 45.0% "
+        "predicted vs 57.6% actual, n 144), so the anchored pmf is now centred cover-balanced at the anchor line. "
+        "The holdout is NOT re-read under rule-2."
+    ),
     "base": "frozen cfb-structural-v6 (params sha256 6e38b14c...), calibrated margin and total; no refit",
     "anchor_historical": "ESPN pinned median of non-live providers (espn-lines-rule-1), closing, untimestamped",
     "anchor_serving": "DraftKings line from the forward ESPN pregame capture, observed_at <= decision and < kickoff",
@@ -94,7 +100,8 @@ RULE: dict[str, Any] = {
     "margin_pmf": (
         "p(m) proportional to [Phi((m+.5-loc)/sd) - Phi((m-.5-loc)/sd)] * g(|m|), g(0)=0 (no ties in "
         "the data), g(k)=exp(theta_k) for 1<=k<=28 else 1; loc solved by "
-        f"{RECENTRE_ITERATIONS} Newton steps so E[m] equals the blended mean"
+        f"{RECENTRE_ITERATIONS} Newton steps: anchored rows cover-balanced at the anchor line "
+        "(P(m > a) = P(m < a)); model-only rows mean-centred (E[m] = v6 mean)"
     ),
     "margin_sd": "sd = exp(s0 + s1*|mu|/10 + s2*(anchor total - 55)/10), MLE jointly with theta on train",
     "ridge": f"penalty lambda * sum(theta^2), lambda in {list(RIDGE_GRID)} chosen by validation margin log score",
@@ -245,14 +252,22 @@ def _interval_mass(grid: np.ndarray, loc: np.ndarray, sd: np.ndarray) -> np.ndar
     return np.where(z[:, :-1] > 0, sf[:, :-1] - sf[:, 1:], cdf[:, 1:] - cdf[:, :-1])
 
 
-def margin_pmf(mu: np.ndarray, sd: np.ndarray, g: np.ndarray) -> np.ndarray:
+def margin_pmf(mu: np.ndarray, sd: np.ndarray, g: np.ndarray, *, balanced: bool = True) -> np.ndarray:
+    """Key-weighted discretised normal. ``balanced``: P(m > mu) = P(m < mu), the market's meaning of a line (anchor
+    rows); else E[m] = mu (a model mean). Fixed Newton steps either way, d/dloc E[h(m)] = Cov(h, m) / sd^2."""
     loc = mu.astype(float).copy()
+    sign = np.sign(M_GRID[None, :] - mu[:, None])
     for _ in range(RECENTRE_ITERATIONS):
         w = _interval_mass(M_GRID, loc, sd) * g[None, :]
         p = w / w.sum(axis=1, keepdims=True)
         mean = p @ M_GRID
-        var = p @ (M_GRID**2) - mean**2
-        loc = loc + (mu - mean) * sd**2 / var
+        if balanced:
+            gap = (p * sign).sum(axis=1)
+            slope = ((p * sign * M_GRID[None, :]).sum(axis=1) - gap * mean) / sd**2
+            loc = loc - gap / slope
+        else:
+            var = p @ (M_GRID**2) - mean**2
+            loc = loc + (mu - mean) * sd**2 / var
     w = _interval_mass(M_GRID, loc, sd) * g[None, :]
     return w / w.sum(axis=1, keepdims=True)
 
@@ -446,6 +461,19 @@ def evaluate(
             cm = m & cov_mask
             blk["home_cover"] = _brier_log(p_cov[cm], ((margin + sp) > 0)[cm].astype(float))
             out["near_key"][key] = blk
+        out["cover_by_line"] = {}
+        for line in (2.5, 3.0, 3.5, 6.5, 7.0, 7.5, 9.5, 10.0, 10.5, 13.5, 14.0, 14.5):
+            m = np.abs(sp) == line
+            if m.sum() < 20:
+                continue
+            fav_g = M_GRID[None, :] * fav_sign[m][:, None]
+            out["cover_by_line"][str(line)] = {
+                "n": int(m.sum()),
+                "fav_cover_pred_pct": 100 * float((pm[m] * (fav_g > line)).sum(axis=1).mean()),
+                "fav_cover_actual_pct": 100 * float((fav_margin[m] > line).mean()),
+                "push_pred_pct": 100 * float((pm[m] * (fav_g == line)).sum(axis=1).mean()),
+                "push_actual_pct": 100 * float((fav_margin[m] == line).mean()),
+            }
     if pt is not None:
         idx = np.clip(total, 0, TOTAL_SUPPORT).astype(int)
         out["total_integer_log_score"] = float(
@@ -503,9 +531,15 @@ def score_models(rows: list[dict[str, Any]], spec: dict[str, Any], meta: dict[st
     res: dict[str, Any] = {}
 
     def run(
-        name: str, mu_m: np.ndarray, mu_t: np.ndarray, sd_m: np.ndarray, g: np.ndarray, sd_t: np.ndarray
+        name: str,
+        mu_m: np.ndarray,
+        mu_t: np.ndarray,
+        sd_m: np.ndarray,
+        g: np.ndarray,
+        sd_t: np.ndarray,
+        balanced: bool = True,
     ) -> None:
-        pm, pt = margin_pmf(mu_m, sd_m, g), total_pmf(mu_t, sd_t)
+        pm, pt = margin_pmf(mu_m, sd_m, g, balanced=balanced), total_pmf(mu_t, sd_t)
         res[name] = evaluate(rows, market_probs_from_pmfs(pm, pt, sp, a_t), pm, pt, mu_m, mu_t)
 
     mu_m, mu_t = w_m * a_m + (1 - w_m) * v_m, w_t * a_t + (1 - w_t) * v_t
@@ -536,6 +570,7 @@ def score_models(rows: list[dict[str, Any]], spec: dict[str, Any], meta: dict[st
         np.array([sdm_tab[r["slice"]] for r in rows]),
         key_multipliers(theta),
         np.array([sdt_tab[r["slice"]] for r in rows]),
+        balanced=False,
     )
     res["v6_engine"] = evaluate(rows, v6_engine_probs(rows, meta["v6_sd_tables"]), None, None, v_m, v_t)
     return res
@@ -567,7 +602,7 @@ def parity_cases(spec: dict[str, Any], sd_tables: dict[str, dict[str, float]]) -
         else:
             mu_m, mu_t = vm, vt
             sd_m, sd_t = np.array([sd_tables["margin"][sl]]), np.array([sd_tables["total"][sl]])
-        pm = margin_pmf(np.array([mu_m]), sd_m, key_multipliers(theta))
+        pm = margin_pmf(np.array([mu_m]), sd_m, key_multipliers(theta), balanced=anchored)
         pt = total_pmf(np.array([mu_t]), sd_t)
         pr = market_probs_from_pmfs(pm, pt, np.array([spl]), np.array([tl]))
         cases.append(
@@ -689,10 +724,14 @@ def cmd_fit(_: argparse.Namespace) -> int:
         "margin": {k: best[k] for k in ("lambda", "sd_params", "theta", "neg_ll", "converged")},
         "margin_smooth_baseline": {k: smooth[k] for k in ("sd_params", "neg_ll")},
         "total": {"bucket_sds": bucket_sds},
-        "holdout_reads": 0,
+        # Counted from the one-read marker, never from memory: rule-1 was scored once on the holdout; this fit
+        # (rule-2) reads no holdout row and the holdout command refuses a second read.
+        "holdout_reads": 1 if HOLDOUT_MARK.exists() else 0,
         "holdout_reads_note": (
-            "0 by this script at fit time. The holdout window's v6-vs-line numbers were read "
-            "before (v6-espn check, v6.1 comparison), so it is not a clean holdout."
+            "Holdout reads by this task, all rules: 1 (rule-1, mean-centred, after hashing; "
+            "outputs/ncaaf/cfb_v62_report_rule1.md). The rule-2 fit and its ridge choice used train and "
+            "validation only; the holdout was not re-read for selection. Before this task the holdout window's "
+            "v6-vs-line numbers were read by the v6-espn check and the v6.1 comparison, so it is not clean."
         ),
     }
     spec["key_multipliers"] = {
@@ -707,7 +746,10 @@ def cmd_fit(_: argparse.Namespace) -> int:
         "rule_sha256": RULE_SHA256,
         "label": "DESIGN-INFORMED: every lined window was read before",
         "validation": val_scores,
-        "holdout": "NOT READ",
+        "holdout": (
+            "NOT RE-READ under rule-2. Rule-1 (mean-centred) was scored once on the holdout after hashing; that single "
+            "read is kept in outputs/ncaaf/cfb_v62_report_rule1.{json,md}."
+        ),
     }
     REPORT_JSON.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
     FIXTURE.write_text(
@@ -756,6 +798,7 @@ def write_artifact(spec: dict[str, Any], spec_sha: str) -> None:
             "sd_params": spec["margin"]["sd_params"],
             "sd_total_centre": SD_TOTAL_CENTRE,
             "sd_scale": SD_SCALE,
+            "centring": {"anchored": "cover_balanced_at_anchor_line", "model_only": "mean"},
             "tie_rule": "g(0)=0; the regulation-tie mass is "
             "renormalised over non-zero margins, symmetric at pick'em (no home bias)",
         },
@@ -884,6 +927,21 @@ def _window_md(title: str, scores: dict[str, Any]) -> list[str]:
             f"| home cover Brier (v6.2 / smooth) | {blk['home_cover']['brier']:.5f} | "
             f"{sm['home_cover']['brier']:.5f} | rate {100 * blk['home_cover']['rate']:.1f}% |"
         )
+    if v62.get("cover_by_line"):
+        lines += [
+            "",
+            "Favourite strict cover and push by exact line, predicted vs actual % (v6.2 / smooth):",
+            "",
+            "| line | n | fav cover v6.2 | smooth | actual | push v6.2 | actual |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        sm_lines = scores["anchor_only_smooth"].get("cover_by_line", {})
+        for line, b in v62["cover_by_line"].items():
+            sm = sm_lines.get(line, {})
+            lines.append(
+                f"| {line} | {b['n']} | {b['fav_cover_pred_pct']:.1f} | {sm.get('fav_cover_pred_pct', float('nan')):.1f} | "
+                f"{b['fav_cover_actual_pct']:.1f} | {b['push_pred_pct']:.1f} | {b['push_actual_pct']:.1f} |"
+            )
     return lines
 
 
@@ -931,7 +989,7 @@ def render_md(spec: dict[str, Any], report: dict[str, Any]) -> str:
             report["holdout"]["scores"],
         )
     else:
-        lines += ["", "Holdout: NOT READ."]
+        lines += ["", f"Holdout: {report.get('holdout')}"]
     lines += [
         "",
         "Models: v6.2 = blended mean, fitted SD model and key multipliers; anchor_only_smooth = close as mean, "

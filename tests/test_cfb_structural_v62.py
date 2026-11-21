@@ -101,18 +101,23 @@ def test_module_reproduces_the_fit_script_parity_fixture(model: CFBStructuralV62
             "push_total",
         ):
             assert priced.probabilities[key] == pytest.approx(e[key], abs=1e-9), (case, key)
-        pm = model.margin_pmf(priced.mu_margin, priced.margin_sd)
+        pm = model.margin_pmf(priced.mu_margin, priced.margin_sd, balanced=anchor is not None)
         assert pm[model.margin_grid == 3][0] == pytest.approx(e["pmf_margin_at_3"], abs=1e-10)
         assert pm[model.margin_grid == -7][0] == pytest.approx(e["pmf_margin_at_minus_7"], abs=1e-10)
 
 
 # ----------------------------------------------------------------------------- coherence
-def test_pmf_has_no_ties_keeps_its_mean_and_markets_are_coherent(model: CFBStructuralV62Model) -> None:
+def test_pmf_has_no_ties_is_centred_as_declared_and_markets_are_coherent(
+    model: CFBStructuralV62Model,
+) -> None:
     for mu, line in ((3.0, -3.0), (-7.0, 7.0), (13.5, -14.0), (0.4, -0.5)):
         sd = model.margin_sd(mu, 52.0)
+        mean_centred = model.margin_pmf(mu, sd, balanced=False)
+        assert float(mean_centred @ model.margin_grid) == pytest.approx(mu, abs=1e-9)
         pm = model.margin_pmf(mu, sd)
-        assert pm[model.margin_grid == 0][0] == 0.0
-        assert float(pm @ model.margin_grid) == pytest.approx(mu, abs=1e-9)
+        grid = model.margin_grid
+        assert float(pm[grid > mu].sum()) == pytest.approx(float(pm[grid < mu].sum()), abs=1e-9)
+        assert pm[grid == 0][0] == 0.0
         pr = model.market_probabilities(pm, model.total_pmf(52.0, 15.0), line, 52.0)
         assert pr["home_win"] + pr["away_win"] == pytest.approx(1.0, abs=1e-12)
         assert pr["home_cover"] + pr["away_cover"] + pr["push_spread"] == pytest.approx(1.0, abs=1e-12)
@@ -133,6 +138,32 @@ def test_pickem_is_an_exact_coin_flip_and_sides_are_symmetric(model: CFBStructur
         a = model.market_probabilities(model.margin_pmf(mu, 15.0), model.total_pmf(50.0, 15.0), None, None)
         b = model.market_probabilities(model.margin_pmf(-mu, 15.0), model.total_pmf(50.0, 15.0), None, None)
         assert a["home_win"] == pytest.approx(b["away_win"], abs=1e-12)
+
+
+def test_anchored_cover_at_the_anchor_line_is_a_coin_flip(model: CFBStructuralV62Model) -> None:
+    """A sportsbook line is cover-balanced: next to a key number the keyed pmf must not lean to the dog."""
+    for margin in (2.5, 3.5, 6.5, 7.5, 10.5, -7.5):
+        pr = model.price(
+            v6_margin=margin + 9.0,
+            v6_total=55.0,
+            v6_slice="established",
+            anchor=_anchor(margin, 55.0),
+            spread_home_line=-margin,
+            total_line=55.5,
+        ).probabilities
+        assert pr["home_cover"] == pytest.approx(0.5, abs=1e-9)
+        assert pr["away_cover"] == pytest.approx(0.5, abs=1e-9)
+    # Integer line: both strict sides are equal and the push carries the key mass.
+    pr = model.price(
+        v6_margin=7.0,
+        v6_total=55.0,
+        v6_slice="established",
+        anchor=_anchor(7.0, 55.0),
+        spread_home_line=-7.0,
+        total_line=55.0,
+    ).probabilities
+    assert pr["home_cover"] == pytest.approx(pr["away_cover"], abs=1e-9)
+    assert pr["push_spread"] > 0.05
 
 
 def test_fitted_key_mass_sits_on_three_and_seven(model: CFBStructuralV62Model) -> None:
@@ -463,3 +494,78 @@ def test_canonical_history_merges_a_renamed_team_and_maps_the_slate_by_espn_id()
     assert rep in owls
     assert history_name("Brand New Display Name", "9001") == rep  # the ESPN id wins over an unseen name
     assert history_name("Totally Unknown", None) == "Totally Unknown"
+
+
+def test_v62_rows_reach_flat_and_research_only_with_their_own_hash(
+    tmp_path: Path, monkeypatch, model
+) -> None:
+    """The real Flat-pick path: _forecast_cfb_sport -> PickRequest.validate -> ledgers, v5 row beside it."""
+    from model_prediction.cli import forecast
+    from model_prediction.ledger import PickLedger
+    from model_prediction.models import college_football
+
+    quotes = EventQuotes(**{**_quotes().__dict__, "event_start_utc": "2030-09-07T20:00:00Z"})
+    decision = datetime(2030, 9, 7, 18, tzinfo=UTC)
+    v62_rows = build_contracts(
+        model,
+        quotes,
+        v6_projected_margin=10.0,
+        v6_projected_total=60.0,
+        is_fbs_vs_fcs=False,
+        sample_games=5,
+        anchor=Anchor("e1", 7.0, 51.0, -7.0, "2030-09-07T12:00:00+00:00", "DraftKings", "core_odds", "h"),
+        decision_time=decision,
+        markets=("moneyline", "spread", "total"),
+    )
+    assert v62_rows
+    v5_row = {
+        "event_id": "e1",
+        "event_start_utc": "2030-09-07T20:00:00Z",
+        "away_team": "Away U",
+        "home_team": "Home U",
+        "market_type": "total",
+        "selection": "under",
+        "line": 51.5,
+        "executable_ask": 0.50,
+        "model_probability": 0.56,
+        "model_uncertainty": 0.05,
+        "edge_vs_executable_ask": 0.06,
+        "model_version": "cfb-structural-v5",
+        "rationale": "fixture",
+        "weather_inputs_verified": True,
+        "feature_basis": {"is_fbs_vs_fcs": False, "projected_total": 49.0},
+    }
+    fixture = {"status": "research", "model_code_hash": "fixture", "priced_contracts": [v5_row, *v62_rows]}
+    monkeypatch.setattr(college_football, "build_cfb_slate", lambda **kwargs: fixture)
+    monkeypatch.setattr(forecast, "utc_now", lambda: decision)
+    ledgers = {
+        tier: PickLedger(
+            tmp_path / f"{tier}.xlsx", audit_path=tmp_path / f"{tier}.jsonl", tier=tier, sport="ncaaf"
+        )
+        for tier in ("research", "gated", "flat", "main")
+    }
+    result = forecast._forecast_cfb_sport(
+        data_root=tmp_path,
+        args_date="2030-09-07",
+        config={
+            "models": {"NCAAF": {"min_edge": 0.005, "status": "shadow_qualified"}},
+            "project": {"maximum_data_age_hours": 24},
+            "bankroll": {},
+        },
+        research_ledger=ledgers["research"],
+        gated_ledger=ledgers["gated"],
+        flat_ledger=ledgers["flat"],
+        main_ledger=ledgers["main"],
+    )
+    assert result["errors"] == []
+    v5_hash = load_cfb_structural_v62_artifact()  # only to prove the two hashes differ
+    for tier in ("flat", "research"):
+        rows = ledgers[tier].rows()
+        challenger = [r for r in rows if r["model_version"] == CFB_V62_MODEL_VERSION]
+        assert len(challenger) == len(v62_rows), tier
+        assert {r["model_artifact_hash"] for r in challenger} == {model.artifact_hash}
+        champion = [r for r in rows if r["model_version"] == "cfb-structural-v5"]
+        assert len(champion) == 1 and champion[0]["model_artifact_hash"] not in ("", model.artifact_hash)
+    assert v5_hash["artifact_hash"] == model.artifact_hash
+    for tier in ("main", "gated"):
+        assert all(r["model_version"] != CFB_V62_MODEL_VERSION for r in ledgers[tier].rows()), tier
