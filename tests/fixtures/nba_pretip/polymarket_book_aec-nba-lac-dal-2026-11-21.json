@@ -1,0 +1,99 @@
+{
+ "marketData": {
+  "bids": [
+   {
+    "px": {
+     "currency": "USD",
+     "value": "0.3400"
+    },
+    "qty": "105989.8800"
+   },
+   {
+    "px": {
+     "currency": "USD",
+     "value": "0.3300"
+    },
+    "qty": "116316.4700"
+   },
+   {
+    "px": {
+     "currency": "USD",
+     "value": "0.3200"
+    },
+    "qty": "3340.0000"
+   }
+  ],
+  "marketSlug": "aec-nba-lac-dal-2026-11-21",
+  "offers": [
+   {
+    "px": {
+     "currency": "USD",
+     "value": "0.3500"
+    },
+    "qty": "111391.4500"
+   },
+   {
+    "px": {
+     "currency": "USD",
+     "value": "0.3600"
+    },
+    "qty": "110089.1700"
+   },
+   {
+    "px": {
+     "currency": "USD",
+     "value": "0.3700"
+    },
+    "qty": "4512.5100"
+   }
+  ],
+  "state": "MARKET_STATE_OPEN",
+  "stats": {
+   "currentPx": {
+    "currency": "USD",
+    "value": "0.3450"
+   },
+   "highPx": {
+    "currency": "USD",
+    "value": "0.4500"
+   },
+   "highSetTime": "2026-11-18T17:13:51.106029722Z",
+   "lastPriceSample": {
+    "longPx": {
+     "currency": "USD",
+     "value": "0.3400"
+    },
+    "shortPx": {
+     "currency": "USD",
+     "value": "0.66"
+    },
+    "ts": "2026-11-21T04:31:03.085047834Z"
+   },
+   "lastTradePx": {
+    "currency": "USD",
+    "value": "0.3400"
+   },
+   "lastTradeQty": "0.1200",
+   "lastTradeSetTime": "2026-11-21T03:08:49.270393419Z",
+   "lowPx": {
+    "currency": "USD",
+    "value": "0.2400"
+   },
+   "lowSetTime": "2026-11-19T03:08:00.447972336Z",
+   "notionalSetTime": "2026-11-21T03:08:49.270393419Z",
+   "notionalTraded": {
+    "currency": "USD",
+    "value": "902.1220"
+   },
+   "openInterest": "852.9600",
+   "openInterestSetTime": "2026-11-21T03:08:49.311227681Z",
+   "openPx": {
+    "currency": "USD",
+    "value": "0.4400"
+   },
+   "openSetTime": "2026-11-18T17:13:51.106029722Z",
+   "sharesTraded": "2631.2800"
+  },
+  "transactTime": "2026-11-21T04:31:03.085047834Z"
+ }
+}

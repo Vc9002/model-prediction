@@ -1,0 +1,545 @@
+{
+ "events": [
+  {
+   "active": true,
+   "archived": false,
+   "category": "sports",
+   "closed": false,
+   "createdAt": "2026-11-07T05:00:28Z",
+   "eventState": {
+    "createdAt": "2026-11-21T00:14:43.790139Z",
+    "eventId": 240448,
+    "gameId": 20024151,
+    "id": 145198821,
+    "mainSpreadLine": 12.5,
+    "mainTotalLine": 229.5,
+    "marketGroupStats": [
+     {
+      "line": 12.5,
+      "marketGroupId": "game-lines/spread/full-game"
+     },
+     {
+      "line": 229.5,
+      "marketGroupId": "game-lines/totals/full-game"
+     },
+     {
+      "line": 6.5,
+      "marketGroupId": "game-lines/spread/1st-half"
+     },
+     {
+      "line": 111.5,
+      "marketGroupId": "game-lines/totals/1st-half"
+     },
+     {
+      "line": 4.5,
+      "marketGroupId": "game-lines/spread/1st-quarter"
+     },
+     {
+      "line": 56.5,
+      "marketGroupId": "game-lines/totals/1st-quarter"
+     },
+     {
+      "line": 2.5,
+      "marketGroupId": "game-lines/spread/2nd-quarter"
+     },
+     {
+      "line": 54.5,
+      "marketGroupId": "game-lines/totals/2nd-quarter"
+     },
+     {
+      "line": 3.5,
+      "marketGroupId": "game-lines/spread/3rd-quarter"
+     },
+     {
+      "line": 60.5,
+      "marketGroupId": "game-lines/totals/3rd-quarter"
+     },
+     {
+      "line": 2.5,
+      "marketGroupId": "game-lines/spread/4th-quarter"
+     },
+     {
+      "line": 57.5,
+      "marketGroupId": "game-lines/totals/4th-quarter"
+     }
+    ],
+    "periodScores": [],
+    "sportradarGameId": "377196f0-d137-45cc-8e14-3848e3d51fb4",
+    "type": "basketball",
+    "updatedAt": "2026-11-21T04:25:13.427522Z"
+   },
+   "fixtureId": "G8sVOFkDYfkAisQQReQC",
+   "gameId": 20024151,
+   "hidden": false,
+   "id": "240448",
+   "markets": [
+    {
+     "active": true,
+     "archived": false,
+     "assetPriceTerms": null,
+     "bestAskQuote": {
+      "currency": "USD",
+      "value": "0.1500"
+     },
+     "bestBidQuote": {
+      "currency": "USD",
+      "value": "0.1400"
+     },
+     "category": "sports",
+     "closed": false,
+     "comboEnabled": true,
+     "createdAt": "2026-11-07T05:00:28Z",
+     "ep3Status": "OPEN",
+     "ep3SyncedAt": "2026-11-07T05:00:28Z",
+     "eventSubcategory": "BASKETBALL",
+     "feeCoefficient": 0.095,
+     "gameStartTime": "2026-11-21T18:00:00Z",
+     "hidden": false,
+     "id": "2261148",
+     "manualActivation": false,
+     "marketSides": [
+      {
+       "createdAt": "2026-11-07T05:00:28Z",
+       "description": "Bucks",
+       "id": "4521732",
+       "identifier": "aec-nba-mil-phi-2026-11-21",
+       "long": true,
+       "marketId": 2261148,
+       "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+       "price": "0.1400",
+       "quote": {
+        "currency": "USD",
+        "value": "0.1500"
+       },
+       "team": {
+        "abbreviation": "mil",
+        "alias": "Milwaukee Bucks",
+        "displayAbbreviation": "MIL",
+        "id": 41,
+        "league": "nba",
+        "name": "Milwaukee Bucks",
+        "ordering": "away",
+        "providerId": 15,
+        "record": "1-15",
+        "safeName": "Bucks"
+       },
+       "teamId": 41,
+       "tradable": true,
+       "updatedAt": "2026-11-07T05:00:28Z"
+      },
+      {
+       "createdAt": "2026-11-07T05:00:28Z",
+       "description": "76ers",
+       "id": "4521733",
+       "identifier": "aec-nba-mil-phi-2026-11-21",
+       "long": false,
+       "marketId": 2261148,
+       "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+       "price": "0.1500",
+       "quote": {
+        "currency": "USD",
+        "value": "0.86"
+       },
+       "team": {
+        "abbreviation": "phi",
+        "alias": "Philadelphia 76ers",
+        "displayAbbreviation": "PHI",
+        "id": 29,
+        "league": "nba",
+        "name": "Philadelphia 76ers",
+        "ordering": "home",
+        "providerId": 7,
+        "record": "13-3",
+        "safeName": "76ers"
+       },
+       "teamId": 29,
+       "tradable": true,
+       "updatedAt": "2026-11-07T05:00:28Z"
+      }
+     ],
+     "marketType": "moneyline",
+     "minimumTradeQty": 0.01,
+     "orderPriceMinTickSize": 0.01,
+     "outcomePrices": "[\"0.1400\",\"0.1500\"]",
+     "outcomes": "[\"Bucks\",\"76ers\"]",
+     "politics": null,
+     "slug": "aec-nba-mil-phi-2026-11-21",
+     "sportsMarketType": "basketball_team_full_game_winner",
+     "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+     "status": "MARKET_STATUS_OPEN",
+     "title": "Milwaukee Bucks vs Philadelphia 76ers",
+     "titleShort": "MIL vs PHI",
+     "updatedAt": "2026-11-21T04:24:26Z"
+    }
+   ],
+   "period": "NS",
+   "seriesSlug": "nba-2025",
+   "slug": "nba-mil-phi-2026-11-21",
+   "sortType": "price",
+   "sportradarGameId": "377196f0-d137-45cc-8e14-3848e3d51fb4",
+   "startTime": "2026-11-21T18:00:00Z",
+   "streamRequiresAuth": false,
+   "teams": [
+    {
+     "abbreviation": "mil",
+     "alias": "Milwaukee Bucks",
+     "displayAbbreviation": "MIL",
+     "id": 41,
+     "league": "nba",
+     "name": "Milwaukee Bucks",
+     "providerId": 15,
+     "record": "1-15",
+     "safeName": "Bucks"
+    },
+    {
+     "abbreviation": "phi",
+     "alias": "Philadelphia 76ers",
+     "displayAbbreviation": "PHI",
+     "id": 29,
+     "league": "nba",
+     "name": "Philadelphia 76ers",
+     "providerId": 7,
+     "record": "13-3",
+     "safeName": "76ers"
+    }
+   ],
+   "ticker": "nba-mil-phi-2026-11-21",
+   "title": "MIL Bucks vs. PHI 76ers",
+   "updatedAt": "2026-11-21T04:25:18Z"
+  },
+  {
+   "active": true,
+   "archived": false,
+   "category": "sports",
+   "closed": false,
+   "createdAt": "2026-11-07T05:00:29Z",
+   "eventState": {
+    "createdAt": "2026-11-20T20:32:43.004201Z",
+    "eventId": 240450,
+    "gameId": 20024153,
+    "id": 145173290,
+    "mainSpreadLine": 5.5,
+    "mainTotalLine": 229.5,
+    "marketGroupStats": [
+     {
+      "line": 5.5,
+      "marketGroupId": "game-lines/spread/full-game"
+     },
+     {
+      "line": 229.5,
+      "marketGroupId": "game-lines/totals/full-game"
+     }
+    ],
+    "periodScores": [],
+    "sportradarGameId": "363a3d10-4410-426d-9992-77d3abcddfbc",
+    "type": "basketball",
+    "updatedAt": "2026-11-21T00:30:43.406135Z"
+   },
+   "fixtureId": "Q9KVtp0eK9xn0LZWL4Lh",
+   "gameId": 20024153,
+   "hidden": false,
+   "id": "240450",
+   "markets": [
+    {
+     "active": true,
+     "archived": false,
+     "assetPriceTerms": null,
+     "bestAskQuote": {
+      "currency": "USD",
+      "value": "0.3500"
+     },
+     "bestBidQuote": {
+      "currency": "USD",
+      "value": "0.3400"
+     },
+     "category": "sports",
+     "closed": false,
+     "comboEnabled": true,
+     "createdAt": "2026-11-07T05:00:29Z",
+     "ep3Status": "OPEN",
+     "ep3SyncedAt": "2026-11-07T05:00:29Z",
+     "eventSubcategory": "BASKETBALL",
+     "feeCoefficient": 0.095,
+     "gameStartTime": "2026-11-22T01:00:00Z",
+     "hidden": false,
+     "id": "2261150",
+     "manualActivation": false,
+     "marketSides": [
+      {
+       "createdAt": "2026-11-07T05:00:29Z",
+       "description": "Clippers",
+       "id": "4521736",
+       "identifier": "aec-nba-lac-dal-2026-11-21",
+       "long": true,
+       "marketId": 2261150,
+       "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+       "price": "0.3400",
+       "quote": {
+        "currency": "USD",
+        "value": "0.3500"
+       },
+       "team": {
+        "abbreviation": "lac",
+        "alias": "Los Angeles Clippers",
+        "displayAbbreviation": "LAC",
+        "id": 20,
+        "league": "nba",
+        "name": "Los Angeles Clippers",
+        "ordering": "away",
+        "providerId": 28,
+        "record": "4-10",
+        "safeName": "Clippers"
+       },
+       "teamId": 20,
+       "tradable": true,
+       "updatedAt": "2026-11-07T05:00:29Z"
+      },
+      {
+       "createdAt": "2026-11-07T05:00:29Z",
+       "description": "Mavericks",
+       "id": "4521737",
+       "identifier": "aec-nba-lac-dal-2026-11-21",
+       "long": false,
+       "marketId": 2261150,
+       "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+       "price": "0.3500",
+       "quote": {
+        "currency": "USD",
+        "value": "0.66"
+       },
+       "team": {
+        "abbreviation": "dal",
+        "alias": "Dallas Mavericks",
+        "displayAbbreviation": "DAL",
+        "id": 39,
+        "league": "nba",
+        "name": "Dallas Mavericks",
+        "ordering": "home",
+        "providerId": 25,
+        "record": "8-7",
+        "safeName": "Mavericks"
+       },
+       "teamId": 39,
+       "tradable": true,
+       "updatedAt": "2026-11-07T05:00:29Z"
+      }
+     ],
+     "marketType": "moneyline",
+     "minimumTradeQty": 0.01,
+     "orderPriceMinTickSize": 0.01,
+     "outcomePrices": "[\"0.3400\",\"0.3500\"]",
+     "outcomes": "[\"Clippers\",\"Mavericks\"]",
+     "politics": null,
+     "slug": "aec-nba-lac-dal-2026-11-21",
+     "sportsMarketType": "basketball_team_full_game_winner",
+     "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+     "status": "MARKET_STATUS_OPEN",
+     "title": "Los Angeles Clippers vs Dallas Mavericks",
+     "titleShort": "LAC vs DAL",
+     "updatedAt": "2026-11-21T04:24:26Z"
+    }
+   ],
+   "period": "NS",
+   "seriesSlug": "nba-2025",
+   "slug": "nba-lac-dal-2026-11-21",
+   "sortType": "price",
+   "sportradarGameId": "363a3d10-4410-426d-9992-77d3abcddfbc",
+   "startTime": "2026-11-22T01:00:00Z",
+   "streamRequiresAuth": false,
+   "teams": [
+    {
+     "abbreviation": "lac",
+     "alias": "Los Angeles Clippers",
+     "displayAbbreviation": "LAC",
+     "id": 20,
+     "league": "nba",
+     "name": "Los Angeles Clippers",
+     "providerId": 28,
+     "record": "4-10",
+     "safeName": "Clippers"
+    },
+    {
+     "abbreviation": "dal",
+     "alias": "Dallas Mavericks",
+     "displayAbbreviation": "DAL",
+     "id": 39,
+     "league": "nba",
+     "name": "Dallas Mavericks",
+     "providerId": 25,
+     "record": "8-7",
+     "safeName": "Mavericks"
+    }
+   ],
+   "ticker": "nba-lac-dal-2026-11-21",
+   "title": "LA Clippers vs. DAL Mavericks",
+   "updatedAt": "2026-11-21T04:24:26Z"
+  },
+  {
+   "active": true,
+   "archived": false,
+   "category": "sports",
+   "closed": false,
+   "createdAt": "2026-11-07T05:00:30Z",
+   "eventState": {
+    "createdAt": "2026-11-20T20:30:57.962058Z",
+    "eventId": 240452,
+    "gameId": 20024154,
+    "id": 145172986,
+    "mainSpreadLine": 5.5,
+    "mainTotalLine": 227.5,
+    "marketGroupStats": [
+     {
+      "line": 5.5,
+      "marketGroupId": "game-lines/spread/full-game"
+     },
+     {
+      "line": 227.5,
+      "marketGroupId": "game-lines/totals/full-game"
+     }
+    ],
+    "periodScores": [],
+    "sportradarGameId": "bd62e284-94f4-4871-894d-2999de385966",
+    "type": "basketball",
+    "updatedAt": "2026-11-21T02:58:28.840624Z"
+   },
+   "fixtureId": "BdMfq3IHw8Ksn8jALOm8",
+   "gameId": 20024154,
+   "hidden": false,
+   "id": "240452",
+   "markets": [
+    {
+     "active": true,
+     "archived": false,
+     "assetPriceTerms": null,
+     "bestAskQuote": {
+      "currency": "USD",
+      "value": "0.3500"
+     },
+     "bestBidQuote": {
+      "currency": "USD",
+      "value": "0.3400"
+     },
+     "category": "sports",
+     "closed": false,
+     "comboEnabled": true,
+     "createdAt": "2026-11-07T05:00:30Z",
+     "ep3Status": "OPEN",
+     "ep3SyncedAt": "2026-11-07T05:00:30Z",
+     "eventSubcategory": "BASKETBALL",
+     "feeCoefficient": 0.095,
+     "gameStartTime": "2026-11-22T01:00:00Z",
+     "hidden": false,
+     "id": "2261152",
+     "manualActivation": false,
+     "marketSides": [
+      {
+       "createdAt": "2026-11-07T05:00:30Z",
+       "description": "Grizzlies",
+       "id": "4521740",
+       "identifier": "aec-nba-mem-min-2026-11-21",
+       "long": true,
+       "marketId": 2261152,
+       "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+       "price": "0.3400",
+       "quote": {
+        "currency": "USD",
+        "value": "0.3500"
+       },
+       "team": {
+        "abbreviation": "mem",
+        "alias": "Memphis Grizzlies",
+        "displayAbbreviation": "MEM",
+        "id": 21,
+        "league": "nba",
+        "name": "Memphis Grizzlies",
+        "ordering": "away",
+        "providerId": 21,
+        "record": "12-4",
+        "safeName": "Grizzlies"
+       },
+       "teamId": 21,
+       "tradable": true,
+       "updatedAt": "2026-11-07T05:00:30Z"
+      },
+      {
+       "createdAt": "2026-11-07T05:00:30Z",
+       "description": "Timberwolves",
+       "id": "4521741",
+       "identifier": "aec-nba-mem-min-2026-11-21",
+       "long": false,
+       "marketId": 2261152,
+       "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+       "price": "0.3500",
+       "quote": {
+        "currency": "USD",
+        "value": "0.66"
+       },
+       "team": {
+        "abbreviation": "min",
+        "alias": "Minnesota Timberwolves",
+        "displayAbbreviation": "MIN",
+        "id": 15,
+        "league": "nba",
+        "name": "Minnesota Timberwolves",
+        "ordering": "home",
+        "providerId": 16,
+        "record": "11-5",
+        "safeName": "Timberwolves"
+       },
+       "teamId": 15,
+       "tradable": true,
+       "updatedAt": "2026-11-07T05:00:30Z"
+      }
+     ],
+     "marketType": "moneyline",
+     "minimumTradeQty": 0.01,
+     "orderPriceMinTickSize": 0.01,
+     "outcomePrices": "[\"0.3400\",\"0.3500\"]",
+     "outcomes": "[\"Grizzlies\",\"Timberwolves\"]",
+     "politics": null,
+     "slug": "aec-nba-mem-min-2026-11-21",
+     "sportsMarketType": "basketball_team_full_game_winner",
+     "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+     "status": "MARKET_STATUS_OPEN",
+     "title": "Memphis Grizzlies vs Minnesota Timberwolves",
+     "titleShort": "MEM vs MIN",
+     "updatedAt": "2026-11-21T04:24:26Z"
+    }
+   ],
+   "period": "NS",
+   "seriesSlug": "nba-2025",
+   "slug": "nba-mem-min-2026-11-21",
+   "sortType": "price",
+   "sportradarGameId": "bd62e284-94f4-4871-894d-2999de385966",
+   "startTime": "2026-11-22T01:00:00Z",
+   "streamRequiresAuth": false,
+   "teams": [
+    {
+     "abbreviation": "mem",
+     "alias": "Memphis Grizzlies",
+     "displayAbbreviation": "MEM",
+     "id": 21,
+     "league": "nba",
+     "name": "Memphis Grizzlies",
+     "providerId": 21,
+     "record": "12-4",
+     "safeName": "Grizzlies"
+    },
+    {
+     "abbreviation": "min",
+     "alias": "Minnesota Timberwolves",
+     "displayAbbreviation": "MIN",
+     "id": 15,
+     "league": "nba",
+     "name": "Minnesota Timberwolves",
+     "providerId": 16,
+     "record": "11-5",
+     "safeName": "Timberwolves"
+    }
+   ],
+   "ticker": "nba-mem-min-2026-11-21",
+   "title": "MEM Grizzlies vs. MIN Timberwolves",
+   "updatedAt": "2026-11-21T04:24:43Z"
+  }
+ ]
+}
