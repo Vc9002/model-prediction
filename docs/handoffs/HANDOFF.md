@@ -270,20 +270,21 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
 
 ## 13. NBA v10 overhaul (started 2026-11-20)
 
-- **Next action:** review and merge `nba-v10/backfill` (injury-report parse finishing 2022-12..2026-11)
-  and `nba-v10/player` (Phase 3 player layer, worktree `E:\MP-wt\player`; PREREG.md is committed
-  before any validation join, then G1_PLAYER.md). Merge by path; v9 engine files untouched.
-- **Capture task registered 2026-11-21 14:34 ET** (`ModelPrediction-NbaPretipCapture`, S4U, every
-  10 min 11:00-02:00). First run exit 0: 5 ESPN-only records for the 2026-11-21 slate. G2 clock
-  started.
-- **Status:** plan section 10 in `docs/NBA_REVIEW_AND_V10_PLAN_2026-11-20.md`. Merged: capture,
-  plumbing fixes, harness, v9.1, anchor scaffold (G1 failed, lambda 0), v10 Flat-only wiring.
-  v9 keeps serving with edge-based sizing; Flat keeps calling everything; v10 replaces v9 in
-  Main only after gate G2 (forward CLV against the devigged consensus).
-- **Open:** backfills into `data/research/nba_v10/` (worktree `E:\MP-wt\backfill`, branch
-  `nba-v10/backfill`, not merged; scoreboards, 10,204 box scores, 13,073 ESPN odds events, closes
-  2007-2026 and injury PDFs through 2026-11-19 are done); Phase 3 player layer (running); G2
-  forward check (>= 150 v10 picks);
-  v10 `main_min_edge` unset until then.
-- **Leftover:** four empty locked worktrees under `.claude/worktrees/agent-*`; merged worktrees
-  `E:\MP-wt\{plumbing,harness,capture,wiring}` can be removed.
+- **Next action:** none blocking; let the forward clocks run. Weekly, run
+  `python scripts/nba_v10/g2_report.py` (gate G2, v10 vs Main) and
+  `python scripts/nba_v10/forward_report.py` (test A line movement, test B injury latency); both
+  stay PENDING until their pre-registered n (G2 150 picks; A 400 games per market; B 100 events).
+- **Running (scheduled, research only):** `ModelPrediction-NbaPretipCapture` (registered 2026-11-21,
+  every 10 min 11:00-02:00 ET) captures ESPN odds (12 h slate) and Polymarket near tip, then in a
+  budgeted thread: official injury reports, ESPN box-score catch-up, nba-player-v10 shadow log,
+  T-C2 events (`<runtime>/research/nba_v10_forward/`, `<runtime>/injury_reports/nba/`). Skipped
+  00:15-01:20 ET. First full run 16:50 ET 11-21: exit 0, 8 reports, 5 player records, 2 T-C2 events.
+- **Results so far:** G1 FAIL for v9, v9.1 and the Phase 3 player layer (all lambda 0); v10 prices at
+  the DraftKings devig (verified on the 16:00 run) and its only edge is T-B (>= 3.0 points). G2 rules
+  pinned and amended before any pick scored (plan section 9). v9 keeps Main with edge sizing; Flat
+  calls everything.
+- **Open:** v10 spread rows carry `model_artifact_hash` null for the v9 spread source (totals have
+  it); upcoming games are treated as regular season in the forward log (fix before April); 2026
+  playoff games are absent from `nba_games_all.jsonl`; a pre-existing 311 s capture run (19:50Z
+  11-21) brushed the 300 s supervisor timeout.
+- **Leftover:** four empty locked worktrees under `.claude/worktrees/agent-*` (removal was denied).

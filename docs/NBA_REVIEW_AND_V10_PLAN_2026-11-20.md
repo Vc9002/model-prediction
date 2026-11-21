@@ -331,3 +331,10 @@ Its output feeds Phase 2 as `model`; it only influences prices through a lambda 
     decision-time line" predicts "T-10 line minus the decision-time line", forward only. That is
     much less noisy than outcomes, plus T-C2 (injury latency) with a live injury-report capture.
     Both are research logs only.
+- **Forward research track (`463fb9c5`, `74dd916d`), live since 16:50 ET 2026-11-21.**
+  - Pre-registered in `outputs/nba/v10_forward/PREREG_FORWARD.md` before any code.
+  - What runs: the pre-tip worker captures the official injury reports, tops up ESPN box scores,
+    and logs nba-player-v10 means next to the decision-time consensus and the Polymarket mid
+    (test A, line movement; evaluated once at 400 games per market). It also records T-C2 events
+    with Polymarket follow-ups at +10, +20 and +30 min (test B; 100 events).
+  - Report: `scripts/nba_v10/forward_report.py`.
