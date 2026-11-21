@@ -338,6 +338,52 @@ def test_snapshot_store_uses_last_observation_before_game(tmp_path) -> None:
     assert closing["long"]["price"] == 0.53
 
 
+def test_closing_snapshot_never_returns_a_quote_taken_after_the_contracts_own_kickoff(tmp_path) -> None:
+    """2026-10-24: six NCAAF rows kicking 19:30Z-02:00Z had been priced on a 16:00Z game's
+    total contract; bounded only by the row's kickoff, its 17:03Z in-play 99c book became
+    their close."""
+    store = PolymarketSnapshotStore(tmp_path / "snapshots.jsonl")
+    for observed, under_ask in (("2026-10-24T11:45:30Z", 0.56), ("2026-10-24T17:03:06Z", 0.99)):
+        store.append(
+            {
+                "market_slug": "tsc-cfb-nhc-cencon-2026-10-24-total-56pt5",
+                "event_start_utc": "2026-10-24T16:00:00Z",
+                "observed_at_utc": observed,
+                "market_state": "MARKET_STATE_OPEN",
+                "market_type": "total",
+                "line": 56.5,
+                "long": {"description": "Over", "ask": 0.5},
+                "short": {"description": "Under", "ask": under_ask},
+            }
+        )
+
+    closing = store.closing_snapshot("tsc-cfb-nhc-cencon-2026-10-24-total-56pt5", "2026-10-24T19:30Z")
+
+    assert closing is not None
+    assert closing["short"]["ask"] == 0.56
+
+
+def test_closing_snapshot_skips_a_book_that_is_not_open(tmp_path) -> None:
+    store = PolymarketSnapshotStore(tmp_path / "snapshots.jsonl")
+    for observed, state, price in (
+        ("2026-11-14T15:00:00Z", "MARKET_STATE_OPEN", 0.52),
+        ("2026-11-14T15:55:00Z", "MARKET_STATE_HALTED", 0.97),
+    ):
+        store.append(
+            {
+                "market_slug": "market",
+                "event_start_utc": "2026-11-14T16:00:00Z",
+                "observed_at_utc": observed,
+                "market_state": state,
+                "long": {"ask": price},
+            }
+        )
+
+    closing = store.closing_snapshot("market", "2026-11-14T16:00:00Z")
+
+    assert closing is not None and closing["long"]["ask"] == 0.52
+
+
 def test_snapshot_store_tolerates_corrupted_lines_and_bad_timestamps(tmp_path) -> None:
     snapshot_path = tmp_path / "snapshots_corrupted.jsonl"
     store = PolymarketSnapshotStore(snapshot_path)

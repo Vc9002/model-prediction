@@ -930,6 +930,16 @@ class PolymarketSnapshotStore:
         return latest
 
     def closing_snapshot(self, slug: str, event_start_utc: str) -> dict[str, Any] | None:
+        """Latest quote of ``slug`` observed strictly before kickoff, or None.
+
+        Kickoff is the earlier of the caller's ``event_start_utc`` and the
+        contract's own stored ``event_start_utc``. Bounding only by the caller's
+        start let an in-play 99c quote through as a "close" (2026-10-24: six
+        NCAAF rows kicking 19:30Z-02:00Z had been priced on a 16:00Z game's total
+        contract, and its 17:03Z in-play book became their close). A row whose
+        ``market_state`` says the book is not open (halted, closed, expired) is
+        never a close either.
+        """
         if not self.path.exists():
             return None
         event_start = parse_utc(event_start_utc)
@@ -952,8 +962,20 @@ class PolymarketSnapshotStore:
                     observed = parse_utc(raw_observed)
                 except (ValueError, TypeError):
                     continue
-                if observed <= event_start:
-                    candidates.append((observed, item))
+                if observed >= event_start:
+                    continue
+                state = item.get("market_state")
+                if state is not None and state != "MARKET_STATE_OPEN":
+                    continue
+                own_start_raw = item.get("event_start_utc")
+                if own_start_raw:
+                    try:
+                        own_start = parse_utc(own_start_raw)
+                    except (ValueError, TypeError):
+                        continue
+                    if observed >= own_start:
+                        continue
+                candidates.append((observed, item))
         return max(candidates, key=lambda item: item[0])[1] if candidates else None
 
 
