@@ -270,14 +270,16 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
 
 ## 13. NBA v10 overhaul (started 2026-11-20)
 
-- **Plan and decisions:** `docs/NBA_REVIEW_AND_V10_PLAN_2026-11-20.md` (sections 6, 8, 9). v9
-  keeps serving with edge-based sizing; the Flat ledger keeps calling everything; v10 replaces
-  v9 in Main only after gate G2 (forward CLV against the devigged consensus).
-- **In flight (worktrees `E:\MP-wt\{plumbing,harness,capture,backfill}`, branches `nba-v10/*`):**
-  plumbing fixes B2/B3/B10 and start-time compare; replay harness + v9.1 challenger + anchor
-  scaffold with G1; NBA pre-tip and consensus capture worker (task registration pending);
-  backfills to `data/research/nba_v10/` (lines 2007-2024, box scores 2016-2024, injury PDFs
-  2021+). Merge each branch into `refactor/cleanup-2026-11-11` by path, outside the :30/:05
-  run windows.
-- **Leftover:** four empty, locked worktrees under `.claude/worktrees/agent-*` from a failed
-  isolation attempt; safe to remove with `git worktree remove --force`.
+- **Next action:** in an ADMIN PowerShell, register the capture task (only that task, S4U,
+  every 10 min 11:00-02:00):
+  `& 'C:\Users\Vince\AppData\Local\Temp\claude\3c4e37e4a6ec2934\725cd53a-6904-44cd-9660-1dcec21da8a9\scratchpad\register_nba_pretip.ps1'`.
+  If the scratchpad is gone, copy the NbaPretipCapture block from `scripts/register_windows_tasks.ps1`.
+- **Status:** plan section 10 in `docs/NBA_REVIEW_AND_V10_PLAN_2026-11-20.md`. Merged: capture,
+  plumbing fixes, harness, v9.1, anchor scaffold (G1 failed, lambda 0), v10 Flat-only wiring.
+  v9 keeps serving with edge-based sizing; Flat keeps calling everything; v10 replaces v9 in
+  Main only after gate G2 (forward CLV against the devigged consensus).
+- **Open:** backfills into `data/research/nba_v10/` (worktree `E:\MP-wt\backfill`, branch
+  `nba-v10/backfill`, not merged); Phase 3 player layer; G2 forward check (>= 150 v10 picks);
+  v10 `main_min_edge` unset until then.
+- **Leftover:** four empty locked worktrees under `.claude/worktrees/agent-*`; merged worktrees
+  `E:\MP-wt\{plumbing,harness,capture,wiring}` can be removed.

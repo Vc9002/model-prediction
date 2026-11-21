@@ -258,3 +258,29 @@ Its output feeds Phase 2 as `model`; it only influences prices through a lambda 
   the status of a player averaging at least 20 minutes, measured against the Polymarket mid
   before and after.
 - **G1 / G2:** as written in section 6; not re-tuned after results are seen.
+
+## 10. Progress (2026-11-21)
+
+- **Phase 0.1 capture (`quick-261120-npc`, `b1e009a8`):** the `nba-pretip-capture` worker writes
+  ESPN odds for the next 12 hours of slate and Polymarket quotes inside a 25-minute window. ESPN
+  exposes one NBA book (DraftKings), so "consensus" is a single-book devig. The Windows task is
+  defined in `scripts/register_windows_tasks.ps1` but not registered yet (S4U needs an elevated
+  shell).
+- **Plumbing (`quick-261120-npl`, `quick-261121-nw1`):** B2 Over-floor key (the 9% floor now
+  fires early-season), B3 Clippers alias in forecast and settlement CLV, B10 stored components,
+  start times compared as instants (forecast, system_health). v9 rows unchanged on replay.
+- **Harness, v9.1, anchor (`quick-261120-nh1/nv9/na0`):** `scripts/nba_v10/replay_harness.py`
+  reproduces the review numbers and replaces v9's unreproducible qualification metrics. v9.1
+  keeps B5 (300-game rolling baseline), B6 for totals only, the B7 playoff offset and the B4 sign
+  fix; B1 was dropped. Total bias +3.34 -> -0.34, RMSE 19.42 -> 19.03; correlation with the line
+  still about 0.
+- **Gate G1: FAIL** for v9 and v9.1 in both markets (validation n=762; lambda CIs straddle 0,
+  corr -0.015 to -0.030). `nba-anchor-v10` ships lambda = 0: its price is the anchor, and its only
+  possible edge is T-B (consensus minus Polymarket ask >= 3.0 points).
+- **Wiring (`quick-261121-nw1`):** `nba-anchor-v10` logs one Flat row per NBA spread and total
+  per game after v9; not on Main or any buyer whitelist. The consensus anchor must be at most 90
+  minutes old, otherwise the Polymarket mid of a two-sided book no wider than 10 points is used.
+  Moneyline is not priced by the anchor module.
+- **In flight:** Phase 0.3-0.5 backfills into `data/research/nba_v10/`. The Phase 3 player layer
+  starts on that data and reaches serving only through a lambda that passes G1.
+- **G2 clock:** starts once the capture task is registered; at least 150 forward v10 picks.
