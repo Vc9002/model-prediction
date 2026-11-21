@@ -55,6 +55,10 @@ SOURCE_POLYMARKET_MID = "polymarket_mid"
 # this run's captures and rejects a previous run's line.
 ANCHOR_MAX_AGE = timedelta(minutes=90)
 TB_THRESHOLD = 0.030  # plan section 9, pinned: consensus prob minus Polymarket ask, gross of fee
+# A Polymarket mid is an anchor only on a two-sided quote at most 10 points wide: the priced rung
+# is normally 1-3 points wide, and a wider book is a resting placeholder (2026-11-21 NO @ SA total:
+# over bid 3c / ask 50c), whose midpoint is not a price.
+MID_MAX_WIDTH = 0.10
 REASON_ANCHOR_MISSING = "NO_CALL_ANCHOR_MISSING"
 REASON_NO_ASK = "NO_EXECUTABLE_ASK"
 
@@ -80,13 +84,17 @@ def _finite(value: Any) -> float | None:
 
 
 def _row_mid(side: Any) -> float | None:
+    """A side's mid, only from a two-sided quote no wider than ``MID_MAX_WIDTH``."""
     if not isinstance(side, dict):
+        return None
+    bid, ask = _finite(side.get("bid")), _finite(side.get("ask"))
+    # The 1e-9 keeps a quote exactly 10 points wide (0.55 - 0.45 in floats) inside the limit.
+    if bid is None or ask is None or not 0.0 <= ask - bid <= MID_MAX_WIDTH + 1e-9:
         return None
     mid = _finite(side.get("midpoint"))
     if mid is None:
-        bid, ask = _finite(side.get("bid")), _finite(side.get("ask"))
-        mid = None if bid is None or ask is None else (bid + ask) / 2.0
-    return mid if mid is not None and 0.0 < mid < 1.0 else None
+        mid = (bid + ask) / 2.0
+    return mid if 0.0 < mid < 1.0 else None
 
 
 def _row_ask(side: Any) -> float | None:
@@ -305,6 +313,7 @@ def _tb_block(entry: dict, call: Any, anchor_meta: dict, sigma: float) -> dict[s
         "side": best,
         "gap": None if best is None else gaps[best],
         "flag": best is not None and gaps[best] >= TB_THRESHOLD,
+        "row_side_is_tb_side": best == call.side,
     }
 
 
@@ -342,6 +351,7 @@ def log_nba_anchor_v10(
         "anchor_sources": {},
         "tb_flags": 0,
         "tb_flag_event_ids": [],
+        "tb_flags_off_row_side": 0,
         "skip_counts": {},
         "skipped": [],
         "anchor_max_age_minutes": ANCHOR_MAX_AGE.total_seconds() / 60,
@@ -366,7 +376,9 @@ def log_nba_anchor_v10(
     source = FallbackAnchorSource(
         [
             CapturedAnchorSource(consensus, max_age=ANCHOR_MAX_AGE),
-            CapturedAnchorSource(mids, max_age=ANCHOR_MAX_AGE),
+            # No age limit here: this is the very quote v9 priced (the slate's own freshness
+            # selector chose it); its age is stored on the row.
+            CapturedAnchorSource(mids),
         ]
     )
     # Captured AFTER both anchor sets are loaded, so a capture is never judged by a stale clock.
@@ -472,11 +484,13 @@ def log_nba_anchor_v10(
             model_uncertainty=None,
             model_version=NBA_ANCHOR_V10_VERSION,
             rationale=(
-                f"Market-anchored v10 ({market}), lambda {call.lambda_:g}: anchor {call.anchor_source} "
-                f"(observed {call.anchor_observed_at_utc}), model mean {call.model_mean:.1f} "
-                f"({entry.get('model_source')}) at weight {call.lambda_:g}. P({call.side} at {call.contract_line:g}) "
-                f"{_pct(call.probability)} vs ask {_pct(call.ask)}, net edge {_pct(call.edge)}; "
-                f"{tb_note}."
+                # Settlement's closing-CLV fallback reads market_slug= first, then the first
+                # parenthesised token with a dash, so no other dashed token sits in parentheses.
+                f"Market-anchored v10 {market}: anchor {call.anchor_source} observed "
+                f"{call.anchor_observed_at_utc}; model mean {call.model_mean:.1f} from "
+                f"{entry.get('model_source')} at weight {call.lambda_:g}. P({call.side} at "
+                f"{call.contract_line:g}) {_pct(call.probability)} vs ask {_pct(call.ask)}, net edge "
+                f"{_pct(call.edge)}; {tb_note}. market_slug={entry.get('market_slug')}"
             ),
             risks=(
                 "Flat-only challenger: G1 failed, so the price is the anchor's and the model has no "
@@ -527,4 +541,8 @@ def log_nba_anchor_v10(
         if tb["flag"]:
             summary["tb_flags"] += 1
             summary["tb_flag_event_ids"].append(event_id)
+            # The row's side is the anchored favourite; T-B may fire on the other side, so grade
+            # T-B from the payload, never from the row's selection.
+            if tb["side"] != call.side:
+                summary["tb_flags_off_row_side"] += 1
     return {**summary, "status": "ok"}

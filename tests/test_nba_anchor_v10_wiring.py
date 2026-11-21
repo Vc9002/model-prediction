@@ -213,6 +213,7 @@ def test_consensus_anchor_sign_and_tb_flag(monkeypatch, tmp_path):
     assert snapshot["tb"]["flag"] is True and snapshot["tb"]["side"] == "home"
     assert snapshot["tb"]["gap"] == pytest.approx(0.040834, abs=1e-6)
     assert summary["tb_flags"] == 1 and summary["anchor_sources"] == {"espn_consensus_devig": 1}
+    assert snapshot["tb"]["row_side_is_tb_side"] is True and summary["tb_flags_off_row_side"] == 0
     assert log[0][2].line == -11.5  # home at -C, v9's convention
 
 
@@ -323,3 +324,31 @@ def test_ledger_replay_accepts_the_v10_snapshot_and_rejects_tampering(monkeypatc
     tampered = {**payload, "anchor_mean": payload["anchor_mean"] + 1.0}
     with pytest.raises(ValueError):
         validate_decision_snapshot(tampered, row)
+
+
+def test_mid_needs_a_two_sided_quote_at_most_ten_points_wide():
+    # Live 2026-11-21 NO @ SA 232.5 over: bid 3c, ask 50c, midpoint 26.5c -- not a price.
+    assert v10._row_mid({"bid": 0.03, "ask": 0.50, "midpoint": 0.265}) is None
+    assert v10._row_mid({"ask": 0.50}) is None
+    assert v10._row_mid({"bid": 0.48, "ask": 0.50, "midpoint": 0.49}) == 0.49
+    assert v10._row_mid({"bid": 0.45, "ask": 0.55}) == pytest.approx(0.50)
+
+
+def test_an_old_mid_still_anchors_because_it_is_the_quote_v9_priced(monkeypatch, tmp_path):
+    forecast = _inputs(
+        asks={"away": 0.55, "home": 0.47}, mids={"away": 0.54}, observed=NOW - timedelta(hours=3)
+    )
+    summary, log = _log_direct(monkeypatch, tmp_path, forecast, lambda: NOW)
+    snapshot = json.loads(log[0][2].model_input_snapshot_json)
+    assert snapshot["anchor_source"] == "polymarket_mid" and snapshot["anchor_age_seconds"] == 10800.0
+    assert summary["logged"] == 1
+
+
+def test_settlement_recovers_the_slug_from_the_v10_rationale(monkeypatch, tmp_path):
+    from model_prediction.cli.settle import _extract_market_slug
+
+    forecast = _inputs(asks={"away": 0.55, "home": 0.47}, mids={"away": 0.54}, observed=NOW)
+    forecast["anchor_v10_inputs"][0]["market_slug"] = "asc-nba-lac-sa-2026-11-19-pos-11pt5"
+    _, log = _log_direct(monkeypatch, tmp_path, forecast, lambda: NOW)
+    rationale = log[0][2].rationale
+    assert _extract_market_slug(rationale, {}) == "asc-nba-lac-sa-2026-11-19-pos-11pt5"
