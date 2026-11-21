@@ -96,6 +96,55 @@ def compute_artifact_hash(payload: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+# ``challengers.<SPORT>`` keys that are bookkeeping, not a market route. MLB carries both, and
+# ``research_candidates`` is already a list, so list-valued routes must not be read off these keys.
+CHALLENGER_METADATA_KEYS = frozenset({"prospective_challenger", "research_candidates"})
+
+
+def challenger_route_ids(value: Any) -> tuple[tuple[str, ...], list[str]]:
+    """(configured ids in order, problems) of one ``challengers.<SPORT>.<market>`` value.
+
+    A route is a single model id (schema v3 as first written), a list of ids (quick-261121-v7r: more than
+    one challenger per sport/market), or null. A malformed item is a problem for that item only.
+    """
+    if value is None:
+        return (), []
+    items = value if isinstance(value, list) else [value]
+    ids: list[str] = []
+    problems: list[str] = []
+    for item in items:
+        if isinstance(item, str) and item.strip():
+            ids.append(item.strip())
+        elif item is not None:
+            problems.append(f"challenger id must be a non-empty string, got {item!r}")
+    return tuple(ids), problems
+
+
+def remove_challenger_route(sport_challengers: Any, market: str, model_id: str) -> bool:
+    """Drop ``model_id`` from one market's challenger route in a raw ``challengers.<SPORT>`` mapping.
+
+    A scalar route equal to the id is deleted; a list loses that id, collapses to a scalar when one id is
+    left and is deleted when none is. Promotion and rejection compared with ``==``, which never matches a
+    list, so a rejected challenger in a list kept making picks. Returns whether anything was removed.
+    """
+    if not isinstance(sport_challengers, dict) or market not in sport_challengers:
+        return False
+    current = sport_challengers[market]
+    if isinstance(current, list):
+        kept = [item for item in current if item != model_id]
+        if len(kept) == len(current):
+            return False
+        if not kept:
+            del sport_challengers[market]
+        else:
+            sport_challengers[market] = kept[0] if len(kept) == 1 else kept
+        return True
+    if current == model_id:
+        del sport_challengers[market]
+        return True
+    return False
+
+
 @dataclass(frozen=True)
 class ProductionModelEntry:
     """One production model's resolved contract."""
@@ -170,8 +219,14 @@ class ProductionModelRegistry:
         self.health = health or {}
         # sport -> market -> champion model_id
         self.champions = champions or {}
-        # sport -> market -> challenger model_id
+        # sport -> market -> challenger route exactly as configured (a model_id or a list of them)
         self.challengers = challengers or {}
+        # SPORT -> market -> every configured challenger id in order (the first is the primary), and the
+        # subset that passed validation. Each broken challenger is left out on its own; none raises here,
+        # because a bad challenger must never take the champions down with it.
+        self.challenger_ids, self.challenger_routes, self.challenger_problems = _resolve_challenger_routes(
+            self.challengers, entries, self.champions
+        )
         # sport -> market -> ModelLifecycleContract
         self.contracts = contracts or {}
         # Structured research queue
@@ -256,7 +311,13 @@ class ProductionModelRegistry:
             contracts[sport_key] = {}
             for market, champ_id in markets.items():
                 champ_entry = entries.get(champ_id)
-                chall_id = (challengers.get(sport_key) or {}).get(market)
+                # The contract names the primary (first-listed) challenger; a list value used to reach
+                # ``chall_id in entries`` below and raise on an unhashable list.
+                sport_challengers = challengers.get(sport_key)
+                configured, _ = challenger_route_ids(
+                    sport_challengers.get(market) if isinstance(sport_challengers, dict) else None
+                )
+                chall_id = configured[0] if configured else None
                 rollback_id = champ_entry.rollback_model if champ_entry else None
                 if champ_id == "cfb-structural-v2":
                     if market == "spread":
@@ -300,9 +361,9 @@ class ProductionModelRegistry:
             manual_orders_only=bool(execution.get("manual_orders_only", True)),
             health=config.get("health") or {},
             champions={str(s): dict(m) for s, m in champions.items()},
-            challengers={str(s): dict(m) for s, m in challengers.items()}
-            if isinstance(challengers, dict)
-            else {},
+            # A non-mapping sport value is kept as configured and reported by the route resolver; it used to
+            # raise here (dict(None)) and take the whole registry, champions included, down with it.
+            challengers={str(s): dict(m) if isinstance(m, dict) else m for s, m in challengers.items()},
             contracts=contracts,
             research_queue=list(research_queue) if isinstance(research_queue, list) else [],
             blocked_workflows=blocked_workflows,
@@ -663,13 +724,23 @@ class ProductionModelRegistry:
         return self.resolve(sport, market)
 
     def challenger(self, sport: str, market: str) -> ProductionModelEntry | None:
-        """The frozen prospective challenger model for a sport+market, or None."""
-        model_id = (self.challengers.get(sport.upper()) or {}).get(market)
-        if model_id:
-            entry = self.entries.get(model_id)
-            if entry is not None and entry.available:
-                return entry
+        """The primary (first-listed) challenger for a sport+market, or None.
+
+        Deliberately no fall-through: when the primary is broken this returns None rather than the next
+        listed model, so single-challenger consumers (qualification, v6.2's routed markets) never silently
+        switch to a different model. ``challengers_for`` returns every healthy one.
+        """
+        configured = (self.challenger_ids.get(sport.upper()) or {}).get(market) or ()
+        if configured and configured[0] in (
+            (self.challenger_routes.get(sport.upper()) or {}).get(market) or ()
+        ):
+            return self.entries[configured[0]]
         return None
+
+    def challengers_for(self, sport: str, market: str) -> list[ProductionModelEntry]:
+        """Every challenger routed for a sport+market, in configured order, each broken one left out alone."""
+        routed = (self.challenger_routes.get(sport.upper()) or {}).get(market) or ()
+        return [self.entries[model_id] for model_id in routed]
 
     def rollback(self, sport: str, market: str) -> ProductionModelEntry | None:
         """The rollback model for a sport+market's champion, or None."""
@@ -700,6 +771,65 @@ class ProductionModelRegistry:
     def problem_entries(self) -> list[ProductionModelEntry]:
         """Entries that are disabled or failed contract validation."""
         return [e for e in self.entries.values() if not e.available]
+
+
+def _entry_serves(entry: ProductionModelEntry, sport: str, market: str) -> bool:
+    """Whether an entry's sport/market contract covers ``sport``/``market`` (same rule as ``champions``)."""
+    markets = {m.strip().casefold() for m in entry.market.split(",")}
+    return entry.sport.casefold() == sport.casefold() and (
+        market.casefold() in markets or entry.market.casefold() in ("multi", "all")
+    )
+
+
+def _resolve_challenger_routes(
+    challengers: dict[str, Any],
+    entries: dict[str, ProductionModelEntry],
+    champions: dict[str, Any],
+) -> tuple[dict[str, dict[str, tuple[str, ...]]], dict[str, dict[str, tuple[str, ...]]], list[str]]:
+    """(configured ids, routed ids, problems) per SPORT -> market. Never raises: fail closed per challenger.
+
+    A configured id is routed only when it is a registered, available model whose sport/market contract
+    covers the route, is not that market's champion, and is not listed twice. Anything else is reported in
+    ``problems`` and left out on its own, so one broken challenger never unroutes the others.
+    """
+    configured: dict[str, dict[str, tuple[str, ...]]] = {}
+    routed: dict[str, dict[str, tuple[str, ...]]] = {}
+    problems: list[str] = []
+    champions_upper = {str(s).upper(): m for s, m in champions.items() if isinstance(m, dict)}
+    for sport, markets in challengers.items():
+        sport_key = str(sport).upper()
+        if not isinstance(markets, dict):
+            problems.append(f"challengers[{sport}] must be a mapping of market -> model_id(s)")
+            continue
+        for market, value in markets.items():
+            market_key = str(market)
+            if market_key in CHALLENGER_METADATA_KEYS:
+                continue
+            ids, item_problems = challenger_route_ids(value)
+            problems.extend(f"challengers[{sport}][{market_key}]: {p}" for p in item_problems)
+            if not ids:
+                continue
+            configured.setdefault(sport_key, {})[market_key] = ids
+            champion_id = (champions_upper.get(sport_key) or {}).get(market_key)
+            good: list[str] = []
+            for model_id in ids:
+                where = f"challengers[{sport}][{market_key}] '{model_id}'"
+                entry = entries.get(model_id)
+                if entry is None:
+                    problems.append(f"{where}: not a registered production model")
+                elif model_id in good:
+                    problems.append(f"{where}: listed twice")
+                elif model_id == champion_id:
+                    problems.append(f"{where}: is the champion of this market")
+                elif not _entry_serves(entry, sport_key, market_key):
+                    problems.append(f"{where}: contract is {entry.sport}/{entry.market}")
+                elif not entry.available:
+                    problems.append(f"{where}: unavailable ({entry.load_error or 'disabled'})")
+                else:
+                    good.append(model_id)
+            if good:
+                routed.setdefault(sport_key, {})[market_key] = tuple(good)
+    return configured, routed, problems
 
 
 def _resolve_entrypoint(entry: str) -> Any:

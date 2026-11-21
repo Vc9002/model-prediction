@@ -366,3 +366,67 @@ def test_promote_leaves_champion_unchanged_when_yaml_write_fails(tmp_path: Path,
     assert rows[0]["status"] == "failed"
     assert "disk full" in (rows[0]["note"] or "")
     assert _active_record(repo, "MLB", "moneyline") is None
+
+
+def _with_challenger_list(repo: Path) -> None:
+    """Register a second MLB moneyline candidate and route both as a challenger list (quick-261121-v7r)."""
+    config_path = repo / "config" / "production.yaml"
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    svc = config["prediction_service"]
+    svc["models"].append(
+        {
+            "model_id": "mlb-elo-trend-lr-v10",
+            "sport": "MLB",
+            "market": "moneyline",
+            "implementation": "json_artifact",
+            "artifact": "config/models/mlb-elo-trend-lr-v10.json",
+            "enabled": True,
+        }
+    )
+    svc["challengers"] = {"MLB": {"moneyline": ["mlb-elo-trend-lr-v9", "mlb-elo-trend-lr-v10"]}}
+    _write_yaml(config_path, config)
+    _write_json(
+        repo / "config/models/mlb-elo-trend-lr-v10.json",
+        _make_artifact("mlb-elo-trend-lr-v10", "mlb"),
+    )
+
+
+def test_rejecting_one_challenger_of_a_list_unroutes_only_that_one(tmp_path: Path) -> None:
+    from model_prediction.model_promotion import reject_challenger
+
+    repo = _make_repo(tmp_path)
+    _with_challenger_list(repo)
+    before = ProductionModelRegistry.load(repo)
+    assert [e.model_id for e in before.challengers_for("MLB", "moneyline")] == [
+        "mlb-elo-trend-lr-v9",
+        "mlb-elo-trend-lr-v10",
+    ]
+    reject_challenger(
+        sport="MLB",
+        market="moneyline",
+        challenger_model_id="mlb-elo-trend-lr-v10",
+        reason="fixture",
+        approved_by="operator",
+        repo_root=repo,
+    )
+    after = ProductionModelRegistry.load(repo)
+    assert [e.model_id for e in after.challengers_for("MLB", "moneyline")] == ["mlb-elo-trend-lr-v9"]
+    assert after.challengers["MLB"]["moneyline"] == "mlb-elo-trend-lr-v9"  # collapsed back to a scalar
+    assert after.champion("MLB", "moneyline").model_id == "mlb-elo-trend-lr-v8"
+
+
+def test_promoting_one_challenger_of_a_list_keeps_the_other_routed(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    _with_challenger_list(repo)
+    promote(
+        sport="MLB",
+        market="moneyline",
+        new_model_id="mlb-elo-trend-lr-v9",
+        approved_by="operator",
+        market_evidence_id="mkt-evidence-42",
+        repo_root=repo,
+    )
+    registry = ProductionModelRegistry.load(repo)
+    assert registry.champion("MLB", "moneyline").model_id == "mlb-elo-trend-lr-v9"
+    assert [e.model_id for e in registry.challengers_for("MLB", "moneyline")] == ["mlb-elo-trend-lr-v10"]
+    assert not [p for p in registry.challenger_problems if "is the champion" in p]

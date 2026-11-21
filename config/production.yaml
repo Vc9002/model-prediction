@@ -604,9 +604,9 @@ prediction_service:
     evidence_status: unverified
     replacement_priority: low
     rollback_model: null
-  # quick-261121-v7: research challenger, registered but NOT routed (challengers.NCAAF holds one model per
-  # market, v6.2). Never champion, never Main, never the auto-buyer; the 2027 forward gate decides
-  # (docs/CFB_V7_2027_GATE.md).
+  # quick-261121-v7: research challenger. quick-261121-v7r routes it as the second challenger beside v6.2
+  # (Flat/research rows only). Never champion, never Main, never the auto-buyer; the 2027 forward gate
+  # decides (docs/CFB_V7_2027_GATE.md).
   - model_id: cfb-structural-v7
     sport: NCAAF
     market: multi
@@ -1026,10 +1026,18 @@ prediction_service:
       moneyline: wnba-moneyline-v5
       spread: wnba-spread-structural-v3
       total: wnba-total-possession-v3
+    # quick-261121-v7r: a route may list several challengers; the first is the primary (lifecycle
+    # contract, qualification). Each prices its own Flat/research rows; none reaches Main or the buyer.
     NCAAF:
-      moneyline: cfb-structural-v6.2
-      spread: cfb-structural-v6.2
-      total: cfb-structural-v6.2
+      moneyline:
+      - cfb-structural-v6.2
+      - cfb-structural-v7
+      spread:
+      - cfb-structural-v6.2
+      - cfb-structural-v7
+      total:
+      - cfb-structural-v6.2
+      - cfb-structural-v7
     NBA: {}
     NFL:
       moneyline: null

@@ -690,6 +690,19 @@ def _load_decision_snapshot_rows(
     return rows
 
 
+def _ncaaf_challenger_routes(repo_root: str | Path | None = None) -> dict[str, tuple[list[str], str | None]]:
+    """Routed NCAAF challenger id -> (its markets, its registered artifact hash), in route order.
+
+    Read from ``challengers.NCAAF`` through the registry, which leaves out each broken challenger on its own.
+    """
+    registry = ProductionModelRegistry.load(Path(repo_root) if repo_root is not None else PROJECT_ROOT)
+    routes: dict[str, tuple[list[str], str | None]] = {}
+    for market in ("moneyline", "spread", "total"):
+        for entry in registry.challengers_for("NCAAF", market):
+            routes.setdefault(entry.model_id, ([], entry.artifact_hash))[0].append(market)
+    return routes
+
+
 def build_cfb_slate(
     data_root: str | Path,
     game_date: str,
@@ -863,7 +876,8 @@ def build_cfb_slate(
                 else _indicative_quote_lineage(listed_observed.isoformat())
             )
 
-        # The v6.2 challenger is priced against these Polymarket quotes only (never ESPN consensus).
+        # The challengers are priced against these Polymarket quotes only (never ESPN consensus). v6.2 builds
+        # EventQuotes(**event) from each dict, so a key added here for another challenger would make v6.2 raise.
         challenger_events.append(
             {
                 "event_id": event_id,
@@ -1415,21 +1429,52 @@ def build_cfb_slate(
         except Exception as exc:  # noqa: BLE001
             candidate_capture = {"status": "capture_error", "reason": f"{type(exc).__name__}: {exc}"}
 
-    # Challenger (quick-261121-v62): v6.2 contracts are appended AFTER the champion's and after the candidate
-    # evidence, so v5's contracts and evidence are untouched; _forecast_cfb_sport sends any version outside
-    # v2-v5 to the research and Flat tiers only. A challenger failure never blocks the champion.
+    # Challengers (quick-261121-v62; several per market since quick-261121-v7r): each model routed in
+    # challengers.NCAAF appends its own contracts AFTER the champion's and after the candidate evidence, in
+    # route order (v6.2, then v7), so v5's contracts and evidence are untouched; _forecast_cfb_sport sends any
+    # version outside v2-v5 to the research and Flat tiers only. Each challenger runs in its own try/except:
+    # one failing blocks neither the champion nor the other challengers. ``challenger_pricing`` stays v6.2's
+    # summary; ``challenger_pricing_by_model`` has every routed challenger's.
     challenger_pricing: dict[str, Any] = {"status": "not_requested"}
+    challenger_pricing_by_model: dict[str, Any] = {}
     if (client is None) if price_challenger is None else price_challenger:
+        import logging
+
+        challenger_pricing = {"status": "not_routed"}
         try:
-            from .cfb_structural_v62 import price_challenger_slate
-
-            challenger_contracts, challenger_pricing = price_challenger_slate(root, obs, challenger_events)
-            priced_contracts.extend(challenger_contracts)
+            routes = _ncaaf_challenger_routes()
         except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning("NCAAF v6.2 challenger pricing failed", exc_info=True)
+            logging.getLogger(__name__).warning("NCAAF challenger routes unavailable", exc_info=True)
+            routes = {}
             challenger_pricing = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+        for challenger_id, (challenger_markets, challenger_hash) in routes.items():
+            try:
+                if challenger_id == "cfb-structural-v6.2":
+                    from .cfb_structural_v62 import price_challenger_slate
+
+                    challenger_contracts, summary = price_challenger_slate(root, obs, challenger_events)
+                elif challenger_id == "cfb-structural-v7":
+                    from .cfb_structural_v7_challenger import price_challenger_slate as price_v7_slate
+
+                    challenger_contracts, summary = price_v7_slate(
+                        root,
+                        obs,
+                        challenger_events,
+                        markets=challenger_markets,
+                        expected_artifact_hash=challenger_hash,
+                    )
+                else:
+                    # A registered challenger with no NCAAF slate pricer prices nothing (fail closed).
+                    challenger_contracts, summary = [], {"status": "no_pricer", "markets": challenger_markets}
+                priced_contracts.extend(challenger_contracts)
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "NCAAF challenger %s pricing failed", challenger_id, exc_info=True
+                )
+                summary = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+            challenger_pricing_by_model[challenger_id] = summary
+            if challenger_id == "cfb-structural-v6.2":
+                challenger_pricing = summary
 
     return {
         "game_date": iso_date,
@@ -1439,6 +1484,7 @@ def build_cfb_slate(
         "model_version": MODEL_VERSION,
         "model_code_hash": code_hash,
         "challenger_pricing": challenger_pricing,
+        "challenger_pricing_by_model": challenger_pricing_by_model,
         "priced_contracts": priced_contracts,
         "unmatched_events": unmatched,
         "event_count": len(events),
