@@ -12,6 +12,21 @@ branch: nba-v10/wiring (from refactor/cleanup-2026-11-11 @ dd8716d2)
 - `c0222198` feat: wire nba-anchor-v10 into the NBA slates as a Flat-only challenger
 - `2d473ef3` fix: NBA-scoped LA alias in settlement closing-CLV lookup
 - `3321c7c9` fix: stale-open watcher compares event starts as instants
+- `a7a19779` fix: v10 mid anchor rules, settlement slug, T-B side count (+ rationale wording commit)
+
+## Deviations from the plan / spec
+
+- Polymarket mid has NO 90-min age limit (it is the quote v9 priced, chosen by the slate's own
+  freshness selector; its age is stored). The 90-min limit applies to the consensus capture only.
+  Without this, a run more than 90 min after the last quote capture would skip games v9 calls.
+- A mid anchors only on a two-sided quote at most 10 points wide; otherwise the game is skipped
+  (`NO_CALL_ANCHOR_MISSING`). Replay: 1 of 12 (NO @ SA total, over bid 3c / ask 50c).
+- ANCHOR_WIRING item 6 overridden: no-anchor games are skipped and counted, not logged as
+  `NO_ANCHOR_MODEL_ONLY` (Flat forces every row to CALL; no reason-coded no-call rows).
+- Moneyline skipped (anchor module prices spread and total only).
+- T-B may fire on the side opposite the row's selection (anchored favourite). The payload carries
+  `tb.row_side_is_tb_side` and the summary counts `tb_flags_off_row_side`; grade T-B from the payload.
+- Rationale carries `market_slug=` so settlement's closing-CLV fallback finds the contract.
 
 ## What changed
 
@@ -44,6 +59,11 @@ paths normalised), same order. Pass 2: v9 duplicates as before, v10 `duplicate` 
 Replayed v10: 12 Flat rows, 0 Main; all 12 anchored on the DraftKings consensus captured 04:38Z
 (22 min before the replay decision time); T-B flags 0 (largest gross gap +1.43 pts, LAC @ DAL over).
 
+Extra replays (v9 diff 0 in each): no ESPN file at 05:00Z gives 11 `polymarket_mid` rows
+(probability = mid, net edge -2.0% to -4.0%, T-B not evaluated) plus 1 skipped one-sided book;
+clock 06:30Z (consensus 112 min old) gives the same 11 mid rows, against a baseline run of the
+dd8716d2 code at 06:30Z. Real runtime `ledgers.db` (mode=ro): 0 `nba-anchor-v10` rows.
+
 ## Operational note
 
 The pre-tip worker captures consensus only within 25 min of tip (every 10 min, 11:00-02:00 ET). The
@@ -54,7 +74,8 @@ the forecast (out of scope).
 
 ## Tests
 
-`tests/test_nba_anchor_v10_wiring.py` (11), `tests/test_nba_settlement_clv_alias.py` (2),
+`tests/test_nba_anchor_v10_wiring.py` (14), `tests/test_nba_settlement_clv_alias.py` (2),
 `tests/test_system_health_start_offsets.py` (1); each was shown failing with its source change
 reverted. `tests/test_nba_serving_plumbing.py` unchanged and passing. Targeted runs only
-(`-o addopts='' -q`); ruff check and format clean on touched files.
+(`-o addopts='' -q`); ruff check and format clean on touched files (`data_sources/espn.py` and
+`tests/test_ingest.py` were already unformatted at dd8716d2 and are untouched).
