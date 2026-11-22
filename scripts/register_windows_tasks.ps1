@@ -28,8 +28,11 @@ function Register-WorkerTask([string]$TaskName, [string]$Worker, $Triggers, [str
     Write-Output "registered: $TaskName ($Worker, $LogonType, Hidden)"
 }
 
-# Daily picks: 8x/day, covering early, midday, afternoon, evening, and late West Coast waves.
-$dailyTriggers = @('00:30', '06:00', '09:00', '12:00', '14:00', '16:00', '18:30', '20:30') | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
+# Daily picks: 11x/day, dense while lines move and games are played, one overnight run (operator 2026-11-22:
+# "more during the day, less at night"). 00:30 settles late games and creates the next slate; 07:00 replaces
+# 06:00; every 90 min from 09:00 to 21:00. A run takes ~33 min (max ~48), so runs never overlap; if one does,
+# the supervisor's lease skips it (exit 75).
+$dailyTriggers = @('00:30', '07:00', '09:00', '10:30', '12:00', '13:30', '15:00', '16:30', '18:00', '19:30', '21:00') | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
 Register-WorkerTask 'ModelPrediction-Daily' 'daily' $dailyTriggers 'model-prediction daily pipeline (settle, ingest, forecast)'
 
 # Model calibration: 4x/day, following daily settlement
@@ -56,8 +59,11 @@ Register-ScheduledTask -TaskName 'ModelPrediction-BackupOffsite' -Action $backup
     -Principal $backupPrincipal -Description 'model-prediction runtime DB backup + offsite copy' | Out-Null
 Write-Output "registered: ModelPrediction-BackupOffsite ($LogonType)"
 
-# Auto-buyer: every 15 minutes (the buyer only buys games within 1h of start, so it needs several looks per game).
-$autoBuyerTriggers = New-ScheduledTaskTrigger -Once -At (Get-Date).Date.AddMinutes(10) -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Days 3650)
+# Auto-buyer: every 15 minutes from 08:00 to 02:00 local (the buyer only buys games within 1h of start, so it needs
+# several looks per game; nothing starts between 02:00 and 09:00 ET, and 08:00 still covers NFL London 09:30 kickoffs).
+# A daily trigger cannot take a repetition directly, so borrow one from a -Once trigger.
+$autoBuyerTriggers = New-ScheduledTaskTrigger -Daily -At '08:00'
+$autoBuyerTriggers.Repetition = (New-ScheduledTaskTrigger -Once -At '08:00' -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
 Register-WorkerTask 'ModelPrediction-AutoBuyer' 'auto-buyer' $autoBuyerTriggers 'model-prediction auto-buyer (paper unless saved state is live)'
 
 # NBA pre-tip capture: every 10 minutes from 11:00 to 02:00 local (this host runs on Eastern time),
