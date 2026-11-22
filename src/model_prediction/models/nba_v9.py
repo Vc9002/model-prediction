@@ -12,6 +12,8 @@ Unified point-in-time scoring distribution, margin, total, and coherent moneylin
 
 from __future__ import annotations
 
+import inspect
+import logging
 import math
 from collections.abc import Sequence
 from typing import Any
@@ -23,9 +25,47 @@ from ..features.trends import TrendEngine
 from .base import GamePrediction, GamePredictionBase
 from .basketball import UpcomingGame
 
+_logger = logging.getLogger(__name__)
+
 NBA_SPREAD_V9_VERSION = "nba-spread-margin-v9"
 NBA_TOTAL_V9_VERSION = "nba-total-margin-v9"
 NBA_MONEYLINE_V9_VERSION = "nba-moneyline-v9"
+
+
+def artifact_key_drift(artifact: dict[str, Any], accepted: Sequence[str]) -> tuple[list[str], list[str]]:
+    """Return ``(unread_keys, defaulted_keys)`` for an artifact against the accepted parameter names.
+
+    The engine constructor swallows unknown keywords (``**_extra_kwargs``), so a retuned or
+    misspelled artifact key is silently ignored and an omitted one silently takes the code default.
+    """
+    accepted_names = set(accepted)
+    unread = sorted(key for key in artifact if key not in accepted_names)
+    defaulted = sorted(name for name in accepted_names if name not in artifact)
+    return unread, defaulted
+
+
+def _warn_on_artifact_key_drift(artifact: dict[str, Any], default_version: str) -> None:
+    """Emit one warning when an artifact has unread or code-defaulted keys. Never raises."""
+    try:
+        params = inspect.signature(NBAStructuralV9Engine.__init__).parameters
+        accepted = [
+            name
+            for name, param in params.items()
+            if name != "self" and param.kind is not inspect.Parameter.VAR_KEYWORD
+        ]
+        unread, defaulted = artifact_key_drift(artifact, accepted)
+        if unread or defaulted:
+            _logger.warning(
+                "NBA v9 artifact %s: %d key(s) never read by the engine %s; %d engine parameter(s) "
+                "absent from the artifact use code defaults %s",
+                artifact.get("model_version", default_version),
+                len(unread),
+                unread,
+                len(defaulted),
+                defaulted,
+            )
+    except Exception:
+        _logger.debug("NBA v9 artifact key-drift check failed", exc_info=True)
 
 
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
@@ -438,6 +478,7 @@ class NBASpreadModelV9:
 
     @classmethod
     def from_artifact(cls, artifact: dict[str, Any]) -> NBASpreadModelV9:
+        _warn_on_artifact_key_drift(artifact, NBA_SPREAD_V9_VERSION)
         return cls(**artifact)
 
     def predict_spreads(
@@ -461,6 +502,7 @@ class NBATotalModelV9:
 
     @classmethod
     def from_artifact(cls, artifact: dict[str, Any]) -> NBATotalModelV9:
+        _warn_on_artifact_key_drift(artifact, NBA_TOTAL_V9_VERSION)
         return cls(**artifact)
 
     def predict_totals(
@@ -484,6 +526,7 @@ class NBAMoneylineModelV9:
 
     @classmethod
     def from_artifact(cls, artifact: dict[str, Any]) -> NBAMoneylineModelV9:
+        _warn_on_artifact_key_drift(artifact, NBA_MONEYLINE_V9_VERSION)
         return cls(**artifact)
 
     def predict_moneyline(
