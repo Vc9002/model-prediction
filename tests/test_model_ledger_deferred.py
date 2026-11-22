@@ -116,6 +116,15 @@ def test_torn_spool_line_is_ignored(tmp_path, monkeypatch) -> None:
     assert [r["prediction_id"] for r in ledger.rows()] == [row["prediction_id"]]
 
 
+def test_append_after_a_torn_tail_keeps_the_new_row(tmp_path, monkeypatch) -> None:
+    ledger = ModelLedger(tmp_path / "m1.xlsx")
+    first = _append_then_crash(ledger, monkeypatch, "e1")
+    with ledger.spool_path.open("a", encoding="utf-8") as handle:
+        handle.write('{"prediction_id": "torn')  # killed mid-append: no trailing newline
+    second = _append_then_crash(ledger, monkeypatch, "e2")
+    assert {r["prediction_id"] for r in ledger.rows()} == {first["prediction_id"], second["prediction_id"]}
+
+
 def test_without_a_deferral_context_the_write_is_immediate(tmp_path) -> None:
     ledger = ModelLedger(tmp_path / "m1.xlsx")
     row = ledger.append_prediction(_record("e1"))

@@ -551,8 +551,21 @@ class ModelLedger:
 
     def _append_spool(self, row: dict[str, str]) -> None:
         self.spool_path.parent.mkdir(parents=True, exist_ok=True)
+        # A crash mid-append can leave a tail with no newline; gluing the next acknowledged row onto it would
+        # make both unparseable and silently drop a row the caller was told was written.
+        needs_break = False
+        try:
+            with self.spool_path.open("rb") as existing:
+                existing.seek(0, os.SEEK_END)
+                if existing.tell() > 0:
+                    existing.seek(-1, os.SEEK_END)
+                    needs_break = existing.read(1) != b"\n"
+        except FileNotFoundError:
+            pass
         with self.spool_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
+            handle.write(
+                ("\n" if needs_break else "") + json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n"
+            )
             handle.flush()
             os.fsync(handle.fileno())
 
