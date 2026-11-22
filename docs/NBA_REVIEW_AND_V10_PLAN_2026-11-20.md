@@ -290,6 +290,20 @@ Its output feeds Phase 2 as `model`; it only influences prices through a lambda 
     book moves to Polymarket, T-B is fading a stale single-book line.
   - D2: same-line versus translated-line picks. One spread point is about 3 probability points at
     sigma 13.
+- **Forward edge gate (pinned 2026-11-22, before any qualifying pick settled;
+  `scripts/nba_v10/gate_forward_report.py`):** answers the operator ask "NBA positive on PnL over
+  settled games, gated but not cherry-picked".
+  - Why forward only: over 542 deduped settled picks (2026-11-22) ROI was moneyline +0.9%, spread
+    -3.8%, total -9.5%, and no gate was coherent (spread edge 8-12% -9% but 12%+ +5%; total 5-8%
+    +23.5% but 8-12% -20%). The 12% threshold was chosen after seeing that sample, so it earns no
+    credit there.
+  - Rule: the serving models (spread-margin-v9, total-margin-v9, elo-trend-lr-v5 moneyline), stored
+    edge >= 12%, picks created after 2026-11-22T02:00Z, deduped per game/market/side with Main
+    preferred over Flat, graded on stored units and PnL.
+  - Verdict: PENDING below 150 gated picks; at 150+ PASS only if the 95% game-cluster bootstrap CI of
+    ROI excludes 0 on the positive side; FAIL at 150-299, KILL at 300+. No threshold or model
+    changes, no window extension.
+  - This is a descriptive PnL gate, not a promotion test; G2 above stays the promotion gate.
 
 ## 10. Progress (2026-11-21)
 
