@@ -99,3 +99,31 @@ def test_rejects_postdecision_and_wrong_line_quotes(tmp_path) -> None:
     assert summary["quote_matched"] == 0
     assert rows[0]["quote_reason"] == "line_mismatch"
     assert rows[0]["quote_hash"] is None
+
+
+def _evidence_for(tmp_path, quote: dict):
+    path = tmp_path / "odds" / "ncaab" / "2026-11-05" / "polymarket_snapshots.jsonl"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(quote) + "\n", encoding="utf-8")
+    return build_candidate_evidence(
+        sport="ncaab",
+        day="2026-11-05",
+        events=[_event()],
+        probabilities={},
+        archive_root=tmp_path,
+        decision_at=datetime(2026, 11, 5, 20, tzinfo=UTC),
+    )
+
+
+def test_event_detail_quote_without_transact_time_matches(tmp_path) -> None:
+    # Event-detail and /bbo quotes never carry transactTime; requiring it rejected ~99% of
+    # NCAAB quotes on 2026-11-21 as invalid_time (quick 261121-uuv).
+    rows, summary = _evidence_for(tmp_path, {**_quote(), "transact_time_utc": None})
+    assert rows[0]["quote_reason"] == "matched"
+    assert summary["quote_matched"] == 1
+
+
+def test_present_transact_time_after_decision_still_rejected(tmp_path) -> None:
+    rows, summary = _evidence_for(tmp_path, {**_quote(), "transact_time_utc": "2026-11-05T20:30:00Z"})
+    assert rows[0]["quote_reason"] == "postdecision_or_poststart_quote"
+    assert summary["quote_matched"] == 0

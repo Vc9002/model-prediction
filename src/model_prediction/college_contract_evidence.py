@@ -55,13 +55,22 @@ def _valid_quote(
         return "nonprospective_source"
     if row.get("timestamp_valid") is not True or row.get("market_state") != "MARKET_STATE_OPEN":
         return "invalid_timestamp_or_state"
+    # transact_time_utc is optional: the event-detail and /bbo endpoints never carry one (observed
+    # 2026-11-14), and NCAAB takes ~99% of its quotes from event-detail, so requiring it rejected
+    # nearly every NCAAB quote as invalid_time (quick 261121-uuv). observed_at_utc remains the
+    # point-in-time gate; a transact time that is present must still precede the decision.
     try:
         observed = parse_utc(str(row["observed_at_utc"]))
-        transacted = parse_utc(str(row["transact_time_utc"]))
+        raw_transacted = row.get("transact_time_utc")
+        transacted = parse_utc(str(raw_transacted)) if raw_transacted not in (None, "") else None
         event_start = parse_utc(str(event["event_start_utc"]))
     except (KeyError, TypeError, ValueError):
         return "invalid_time"
-    if observed > decision_at or transacted > decision_at or observed >= event_start:
+    if (
+        observed > decision_at
+        or (transacted is not None and transacted > decision_at)
+        or observed >= event_start
+    ):
         return "postdecision_or_poststart_quote"
     for side in ("long", "short"):
         book = row.get(side) or {}

@@ -717,6 +717,10 @@ models:
     max_margin_divergence: 12.0
     max_total_divergence: 14.0
     max_moneyline_margin: 10.0
+    # The daily run captures Polymarket BBOs ~15 min before the NCAAB step; 30 min matches NCAAF's
+    # capture window (quick 261121-uuv, operator-approved). Inert on its own: see the PLAN for the
+    # transact_time blocker in college_contract_evidence._valid_quote.
+    max_quote_age_seconds: 1800
     # The margin engine follows the production.yaml champion: ncaab-spread-v7 = v6 artifact + frozen v7
     # multi-season margin engine (served since 2026-11-16, promoted 2026-11-21, quick 261120-nip);
     # rollback ncaab-spread-v6 = v6 engine via `model_promotion rollback`. A `margin_engine` key here
