@@ -289,6 +289,13 @@ def _settle_all_unsettled(
             if resolved is not None and resolved.get("voided"):
                 voided.append(resolved["pick_id"])
                 continue
+            if resolved is not None and str(resolved.get("reason", "")).startswith(
+                _NON_BINARY_TERMINAL_REASON
+            ):
+                # Decided market with trading-price terminal quotes: report it and keep the
+                # pick open rather than letting the 7-day rule void it as "unrecorded".
+                failures.append(resolved)
+                continue
             if (now - start).total_seconds() > 7 * 86400:
                 try:
                     voided.append(
@@ -1123,9 +1130,9 @@ def _resolve_side_by_name_tokens(team: str, prices: list, market_type: str, line
 def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dict | None:
     """Settle any pick from its Polymarket contract's terminal resolution.
 
-    Used when no results API covers the league. None while the market is unresolved or
-    the terminal prices are not a clean 1/0 (never guessed); the caller keeps the pick
-    pending and eventually voids it.
+    Used when no results API covers the league. None while the market is unresolved. A
+    terminal market whose prices are not a clean 1/0 returns a ``reason`` dict (never
+    guessed, never voided here); the pick stays open and callers report it as unsettled.
     """
     from ..data_sources.polymarket_us import PolymarketUSClient, _amount
 
@@ -1156,16 +1163,20 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
     if len(prices) != 2 or len(valid_prices) != 2:
         return None
     if sorted(valid_prices) != [0.0, 1.0]:
-        # Market reached terminal state with non-binary prices (e.g. 0.3/0.7 or void/split
-        # settlement due to player withdrawal, cancellation, or walkover). Void cleanly.
-        try:
-            voided = ledger.void(
-                row["pick_id"],
-                f"market resolved terminal with non-binary prices {valid_prices}",
-            )
-            return {"pick_id": row["pick_id"], "voided": True, "result": voided["result"]}
-        except (KeyError, ValueError, OSError) as error:
-            return {"pick_id": row["pick_id"], "reason": str(error)}
+        # Polymarket US reports pre-close trading prices on markets that have already been decided
+        # (the esports path mis-voided about 260 picks on exactly this signal), so a non-binary
+        # terminal price is not evidence of a forfeit or postponement. Leave the pick open and
+        # surface it in the settle report instead of silently booking a 0-pnl push.
+        logger.warning(
+            "terminal market %s has non-binary prices %s; leaving pick %s open",
+            slug,
+            valid_prices,
+            row["pick_id"],
+        )
+        return {
+            "pick_id": row["pick_id"],
+            "reason": f"{_NON_BINARY_TERMINAL_REASON} {valid_prices} for {slug}",
+        }
     selection = str(row.get("selection") or "").lower()
     own = None
     if market_type == "total":
@@ -1243,6 +1254,7 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
 
 
 _RESOLVED_MARKET_STATUSES = frozenset({"MARKET_STATUS_RESOLVED"})
+_NON_BINARY_TERMINAL_REASON = "market terminal with non-binary prices"
 
 
 def _market_is_terminal(market: dict, book: dict) -> bool:

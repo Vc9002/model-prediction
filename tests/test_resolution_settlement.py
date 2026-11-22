@@ -97,10 +97,13 @@ def test_total_resolution_settles_and_unresolved_or_unclean_stay_pending():
     done = _settle_by_resolution(ROW, ledger, _Client("MARKET_STATE_EXPIRED", [0.0, 1.0], sides))
     assert done["settled"] and ledger.args == (0, 0)  # under won -> total below the line
     assert _settle_by_resolution(ROW, _Ledger(), _Client("MARKET_STATE_OPEN", [0.0, 1.0], sides)) is None
-    # A terminal market with non-binary prices is voided cleanly, never guessed.
+    # A terminal market with non-binary prices is never guessed. It used to be voided here, but
+    # Polymarket US reports pre-close trading prices on decided markets, so the void silently
+    # booked 0 pnl (207 settled-push rows on esports/darts). The pick now stays open (2026-11-21).
     ledger = _Ledger()
     out = _settle_by_resolution(ROW, ledger, _Client("MARKET_STATE_EXPIRED", [0.4, 0.6], sides))
-    assert out["voided"] and "non-binary" in ledger.voided
+    assert "non-binary" in out["reason"] and not out.get("voided") and not out.get("settled")
+    assert not hasattr(ledger, "voided") and not hasattr(ledger, "args")
 
 
 def test_spread_resolution_matches_team_and_line():
@@ -243,3 +246,82 @@ def test_resolution_close_is_the_last_pre_kickoff_quote_after_the_decision(tmp_p
 def test_resolution_close_for_unlisted_sport_is_unchanged(tmp_path, monkeypatch):
     quotes = [("2026-11-21T14:30:00Z", 0.55)]
     assert _resolution_close(tmp_path, monkeypatch, "nba", quotes) == 0.55
+
+
+class _RecordingLedger:
+    """Fails loudly on any write, so a stays-open assertion cannot pass by accident."""
+
+    def settle(self, *args, **kwargs):
+        raise AssertionError("must not settle")
+
+    def void(self, *args, **kwargs):
+        raise AssertionError("must not void")
+
+
+@pytest.mark.parametrize("state", ["MARKET_STATE_HALTED", "MARKET_STATE_CLOSED"])
+def test_terminal_market_with_trading_prices_leaves_the_pick_open(state):
+    sides = [("Over", None), ("Under", None)]
+    out = _settle_by_resolution(ROW, _RecordingLedger(), _Client(state, [0.41, 0.59], sides))
+    assert out["pick_id"] == "p"
+    assert "non-binary" in out["reason"] and "tsc-khl-a-b-2026-10-22-3pt5" in out["reason"]
+    assert "settled" not in out and "voided" not in out
+
+
+@pytest.mark.parametrize("state", ["MARKET_STATE_HALTED", "MARKET_STATE_CLOSED"])
+def test_clean_terminal_prices_still_settle_win_and_loss(state):
+    sides = [("Over", None), ("Under", None)]
+    ledger = _Ledger()
+    assert _settle_by_resolution(ROW, ledger, _Client(state, [0.0, 1.0], sides))["settled"]
+    assert ledger.args == (0, 0)  # under won
+    ledger = _Ledger()
+    assert _settle_by_resolution(ROW, ledger, _Client(state, [1.0, 0.0], sides))["settled"]
+    assert ledger.args != (0, 0)  # over won
+
+
+def test_non_terminal_market_returns_none_even_with_trading_prices():
+    sides = [("Over", None), ("Under", None)]
+    assert (
+        _settle_by_resolution(ROW, _RecordingLedger(), _Client("MARKET_STATE_OPEN", [0.41, 0.59], sides))
+        is None
+    )
+
+
+def test_espn_fallback_reports_non_binary_terminal_and_does_not_age_out_to_void(tmp_path, monkeypatch):
+    """A row with no ESPN record older than 7 days must not fall through to the unrecorded-event void."""
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from model_prediction.domain import utc_now
+
+    start = utc_now() - timedelta(days=9)
+    row = {
+        **ROW,
+        "status": "open",
+        "league": "NBA",
+        "event_start_utc": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+    class _OneRowLedger(_RecordingLedger):
+        def rows(self):
+            return [row]
+
+    monkeypatch.setattr(settle_module, "_find_espn_result", lambda *a, **k: None)
+    monkeypatch.setattr(
+        settle_module,
+        "_settle_by_resolution",
+        lambda r, ledger: {
+            "pick_id": r["pick_id"],
+            "reason": f"{settle_module._NON_BINARY_TERMINAL_REASON} [0.4, 0.6]",
+        },
+    )
+    config = {
+        "project": {
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+            "market_odds_snapshot_path": str(tmp_path / "no_market_odds.jsonl"),
+        }
+    }
+    out = settle_module._settle_all_unsettled(
+        SimpleNamespace(), config, _OneRowLedger(), espn=SimpleNamespace(), scoreboard_cache={}
+    )
+    assert out["voided"] == [] and out["settled"] == []
+    assert [f["pick_id"] for f in out["failures"]] == ["p"]
