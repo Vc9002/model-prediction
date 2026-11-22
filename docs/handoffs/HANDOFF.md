@@ -8,8 +8,8 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 ## Next action
 
 1. **Operator, hardware (blocks trust in everything else):** run a real RAM test, see section 1.
-2. Land or drop the daily-speed branch `speed/daily-2026-11-22` (worktree `E:/MP-wt/daily-speed-2026-11-22`), section 2.
-3. Read the NCAAB addendum scorecards, section 4.
+2. Check the first scheduled daily runs after the daily-speed merge, section 2.
+3. Decide whether to fetch 2014-2021 player boxes to confirm NCAAB P1 (player availability), section 4.
 
 ## 1. Suspected bad RAM (open, operator action)
 
@@ -25,11 +25,23 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
   `production.db`, `market_quotes.db` and `dashboard_cache.db` all return `ok`. Re-run after every crash; `quick_check` does
   not compare indexes.
 
-## 2. Daily speed and exit-1 runs (in flight 2026-11-22)
+## 2. Daily speed and exit-1 runs (landed 2026-11-22, quick-261122-spd; watch the first runs)
 
-Branch `speed/daily-2026-11-22`, quick-261122-spd: skip per-sport forecast tasks with no event in the horizon, batch
-ledger writes only if audit-first ordering survives, fix real exit-1 causes. Not merged. Environmental failures
-(00:30 memory exhaustion, host crashes) are section 1, not code.
+- **Exit-1 causes (runs.db 11-12 to 11-22, 3 of 91 daily runs): none is a code defect.** Low host memory (11-12, 11-13),
+  native heap corruption in the ingest step (11-20), a host bugcheck (11-19): all section 1. "Zero exit-1 in a week" is not
+  reachable in code while the RAM fault persists. No ingest retry was added: it would only turn a hardware fault green.
+- **Timing (53 reports 11-15..11-22):** mean 1,086 s; capture pool 731 s (request-rate bound, not fixable here); forecast
+  phase 284 s. The old 1,200 s figure was mostly sports now switched off.
+- **Changed:** per-model xlsx appends spool to `<name>.xlsx.pending.jsonl` (fsync'd) and the workbook is rebuilt once when the
+  daily deferral exits (estimated saving 100-150 s/run, not yet measured); `cli/event_horizon.py` skips NBA/NFL/WNBA/MLB-moneyline
+  scoreboard tasks (and NBA/NFL/WNBA spread and total) when a well-formed scoreboard has no game left (saves about 15-20 s on
+  non-game days). Fail-open: any fetch error or odd date means the task runs. NCAAF, MLB totals and NRFI stay ungated.
+- **Verify after the first scheduled runs:** report keys `timing.event_horizon_probe_seconds` and `forecast_tasks_skipped_no_event`;
+  `forecast_seconds` should drop versus the 284 s mean; no `*.pending.jsonl` left under `model_ledgers/` once a run ends.
+- **Known limits:** the dashboard's direct xlsx read lags model-ledger rows until the run's flush; the startup fold covers
+  `<data_root>/model_ledgers` and the ledger path's `model_ledgers` only; one empty-but-200 scoreboard would skip a league's
+  tasks for that run (the 6-hourly cadence limits it). Batching `supersede_open_rows`/`restore_unreplaced_picks` was declined
+  (about 7 ms/row; audit-first ordering).
 
 ## 3. Decisions recorded 2026-11-22 (operator said "go ahead"; every one is "leave as is", reversible)
 
@@ -50,7 +62,13 @@ ledger writes only if audit-first ordering survives, fix real exit-1 causes. Not
 ## 4. NCAAB
 
 - Serving: moneyline `ncaab-moneyline-v7m`, spread `ncaab-spread-v7`, total `ncaab-total-v6` (buyer state blacklists v7 and v7m; NCAAB buyer stays disabled by operator state).
-- **Next action:** read the addendum v4 scorecards in `outputs/ncaab/research_261120/P1_player_availability/` and `P2_returning_production_early/`. 2014-2021 boxes are fetched only if a candidate is DEV_ELIGIBLE.
+- **Addendum v4 scorecards read 2026-11-22** (22,947 D1 games with a closing spread, 2023-2026, leave-one-season-out; `outputs/ncaab/research_261120/`):
+  **P1 player availability is DEV_ELIGIBLE** vs served v7: spread corr delta +0.0065 (K-adj CI +0.0013..+0.0121), margin RMSE -0.017 pt,
+  moneyline log loss -0.00065 (K-adj CI -0.0011..-0.0002), cover log loss -0.0008 (K-adj CI includes zero). Still **no edge**: its
+  corr with (result minus closing line) is +0.003 (CI -0.011..+0.018), closing-line RMSE 11.19 vs 11.44; the shuffled-outcome control
+  degrades it (corr delta -0.019), as a clean control should. **P2 returning production is NOT_ELIGIBLE** (late-fold corr delta
+  -0.0014; the RMSE and log-loss gains do not move corr vs the line). Next, only if wanted: fetch 2014-2021 player boxes and run the
+  sealed confirmation (2018-20 + 2022) for P1; expect a small accuracy gain on a market that already beats us, not an edge.
 - Rollback: moneyline first (`model_promotion rollback --sport NCAAB --market moneyline`), then spread.
 - Forward check: split on `COALESCE(json_extract(json_extract(decision_payload_json,'$.model_input_snapshot_json'),'$.features.margin_engine'),'v6')`; the v7 cohort includes `ncaab-moneyline-v7m` rows.
 - Open: the ledger `model_probability` column is raw while the payload is served (readers fixed); check settled NCAAB rows carry close != decision price.
