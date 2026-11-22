@@ -30,18 +30,22 @@ from tb_settled_replay import ET, ROOT, cluster_ci, parse_utc
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--ledger", default="E:/model-prediction-runtime/ledgers/ledgers.db")
-    parser.add_argument("--out", default=str(ROOT / "outputs/nba/MODEL_AGREEMENT_SETTLED.md"))
+    parser.add_argument("--out", default=None)
+    parser.add_argument("--sport", default="nba")
     args = parser.parse_args()
     conn = sqlite3.connect(f"file:{args.ledger}?mode=ro", uri=True)
     df = pd.read_sql(
         """select event_id, market_type, selection, model_id, units, pnl_units, result, created_at_utc,
                   event_start_utc
            from ledger_records
-           where sport='nba' and status='settled' and ledger_tier='flat' and units > 0
+           where sport=? and status='settled' and ledger_tier='flat' and units > 0
              and market_type in ('spread', 'moneyline') and model_id != 'nba-anchor-v10'""",
         conn,
+        params=(args.sport,),
     )
     conn.close()
+    suffix = "" if args.sport == "nba" else f"_{args.sport.upper()}"
+    out_path = args.out or str(ROOT / f"outputs/nba/MODEL_AGREEMENT_SETTLED{suffix}.md")
     df = df.sort_values("created_at_utc").drop_duplicates(["event_id", "market_type"], keep="last")
     sp = df[df.market_type == "spread"].set_index("event_id")
     ml = df[df.market_type == "moneyline"].set_index("event_id")
@@ -57,7 +61,7 @@ def main() -> None:
                          "units": float(r.units), "pnl": float(r.pnl_units), "result": r.result,
                          "pnl_1u": float(r.pnl_units) / float(r.units), "stake": 1.0})  # fmt: skip
     d = pd.DataFrame(rows)
-    out = ["# Model-agreement gate on the settled NBA Flat ledger", "",
+    out = [f"# Model-agreement gate on the settled {args.sport.upper()} Flat ledger", "",
            f"Games with both a spread and a moneyline Flat row: {len(both)}; agree on {int(d[d.market == 'spread'].agree.sum())}.", ""]  # fmt: skip
     out += [
         "| slice | n | W-L | PnL stored units | PnL per 1u | ROI 1u | 95% CI |",
@@ -75,12 +79,20 @@ def main() -> None:
         w, lo_ = int((part.result == "win").sum()), int((part.result == "loss").sum())
         out.append(f"| {name} | {len(part)} | {w}-{lo_} | {part.pnl.sum():+.2f} | {part.pnl_1u.sum():+.2f} | "
                    f"{part.pnl_1u.mean():+.1%} | {ci[0]:+.1%} .. {ci[1]:+.1%} |")  # fmt: skip
-    prim = d[(d.market == "spread") & d.agree]
-    out += ["", "## PRIMARY by week", "", "| week | n | PnL stored | PnL 1u |", "|---|---|---|---|"]
+    for title, prim in (
+        ("PRIMARY spread, models agree", d[(d.market == "spread") & d.agree]),
+        ("round-17 hypothesis: moneyline, models disagree", d[(d.market == "moneyline") & ~d.agree]),
+    ):
+        out += _weekly(title, prim)
+    Path(out_path).write_text("\n".join(out) + "\n", encoding="utf-8")
+    print("\n".join(out))
+
+
+def _weekly(title: str, prim: pd.DataFrame) -> list[str]:
+    out = ["", f"## {title} by week", "", "| week | n | PnL stored | PnL 1u |", "|---|---|---|---|"]
     for week, wk in prim.groupby("week"):
         out.append(f"| {week} | {len(wk)} | {wk.pnl.sum():+.2f} | {wk.pnl_1u.sum():+.2f} |")
-    Path(args.out).write_text("\n".join(out) + "\n", encoding="utf-8")
-    print("\n".join(out))
+    return out
 
 
 if __name__ == "__main__":
