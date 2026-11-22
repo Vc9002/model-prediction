@@ -2457,3 +2457,29 @@ def test_fingerprint_signal_fails_soft_without_ledger(monkeypatch, tmp_path):
 
     monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT")
     assert dashboard_server._canonical_ledger_signal() == -1
+
+
+def test_warm_fingerprint_changes_when_canonical_ledger_appends(monkeypatch, tmp_path):
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from model_prediction.runtime_paths import RuntimePaths
+
+    paths = RuntimePaths.for_test(tmp_path)
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(paths.runtime_root))
+    store = RuntimeLedgerStore(paths)
+    try:
+        store.apply(_remove_mutation("pick-a", "op-a"))
+        before = dashboard_server._warm_fingerprint()
+        assert before == dashboard_server._warm_fingerprint()
+        store.apply(_remove_mutation("pick-b", "op-b"))
+        assert dashboard_server._warm_fingerprint() != before
+    finally:
+        store.close()
+
+
+def test_warm_max_age_keeps_live_quote_views_on_five_minutes():
+    # picks/flat-picks carry build-time quote freshness, buy_ready and order
+    # reconciliation from inputs the fingerprint cannot see.
+    for key in ("picks", "flat-picks", "status"):
+        assert dashboard_server._warm_max_age(key) == 300.0
+    for key in ("production-evidence", "matrix", "model-ledgers", "performance:all"):
+        assert dashboard_server._warm_max_age(key) == 1800.0

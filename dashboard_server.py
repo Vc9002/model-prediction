@@ -33,7 +33,9 @@ from http.server import ThreadingHTTPServer
 # sized to the core count at import (~740 MB private on this 12-core host):
 # private bytes after `import dashboard_server` measured 903 MB -> 160 MB with one
 # thread, working set unchanged. The dashboard does no heavy linear algebra.
-# setdefault so an operator-set value wins; this must stay above the
+# Jobs the dashboard launches inherit it through _runner_env (os.environ copy),
+# matching run_supervisor._worker_env. setdefault so an operator-set value
+# wins; this must stay above the
 # model_prediction imports below because they load numpy transitively.
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 
@@ -254,8 +256,9 @@ def _canonical_ledger_signal() -> int:
 
     The canonical ledger is a ~1.5 GB WAL database whose file mtime changes even
     on reads, so its stat is useless as a change signal. ledger_events is
-    append-only with one row per mutation (the same signal DashboardCache keys
-    on); MAX(rowid) is an index seek, and mode=ro never creates the file or
+    append-only with one row per mutation (RuntimeLedgerStore.apply writes the
+    record and its event in one transaction; DashboardCache keys on COUNT(*) of
+    the same table); MAX(rowid) is an index seek, and mode=ro never creates the file or
     checkpoints the WAL. Resolved on every call rather than through
     _runtime_paths(), which caches the first resolution process-wide and would
     pin a test's temporary root for the rest of the process. Fails soft without
@@ -271,6 +274,47 @@ def _canonical_ledger_signal() -> int:
         return int(value or 0)
     except Exception:  # noqa: BLE001
         return -1
+
+
+def _warm_fingerprint() -> tuple:
+    """Cheap change detector: (mtime, size) of the ledgers + recent data dirs,
+    plus the canonical SQLite ledger's event signal."""
+    stats = []
+    paths = [
+        *_main_ledger_paths(),
+        *_flat_ledger_paths(),
+        *_research_ledger_paths(),
+        *_research_ledger_paths(gated=True),
+        DASH_DIR / "jobs.json",
+    ]
+    for directory in (DATA / "historical", DATA / "flat"):
+        try:
+            paths.extend(p for p in directory.iterdir() if p.is_file())
+        except OSError:
+            pass
+    for path in paths:
+        try:
+            st = path.stat()
+            stats.append((str(path), st.st_mtime_ns, st.st_size))
+        except OSError:
+            stats.append((str(path), 0, 0))
+    stats.append(("ledgers.db:ledger_events", _canonical_ledger_signal(), 0))
+    return tuple(stats)
+
+
+# Keys whose builds read live inputs the fingerprint cannot see keep the old
+# 300 s age rebuild: "picks"/"flat-picks" decorate rows with Polymarket quote
+# snapshots (rewritten every 10 min by the capture tasks), compute quote.fresh,
+# game-started and buy_ready at build time, and run exchange order
+# reconciliation; "status" reads the daily pipeline logs. Only the heavy,
+# ledger-and-artifact-driven views (production evidence is the 43 s xlsx parse)
+# wait 1800 s when nothing they watch has changed.
+_WARM_FAST_KEYS = frozenset({"picks", "flat-picks", "status"})
+_WARM_CHANGE_MAX_DELAY = 300.0
+
+
+def _warm_max_age(key: str) -> float:
+    return 300.0 if key in _WARM_FAST_KEYS else 1800.0
 
 
 def _warm_caches(forever: bool = False) -> None:
@@ -298,50 +342,23 @@ def _warm_caches(forever: bool = False) -> None:
         ),
     ]
 
-    def _fingerprint():
-        """Cheap change detector: (mtime, size) of the ledgers + recent data dirs."""
-        stats = []
-        paths = [
-            *_main_ledger_paths(),
-            *_flat_ledger_paths(),
-            *_research_ledger_paths(),
-            *_research_ledger_paths(gated=True),
-            DASH_DIR / "jobs.json",
-        ]
-        for directory in (DATA / "historical", DATA / "flat"):
-            try:
-                paths.extend(p for p in directory.iterdir() if p.is_file())
-            except OSError:
-                pass
-        for path in paths:
-            try:
-                st = path.stat()
-                stats.append((str(path), st.st_mtime_ns, st.st_size))
-            except OSError:
-                stats.append((str(path), 0, 0))
-        stats.append(("ledgers.db:ledger_events", _canonical_ledger_signal(), 0))
-        return tuple(stats)
-
     first_pass: set[str] = set()
-    # The fingerprint now covers the canonical ledger, so the age rebuild is only
-    # a safety net for inputs it still does not see (outputs/ validation JSON,
-    # production artifacts, events JSON).
-    max_age = 1800.0
     if forever:
         for key, _ttl, _builder in warmers:
-            _TTL_OVERRIDE[key] = max_age + 60
+            _TTL_OVERRIDE[key] = _warm_max_age(key) + 60
 
     def _warm(item):
         # Rebuild a key only when its source files changed (debounced so a
-        # half-written ledger isn't read) or after max_age. Requests are always
-        # served from the cache (stale-while-revalidate), so opening the
+        # half-written ledger isn't read) or after its max age. Requests are
+        # always served from the cache (stale-while-revalidate), so opening the
         # dashboard never waits on a build.
         key, _ttl, builder = item
+        max_age = _warm_max_age(key)
         built_at, built_fp = 0.0, None
         pending_fp, pending_n = None, 0
         while True:
             try:
-                fp = _fingerprint()
+                fp = _warm_fingerprint()
                 with _CACHE_LOCK:
                     present = key in _CACHE
                 if fp != built_fp:
@@ -349,7 +366,11 @@ def _warm_caches(forever: bool = False) -> None:
                         pending_n += 1
                     else:
                         pending_fp, pending_n = fp, 1
-                changed = fp != built_fp and (built_fp is None or pending_n >= 2)
+                # The debounce must not hold a real change back indefinitely: a
+                # daily run can change the fingerprint on every 30 s poll for
+                # half an hour, which would leave only the 1800 s age rebuild.
+                stale_change = time.monotonic() - built_at > _WARM_CHANGE_MAX_DELAY
+                changed = fp != built_fp and (built_fp is None or pending_n >= 2 or stale_change)
                 if not present or changed or time.monotonic() - built_at > max_age:
                     with _WARM_BUILD_LOCK:
                         _cache_rebuild(key, builder)
