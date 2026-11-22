@@ -43,14 +43,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
-import time
-import urllib.parse
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from model_prediction.data_sources.mlb_statsapi import curl_get_json
 from model_prediction.filelock import lock_exclusive, unlock
 
 STATS_API_BASE = "https://statsapi.mlb.com/api"
@@ -81,36 +79,7 @@ class MLBLineupClient:
         return self._get_json(f"{self.base_url}/v1/game/{game_pk}/boxscore")
 
     def _get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        # Same curl-based transport as mlb_statsapi.py -- keeping one shape
-        # for both means one place to reason about retries and timeouts.
-        last_error: Exception | None = None
-        query = urllib.parse.urlencode(params or {})
-        request_url = f"{url}?{query}" if query else url
-        for attempt in range(4):
-            try:
-                completed = subprocess.run(
-                    [
-                        "curl",
-                        "-fsSL",
-                        "--compressed",
-                        "--max-time",
-                        str(int(self.timeout)),
-                        "--connect-timeout",
-                        "5",
-                        "--retry",
-                        "1",
-                        request_url,
-                    ],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                return json.loads(completed.stdout)
-            except (subprocess.CalledProcessError, ValueError) as error:
-                last_error = error
-                if attempt < 3:
-                    time.sleep(0.4 * (2**attempt))
-        raise RuntimeError(f"MLB Stats API request failed: {url}: {last_error}")
+        return curl_get_json(url, params, timeout=self.timeout)
 
 
 def classify_lineup_state(detailed_state: str) -> str:

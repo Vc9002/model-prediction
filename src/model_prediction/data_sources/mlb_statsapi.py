@@ -99,34 +99,43 @@ class MLBStatsAPIClient:
         return compact_game_snapshot(payload, snapshot_type=snapshot_type)
 
     def _get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        last_error: Exception | None = None
-        query = urllib.parse.urlencode(params or {})
-        request_url = f"{url}?{query}" if query else url
-        for attempt in range(4):
-            try:
-                completed = subprocess.run(
-                    [
-                        "curl",
-                        "-fsSL",
-                        "--compressed",
-                        "--max-time",
-                        str(int(self.timeout)),
-                        "--connect-timeout",
-                        "5",
-                        "--retry",
-                        "1",
-                        request_url,
-                    ],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                return json.loads(completed.stdout)
-            except (subprocess.CalledProcessError, ValueError) as error:
-                last_error = error
-                if attempt < 3:
-                    time.sleep(0.4 * (2**attempt))
-        raise RuntimeError(f"MLB Stats API request failed: {url}: {last_error}")
+        return curl_get_json(url, params, timeout=self.timeout)
+
+
+def curl_get_json(url: str, params: dict[str, Any] | None = None, *, timeout: float) -> dict[str, Any]:
+    """GET a Stats API URL through curl: four attempts with 0.4/0.8/1.6 s backoff.
+
+    Shared by ``MLBStatsAPIClient`` and ``mlb_lineups.MLBLineupClient`` so both
+    reason about retries and timeouts in one place.
+    """
+    last_error: Exception | None = None
+    query = urllib.parse.urlencode(params or {})
+    request_url = f"{url}?{query}" if query else url
+    for attempt in range(4):
+        try:
+            completed = subprocess.run(
+                [
+                    "curl",
+                    "-fsSL",
+                    "--compressed",
+                    "--max-time",
+                    str(int(timeout)),
+                    "--connect-timeout",
+                    "5",
+                    "--retry",
+                    "1",
+                    request_url,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            return json.loads(completed.stdout)
+        except (subprocess.CalledProcessError, ValueError) as error:
+            last_error = error
+            if attempt < 3:
+                time.sleep(0.4 * (2**attempt))
+    raise RuntimeError(f"MLB Stats API request failed: {url}: {last_error}")
 
 
 def collect_game_snapshots(
