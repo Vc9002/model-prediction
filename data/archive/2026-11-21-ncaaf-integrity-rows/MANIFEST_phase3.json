@@ -1,0 +1,27 @@
+{
+ "created_utc": "2026-11-21T04:55:05.004995+00:00",
+ "operation": "ncaaf-integrity-2026-11-21 phase 3",
+ "approved_by": "Vincent (2026-11-21, 'go ahead execute all')",
+ "precondition": "ledger.py fix cde2c4e7 (archive degrades replay identity mismatch to a warning)",
+ "items": {
+  "collided_quote": {
+   "reason": "ncaaf-integrity-2026-11-21: collided quote (one Polymarket snapshot record attached to 5-6 different events; graded at another game's line)",
+   "pick_ids": [
+    "2b9c7715d9304cf5"
+   ]
+  }
+ },
+ "note": "South Carolina vs Tennessee priced on the Charleston Southern vs Tennessee State contract (same kickoff); found by the plumbing agent",
+ "summary_by_item_tier": {
+  "collided_quote/flat": {
+   "n": 1,
+   "pnl": 2.0,
+   "W-L-P": "1-0-0"
+  }
+ },
+ "rows_file": "settled_rows_phase3.jsonl",
+ "rows_file_sha256": "8268def61769a4d05e8580292adadab0cd4ccc8981703304cd13a822f0f67311",
+ "sqlite_backup_before": "E:\\model-prediction-runtime\\ledgers\\ledgers.db.pre-ncaaf-integrity-2026-11-21-phase3-20261121T045456Z.bak",
+ "audit_backup_before": "E:\\model-prediction-runtime\\backups\\ncaaf-integrity-2026-11-21-phase3-20261121T045456Z\\E_MP_data_events.jsonl",
+ "orphan_audit_event_note": "phase-1 orphan settled_pick_archived event 39ad8fec.. for 26e45acf41d047be precedes this phase's real archive event for the same pick"
+}

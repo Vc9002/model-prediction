@@ -1,0 +1,75 @@
+{
+ "created_utc": "2026-11-21T04:29:56.182506+00:00",
+ "operation": "ncaaf-integrity-2026-11-21",
+ "approved_by": "Vincent (2026-11-21, 'go ahead execute all')",
+ "source": "E:\\model-prediction-runtime\\ledgers\\ledgers.db ledger_records sport=ncaaf status=settled (exact pick_ids)",
+ "status": "PARTIAL: item voided_fabricated_ask archived; collided_quote (21) and duplicate_line_copy (8) BLOCKED and still settled",
+ "items": {
+  "voided_fabricated_ask": {
+   "reason": "ncaaf-integrity-2026-11-21: void_reason set 2026-08-30 (priced against a fabricated 50% ask) but row still settled",
+   "pick_ids": [
+    "61e2a1cdad814465",
+    "837f9f1ac2f944e9",
+    "b55eb736b8524001"
+   ]
+  }
+ },
+ "blocked_items": {
+  "collided_quote": {
+   "reason": "ncaaf-integrity-2026-11-21: collided quote (one Polymarket snapshot record attached to 5-6 different events; graded at another game's line)",
+   "pick_ids": [
+    "26e45acf41d047be",
+    "1577d45fde574d45",
+    "0691ee1f17894fe7",
+    "e6ea9a14875e4b04",
+    "943512086d90449a",
+    "3dd996d8a7d04db2",
+    "792d76345356415b",
+    "79458425d458495b",
+    "956d98d934544fed",
+    "007a66d4d4194f10",
+    "552b33d3f4404fdf",
+    "ae720fbb40e54a3f",
+    "b840f3ed7dc1404e",
+    "5ee7c976b4b64812",
+    "54e9d683d56044e1",
+    "dbc2d98d56a14687",
+    "a52886104f04405a",
+    "eab28ce1897e488c",
+    "90d068e2b914433d",
+    "23ac89d129d4477b",
+    "5a99b5a010e5488d"
+   ]
+  },
+  "duplicate_line_copy": {
+   "reason": "ncaaf-integrity-2026-11-21: duplicate copy of a Main pick at a 0.5-1 point different line (Main copy kept)",
+   "pick_ids": [
+    "6ff1ad0c78274d7c",
+    "85fd40975c15475e",
+    "7775d531cc514abc",
+    "b7c919aaf9ba45e1",
+    "fca417c4652b4a93",
+    "aeba163097cc40e4",
+    "a24e60d5225c4b6c",
+    "0388fd78e9be4e5c"
+   ]
+  }
+ },
+ "blocked_cause": "archive_settled_rows -> _mirror_row -> _feature_payload(event_type='archive') runs validate_decision_snapshot strictly (settle/void/update only warn, remove/supersede skip); every v1-v4 CFB row with a replay snapshot raises cfb_replay_engine_identity_mismatch because the engine source hash changed. Proposed fix (operator decision): treat 'archive' like the warn-only group in ledger.py _feature_payload, with a regression test, then rerun the blocked ids.",
+ "orphan_audit_event": "Attempt 1 at 2026-11-21T04:27:25Z appended one settled_pick_archived event (event_id 39ad8fec7207483d9bb92386a6c848f6) for 26e45acf41d047be to data/events.jsonl before the mirror write raised; that row is still settled in ledgers.db (no DB change). Pre-attempt-1 backup: ledgers.db.pre-ncaaf-integrity-2026-11-21-20261121T042713Z.bak.",
+ "summary_by_item_tier": {
+  "voided_fabricated_ask/flat": {
+   "n": 3,
+   "units": 3.5,
+   "pnl": -1.5909,
+   "W-L-P": "1-2-0"
+  }
+ },
+ "row_count": 3,
+ "rows_file": "settled_rows.jsonl",
+ "rows_file_sha256": "c5c47759bc3cd30431fd4d90d0ab308277fa39a0a97c2739ea100b6fd1c5795b",
+ "method": "PickLedger.archive_settled_rows via main_ledger/flat_ledger, authority=sqlite, daily.lock held",
+ "sqlite_backup_before": "E:\\model-prediction-runtime\\ledgers\\ledgers.db.pre-ncaaf-integrity-2026-11-21-20261121T042945Z.bak",
+ "audit_backup_before": "E:\\model-prediction-runtime\\backups\\ncaaf-integrity-2026-11-21-20261121T042945Z\\E_MP_data_events.jsonl",
+ "limitations": "The two 10-31 snapshot records (e5e59051.., a4adaa6c..) are no longer in data/odds/ncaaf/2026-10-31/polymarket_snapshots.jsonl (file starts 05:48Z), so the quote's own event cannot be named; one sha256 record id cannot describe 5 events, so at most one row per id could have been genuine. Not archived: 48ae892be5e343ee (Louisiana @ Southern Miss) was priced on its own game's record bc3f286b..; 5f785b3ec8f3454d (ODU @ Louisiana Tech, Main) shares that record but was outside the approved set and is left for the operator."
+}

@@ -1,7 +1,7 @@
 {
-  "baseline_brier": 0.262521,
-  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
-  "calibrated_oof_brier": 0.262521136992814,
+  "baseline_brier": 0.256445,
+  "calibrated_at_utc": "2026-11-22T01:38:05.596680+00:00",
+  "calibrated_oof_brier": 0.2564450640530421,
   "champion_method": "identity",
   "fit_model_versions": [
     "nba-spread-margin-v9"
@@ -10,6 +10,6 @@
   "market": "spread",
   "model_version": "nba-spread-margin-v9",
   "parameters": {},
-  "sample_size": 43,
+  "sample_size": 95,
   "sport": "nba"
 }

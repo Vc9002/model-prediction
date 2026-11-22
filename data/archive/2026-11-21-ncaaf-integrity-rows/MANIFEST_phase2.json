@@ -1,0 +1,73 @@
+{
+ "created_utc": "2026-11-21T04:32:51.354176+00:00",
+ "operation": "ncaaf-integrity-2026-11-21 phase 2",
+ "approved_by": "Vincent (2026-11-21, 'go ahead execute all')",
+ "precondition": "ledger.py fix cde2c4e7 (archive degrades replay identity mismatch to a warning)",
+ "items": {
+  "collided_quote": {
+   "reason": "ncaaf-integrity-2026-11-21: collided quote (one Polymarket snapshot record attached to 5-6 different events; graded at another game's line)",
+   "pick_ids": [
+    "26e45acf41d047be",
+    "1577d45fde574d45",
+    "0691ee1f17894fe7",
+    "e6ea9a14875e4b04",
+    "943512086d90449a",
+    "3dd996d8a7d04db2",
+    "792d76345356415b",
+    "79458425d458495b",
+    "956d98d934544fed",
+    "007a66d4d4194f10",
+    "552b33d3f4404fdf",
+    "ae720fbb40e54a3f",
+    "b840f3ed7dc1404e",
+    "5ee7c976b4b64812",
+    "54e9d683d56044e1",
+    "dbc2d98d56a14687",
+    "a52886104f04405a",
+    "eab28ce1897e488c",
+    "90d068e2b914433d",
+    "23ac89d129d4477b",
+    "5a99b5a010e5488d",
+    "5f785b3ec8f3454d"
+   ]
+  },
+  "duplicate_line_copy": {
+   "reason": "ncaaf-integrity-2026-11-21: duplicate copy of a Main pick at a 0.5-1 point different line (Main copy kept)",
+   "pick_ids": [
+    "6ff1ad0c78274d7c",
+    "85fd40975c15475e",
+    "7775d531cc514abc",
+    "b7c919aaf9ba45e1",
+    "fca417c4652b4a93",
+    "aeba163097cc40e4",
+    "a24e60d5225c4b6c",
+    "0388fd78e9be4e5c"
+   ]
+  }
+ },
+ "added_beyond_phase1_list": {
+  "5f785b3ec8f3454d": "ODU @ Louisiana Tech Main, priced on record bc3f286b.. (Louisiana @ Southern Miss), same collided-quote defect"
+ },
+ "summary_by_item_tier": {
+  "collided_quote/main": {
+   "n": 2,
+   "pnl": -0.1,
+   "W-L-P": "1-1-0"
+  },
+  "collided_quote/flat": {
+   "n": 20,
+   "pnl": 15.0002,
+   "W-L-P": "15-5-0"
+  },
+  "duplicate_line_copy/flat": {
+   "n": 8,
+   "pnl": -2.3928,
+   "W-L-P": "3-5-0"
+  }
+ },
+ "rows_file": "settled_rows_phase2.jsonl",
+ "rows_file_sha256": "2307ee39a35f3b26ef436d43afa3e2a300eb21e270f1524378193867f274df2d",
+ "sqlite_backup_before": "E:\\model-prediction-runtime\\ledgers\\ledgers.db.pre-ncaaf-integrity-2026-11-21-phase2-20261121T043247Z.bak",
+ "audit_backup_before": "E:\\model-prediction-runtime\\backups\\ncaaf-integrity-2026-11-21-phase2-20261121T043247Z\\E_MP_data_events.jsonl",
+ "orphan_audit_event_note": "phase-1 orphan settled_pick_archived event 39ad8fec.. for 26e45acf41d047be precedes this phase's real archive event for the same pick"
+}

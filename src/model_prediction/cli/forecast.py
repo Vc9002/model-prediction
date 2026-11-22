@@ -2280,8 +2280,11 @@ def _log_basketball_spread_picks(
                 ):
                     eligibility = _downgrade_unserved(eligibility)
                 if eligibility.decision == "CALL":
+                    # Only Main gates. Flat logs every game x market, so a moneyline
+                    # that disagrees with the spread side stays in Flat (2026-11-17:
+                    # this call dropped 3 of 8 NBA moneylines from Flat on 11/16).
                     _supersede_incoherent_moneyline_calls(
-                        (flat_ledger, main_ledger),
+                        (main_ledger,),
                         event_id=str(contract["event_id"]),
                         selection=request.selection,
                         line=request.line,

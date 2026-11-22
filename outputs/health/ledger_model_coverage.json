@@ -1,22 +1,22 @@
 {
   "status": "ok",
-  "generated_at_utc": "2026-11-14T19:31:59.421932+00:00",
-  "date_et": "2026-11-14",
+  "generated_at_utc": "2026-11-22T01:54:49.447287+00:00",
+  "date_et": "2026-11-21",
   "lanes": [
     {
       "sport": "NCAAB",
       "market": "moneyline",
-      "model_id": "ncaab-spread-v6",
+      "model_id": "ncaab-moneyline-v7m",
       "route": "ncaab",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 52
+        "flat": 5
       },
       "generated_today_ledger_counts": {
-        "flat": 52
+        "flat": 5
       },
       "flat_coverage": {
-        "recorded_games": 52,
+        "recorded_games": 5,
         "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
@@ -24,120 +24,78 @@
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "FLAT_CALL": 52
+        "FLAT_CALL": 5
       },
       "source_exclusions": {
-        "missing_identity_or_event_started": 18,
-        "insufficient_history_non_d1": 8
+        "missing_identity_or_event_started": 13,
+        "moneyline_nonpositive_edge": 2
       },
       "forecast": {
         "status": "ok",
-        "scheduled_games": 71,
-        "logged": 119,
+        "scheduled_games": 57,
+        "logged": 4,
         "skipped": [
           {
-            "event_id": "212780",
+            "event_id": "240540",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212782",
+            "event_id": "240541",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212784",
+            "event_id": "240542",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212786",
+            "event_id": "240543",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212838",
+            "event_id": "240544",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "229985",
+            "event_id": "240547",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "229986",
+            "event_id": "240548",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212790",
+            "event_id": "240549",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212804",
+            "event_id": "240550",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212792",
+            "event_id": "240554",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212794",
+            "event_id": "240566",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212796",
+            "event_id": "241362",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212798",
+            "event_id": "240577",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212800",
-            "reason": "missing_identity_or_event_started"
+            "event_id": "240579",
+            "market_type": "moneyline",
+            "reason": "moneyline_nonpositive_edge"
           },
           {
-            "event_id": "212802",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "212806",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229987",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229988",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229989",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "226827",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "212832",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229990",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229992",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "212856",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229993",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229994",
-            "reason": "insufficient_history_non_d1"
+            "event_id": "240580",
+            "market_type": "moneyline",
+            "reason": "moneyline_nonpositive_edge"
           }
         ],
         "errors": []
@@ -146,17 +104,17 @@
     {
       "sport": "NCAAB",
       "market": "spread",
-      "model_id": "ncaab-spread-v6",
+      "model_id": "ncaab-spread-v7",
       "route": "ncaab",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 54
+        "flat": 51
       },
       "generated_today_ledger_counts": {
-        "flat": 54
+        "flat": 51
       },
       "flat_coverage": {
-        "recorded_games": 54,
+        "recorded_games": 51,
         "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
@@ -164,120 +122,78 @@
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "FLAT_CALL": 54
+        "FLAT_CALL": 51
       },
       "source_exclusions": {
-        "missing_identity_or_event_started": 18,
-        "insufficient_history_non_d1": 8
+        "missing_identity_or_event_started": 13,
+        "moneyline_nonpositive_edge": 2
       },
       "forecast": {
         "status": "ok",
-        "scheduled_games": 71,
-        "logged": 119,
+        "scheduled_games": 57,
+        "logged": 4,
         "skipped": [
           {
-            "event_id": "212780",
+            "event_id": "240540",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212782",
+            "event_id": "240541",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212784",
+            "event_id": "240542",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212786",
+            "event_id": "240543",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212838",
+            "event_id": "240544",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "229985",
+            "event_id": "240547",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "229986",
+            "event_id": "240548",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212790",
+            "event_id": "240549",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212804",
+            "event_id": "240550",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212792",
+            "event_id": "240554",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212794",
+            "event_id": "240566",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212796",
+            "event_id": "241362",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212798",
+            "event_id": "240577",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212800",
-            "reason": "missing_identity_or_event_started"
+            "event_id": "240579",
+            "market_type": "moneyline",
+            "reason": "moneyline_nonpositive_edge"
           },
           {
-            "event_id": "212802",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "212806",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229987",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229988",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229989",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "226827",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "212832",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229990",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229992",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "212856",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229993",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229994",
-            "reason": "insufficient_history_non_d1"
+            "event_id": "240580",
+            "market_type": "moneyline",
+            "reason": "moneyline_nonpositive_edge"
           }
         ],
         "errors": []
@@ -290,13 +206,13 @@
       "route": "ncaab",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 54
+        "flat": 24
       },
       "generated_today_ledger_counts": {
-        "flat": 54
+        "flat": 24
       },
       "flat_coverage": {
-        "recorded_games": 54,
+        "recorded_games": 24,
         "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
@@ -304,120 +220,78 @@
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "FLAT_CALL": 54
+        "FLAT_CALL": 24
       },
       "source_exclusions": {
-        "missing_identity_or_event_started": 18,
-        "insufficient_history_non_d1": 8
+        "missing_identity_or_event_started": 13,
+        "moneyline_nonpositive_edge": 2
       },
       "forecast": {
         "status": "ok",
-        "scheduled_games": 71,
-        "logged": 119,
+        "scheduled_games": 57,
+        "logged": 4,
         "skipped": [
           {
-            "event_id": "212780",
+            "event_id": "240540",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212782",
+            "event_id": "240541",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212784",
+            "event_id": "240542",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212786",
+            "event_id": "240543",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212838",
+            "event_id": "240544",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "229985",
+            "event_id": "240547",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "229986",
+            "event_id": "240548",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212790",
+            "event_id": "240549",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212804",
+            "event_id": "240550",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212792",
+            "event_id": "240554",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212794",
+            "event_id": "240566",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212796",
+            "event_id": "241362",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212798",
+            "event_id": "240577",
             "reason": "missing_identity_or_event_started"
           },
           {
-            "event_id": "212800",
-            "reason": "missing_identity_or_event_started"
+            "event_id": "240579",
+            "market_type": "moneyline",
+            "reason": "moneyline_nonpositive_edge"
           },
           {
-            "event_id": "212802",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "212806",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229987",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229988",
-            "reason": "missing_identity_or_event_started"
-          },
-          {
-            "event_id": "229989",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "226827",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "212832",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229990",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229992",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "212856",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229993",
-            "reason": "insufficient_history_non_d1"
-          },
-          {
-            "event_id": "229994",
-            "reason": "insufficient_history_non_d1"
+            "event_id": "240580",
+            "market_type": "moneyline",
+            "reason": "moneyline_nonpositive_edge"
           }
         ],
         "errors": []
@@ -598,13 +472,13 @@
       "route": "nba",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 3
+        "flat": 6
       },
       "generated_today_ledger_counts": {
-        "flat": 3
+        "flat": 6
       },
       "flat_coverage": {
-        "recorded_games": 3,
+        "recorded_games": 6,
         "priced_games": 0,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
@@ -612,14 +486,37 @@
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "FLAT_CALL": 3
+        "FLAT_CALL": 6
       },
-      "source_exclusions": {},
+      "source_exclusions": {
+        "event_started": 5
+      },
       "forecast": {
         "status": "learned_forecast_complete",
-        "scheduled_games": 5,
-        "logged": 1,
-        "skipped": []
+        "scheduled_games": 6,
+        "logged": 0,
+        "skipped": [
+          {
+            "event_id": "401910023",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401910024",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401910025",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401910026",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401910027",
+            "reason": "event_started"
+          }
+        ]
       }
     },
     {
@@ -629,43 +526,31 @@
       "route": "nba_spread",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 4,
+        "flat": 6,
         "main": 1
       },
       "generated_today_ledger_counts": {
-        "flat": 4,
+        "flat": 6,
         "main": 1
       },
       "flat_coverage": {
-        "recorded_games": 4,
-        "priced_games": 4,
+        "recorded_games": 6,
+        "priced_games": 1,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "QUALIFIED": 5
+        "QUALIFIED": 7
       },
-      "source_exclusions": {
-        "no matched spread market": 2
-      },
+      "source_exclusions": {},
       "forecast": {
-        "scheduled_games": 5,
-        "market_candidates": 4,
-        "logged": 4,
-        "unmatched": [
-          {
-            "event_id": "401909982",
-            "reason": "no matched spread market"
-          }
-        ],
-        "skipped": [
-          {
-            "event_id": "401909982",
-            "reason": "no matched spread market"
-          }
-        ]
+        "scheduled_games": 6,
+        "market_candidates": 1,
+        "logged": 1,
+        "unmatched": [],
+        "skipped": []
       }
     },
     {
@@ -675,41 +560,31 @@
       "route": "nba_total",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 4
+        "flat": 6,
+        "main": 1
       },
       "generated_today_ledger_counts": {
-        "flat": 4
+        "flat": 6,
+        "main": 1
       },
       "flat_coverage": {
-        "recorded_games": 4,
-        "priced_games": 4,
+        "recorded_games": 6,
+        "priced_games": 1,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "QUALIFIED": 4
+        "QUALIFIED": 7
       },
-      "source_exclusions": {
-        "no matched total market": 2
-      },
+      "source_exclusions": {},
       "forecast": {
-        "scheduled_games": 5,
-        "market_candidates": 4,
-        "logged": 4,
-        "unmatched": [
-          {
-            "event_id": "401909982",
-            "reason": "no matched total market"
-          }
-        ],
-        "skipped": [
-          {
-            "event_id": "401909982",
-            "reason": "no matched total market"
-          }
-        ]
+        "scheduled_games": 6,
+        "market_candidates": 1,
+        "logged": 1,
+        "unmatched": [],
+        "skipped": []
       }
     },
     {
@@ -796,138 +671,1778 @@
       "route": "ncaaf",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 55,
-        "main": 3
+        "flat": 56,
+        "main": 7
       },
       "generated_today_ledger_counts": {
-        "flat": 55,
-        "main": 3
+        "flat": 56,
+        "main": 7
       },
       "flat_coverage": {
-        "recorded_games": 55,
-        "priced_games": 49,
+        "recorded_games": 56,
+        "priced_games": 56,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "FLAT_CALL": 47,
-        "QUALIFIED": 11
+        "FLAT_CALL": 48,
+        "QUALIFIED": 15
       },
       "source_exclusions": {
-        "event_started": 27
+        "event_started": 437
       },
       "forecast": {
         "status": "research",
-        "logged": 120,
+        "logged": 44,
         "skipped": [
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
             "reason": "event_started"
           }
         ],
@@ -941,138 +2456,1778 @@
       "route": "ncaaf",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 55,
-        "main": 6
+        "flat": 58,
+        "main": 19
       },
       "generated_today_ledger_counts": {
-        "flat": 55,
-        "main": 6
+        "flat": 58,
+        "main": 19
       },
       "flat_coverage": {
-        "recorded_games": 55,
-        "priced_games": 49,
+        "recorded_games": 58,
+        "priced_games": 58,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "FLAT_CALL": 44,
-        "QUALIFIED": 17
+        "QUALIFIED": 43,
+        "FLAT_CALL": 34
       },
       "source_exclusions": {
-        "event_started": 27
+        "event_started": 437
       },
       "forecast": {
         "status": "research",
-        "logged": 120,
+        "logged": 44,
         "skipped": [
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
             "reason": "event_started"
           }
         ],
@@ -1086,138 +4241,1778 @@
       "route": "ncaaf",
       "status": "recorded",
       "ledger_counts": {
-        "flat": 55,
-        "main": 19
+        "flat": 58,
+        "main": 13
       },
       "generated_today_ledger_counts": {
-        "flat": 55,
-        "main": 19
+        "flat": 58,
+        "main": 13
       },
       "flat_coverage": {
-        "recorded_games": 55,
-        "priced_games": 49,
+        "recorded_games": 58,
+        "priced_games": 58,
         "off_date_priced_count": 0,
         "missing_priced_event_ids": [],
         "main_only": false,
         "main_without_flat_event_ids": []
       },
       "reasons": {
-        "FLAT_CALL": 26,
-        "QUALIFIED": 48
+        "QUALIFIED": 43,
+        "FLAT_CALL": 28
       },
       "source_exclusions": {
-        "event_started": 27
+        "event_started": 437
       },
       "forecast": {
         "status": "research",
-        "logged": 120,
+        "logged": 44,
         "skipped": [
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858296",
+            "event_id": "401860920",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858301",
+            "event_id": "401858534",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401858522",
+            "event_id": "401858302",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401856859",
+            "event_id": "401856865",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858300",
+            "event_id": "401864544",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401858520",
+            "event_id": "401869938",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401861967",
+            "event_id": "401856753",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401856862",
+            "event_id": "401858307",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
             "reason": "event_started"
           },
           {
-            "event_id": "401870769",
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856752",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860920",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858534",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858302",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856865",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864544",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869938",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856753",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858307",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856751",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858306",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858308",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401860918",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862836",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856746",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858528",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856755",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858535",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856754",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856866",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858310",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856871",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858531",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858527",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856868",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856748",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856749",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856867",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858309",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858530",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858533",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862831",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862834",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862835",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858305",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856750",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871080",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862832",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871079",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871081",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401862833",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869929",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869946",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871077",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871078",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401856747",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858304",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401858532",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401861968",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401864543",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869953",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401869958",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
+            "reason": "event_started"
+          },
+          {
+            "event_id": "401871101",
             "reason": "event_started"
           }
         ],

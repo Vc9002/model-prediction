@@ -1,0 +1,483 @@
+{
+  "auto_buyer_fallback_reconciliation": {
+    "cancelled_expired": 0,
+    "errors": 0,
+    "reconciled_filled": 0,
+    "still_pending": 0
+  },
+  "auto_buyer_settlement": {
+    "changed": 0,
+    "changes": [],
+    "corrected": 0,
+    "newly_settled": 0,
+    "pending": 0,
+    "remaining_pending": 0,
+    "reopened": 0,
+    "settled": 22
+  },
+  "failures": [],
+  "flat_settlement": {
+    "failures": [],
+    "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+    "polymarket_edge_settlement": {
+      "reason": "operator_disabled",
+      "status": "disabled"
+    },
+    "seconds_by_league": {
+      "(ledger_read)": 1.56,
+      "CS2": 0.84,
+      "DARTS": 0.0,
+      "DOTA2": 0.0,
+      "EUROLEAGUE": 0.0,
+      "HOCKEY": 17.83,
+      "KBO": 0.0,
+      "LOL": 0.0,
+      "MLB": 0.0,
+      "NBA": 14.91,
+      "NBL": 0.0,
+      "NCAAB": 24.81,
+      "NCAAF": 7.19,
+      "NFL": 0.0,
+      "NPB": 0.01,
+      "RAINBOW_SIX": 0.02,
+      "SOCCER": 0.0,
+      "TENNIS": 0.0,
+      "VALORANT": 0.0,
+      "WNBA": 0.0
+    },
+    "settled": [
+      {
+        "pick_id": "e89def198b024532",
+        "result": "loss"
+      },
+      {
+        "pick_id": "4ef26e216bc941a5",
+        "result": "loss"
+      },
+      {
+        "pick_id": "0b02e33a118d4ed1",
+        "result": "win"
+      },
+      {
+        "pick_id": "9ccbacf6701d4a6a",
+        "result": "win"
+      },
+      {
+        "pick_id": "c0e507f695584560",
+        "result": "win"
+      },
+      {
+        "pick_id": "91ec6f01bde84f2d",
+        "result": "win"
+      },
+      {
+        "pick_id": "8f35e227b3e849fd",
+        "result": "win"
+      },
+      {
+        "pick_id": "6a1f75a218344930",
+        "result": "win"
+      },
+      {
+        "pick_id": "1922d2e78fab4a12",
+        "result": "loss"
+      },
+      {
+        "pick_id": "afd120e66ac2436b",
+        "result": "win"
+      },
+      {
+        "pick_id": "af32977e6d2443c9",
+        "result": "win"
+      },
+      {
+        "pick_id": "7a175e22d48745e6",
+        "result": "win"
+      },
+      {
+        "pick_id": "6ef7c22dfdd44c1b",
+        "result": "win"
+      },
+      {
+        "pick_id": "d4c4f2b2f4fe401f",
+        "result": "win"
+      },
+      {
+        "pick_id": "0d0737da683f4fad",
+        "result": "win"
+      },
+      {
+        "pick_id": "982622fa7684419b",
+        "result": "win"
+      },
+      {
+        "pick_id": "0b3b329f80fb416f",
+        "result": "win"
+      },
+      {
+        "pick_id": "e3cbdbef6e854f62",
+        "result": "loss"
+      },
+      {
+        "pick_id": "169cdf1ee425459b",
+        "result": "win"
+      },
+      {
+        "pick_id": "437e09d901684a9a",
+        "result": "win"
+      },
+      {
+        "pick_id": "5c0ba850181a4630",
+        "result": "loss"
+      },
+      {
+        "pick_id": "25d7af5ec6cd4bef",
+        "result": "loss"
+      },
+      {
+        "pick_id": "ba0b094568dd4b62",
+        "result": "win"
+      },
+      {
+        "pick_id": "31262f6ad8e74e32",
+        "result": "loss"
+      },
+      {
+        "pick_id": "cdaf1bb2917a4053",
+        "result": "win"
+      },
+      {
+        "pick_id": "385dfdeb8ee44d78",
+        "result": "loss"
+      },
+      {
+        "pick_id": "2c83c4202d0e47f4",
+        "result": "win"
+      },
+      {
+        "pick_id": "3b42805a107949b7",
+        "result": "loss"
+      },
+      {
+        "pick_id": "49bdb96116e74a74",
+        "result": "win"
+      },
+      {
+        "pick_id": "0688e624036a479f",
+        "result": "loss"
+      },
+      {
+        "pick_id": "e776ba532983419b",
+        "result": "loss"
+      },
+      {
+        "pick_id": "459865fc8dba4574",
+        "result": "loss"
+      },
+      {
+        "pick_id": "842046e098234aa1",
+        "result": "loss"
+      },
+      {
+        "pick_id": "c65f0e26f6f141a6",
+        "result": "loss"
+      },
+      {
+        "pick_id": "d4a81970dd294e29",
+        "result": "win"
+      },
+      {
+        "pick_id": "415a553abbe94aa7",
+        "result": "win"
+      },
+      {
+        "pick_id": "2b49c4ebc5424e4c",
+        "result": "win"
+      },
+      {
+        "pick_id": "6993e9c8e4524b73",
+        "result": "win"
+      },
+      {
+        "pick_id": "5e16ddd38876470b",
+        "result": "win"
+      },
+      {
+        "pick_id": "9670160ef33c4939",
+        "result": "loss"
+      },
+      {
+        "pick_id": "60032cb3f03a44d1",
+        "result": "loss"
+      },
+      {
+        "pick_id": "0f63e8f7d8c14dc7",
+        "result": "loss"
+      },
+      {
+        "pick_id": "7858e1577fff4a25",
+        "result": "loss"
+      },
+      {
+        "pick_id": "8df8255ab9b94a33",
+        "result": "loss"
+      },
+      {
+        "pick_id": "541aab7fe9f74e49",
+        "result": "loss"
+      },
+      {
+        "pick_id": "d9beb009f71f4854",
+        "result": "loss"
+      },
+      {
+        "pick_id": "61b9622b1c4549b4",
+        "result": "win"
+      },
+      {
+        "pick_id": "0a4fd915250e4ec3",
+        "result": "loss"
+      },
+      {
+        "pick_id": "81ee94154ec84841",
+        "result": "loss"
+      },
+      {
+        "pick_id": "fd9ff1ebb1fa4e47",
+        "result": "loss"
+      },
+      {
+        "pick_id": "14bfb65dd80e4236",
+        "result": "loss"
+      },
+      {
+        "pick_id": "6a7e59d322974114",
+        "result": "loss",
+        "settled": true,
+        "source": "polymarket_resolution"
+      },
+      {
+        "pick_id": "a7a50a7322f44fc0",
+        "result": "loss",
+        "settled": true,
+        "source": "polymarket_resolution"
+      },
+      {
+        "pick_id": "d4d5bb8b3f7a4712",
+        "result": "win",
+        "settled": true,
+        "source": "polymarket_resolution"
+      },
+      {
+        "pick_id": "3c96b9d0a8c2423b",
+        "result": "win",
+        "settled": true,
+        "source": "polymarket_resolution"
+      },
+      {
+        "pick_id": "58822a8fa55f4b5e",
+        "result": "loss",
+        "settled": true,
+        "source": "polymarket_resolution"
+      }
+    ],
+    "still_open": [
+      "7a62e7901f16460d",
+      "2375b31deb4b4614",
+      "acc63ea6e37b4e87",
+      "48afea50cdbf49b0",
+      "b120c051f6e94625",
+      "64ba791d8063430b",
+      "8601327f8a6f43a8",
+      "7f52092fa70146da",
+      "8050dfc9ce8b40a4",
+      "d5adb8cd167846f9",
+      "827ea9b9a0214a1e",
+      "9a77505f6a914342",
+      "d24f44f8ef38476e",
+      "8693d677af5841e0",
+      "f79bfdd7e5f34b82",
+      "e69ea0cc792f40d9",
+      "6a58b34d92904736",
+      "c7945d235b1e410e",
+      "5c9d7cdb728049e7",
+      "817b1a7d03204a60",
+      "1614b89fceda431d",
+      "59beda0c1c0041f2",
+      "288fa687315942c9",
+      "2da5888687fb4ad9",
+      "4638083362a74718",
+      "6164975f132d4a3f",
+      "e300ab763a5a4949",
+      "482e24757ac349d9",
+      "37081bc63b1d4c7b",
+      "f36a222d7ffd481d",
+      "440d1dac1a31488a",
+      "82c5a212b183444f",
+      "368e0ae3152c4fec",
+      "93c8881560f04b43",
+      "85861ec2dd9848a0",
+      "27f0222e6f1d4a71",
+      "311e6bec0af74487",
+      "869cf5a9f6824cd3",
+      "c3d3e15672984dd0",
+      "82347b21f4a94583",
+      "40c1489db4cf4f63",
+      "7b00f51815c14f44",
+      "bb8d8e1e63284722",
+      "158e41c084154543",
+      "2a467a4f880a4f3c",
+      "5cb543fc698b4a55",
+      "fb4b1b8d3a924718",
+      "d7444c5c6bf0488a",
+      "b602d29f13714f3f",
+      "38a3ab8d7f1a4346",
+      "378f731494f24423",
+      "913c8273ba7541f3",
+      "9daae2113a6a49a1",
+      "860c1d1f8e6e49ec",
+      "46c7aee0c9ee4fbd",
+      "bfb5bccd2db9458a",
+      "a98d1312932b4213",
+      "8fc89ff4835544a2",
+      "9d0c29c187884bd7",
+      "cebd60ae02ec4676",
+      "8675f9c6339f4015",
+      "b53e78109db64244",
+      "813f7f7185074cd9",
+      "c316035324c043dc",
+      "6c2427ad08dc4653",
+      "cebe2e7d941a486f",
+      "1cb86cd6aa2d4ddc",
+      "edd0e1e386104274",
+      "e4df52f360e74265",
+      "c1b9cefef9ad4dc0",
+      "b27a3f36cba84a7e",
+      "19221db874514aae"
+    ],
+    "voided": []
+  },
+  "gated_research_settlement": {
+    "gated": {
+      "failures": [],
+      "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+      "polymarket_edge_settlement": {
+        "reason": "operator_disabled",
+        "status": "disabled"
+      },
+      "seconds_by_league": {
+        "(ledger_read)": 0.0,
+        "VALORANT": 0.0
+      },
+      "settled": [],
+      "still_open": [],
+      "voided": []
+    }
+  },
+  "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+  "polymarket_edge_settlement": {
+    "reason": "operator_disabled",
+    "status": "disabled"
+  },
+  "research_settlement": {
+    "research": {
+      "failures": [],
+      "note": "Results pulled from ESPN scoreboards; closing prices from stored pregame BBO asks.",
+      "polymarket_edge_settlement": {
+        "reason": "operator_disabled",
+        "status": "disabled"
+      },
+      "seconds_by_league": {
+        "(ledger_read)": 0.01,
+        "VALORANT": 0.0
+      },
+      "settled": [],
+      "still_open": [],
+      "voided": []
+    }
+  },
+  "seconds_by_league": {
+    "(ledger_read)": 0.95,
+    "CS2": 10.93,
+    "DOTA2": 0.0,
+    "HOCKEY": 2.47,
+    "KBO": 0.0,
+    "LOL": 0.0,
+    "MLB": 0.0,
+    "NBA": 1.78,
+    "NCAAB": 0.0,
+    "NCAAF": 0.09,
+    "NFL": 0.0,
+    "NPB": 0.0,
+    "RAINBOW_SIX": 0.03,
+    "SOCCER": 0.0,
+    "TENNIS": 0.0,
+    "VALORANT": 0.0,
+    "WNBA": 0.0
+  },
+  "settled": [
+    {
+      "pick_id": "dfd8c81dedb14220",
+      "result": "loss"
+    },
+    {
+      "pick_id": "5b423d763b794ec1",
+      "result": "loss"
+    },
+    {
+      "pick_id": "aeb24fd8b9114043",
+      "result": "win"
+    },
+    {
+      "pick_id": "a07d822d70c440cb",
+      "result": "loss"
+    },
+    {
+      "pick_id": "f2cad36ed4344c69",
+      "result": "loss",
+      "settled": true,
+      "source": "polymarket_resolution"
+    },
+    {
+      "pick_id": "64bb30726ada4f61",
+      "result": "loss",
+      "settled": true,
+      "source": "polymarket_resolution"
+    },
+    {
+      "pick_id": "a3ae58edcab64bc2",
+      "result": "win",
+      "settled": true,
+      "source": "polymarket_resolution"
+    }
+  ],
+  "still_open": [
+    "5c2990d97e0e4281",
+    "361fe57bfbe844c7",
+    "04da2e47acba413f",
+    "b0b50b42bf6e4817",
+    "25245aeabeeb468a",
+    "64eb1c8814614add",
+    "c3cc01dde6864774",
+    "112b51c26e3f41d3",
+    "8a13fce464ed4749",
+    "af7790cd4b9c4b4f",
+    "3cdd1937ba5746a0",
+    "ed4a3ceccb63431a",
+    "0b10e05ec56c4f79",
+    "6353e2340a6e43aa",
+    "06a381dcb0f24c96",
+    "3e81b1b27de947af",
+    "57da62482db04ce2",
+    "df99d909a2b94879",
+    "ab9e521e7b014d4c",
+    "b1c45ff9d52b48cf",
+    "d6b05e782af249eb",
+    "3764dff3e7354e0d",
+    "87071e1db42a455b",
+    "47f0532e04684454",
+    "92df3c7e533c4da1",
+    "01c483a0abff481a"
+  ],
+  "voided": []
+}

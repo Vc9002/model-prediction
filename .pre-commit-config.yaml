@@ -1,5 +1,8 @@
 # Pre-commit lint gate. Install once with: pre-commit install
 # (DD-9: lint violations previously accumulated between CI runs.)
+# outputs/ and docs/ hold one-off research and forensics scripts kept as evidence;
+# rewriting them on commit would change the record, so the gate skips them.
+exclude: ^(outputs|docs)/
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.2

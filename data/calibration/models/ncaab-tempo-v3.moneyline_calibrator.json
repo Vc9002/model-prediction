@@ -1,7 +1,7 @@
 {
-  "baseline_brier": 0.172528,
-  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
-  "calibrated_oof_brier": 0.17252756918267223,
+  "baseline_brier": 0.170987,
+  "calibrated_at_utc": "2026-11-22T01:38:05.596680+00:00",
+  "calibrated_oof_brier": 0.1709866569652599,
   "champion_method": "identity",
   "fit_model_versions": [
     "ncaab-tempo-v3"
@@ -10,6 +10,6 @@
   "market": "moneyline",
   "model_version": "ncaab-tempo-v3",
   "parameters": {},
-  "sample_size": 180,
+  "sample_size": 177,
   "sport": "ncaab"
 }

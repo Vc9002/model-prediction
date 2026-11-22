@@ -1,0 +1,7 @@
+away,created,edge,event_id,home,line,mkt,model,mt,pick_id,pnl,prob,result,sel,slug,start,status,tier,units
+Notre Dame Fighting Irish,2026-10-31T05:04:50.369203Z,-0.156195,401859185,Navy Midshipmen,,0.975,cfb-structural-v3,moneyline,d3bda226f5674c40,0.0256,0.818805,win,away,aec-cfb-nd-navy-2026-10-31,2026-10-31T16:00Z,settled,flat,1.0
+Notre Dame Fighting Irish,2026-10-31T05:04:50.369203Z,0.24195,401859185,Navy Midshipmen,30.5,0.49505,cfb-structural-v3,spread,6af5e571e4354c0f,2.04,0.737,win,home,asc-cfb-nd-navy-2026-10-31-neg-30pt5,2026-10-31T16:00Z,settled,flat,2.0
+Notre Dame Fighting Irish,2026-10-31T05:04:50.369203Z,0.0958,401859185,Navy Midshipmen,55.5,0.5,cfb-structural-v3,total,399cecbac0914a12,2.0,0.5958,win,under,tsc-cfb-nd-navy-2026-10-31-total-55pt5,2026-10-31T16:00Z,settled,flat,2.0
+Bowling Green Falcons,2026-10-31T05:04:50.369203Z,-0.01757,401866452,Western Michigan Broncos,,0.834983,cfb-structural-v3,moneyline,90ad1825056a49cb,0.1976,0.817413,win,home,aec-cfb-bowlgr-wmich-2026-10-31,2026-10-31T16:00Z,settled,flat,1.0
+Bowling Green Falcons,2026-10-31T05:04:50.369203Z,0.008667,401866452,Western Michigan Broncos,-13.5,0.526066,cfb-structural-v3,spread,9761ceedca744896,-1.0,0.534733,loss,home,asc-cfb-bowlgr-wmich-2026-10-31-pos-13pt5,2026-10-31T16:00Z,settled,flat,1.0
+Bowling Green Falcons,2026-10-31T05:04:50.369203Z,0.107871,401866452,Western Michigan Broncos,45.5,0.490196,cfb-structural-v3,total,f5a3ce91c3ea4e97,-2.0,0.598067,loss,over,tsc-cfb-bowlgr-wmich-2026-10-31-total-45pt5,2026-10-31T16:00Z,settled,flat,2.0

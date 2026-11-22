@@ -1,0 +1,2 @@
+away,created,edge,event_id,expected,home,la,line,mkt,model,mt,other_side,p1,pick_id,pnl,prob,result,row_ask,sa,sel,side_unverifiable_by_price,slug,start,status,tier,title,units
+New Mexico State Aggies,2026-10-21T22:26:30.363715Z,0.025278,401871070,0.46,Sam Houston Bearkats,0.46,3.5,0.545455,cfb-structural-v2,spread,0.545,away,881b2c77229146ee,0.8333,0.570733,win,0.545,0.545,away,False,asc-cfb-nmxst-smho-2026-10-21-neg-3pt5,2026-10-22T00:00Z,settled,flat,NM State vs. Sam Houston,1.0

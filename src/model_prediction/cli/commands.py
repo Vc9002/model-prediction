@@ -284,7 +284,9 @@ def _capture_ladder_keep() -> int | None:
 # made one capture take 2.8 hours at the gateway's rate limit. Until 2026-11-14
 # one integer was chosen first-match (NBA on the slate => 3 for every league),
 # so NCAAB and NCAAF each priced 3 rungs and the queue outgrew the limit.
-CAPTURE_LADDER_KEEP: dict[str, int] = {"NBA": 3, "NCAAF": 2, "NCAAB": 1, "NFL": 2}
+# NCAAF is 12, not 2: a one-game Sunday slate lists 41 spread and 25 total
+# alternates, and keeping 2 per type left 5 contracts, so 62 went unpriced.
+CAPTURE_LADDER_KEEP: dict[str, int] = {"NBA": 3, "NCAAF": 12, "NCAAB": 1, "NFL": 2}
 
 
 def _capture_ladder_keep_by_league() -> dict[str, int]:

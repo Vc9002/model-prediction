@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-18T19:44:33.153Z"
+last_updated: "2026-11-22T04:05:45.814Z"
 last_activity: 2026-11-13
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 0de746381925862817da265252cc3732c506d303
+state_head: 76bcd5207af269132d57b4accff5ef96a7bb2b41
 progress:
   total_phases: 4
   completed_phases: 0
@@ -86,6 +86,11 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 261111-o7p | Fix auto-buyer rejection telemetry miscategorization and add state-file conflict detection | 2026-11-11 | d349715b | [261111-o7p-fix-auto-buyer-rejection-telemetry-misca](./quick/261111-o7p-fix-auto-buyer-rejection-telemetry-misca/) |
+| 261115-1m3 | NCAAB Tier 1 guardrails: Flat gates and stake cap, unquoted shadow rows, balanced totals line, daily restore wiring, settlement CLV capture | 2026-11-15 | 23680558 | [261115-1m3-ncaab-tier1-guardrails-divergence-gate-a](./quick/261115-1m3-ncaab-tier1-guardrails-divergence-gate-a/) |
+| 261115-1m7 | NCAAB Tier 2: shadow-only v7 challenger and feature-idea tests (not promoted) | 2026-11-15 | 7c8b6af0 | [261115-1m7-ncaab-tier2-shadow-challenger-v7-plus-fe](./quick/261115-1m7-ncaab-tier2-shadow-challenger-v7-plus-fe/) |
+| 261115-g9j | NCAAB follow-ups: non-D1 no-pick rule, daily restore for every enabled league, NFL consensus pin test | 2026-11-15 | 0edd81e1 | [261115-g9j-ncaab-follow-up-fixes-non-d1-no-pick-rul](./quick/261115-g9j-ncaab-follow-up-fixes-non-d1-no-pick-rul/) |
+| 261115-m5r | NCAAB v7 multi-season re-fit and evaluation (shadow, not promoted): better forecasts, no edge over the line | 2026-11-15 | 4c6f06f4 | [261115-m5r-ncaab-model-improvement-re-fit-and-evalu](./quick/261115-m5r-ncaab-model-improvement-re-fit-and-evalu/) |
+| 261115-1m8 | NCAAB Tier 3: ESPN closing-line archive (data/research/ncaab_market/) and market-residual test, verdict NO PICK | 2026-11-15 | 8ff94b81 | [261115-1m8-ncaab-tier3-espn-closing-line-archive-an](./quick/261115-1m8-ncaab-tier3-espn-closing-line-archive-an/) |
 | 261111-tx4 | Fix NCAAB paper-trial duplicate-buy bug: dedup keyed only on pick_id misses re-forecast churn of the same game/selection/line | 2026-11-11 | 69856d6b | [261111-tx4-fix-ncaab-paper-trial-duplicate-buy-bug-](./quick/261111-tx4-fix-ncaab-paper-trial-duplicate-buy-bug-/) |
 | 261111-w1m | Fix scripts/audit_best_picks.py hardcoded CONFIRMED_BEST overrides; recompute verdicts live from ledgers.db with verified-quote gate | 2026-11-11 | 3ca0a4c5 | [261111-w1m-fix-scripts-audit-best-picks-py-audit-ca](./quick/261111-w1m-fix-scripts-audit-best-picks-py-audit-ca/) |
 | 261111-wv9 | Exclude MANUAL-* buyer-ledger rows from auto-buyer performance summary, model quarantine ROI, and dashboard KPIs | 2026-11-12 | b2ad1781 | [261111-wv9-audit-every-script-that-computes-model-e](./quick/261111-wv9-audit-every-script-that-computes-model-e/) |

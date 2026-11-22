@@ -1,6 +1,6 @@
 {
   "baseline_brier": 0.251383,
-  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
+  "calibrated_at_utc": "2026-11-22T01:38:05.596680+00:00",
   "calibrated_oof_brier": 0.2511473568190261,
   "champion_method": "beta",
   "fit_model_versions": [
