@@ -356,12 +356,15 @@ def _warm_caches(forever: bool = False) -> None:
         max_age = _warm_max_age(key)
         built_at, built_fp = 0.0, None
         pending_fp, pending_n = None, 0
+        pending_since: float | None = None  # first poll that differed from the built fingerprint
         while True:
             try:
                 fp = _warm_fingerprint()
                 with _CACHE_LOCK:
                     present = key in _CACHE
                 if fp != built_fp:
+                    if pending_since is None:
+                        pending_since = time.monotonic()
                     if fp == pending_fp:
                         pending_n += 1
                     else:
@@ -369,13 +372,17 @@ def _warm_caches(forever: bool = False) -> None:
                 # The debounce must not hold a real change back indefinitely: a
                 # daily run can change the fingerprint on every 30 s poll for
                 # half an hour, which would leave only the 1800 s age rebuild.
-                stale_change = time.monotonic() - built_at > _WARM_CHANGE_MAX_DELAY
+                # Measured from when the change was first seen (not from the last
+                # build) so the first change after a quiet spell is still debounced.
+                stale_change = (
+                    pending_since is not None and time.monotonic() - pending_since >= _WARM_CHANGE_MAX_DELAY
+                )
                 changed = fp != built_fp and (built_fp is None or pending_n >= 2 or stale_change)
                 if not present or changed or time.monotonic() - built_at > max_age:
                     with _WARM_BUILD_LOCK:
                         _cache_rebuild(key, builder)
                     built_at, built_fp = time.monotonic(), fp
-                    pending_fp, pending_n = None, 0
+                    pending_fp, pending_n, pending_since = None, 0, None
                     first_pass.add(key)
                     if forever and len(first_pass) == len(warmers):
                         _WARMING["on"] = False
