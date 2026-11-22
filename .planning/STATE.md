@@ -129,6 +129,7 @@ None yet.
 | 261120-gaq | Best-pick audit edge buckets keyed on first-sight edge, graded at that row's own line and price; last-run record kept as context | 2026-11-20 | 24091844 | [261120-gaq-re-key-best-pick-audit-edge-buckets-on-f](./quick/261120-gaq-re-key-best-pick-audit-edge-buckets-on-f/) |
 | 261120-w6i | Best-pick CONFIRMED_BEST hardened: n>=30, Wilson 95% bound above bucket mean price, ROI>=15%, non-negative bucket and model-family CLV; open picks bucketed on first-sight edge; verified record needs a verified first row; post-start rows, nrfi scores and archived/removed keys excluded | 2026-11-20 | 0d937297 | [261120-w6i-harden-confirmed-best-in-best-pick-audit](./quick/261120-w6i-harden-confirmed-best-in-best-pick-audit/) |
 | 261120-nip | NCAAB program: mascot match fix; ncaab-spread-v7 promoted (own id, artifact hash, engine-pure guarded calibration, pre-tip CLV); research protocol with six candidates, none beats the close; A_ml_w0 (moneyline Elo weight 0) passed confirmation, promotion pending operator | 2026-11-21 | 2e8b2bca | [261120-nip-ncaab-improvement-program](./quick/261120-nip-ncaab-improvement-program/) |
+| 261121-uuv | NCAAB real Polymarket quotes: accept quotes without transactTime, 30-min quote window (672/683 decisions join on 11-21 replay) | 2026-11-21 | 76bcd520 | [261121-uuv-ncaab-quote-freshness-window-30-min](./quick/261121-uuv-ncaab-quote-freshness-window-30-min/) |
 
 ## Milestone History
 
