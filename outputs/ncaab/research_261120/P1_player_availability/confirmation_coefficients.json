@@ -1,0 +1,41 @@
+{
+  "addendum_v4_sha256": "ccb107fc6f0b5b525337f8e48e7c9717b27afe824b78f7ea6c354f354618490e",
+  "addendum_v5_sha256": "c11e1910cec9fbc1cc1c5ea7b9ef9422d4eb8b8eafae48e96f65c255b5df7b57",
+  "b1_dA_avail_top7_prev1": 5.804739185553095,
+  "b2_dL_top7_minutes_share_out_3plus": -2.683617378023771,
+  "clause": "addendum v5 d_coefficients: one OLS fit, no intercept, on ALL development cohort rows 2023-2026",
+  "code_lf_sha256": {
+    "scripts/ncaab_research/candidates/p_player_261121.py": "3fb5724cacd60c415e87094e5d1c15146142b6cc2ee66aeb78025f18f36d0696",
+    "scripts/ncaab_research/confirmation/confirm_p1_261122.py": "0c08e451a5d3edba2c08002bcf087309ad6a3e5276404453885871e9191d3eb0"
+  },
+  "coef": [
+    5.804739185553095,
+    -2.683617378023771
+  ],
+  "fit_seasons": [
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "grid_name": "P1_player_availability",
+  "inputs_table": {
+    "data/research/ncaab_external/player_features/pit_player_features.jsonl": "a9a406d87af14fc6ac9a6023dda79ad8ce8b02c0459825bebdc605f69f93062a"
+  },
+  "n": 19843,
+  "n_by_season": {
+    "2023": 4435,
+    "2024": 4892,
+    "2025": 5267,
+    "2026": 5249
+  },
+  "regressor_sd": [
+    0.10312,
+    0.05902
+  ],
+  "target": "margin - v7_mu, v7_mu = grader.baseline_predictions(load_archive(2023-2026))['v7_served']",
+  "train_target_rmse_after": 11.31512,
+  "train_target_rmse_before": 11.33657,
+  "written_before": "any confirmation-window line or outcome is loaded",
+  "written_utc": "2026-11-22T19:52:06Z"
+}
