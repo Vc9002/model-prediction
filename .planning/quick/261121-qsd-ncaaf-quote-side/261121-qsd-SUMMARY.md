@@ -28,6 +28,5 @@ an artifact of short names; ambiguous, so not dropped, with ESPN display names).
 resolve, both orientations; label naming the other team fails closed). Mutation-proven: all three fail on
 the old matcher, pass on the fix.
 
-## Not done (operator decision)
-The 3 open Flat rows for the Arizona game (v5, v6.2, v7) are mispriced and were left in place; removing or
-archiving them is a ledger mutation that needs operator approval.
+## Ledger correction (operator: "void the Arizona pick", 2026-11-22)
+Voided via `PickLedger.void` (flat NCAAF ledger, SQLite authority): v5 `a73eac39a721493a`, v6.2 `fb2d86e1e11f4877`, v7 `ac24d71045194a76` -> settled push, 0U. Backup `E:/model-prediction-runtime/ledgers/ledgers.db.pre-arizona-void-20261122.bak`. The game's moneyline and total rows were priced correctly and remain open.
