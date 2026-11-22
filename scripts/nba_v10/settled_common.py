@@ -24,7 +24,6 @@ from pathlib import Path
 
 from tb_settled_replay import (
     ET,
-    MARKET_SLUG_RE,
     QUOTE_MIN_LEAD,
     ask,
     finite,
@@ -34,7 +33,29 @@ from tb_settled_replay import (
     parse_utc,
 )
 
-__all__ = ["attach", "decision_book", "harness_all", "load_games", "load_snapshots", "resolve_side"]
+__all__ = [
+    "attach",
+    "decision_book",
+    "harness_all",
+    "load_games",
+    "load_snapshots",
+    "load_sport",
+    "resolve_side",
+]
+
+ANY_MARKET_SLUG_RE = re.compile(
+    r"([a-z]{3}-(?:nba|wnba|mlb|nfl|cfb|cbb|wcbb)-[a-z0-9]+-[a-z0-9]+-\d{4}-\d{2}-\d{2}[a-z0-9-]*)"
+)
+
+
+def load_sport(runtime: Path, sport: str) -> tuple[dict[str, dict], dict[str, list[dict]]]:
+    """Settled ledger games and archived snapshots for any sport (NBA uses the harness-proven loaders)."""
+    if sport == "nba":
+        return load_games(runtime / "ledgers/ledgers.db"), load_snapshots(runtime)
+    from longshot_harvest_replay import load_games as games_any
+    from longshot_harvest_replay import load_snapshots as snaps_any
+
+    return games_any(runtime / "ledgers/ledgers.db", sport), snaps_any(runtime, sport)
 
 
 def _norm(name: object) -> str:
@@ -121,7 +142,9 @@ def decision_book(recs: list[dict], tip: datetime) -> list[dict]:
     return list(best.values())
 
 
-def harness_all(ledger: Path, snaps: dict[str, list[dict]], games: dict[str, dict]) -> dict:
+def harness_all(
+    ledger: Path, snaps: dict[str, list[dict]], games: dict[str, dict], sport: str = "nba"
+) -> dict:
     """Every settled NBA row with a quote time and a market slug: ask rebuilt, result regraded."""
     index = {}
     for recs in snaps.values():
@@ -130,7 +153,8 @@ def harness_all(ledger: Path, snaps: dict[str, list[dict]], games: dict[str, dic
     conn = sqlite3.connect(f"file:{ledger}?mode=ro", uri=True)
     rows = conn.execute(
         """select event_id, market_type, selection, line, market_probability, result, decision_payload_json
-           from ledger_records where sport='nba' and status='settled'"""
+           from ledger_records where sport=? and status='settled'""",
+        (sport,),
     ).fetchall()
     conn.close()
     out = {"rows": len(rows), "with_slug_and_time": 0, "snapshot_found": 0, "ask_match": 0, "graded": 0,
@@ -148,7 +172,7 @@ def harness_all(ledger: Path, snaps: dict[str, list[dict]], games: dict[str, dic
                 out["result_match"] += 1
             elif len(out["result_mismatch_examples"]) < 5:
                 out["result_mismatch_examples"].append([event_id, market, selection, line, stored, regraded])
-        m = MARKET_SLUG_RE.search(str(p.get("rationale") or ""))
+        m = ANY_MARKET_SLUG_RE.search(str(p.get("rationale") or ""))
         obs = p.get("market_quote_observed_at_utc")
         if not m or not obs:
             continue
