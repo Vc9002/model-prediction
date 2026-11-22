@@ -820,3 +820,199 @@ def test_market_capture_reads_the_runtime_root_not_the_checkout(tmp_path: Path) 
     assert report["checks"]["market_capture"]["nba"]["latest_snapshot_date"] == fresh
     assert report["checks"]["market_capture"]["nba"]["stale"] is False
     assert not [r for r in report["reasons"] if "market snapshots stale" in r]
+
+
+# ── consecutive exit-75 skip escalation ─────────────────────────────────────
+
+
+def _seed_runs_with_history(
+    repo: Path,
+    worker: str,
+    history: list[tuple[str, float]],
+    also: dict[str, list[tuple[str, float]]] | None = None,
+) -> None:
+    """Insert run rows for ``worker`` (and ``also`` workers) at explicit ages.
+
+    Each history is (status, hours ago), oldest first. Every worker without a
+    history gets a fresh successful run so the verdict isolates the workers
+    under test. Rows are written directly because the streak depends on exact
+    timestamps a real subprocess run cannot produce.
+    """
+    histories = {worker: history, **(also or {})}
+    for other in WORKERS:
+        if other not in histories:
+            _seed_successful_run(repo, other)
+    sup = RunSupervisor(
+        db_path=repo / "data" / "runs.db",
+        paths=RuntimePaths(repo_root=repo, runtime_root=repo / "data"),
+    )
+    for name, rows in histories.items():
+        for index, (status, hours_ago) in enumerate(rows):
+            stamp = (datetime.now(UTC) - timedelta(hours=hours_ago)).isoformat()
+            sup._insert_run(
+                {
+                    "run_id": f"{name}-{index}",
+                    "worker": name,
+                    "command": "[]",
+                    "status": status,
+                    "started_at_utc": stamp,
+                    "finished_at_utc": stamp,
+                    "heartbeat_at_utc": stamp,
+                    "exit_code": {"skipped": 75, "failed": 1, "completed": 0}.get(status),
+                    "note": ("worker exited 75 (lock busy; coalesced skip)" if status == "skipped" else None),
+                }
+            )
+    sup.close()
+
+
+def _health_for(repo: Path) -> dict[str, Any]:
+    return system_health(repo_root=repo, runtime_root=repo / "data")
+
+
+def _stuck_reasons(report: dict[str, Any]) -> list[str]:
+    return [r for r in report["reasons"] if "lock stuck" in r]
+
+
+def test_skip_streak_below_run_count_stays_degraded(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    # daily threshold is 3 runs / 3 h: two skips spanning 4 h is still overlap.
+    _seed_runs_with_history(repo, "daily", [("completed", 10.0), ("skipped", 4.5), ("skipped", 0.5)])
+
+    report = _health_for(repo)
+
+    assert report["status"] == "DEGRADED"
+    assert not _stuck_reasons(report)
+    assert any("worker 'daily' last run was skipped" in r for r in report["reasons"])
+    assert report["checks"]["runs"]["daily"]["skip_streak"]["count"] == 2
+
+
+def test_skip_streak_meeting_count_but_short_in_time_stays_degraded(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    _seed_runs_with_history(
+        repo, "daily", [("completed", 10.0), ("skipped", 1.0), ("skipped", 0.5), ("skipped", 0.1)]
+    )
+
+    report = _health_for(repo)
+
+    assert report["status"] == "DEGRADED"
+    assert not _stuck_reasons(report)
+    assert report["checks"]["runs"]["daily"]["skip_streak"]["count"] == 3
+
+
+def test_long_skip_streak_is_down_and_names_worker_streak_and_last_completed(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    _seed_runs_with_history(
+        repo,
+        "daily",
+        [("completed", 10.0), ("skipped", 5.0), ("skipped", 3.0), ("skipped", 1.0)],
+    )
+
+    report = _health_for(repo)
+
+    streak = report["checks"]["runs"]["daily"]["skip_streak"]
+    assert report["status"] == "DOWN"
+    (reason,) = _stuck_reasons(report)
+    assert "worker 'daily'" in reason
+    assert "3 consecutive skipped runs" in reason
+    assert streak["first_skip_utc"] in reason
+    assert streak["last_completed_utc"] in reason
+    # Exit 75 stays a skip in the recorded row, never a failure.
+    assert report["checks"]["runs"]["daily"]["status"] == "skipped"
+    assert not any("last run failed" in r for r in report["reasons"])
+
+
+def test_stuck_worker_that_never_completed_says_so(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    _seed_runs_with_history(repo, "daily", [("skipped", 5.0), ("skipped", 3.0), ("skipped", 1.0)])
+
+    report = _health_for(repo)
+
+    assert report["status"] == "DOWN"
+    assert "last completed run none recorded" in _stuck_reasons(report)[0]
+
+
+def test_completed_run_in_between_resets_the_skip_streak(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    # Four old skips would trip it, but a completed run since then restarts the count.
+    _seed_runs_with_history(
+        repo,
+        "daily",
+        [
+            ("skipped", 12.0),
+            ("skipped", 11.0),
+            ("skipped", 9.0),
+            ("skipped", 8.0),
+            ("completed", 6.0),
+            ("skipped", 1.0),
+            ("skipped", 0.5),
+        ],
+    )
+
+    report = _health_for(repo)
+
+    assert report["status"] == "DEGRADED"
+    assert not _stuck_reasons(report)
+    assert report["checks"]["runs"]["daily"]["skip_streak"]["count"] == 2
+
+
+def test_latest_completed_run_after_a_long_streak_is_healthy(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    _seed_runs_with_history(
+        repo, "daily", [("skipped", 9.0), ("skipped", 7.0), ("skipped", 5.0), ("completed", 0.1)]
+    )
+    _seed_prediction_state(repo, minutes_ago=5)
+
+    report = _health_for(repo)
+
+    assert "skip_streak" not in report["checks"]["runs"]["daily"]
+    assert not _stuck_reasons(report)
+    assert not any("worker 'daily'" in r for r in report["reasons"])
+
+
+def test_skip_escalation_is_per_worker(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    # The same 3 skips over 4 h: past daily's 3 runs / 3 h, short of auto-buyer's
+    # 6 runs / 4 h (a 30-minute cadence produces far more skips per hour).
+    history = [("completed", 10.0), ("skipped", 5.0), ("skipped", 3.0), ("skipped", 1.0)]
+    _seed_runs_with_history(
+        repo,
+        "daily",
+        history,
+        also={
+            "auto-buyer": history,
+            # A different worker with one ordinary skip as its latest run.
+            "production": [("completed", 4.0), ("skipped", 0.2)],
+        },
+    )
+
+    report = _health_for(repo)
+
+    stuck = _stuck_reasons(report)
+    assert len(stuck) == 1 and "worker 'daily'" in stuck[0]
+    assert report["status"] == "DOWN"
+    assert any("worker 'auto-buyer' last run was skipped" in r for r in report["reasons"])
+    assert any("worker 'production' last run was skipped" in r for r in report["reasons"])
+
+
+def test_failed_rows_still_go_down_and_break_a_skip_streak(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    # Latest run failed: DOWN for the old reason, not the skip escalation.
+    _seed_runs_with_history(
+        repo, "daily", [("completed", 10.0), ("skipped", 5.0), ("skipped", 3.0), ("failed", 0.5)]
+    )
+    report = _health_for(repo)
+    assert report["status"] == "DOWN"
+    assert any("worker 'daily' last run failed (exit 1)" in r for r in report["reasons"])
+    assert not _stuck_reasons(report)
+
+    # A failed row between skips ends the streak: only the newest skip counts.
+    other = _make_repo(tmp_path / "second")
+    _seed_runs_with_history(
+        other,
+        "daily",
+        [("skipped", 9.0), ("skipped", 7.0), ("skipped", 5.0), ("failed", 3.0), ("skipped", 0.5)],
+    )
+    report = _health_for(other)
+    assert report["checks"]["runs"]["daily"]["skip_streak"]["count"] == 1
+    assert not _stuck_reasons(report)
+    assert not any("last run failed" in r for r in report["reasons"])

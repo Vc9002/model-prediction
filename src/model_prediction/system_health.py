@@ -9,9 +9,13 @@ tells you *why* something is stale:
 
 Status rules (most severe wins):
 
-- **DOWN** — the primary model's contract cannot resolve, or the most
+- **DOWN** — the primary model's contract cannot resolve, the most
   recent supervisor run for any worker failed (the scheduler path is
-  broken until a newer run succeeds).
+  broken until a newer run succeeds), or a worker's lock has stayed busy:
+  N consecutive ``skipped`` runs (exit 75 / lease held) spanning at least T
+  hours with no run of any other status in between (see
+  ``_SKIP_ESCALATION`` for the per-worker N/T and why). Exit 75 itself is
+  never a failure; one overlap skip is routine and only degrades.
 - **DEGRADED** — any registered model failed contract validation (a
   deliberately *disabled* entry is reported, not degraded — see the
   registry check); the
@@ -54,6 +58,27 @@ _STALE_OPEN_WARN_HOURS = 24.0
 _STALE_OPEN_HARD_HOURS = 72.0
 _SERVED_VALUE_WINDOW_DAYS = 14.0
 _SERVED_VALUE_MIN_ROWS = 10
+
+# Consecutive-skip escalation: (min skipped rows in the streak, min hours the
+# streak spans first-to-last skip). BOTH must hold, so ordinary overlap (the
+# daily job fires ~11x/day on purpose; a run that outlives the next trigger
+# gives 1-2 skips) can never trip it, while a lock that stays held (hung
+# worker, stale lease) makes every later run skip and is caught within hours.
+# Sized from E:/model-prediction-runtime/runs.db on 2026-11-22: every skip
+# streak ever recorded was daily <=2 rows / 0.02 h and auto-buyer <=7 rows /
+# 3.0 h (the 2026-10-31 hung-lease episode, which self-cleared). Each T sits
+# above the worker's DEFAULT_WORKER_TIMEOUTS (a live run can legitimately hold
+# the lock that long) and above the longest observed streak; N is the number
+# of skips the cadence produces within T. Workers absent from this table use
+# _SKIP_ESCALATION_DEFAULT.
+_SKIP_ESCALATION_DEFAULT = (3, 6.0)  # slowest cadences (calibrate 6 h, manual-bet-sync)
+_SKIP_ESCALATION: dict[str, tuple[int, float]] = {
+    "daily": (3, 3.0),  # ~every 1.5-2 h; 60 min timeout, observed max 2 skips
+    "production": (3, 6.0),  # every 3 h; 15 min timeout, no skip ever recorded
+    "auto-buyer": (6, 4.0),  # every 30 min; 25 min timeout, observed max 7 skips / 3.0 h
+    "nba-pretip-capture": (6, 1.0),  # every 10 min, takes no lock; 5 min timeout
+    "ncaaf-prekickoff-capture": (6, 1.0),  # every 10 min, takes no lock; 6 min timeout
+}
 
 
 def _stale_open_rows(paths: RuntimePaths) -> dict[str, Any]:
@@ -294,6 +319,47 @@ def _age_minutes(iso_utc: str) -> float:
     return (datetime.now(UTC) - dt).total_seconds() / 60.0
 
 
+def _skip_streak(supervisor: RunSupervisor, worker: str) -> dict[str, Any] | None:
+    """The unbroken run of ``skipped`` rows ending at the worker's latest run.
+
+    The streak is every ``skipped`` row newer than the worker's most recent
+    non-skipped row (completed, failed, or a live ``started`` run: any of
+    them proves the lock was acquired, so the lock is not stuck). Returns
+    None when the latest row is not skipped. Timestamps are all UTC isoformat
+    strings written by the supervisor, so lexicographic comparison is exact.
+    """
+    conn = supervisor.conn
+    broke = conn.execute(
+        "SELECT started_at_utc FROM runs WHERE worker = ? AND status != 'skipped' "
+        "ORDER BY started_at_utc DESC LIMIT 1",
+        (worker,),
+    ).fetchone()
+    skipped = conn.execute(
+        "SELECT started_at_utc FROM runs WHERE worker = ? AND status = 'skipped' "
+        "AND started_at_utc > ? ORDER BY started_at_utc",
+        (worker, broke[0] if broke else ""),
+    ).fetchall()
+    if not skipped:
+        return None
+    completed = conn.execute(
+        "SELECT started_at_utc FROM runs WHERE worker = ? AND status = 'completed' "
+        "ORDER BY started_at_utc DESC LIMIT 1",
+        (worker,),
+    ).fetchone()
+    first, last = skipped[0][0], skipped[-1][0]
+    try:
+        span_hours = (parse_utc(last) - parse_utc(first)).total_seconds() / 3600.0
+    except ValueError:
+        span_hours = 0.0
+    return {
+        "count": len(skipped),
+        "first_skip_utc": first,
+        "last_skip_utc": last,
+        "span_hours": round(span_hours, 2),
+        "last_completed_utc": completed[0] if completed else None,
+    }
+
+
 def _latest_event_utc(path: Path, field: str) -> str | None:
     """Most recent event timestamp in an append-only JSONL file.
 
@@ -530,7 +596,19 @@ def system_health(
             if row["status"] == "failed":
                 down(f"worker '{worker}' last run failed (exit {row['exit_code']})")
             elif row["status"] == "skipped":
-                degrade(f"worker '{worker}' last run was skipped ({row['note'] or 'no reason recorded'})")
+                streak = _skip_streak(supervisor, worker)
+                min_skips, min_hours = _SKIP_ESCALATION.get(worker, _SKIP_ESCALATION_DEFAULT)
+                if streak is not None:
+                    summary["skip_streak"] = streak
+                if streak is not None and streak["count"] >= min_skips and streak["span_hours"] >= min_hours:
+                    down(
+                        f"worker '{worker}' lock stuck: {streak['count']} consecutive skipped runs "
+                        f"(lock busy) since {streak['first_skip_utc']} spanning {streak['span_hours']:.1f}h "
+                        f"(threshold {min_skips} runs / {min_hours:g}h); last completed run "
+                        f"{streak['last_completed_utc'] or 'none recorded'}"
+                    )
+                else:
+                    degrade(f"worker '{worker}' last run was skipped ({row['note'] or 'no reason recorded'})")
         report["checks"]["runs"] = runs_check
     finally:
         supervisor.close()
