@@ -2363,3 +2363,97 @@ def test_cache_warmer_builds_every_entry_without_failures(monkeypatch):
     assert messages == []
     assert "performance:all" in dashboard_server._CACHE
     dashboard_server._CACHE.clear()
+
+
+def test_warm_builds_never_overlap(monkeypatch):
+    import time
+
+    messages: list[str] = []
+    monkeypatch.setattr(dashboard_server, "_log", messages.append)
+    dashboard_server._CACHE.clear()
+
+    guard = threading.Lock()
+    state = {"active": 0, "peak": 0}
+
+    def _tracking_builder(*args, **kwargs):
+        with guard:
+            state["active"] += 1
+            state["peak"] = max(state["peak"], state["active"])
+        time.sleep(0.05)
+        with guard:
+            state["active"] -= 1
+        return {}
+
+    for name in (
+        "status",
+        "matrix",
+        "production_evidence",
+        "model_ledger_comparison",
+        "dashboard_picks",
+        "read_flat_picks",
+        "performance_for_sport",
+    ):
+        monkeypatch.setattr(dashboard_server, name, _tracking_builder)
+    monkeypatch.setattr(dashboard_server, "read_picks", list)
+    monkeypatch.setattr(dashboard_server, "_load_archive", lambda: {"pick_ids": []})
+
+    dashboard_server._warm_caches()
+
+    assert state["peak"] == 1
+    assert messages == []
+    for key in (
+        "status",
+        "matrix",
+        "production-evidence",
+        "model-ledgers",
+        "picks",
+        "flat-picks",
+        "performance:all",
+    ):
+        assert key in dashboard_server._CACHE
+    dashboard_server._CACHE.clear()
+
+
+def _remove_mutation(pick_id: str, operation_id: str):
+    from model_prediction.runtime_ledger_store import LedgerMutation
+
+    return LedgerMutation(
+        pick_id=pick_id,
+        operation_id=operation_id,
+        ledger_tier="main",
+        sport="tennis",
+        event_type="remove",
+        created_at_utc="2026-11-22T00:00:00Z",
+        status="removed",
+    )
+
+
+def test_fingerprint_signal_tracks_canonical_ledger_events(monkeypatch, tmp_path):
+    from model_prediction.runtime_ledger_store import RuntimeLedgerStore
+    from model_prediction.runtime_paths import RuntimePaths
+
+    paths = RuntimePaths.for_test(tmp_path)
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(paths.runtime_root))
+    store = RuntimeLedgerStore(paths)
+    try:
+        store.apply(_remove_mutation("pick-a", "op-a"))
+        first = dashboard_server._canonical_ledger_signal()
+        assert first >= 1
+
+        store.apply(_remove_mutation("pick-b", "op-b"))
+        second = dashboard_server._canonical_ledger_signal()
+        assert second > first
+    finally:
+        store.close()
+
+
+def test_fingerprint_signal_fails_soft_without_ledger(monkeypatch, tmp_path):
+    root = tmp_path / "empty-runtime"
+    root.mkdir()
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(root))
+    assert dashboard_server._canonical_ledger_signal() == -1
+    # A read-only open must never create the database file.
+    assert not (root / "ledgers" / "ledgers.db").exists()
+
+    monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT")
+    assert dashboard_server._canonical_ledger_signal() == -1

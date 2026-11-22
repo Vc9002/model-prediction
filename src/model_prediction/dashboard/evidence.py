@@ -958,7 +958,10 @@ def production_evidence() -> dict:
         *_flat_ledger_paths(),
         *_research_ledger_paths(),
     )
-    with ThreadPoolExecutor(max_workers=max(1, min(len(ledger_paths), 8))) as _pool:
+    # openpyxl parsing is pure Python and GIL-bound, so 8 threads bought little
+    # speed while multiplying the transient peak (989 MB traced in a 43 s status()
+    # build); 2 keeps some I/O overlap.
+    with ThreadPoolExecutor(max_workers=max(1, min(len(ledger_paths), 2))) as _pool:
         rows_by_source = dict(
             _pool.map(
                 lambda p: (p.relative_to(ROOT).as_posix(), _read_evidence_ledger(p)),

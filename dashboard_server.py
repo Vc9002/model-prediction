@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sqlite3
 import subprocess  # noqa: F401 -- re-export for compat (tests patch dashboard_server.subprocess.run)
 import sys
 import time
@@ -231,12 +232,45 @@ from model_prediction.dashboard.status import (  # noqa: F401 -- re-export for c
     _data_inventory,
     status,
 )
+from model_prediction.runtime_paths import RuntimePaths
 from model_prediction.stealth_runtime import cooperative_sleep, enable_background_priority
 
 __all__ = ["main"]
 
 import threading as _threading
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
+
+# The 7 warmer threads used to rebuild concurrently. A probe of 4 concurrent
+# passes with the cache retained grew working set 617 -> 719 -> 710 -> 1032 MB
+# (1.7 GB peak) with unchanged cache contents, because stacked build peaks
+# fragment the heap; sequential builds peaked ~1.6 GB and settled ~560 MB.
+# Taken only in _warm around _cache_rebuild (warm lock, then the per-key build
+# lock); never inside dashboard/common.py, so the SWR request path never waits on it.
+_WARM_BUILD_LOCK = _threading.Lock()
+
+
+def _canonical_ledger_signal() -> int:
+    """MAX(rowid) of the canonical ledger's ledger_events, or -1 when unreadable.
+
+    The canonical ledger is a ~1.5 GB WAL database whose file mtime changes even
+    on reads, so its stat is useless as a change signal. ledger_events is
+    append-only with one row per mutation (the same signal DashboardCache keys
+    on); MAX(rowid) is an index seek, and mode=ro never creates the file or
+    checkpoints the WAL. Resolved on every call rather than through
+    _runtime_paths(), which caches the first resolution process-wide and would
+    pin a test's temporary root for the rest of the process. Fails soft without
+    logging: a missing ledger is a normal env-less state.
+    """
+    try:
+        db = RuntimePaths.resolve(repo_root=ROOT, require_external_runtime=True).ledgers_db
+        conn = sqlite3.connect(db.resolve().as_uri() + "?mode=ro", uri=True, timeout=1.0)
+        try:
+            value = conn.execute("SELECT MAX(rowid) FROM ledger_events").fetchone()[0]
+        finally:
+            conn.close()
+        return int(value or 0)
+    except Exception:  # noqa: BLE001
+        return -1
 
 
 def _warm_caches(forever: bool = False) -> None:
@@ -285,10 +319,14 @@ def _warm_caches(forever: bool = False) -> None:
                 stats.append((str(path), st.st_mtime_ns, st.st_size))
             except OSError:
                 stats.append((str(path), 0, 0))
+        stats.append(("ledgers.db:ledger_events", _canonical_ledger_signal(), 0))
         return tuple(stats)
 
     first_pass: set[str] = set()
-    max_age = 300.0  # safety net for inputs the fingerprint doesn't cover
+    # The fingerprint now covers the canonical ledger, so the age rebuild is only
+    # a safety net for inputs it still does not see (outputs/ validation JSON,
+    # production artifacts, events JSON).
+    max_age = 1800.0
     if forever:
         for key, _ttl, _builder in warmers:
             _TTL_OVERRIDE[key] = max_age + 60
@@ -313,7 +351,8 @@ def _warm_caches(forever: bool = False) -> None:
                         pending_fp, pending_n = fp, 1
                 changed = fp != built_fp and (built_fp is None or pending_n >= 2)
                 if not present or changed or time.monotonic() - built_at > max_age:
-                    _cache_rebuild(key, builder)
+                    with _WARM_BUILD_LOCK:
+                        _cache_rebuild(key, builder)
                     built_at, built_fp = time.monotonic(), fp
                     pending_fp, pending_n = None, 0
                     first_pass.add(key)
