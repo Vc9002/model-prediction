@@ -126,11 +126,25 @@ def attach(games: dict[str, dict], snaps: dict[str, list[dict]]) -> dict[str, in
     return dict(counts)
 
 
+BOOK_WINDOW = timedelta(minutes=15)
+
+
 def decision_book(recs: list[dict], tip: datetime) -> list[dict]:
-    """Last open, two-sided snapshot per market observed at or before tip - 5 min (any age)."""
+    """One capture's book: the last open, two-sided snapshot per market before tip - 5 min, keeping only
+    markets observed within BOOK_WINDOW of the newest one.
+
+    Critical review 2026-11-22: without the window, a book mixed rungs re-quoted at 21:04Z with rungs
+    last quoted at 10:20Z (Denver @ Houston, 2026-11-09), so ladder fits blended morning and evening
+    lines and produced fake gaps. The cutoff also uses the record's own start time when earlier than
+    the ledger tip, and drops records the capture marked timestamp-invalid.
+    """
     best: dict[str, dict] = {}
     for rec in recs:
-        if rec["_obs"] > tip - QUOTE_MIN_LEAD:
+        cutoff = tip
+        own_start = rec.get("event_start_utc")
+        if own_start:
+            cutoff = min(cutoff, parse_utc(own_start))
+        if rec["_obs"] > cutoff - QUOTE_MIN_LEAD or rec.get("timestamp_valid") is False:
             continue
         if rec.get("market_state") not in (None, "MARKET_STATE_OPEN"):
             continue
@@ -139,7 +153,10 @@ def decision_book(recs: list[dict], tip: datetime) -> list[dict]:
         key = str(rec.get("market_slug") or rec.get("market_id"))
         if key not in best or rec["_obs"] > best[key]["_obs"]:
             best[key] = rec
-    return list(best.values())
+    if not best:
+        return []
+    newest = max(r["_obs"] for r in best.values())
+    return [r for r in best.values() if newest - r["_obs"] <= BOOK_WINDOW]
 
 
 def harness_all(
