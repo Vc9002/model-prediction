@@ -1,0 +1,139 @@
+{
+  "addendum_sha256": "75241bc7885378f266ba66ce383f3b50fe58869e9b699ae90f0ddd9c8ead6317",
+  "addendum_v4_sha256": "ccb107fc6f0b5b525337f8e48e7c9717b27afe824b78f7ea6c354f354618490e",
+  "adjustment_valid_share_by_season": {
+    "2023": 0.21325,
+    "2024": 0.22896,
+    "2025": 0.25278,
+    "2026": 0.26843
+  },
+  "candidate": "P2: v7 + max(0, 1 - s/10)*(c1*d(ret gmsc same+transfer) + c2*d(prior gmsc40)), LOSO OLS v1",
+  "code_files_sha256": {
+    "scripts/ncaab_research/candidates/ab_common_261120.py": "ad63f398f43b19935d757851e1bbc55c9d9bc1f4f160881b3182f3908f6ef66c",
+    "scripts/ncaab_research/candidates/p_player_261121.py": "3fb5724cacd60c415e87094e5d1c15146142b6cc2ee66aeb78025f18f36d0696",
+    "scripts/ncaab_research/grader_v4.py": "2e27601a15b213c5e14c307a18e1689741fc8f203134ae5c2090956ee7b1f526"
+  },
+  "code_sha256": "ce4c6b0e0758910989a025ff6c3aca537145388e01d293585f6b00500ea4d36e",
+  "coefficient_names": [
+    "c1 (w*dR)",
+    "c2 (w*dG)"
+  ],
+  "data_sources": {
+    "data/research/ncaab_external/player_features/pit_player_features.jsonl": "a9a406d87af14fc6ac9a6023dda79ad8ce8b02c0459825bebdc605f69f93062a",
+    "data/research/ncaab_market/espn_lines.jsonl": "3386b8d1f1f8d50fa59bbfb9af0f2c015afff3866ec1a668611147d839e8a4f4",
+    "data/research/ncaab_market/scoreboard.jsonl": "ee5394da02380ae9ca4780813ba9cfa851f450d87d94206031c7be81a5d8d1a7",
+    "data/research/ncaab_market/v7ms_components.jsonl": "cf1b90760618bd90869a121c5fca12ef24a0327670c0016200dce3b13175fe94",
+    "data/research/ncaab_market/v7ms_loso_fit_preds.jsonl": "347f32e4fb7686fa7d4e87d8ced95f369ef9d46bdac9ecf9ae3950c116e2b3da",
+    "outputs/ncaab/ncaab_v7_multiseason_frozen.json": "6c4676ffaf3c16aeee756cf748a4af3f6da617ceb794ad5d07643cff99bc8bdb",
+    "scripts/backfill_ncaab_player_boxes.py": "f195cc5e889c4a54c3c0b2c4e114ddfd80146784ce2867a348f81425b1cc7ed3",
+    "scripts/ncaab_research/player_features_261121.py": "a6efbde1b9e380b4f764f083707ff56c3e35153a2577f55ebc69f41183539665"
+  },
+  "fit_seasons_by_predicted_season": {
+    "2023": [
+      2024,
+      2025,
+      2026
+    ],
+    "2024": [
+      2023,
+      2025,
+      2026
+    ],
+    "2025": [
+      2023,
+      2024,
+      2026
+    ],
+    "2026": [
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "fitted_coefficients_by_fold": {
+    "2023": {
+      "coef": [
+        5.173132768524409,
+        0.4253413699044597
+      ],
+      "fit_seasons": [
+        2024,
+        2025,
+        2026
+      ],
+      "n_train": 4308,
+      "n_train_rows_total": 17242,
+      "regressor_sd": [
+        0.19752,
+        1.39083
+      ],
+      "train_target_rmse_after": 11.84546,
+      "train_target_rmse_before": 11.94024
+    },
+    "2024": {
+      "coef": [
+        5.383571946265115,
+        0.5499224953680442
+      ],
+      "fit_seasons": [
+        2023,
+        2025,
+        2026
+      ],
+      "n_train": 4217,
+      "n_train_rows_total": 17237,
+      "regressor_sd": [
+        0.19407,
+        1.38207
+      ],
+      "train_target_rmse_after": 11.92377,
+      "train_target_rmse_before": 12.04122
+    },
+    "2025": {
+      "coef": [
+        6.8103599012895835,
+        0.43493736334006466
+      ],
+      "fit_seasons": [
+        2023,
+        2024,
+        2026
+      ],
+      "n_train": 4071,
+      "n_train_rows_total": 17199,
+      "regressor_sd": [
+        0.18427,
+        1.35661
+      ],
+      "train_target_rmse_after": 11.76508,
+      "train_target_rmse_before": 11.88642
+    },
+    "2026": {
+      "coef": [
+        6.3574497583463145,
+        0.3016543682401007
+      ],
+      "fit_seasons": [
+        2023,
+        2024,
+        2025
+      ],
+      "n_train": 3988,
+      "n_train_rows_total": 17211,
+      "regressor_sd": [
+        0.19673,
+        1.35533
+      ],
+      "train_target_rmse_after": 11.66746,
+      "train_target_rmse_before": 11.77118
+    }
+  },
+  "grid_name": "P2_returning_production_early",
+  "history_cutoff": "strictly before Eastern midnight of the game day",
+  "null_rule": "any null input (P2: or w = 0) -> adjustment 0, mu = served v7 bit for bit",
+  "p_home_ml": "grader.served_ml_blend(event_ids, mu, scale, 't8')",
+  "predictions_file_sha256": "d98e413b7caec35b88e02d7bd992313b2fa2f81da02b7f409b2f2705b5c724a9",
+  "protocol_sha256": "72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813",
+  "training_rows": "cohort-eligible (D1-vs-D1 with a closing spread line; presence only) rows of the three training seasons with every input non-null (P2: and w > 0)",
+  "v7_mu": "grader.baseline_predictions(load_archive(2023-2026))['v7_served'] prediction columns"
+}

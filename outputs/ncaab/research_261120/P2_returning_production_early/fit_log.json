@@ -1,0 +1,87 @@
+{
+  "grid": "P2_returning_production_early",
+  "fitted_by_fold": {
+    "2023": {
+      "coef": [
+        5.173132768524409,
+        0.4253413699044597
+      ],
+      "n_train": 4308,
+      "n_train_rows_total": 17242,
+      "train_target_rmse_before": 11.94024,
+      "train_target_rmse_after": 11.84546,
+      "regressor_sd": [
+        0.19752,
+        1.39083
+      ],
+      "fit_seasons": [
+        2024,
+        2025,
+        2026
+      ]
+    },
+    "2024": {
+      "coef": [
+        5.383571946265115,
+        0.5499224953680442
+      ],
+      "n_train": 4217,
+      "n_train_rows_total": 17237,
+      "train_target_rmse_before": 12.04122,
+      "train_target_rmse_after": 11.92377,
+      "regressor_sd": [
+        0.19407,
+        1.38207
+      ],
+      "fit_seasons": [
+        2023,
+        2025,
+        2026
+      ]
+    },
+    "2025": {
+      "coef": [
+        6.8103599012895835,
+        0.43493736334006466
+      ],
+      "n_train": 4071,
+      "n_train_rows_total": 17199,
+      "train_target_rmse_before": 11.88642,
+      "train_target_rmse_after": 11.76508,
+      "regressor_sd": [
+        0.18427,
+        1.35661
+      ],
+      "fit_seasons": [
+        2023,
+        2024,
+        2026
+      ]
+    },
+    "2026": {
+      "coef": [
+        6.3574497583463145,
+        0.3016543682401007
+      ],
+      "n_train": 3988,
+      "n_train_rows_total": 17211,
+      "train_target_rmse_before": 11.77118,
+      "train_target_rmse_after": 11.66746,
+      "regressor_sd": [
+        0.19673,
+        1.35533
+      ],
+      "fit_seasons": [
+        2023,
+        2024,
+        2025
+      ]
+    }
+  },
+  "adj_valid_share": {
+    "2023": 0.21325,
+    "2024": 0.22896,
+    "2025": 0.25278,
+    "2026": 0.26843
+  }
+}

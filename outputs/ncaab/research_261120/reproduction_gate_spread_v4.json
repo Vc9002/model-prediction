@@ -1,0 +1,28 @@
+{
+ "checks": {
+  "cover": true,
+  "k_is_v1_21": true,
+  "margin_all": true,
+  "market_spread": true,
+  "rule1_spread": true
+ },
+ "got": {
+  "bias": 0.1048,
+  "corr": -0.00333,
+  "cover_brier": 0.25782,
+  "cover_logloss": 0.7099,
+  "n": 22947,
+  "rmse": 11.4578,
+  "rule1_mse_delta": -0.010843661265456788,
+  "rule1_mse_delta_ci_adj_k21": [
+   -0.027337110190851718,
+   0.0049888402726244166
+  ],
+  "slope": -0.0153,
+  "slope_ci95": [
+   -0.07793,
+   0.04921
+  ]
+ },
+ "passed": true
+}
