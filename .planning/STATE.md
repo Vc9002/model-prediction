@@ -137,6 +137,7 @@ None yet.
 | 261121-uuv | NCAAB real Polymarket quotes: accept quotes without transactTime, 30-min quote window (672/683 decisions join on 11-21 replay) | 2026-11-21 | 76bcd520 | [261121-uuv-ncaab-quote-freshness-window-30-min](./quick/261121-uuv-ncaab-quote-freshness-window-30-min/) |
 | 261121-xaw | Settlement: no void on non-binary terminal prices; supervisor: exit 75 recorded as skipped | 2026-11-22 | 75706abc | [261121-xaw-settlement-and-supervisor-exit-75-fixes](./quick/261121-xaw-settlement-and-supervisor-exit-75-fixes/) |
 | 261121-xbn | NBA v7/v9 market-blend sign (B4) and v9 artifact key drift log + pinned test | 2026-11-22 | 75706abc | [261121-xbn-nba-v7-v9-blend-sign-and-v9-artifact-key](./quick/261121-xbn-nba-v7-v9-blend-sign-and-v9-artifact-key/) |
+| 261121-wnd | Behavior-preserving helper dedupe in data_sources (5 commits on simplify/helpers-2026-11-21) | 2026-11-21 | 2c805adc | [261121-wnd-behavior-preserving-helper-dedupe-in-dat](./quick/261121-wnd-behavior-preserving-helper-dedupe-in-dat/) |
 
 ## Milestone History
 
