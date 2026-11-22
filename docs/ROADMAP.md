@@ -339,3 +339,13 @@ Detail and commit ids: `DEBUG.md` (2026-11-22). Open operator decisions:
 - **v9 artifact keys.** Honouring the unread keys, editing the v9 JSON, changing a default, or making the loader strict all change served numbers or the artifact hash: a new version through `model_promotion`, not an edit. The warning is INFO only.
 - **Exit 75 escalation (done 2026-11-22).** One skip degrades; a worker with N consecutive skips spanning T hours goes DOWN (`system_health._SKIP_ESCALATION`).
 - **Protected-file note.** `docs/AGENTS.md` lists the NBA model as protected; `nba_v7.py` and `nba_v9.py` were edited on an explicit operator request and are output-identical at weight 0.
+
+## 2026-11-22 — Background footprint (quick-261122-mjo)
+
+Dashboard on the live host: 1.0-1.65 GB working set and 1.5-2.1 GB private before (with snapshot-save `MemoryError` at 02:28 UTC); about 0.43-0.61 GB working set and 0.6 GB private after, idle at about 1-2 s CPU per minute once warm. The OpenBLAS cap (about 740 MB of commit per numpy+scipy process) now covers every supervised worker. Open follow-ups:
+
+- **Evidence off xlsx.** `production_evidence` still parses every xlsx ledger export with openpyxl (about 43 s, about 1 GB transient). Read the canonical SQLite store instead after a column-parity check of `_read_evidence_ledger` consumers and a before/after diff of `production_evidence()` on live data.
+- **Warm "flat-picks" builder.** The warmer builds it with `read_flat_picks`, while the route uses `_flat_picks_decorated`, so the warmed entry has no quote/order/buy_ready fields (pre-existing).
+- **`scripts/dedup_ncaaf_settled_picks.py`** issues a raw `UPDATE ledger_records` with no `ledger_events` row, so neither DashboardCache nor the warm fingerprint sees it (pre-existing).
+- **Startup peak.** One restart peaked at 1.3 GB working set within its first 14 s, likely a browser request's stale-while-revalidate rebuild overlapping the warm pass (the request path is outside `_WARM_BUILD_LOCK`).
+- **Verify the worker cap.** Confirm that the next daily run's duration in `runs.db` did not regress under `OPENBLAS_NUM_THREADS=1`.

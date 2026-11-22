@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-22T05:17:13.886Z"
+last_updated: "2026-11-22T21:47:44.105Z"
 last_activity: 2026-11-13
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 75706abc3be09c6c9379b0d9980798c1b2f29720
+state_head: 5325a2691b79620ca16c4d2145961acda45175f9
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-13 - Completed quick task 261113-jrq: Fix NBA availability feature matching foreign teams injuries via abbreviation substrings
+Last activity: 2026-11-22 - Completed quick task 261122-mjo: Reduce background footprint (OpenBLAS thread cap, dashboard_cache freshness-first refresh, serialized/fingerprinted dashboard warmer, low memory priority)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -138,6 +138,7 @@ None yet.
 | 261121-xaw | Settlement: no void on non-binary terminal prices; supervisor: exit 75 recorded as skipped | 2026-11-22 | 75706abc | [261121-xaw-settlement-and-supervisor-exit-75-fixes](./quick/261121-xaw-settlement-and-supervisor-exit-75-fixes/) |
 | 261121-xbn | NBA v7/v9 market-blend sign (B4) and v9 artifact key drift log + pinned test | 2026-11-22 | 75706abc | [261121-xbn-nba-v7-v9-blend-sign-and-v9-artifact-key](./quick/261121-xbn-nba-v7-v9-blend-sign-and-v9-artifact-key/) |
 | 261121-wnd | Behavior-preserving helper dedupe in data_sources (5 commits on simplify/helpers-2026-11-21) | 2026-11-21 | 2c805adc | [261121-wnd-behavior-preserving-helper-dedupe-in-dat](./quick/261121-wnd-behavior-preserving-helper-dedupe-in-dat/) |
+| 261122-mjo | Reduce background footprint: OpenBLAS thread cap, dashboard_cache freshness-first refresh, serialized/fingerprinted dashboard warmer, low memory priority | 2026-11-22 | 5325a269 | [261122-mjo-reduce-background-footprint-openblas-thr](./quick/261122-mjo-reduce-background-footprint-openblas-thr/) |
 
 ## Milestone History
 
