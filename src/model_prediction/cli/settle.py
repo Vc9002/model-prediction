@@ -29,7 +29,6 @@ from ..config import (
 from ..data_sources.espn import ESPNClient
 from ..data_sources.espn_nfl_odds import closing_espn_consensus, consensus_for_selection
 from ..data_sources.mlb_market_odds import MarketOddsSnapshotStore
-from ..data_sources.polymarket_execute import _team_name_matches
 from ..data_sources.polymarket_us import (
     CLOSE_AFTER_DECISION_SPORTS,
     PolymarketSnapshotStore,
@@ -477,6 +476,9 @@ _SETTLE_TEAM_ALIASES = {
     "se louisiana": "southeastern louisiana",
     "k-state": "kansas state",
     "k state": "kansas state",
+    # NCAAB ledger spellings that only the dropped mascot rule used to bridge (2026-11 replay).
+    "ark pine bluff": "arkansas pine bluff",
+    "mississippi university for women owls": "mississippi u for women owls",
 }
 
 
@@ -487,30 +489,81 @@ def _normalize_settle_name(name: str) -> str:
     return _SETTLE_TEAM_ALIASES.get(normalized, normalized)
 
 
-def _team_matches_espn_competitor(target_names: set[str], espn_team: dict) -> bool:
-    """Check if an ESPN competitor team matches any target name for a ledger side."""
+def _ncaaf_team_key(name: str) -> str | None:
+    """Canonical NCAAF team of a name, or None when the team table does not know it.
+
+    The raw name is tried before the paren-stripped one: "Miami (OH) RedHawks" resolves,
+    "Miami OH RedHawks" does not.
+    """
+    from ..data_sources.cfb_data import resolve_team
+
+    for candidate in (name, name.replace("(", "").replace(")", "")):
+        team = resolve_team(candidate.strip())
+        if team is not None:
+            return team.canonical_name
+    return None
+
+
+def _ncaaf_espn_competitor_matches(target_names: set[str], espn_team: dict) -> bool:
+    """NCAAF identity match of a ledger side against an ESPN competitor.
+
+    When both names resolve to a canonical team, identity decides (Iowa State is never Iowa,
+    Penn State never Penn). When either does not resolve (FCS teams such as Missouri State),
+    only an exact normalized full name counts; no phrase or mascot match.
+    """
+    espn_name = str(espn_team.get("displayName") or espn_team.get("location") or "")
+    espn_key = _ncaaf_team_key(espn_name) if espn_name else None
+    target_keys = {_ncaaf_team_key(t) for t in target_names if t}
+    resolved = {k for k in target_keys if k is not None}
+    if espn_key is not None and resolved:
+        # Two ledger spellings of one side resolving to different teams is ambiguous: decline.
+        return resolved == {espn_key}
+    full_names = {
+        _normalize_settle_name(str(espn_team.get(field) or ""))
+        for field in ("displayName", "shortDisplayName", "location")
+    } - {""}
+    return any(_normalize_settle_name(t) in full_names for t in target_names if t)
+
+
+def _team_matches_espn_competitor(target_names: set[str], espn_team: dict, league: str = "") -> bool:
+    """Check if an ESPN competitor team matches any target name for a ledger side.
+
+    No mascot-only match: ESPN's ``name`` field is the bare mascot and is not a candidate, and a
+    phrase match must cover a token outside the mascot. The loose ``_team_name_matches`` mascot
+    rule settled NCAAB Samford Bulldogs @ South Carolina Upstate Spartans (2026-11-18, real final
+    74-64) on UNC Greensboro Spartans @ Gardner-Webb Runnin' Bulldogs (78-72) and would pair
+    Kansas State / Arizona Wildcats or Georgia / Mississippi State Bulldogs in NCAAF.
+    """
+    from ..learned_forward import _team_matches
+
+    if str(league).upper() == "NCAAF":
+        return _ncaaf_espn_competitor_matches(target_names, espn_team)
     candidates = [
-        espn_team.get("displayName", ""),
-        espn_team.get("shortDisplayName", ""),
-        espn_team.get("location", ""),
-        espn_team.get("name", ""),
+        _normalize_settle_name(str(espn_team.get(field) or ""))
+        for field in ("displayName", "shortDisplayName", "location")
     ]
     candidates = [c for c in candidates if c]
+    # The mascot is ``name`` minus the school: ESPN's name is "Regent Royals" for Regent.
+    mascot_tokens = set(_normalize_settle_name(str(espn_team.get("name") or "")).split()) - set(
+        _normalize_settle_name(str(espn_team.get("location") or "")).split()
+    )
     for target in target_names:
         if not target:
             continue
-        t_cf = target.casefold()
-        for cand in candidates:
-            if t_cf == cand.casefold():
-                return True
         norm_target = _normalize_settle_name(target)
-        for cand in candidates:
-            norm_cand = _normalize_settle_name(cand)
+        for norm_cand in candidates:
             if norm_target == norm_cand:
                 return True
-            if _team_name_matches(norm_target, norm_cand) or _team_name_matches(norm_cand, norm_target):
-                return True
+            if _team_matches(norm_target, norm_cand):
+                shorter = norm_cand if len(norm_cand) <= len(norm_target) else norm_target
+                if set(shorter.split()) - mascot_tokens:
+                    return True
     return False
+
+
+def _espn_team_identity(competitor: dict) -> str:
+    team = competitor.get("team") or {}
+    return str(team.get("id") or "") or _normalize_settle_name(str(team.get("displayName") or ""))
 
 
 def _find_espn_result(
@@ -552,16 +605,17 @@ def _find_espn_result(
                 return _extract_espn_record(status, away, home)
             events_to_check.append((event, competition, away, home))
 
+    league = str(row.get("league") or "")
     name_matched: list[tuple[dict, dict, dict, dict]] = []
     for event, competition, away, home in events_to_check:
         away_team = away["team"]
         home_team = home["team"]
-        if _team_matches_espn_competitor(away_names, away_team) and _team_matches_espn_competitor(
-            home_names, home_team
+        if _team_matches_espn_competitor(away_names, away_team, league) and _team_matches_espn_competitor(
+            home_names, home_team, league
         ):
             name_matched.append((event, competition, away, home))
-        elif _team_matches_espn_competitor(away_names, home_team) and _team_matches_espn_competitor(
-            home_names, away_team
+        elif _team_matches_espn_competitor(away_names, home_team, league) and _team_matches_espn_competitor(
+            home_names, away_team, league
         ):
             # Inverted / neutral-site match: ESPN away is row's home, and ESPN home is row's away.
             # Store (home, away) so chosen_away corresponds to row's away team and chosen_home
@@ -575,7 +629,22 @@ def _find_espn_result(
         _, chosen_comp, chosen_away, chosen_home = name_matched[0]
         return _extract_espn_record(chosen_comp.get("status", {}).get("type", {}), chosen_away, chosen_home)
 
-    # Disambiguate multiple matches (e.g. doubleheaders) by start time
+    matchups = {
+        frozenset((_espn_team_identity(away), _espn_team_identity(home))) for _, _, away, home in name_matched
+    }
+    if len(matchups) > 1:
+        # Different games matched the row's names: the start-time tie-break below once picked
+        # the wrong one (NCAAB 2026-11-18, ledger start 23:30Z nearer the other game's 01:00Z than
+        # the real 01:30Z). Leave the row unsettled rather than guess.
+        logger.warning(
+            "ESPN name fallback for %s matched %d different games on %s; not settled from ESPN",
+            row.get("pick_id"),
+            len(matchups),
+            game_day,
+        )
+        return None
+
+    # Disambiguate multiple matches of one matchup (doubleheaders) by start time
     row_start_raw = row.get("event_start_utc") or row.get("commence_time")
     row_start_dt = None
     if row_start_raw:
@@ -617,6 +686,60 @@ def _close_after_decision_kwargs(row: dict, sport_dir: str) -> dict[str, Any]:
         return {}
     decision_quote_at = row.get("market_quote_observed_at_utc") or row.get("observed_at_utc")
     return {"not_before_utc": str(decision_quote_at)} if decision_quote_at else {}
+
+
+_TITLE_SEPARATORS = (" vs. ", " vs ", " @ ", " at ")
+
+
+def _ncaaf_same_team(ledger_name: str, quote_name: str) -> bool:
+    """Identity when both names resolve (different teams veto), else the strict phrase match."""
+    from ..learned_forward import _team_matches
+
+    ledger_key, quote_key = _ncaaf_team_key(ledger_name), _ncaaf_team_key(quote_name)
+    if ledger_key is not None and quote_key is not None:
+        return ledger_key == quote_key
+    return _team_matches(ledger_name, quote_name)
+
+
+def _ncaaf_name_side(name: str, home_team: str, away_team: str) -> str | None:
+    """'home'/'away' when a quote's team name denotes exactly one of the row's teams."""
+    if not name:
+        return None
+    is_away, is_home = _ncaaf_same_team(away_team, name), _ncaaf_same_team(home_team, name)
+    if is_away == is_home:
+        return None
+    return "away" if is_away else "home"
+
+
+def _ncaaf_close_anchor_side(snapshot: dict, home_team: str, away_team: str) -> tuple[str | None, str | None]:
+    """(row side of the contract's long side, failure reason) for an NCAAF close quote.
+
+    A Polymarket NCAAF quote's long side (the spread line's team, the moneyline's first outcome)
+    is the event title's first team (2d4596bc: 22,256 of 22,256 spread and 1,165 of 1,165
+    moneyline labels). The strict nickname / anchor-label match missed "NM State", "UMass",
+    "San Jose State", "App State" anchors and the "Eagles" / "Fightin' Blue Hens" outcomes, so
+    those rows got no close. The title must map one-to-one onto the row's two teams first, so a
+    contract from another game (F1: a Penn State row on "Penn vs. Brown") never yields a close;
+    the anchor label only cross-checks. Without a title the label alone anchors, or nothing does
+    and the caller's nickname match runs as before.
+    """
+    label = str(snapshot.get("team") or "").strip()
+    label_side = _ncaaf_name_side(label, home_team, away_team) if label else None
+    title = str(snapshot.get("event_title") or "").strip()
+    if not title:
+        return label_side, None
+    sep = next((s for s in _TITLE_SEPARATORS if s in title), None)
+    if sep is None:
+        return None, "close_title_unparsed"
+    first, second = (part.strip() for part in title.split(sep, 1))
+    normal = _ncaaf_same_team(away_team, first) and _ncaaf_same_team(home_team, second)
+    reverse = _ncaaf_same_team(home_team, first) and _ncaaf_same_team(away_team, second)
+    if normal == reverse:
+        return None, "close_title_not_row_game"
+    anchor = "away" if normal else "home"
+    if label_side not in (None, anchor):
+        return None, "close_title_label_conflict"
+    return anchor, None
 
 
 def _closing_probability_for_moneyline_pick(
@@ -703,12 +826,40 @@ def _closing_probability_for_moneyline_pick(
     short_desc = str((snapshot.get("short") or {}).get("description", ""))
     sel = str(selection).strip().lower()
 
+    ncaaf_side: str | None = None
+    if str(sport_dir).casefold() == "ncaaf" and sel in ("home", "away"):
+        anchor, failure = _ncaaf_close_anchor_side(snapshot, home_team, away_team)
+        if failure is not None:
+            logger.info("CLV left blank for %s (%s): %s", slug, event_start_utc, failure)
+            return None, None
+        if anchor is not None:
+            ncaaf_side = "long" if sel == anchor else "short"
+
     # 1. Spread markets (e.g., long: "-5.50", short: "+5.50", team: "Detroit Lions")
     if snapshot.get("market_type") == "spread" or (
         long_desc.startswith(("+", "-")) and short_desc.startswith(("+", "-"))
     ):
         side = None
-        if sel in ("long", "short"):
+        if ncaaf_side is not None:
+            side = snapshot.get(ncaaf_side)
+            # The side's own line must be the row's signed line. A row whose entry was priced on
+            # the other team's rung (pre-2d4596bc anchor fallback, e.g. 881b2c77229146ee "NM State
+            # +3.5" bought at the "+3.50" Sam Houston ask) gets no close rather than a wrong one.
+            if side is not None and line not in (None, ""):
+                try:
+                    sign_ok = abs(float(str(side.get("description"))) - float(line)) < 1e-9
+                except (TypeError, ValueError):
+                    sign_ok = False
+                if not sign_ok:
+                    logger.info(
+                        "CLV left blank for %s (%s): close_spread_sign_conflict row=%s side=%s",
+                        slug,
+                        event_start_utc,
+                        line,
+                        side.get("description"),
+                    )
+                    return None, None
+        elif sel in ("long", "short"):
             side = snapshot.get(sel)
         else:
             ref_team = snapshot.get("team")
@@ -757,6 +908,12 @@ def _closing_probability_for_moneyline_pick(
     selected_name = home_team if selection == "home" else away_team
     matches_long = _team_matches(selected_name, long_desc)
     matches_short = _team_matches(selected_name, short_desc)
+    if ncaaf_side is not None:
+        # The title position decides; a nickname that names the other side vetoes.
+        if matches_long != matches_short and ("long" if matches_long else "short") != ncaaf_side:
+            logger.info("CLV left blank for %s (%s): close_title_nickname_conflict", slug, event_start_utc)
+            return None, None
+        matches_long, matches_short = ncaaf_side == "long", ncaaf_side == "short"
     if matches_long == matches_short:
         # Ambiguous or no match -- never guess. Defaulting to the long side here
         # attributes a real ask to a row we cannot prove it belongs to, which is
@@ -911,8 +1068,10 @@ def _scores_for_outcome(market_type: str, selection: str, line, won: bool) -> tu
         under_score = (0, 0)
         return over_score if (selection == "over") == won else under_score
     if market_type == "spread":
-        # margin for the selected side must land on the covering side of the line
-        margin = math.floor(-float(line)) + 1 if won else math.floor(-float(line))
+        # The selected side's margin must land strictly on the covering (won) or losing side of
+        # the line. floor(-line) for a loss sat exactly on a whole-number line, so a losing -7
+        # graded as a push (margin 7 + line -7 = 0).
+        margin = math.floor(-float(line)) + 1 if won else math.ceil(-float(line)) - 1
         sel_score, other = max(margin, 0), max(-margin, 0)
     else:
         sel_score, other = (1, 0) if won else (0, 1)
@@ -972,6 +1131,14 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
 
     slug = _extract_market_slug(str(row.get("rationale", "")), row)
     market_type = str(row.get("market_type") or "").lower().split(".")[-1]
+    is_ncaaf = str(row.get("league") or "").upper() == "NCAAF"
+    if slug is not None and is_ncaaf:
+        # Same mapping as the ESPN path's close lookup: a moneyline row's slug carries a
+        # -home/-away suffix and a v6.2 row's extracted "slug" is "anchor-blended"; neither is a
+        # contract, so client.market() 404'd and the row was voided after 7 days.
+        from ..ncaaf_prekickoff_capture import ncaaf_settlement_slug
+
+        slug = ncaaf_settlement_slug(slug, str(row.get("rationale", "")))
     if slug is None or market_type not in {"moneyline", "spread", "total"}:
         return None
     client = client or PolymarketUSClient()
@@ -1013,6 +1180,7 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
     else:
         team = str(row["home_team"] if selection == "home" else row["away_team"])
         tkey = _identity_key(team)
+        name_hits: list[dict] = []
         for side, _ in prices:
             name = _identity_key(str((side.get("team") or {}).get("name") or side.get("description") or ""))
             if name and (name in tkey or tkey in name):
@@ -1025,8 +1193,12 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
                             continue
                     except (TypeError, ValueError):
                         continue
-                own = side
-                break
+                name_hits.append(side)
+        if is_ncaaf and len(name_hits) > 1:
+            # Both outcomes named alike ("Wildcats" for Arizona and Kansas State): taking the
+            # first would grade on a guess.
+            return {"pick_id": row["pick_id"], "reason": f"resolution side ambiguous for {slug}"}
+        own = name_hits[0] if name_hits else None
         if own is None:
             own = _resolve_side_by_name_tokens(team, prices, market_type, row.get("line"))
     if own is None:

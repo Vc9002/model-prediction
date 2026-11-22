@@ -126,7 +126,10 @@ class _Game:
         return {
             "id": self.key,
             "slug": self.event_slug,
-            "title": f"{self.away} vs. {self.home}",
+            # A real NCAAF quote's long side is the title's first team (2d4596bc), and every
+            # long side here is the home team, so home is listed first. Settlement's NCAAF close
+            # cross-checks the title and declines a quote whose long side contradicts it.
+            "title": f"{self.home} vs. {self.away}",
             "startTime": _iso(self.start),
             "markets": self.markets(),
         }
