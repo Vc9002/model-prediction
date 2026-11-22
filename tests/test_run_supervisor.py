@@ -49,6 +49,40 @@ def test_successful_run_records_completed_row(tmp_path) -> None:
     sup.close()
 
 
+_ENV_PROBE = (
+    "import os; "
+    "print('OPENBLAS=' + os.environ.get('OPENBLAS_NUM_THREADS', '<unset>')); "
+    "print('OMP=' + os.environ.get('OMP_NUM_THREADS', '<unset>'))"
+)
+
+
+def test_worker_env_caps_openblas_threads(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("OPENBLAS_NUM_THREADS", raising=False)
+    monkeypatch.delenv("OMP_NUM_THREADS", raising=False)
+    sup = _supervisor(tmp_path)
+    code = sup.run_worker("daily", command=[sys.executable, "-c", _ENV_PROBE])
+
+    assert code == 0
+    row = sup.latest_runs()[0]
+    log_text = (tmp_path / "runtime" / "logs" / "supervisor" / f"{row['run_id']}.log").read_text()
+    assert "OPENBLAS=1" in log_text
+    # OpenMP stays uncapped: xgboost/sklearn training needs its parallelism.
+    assert "OMP=<unset>" in log_text
+    sup.close()
+
+
+def test_worker_env_keeps_operator_openblas_value(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("OPENBLAS_NUM_THREADS", "4")
+    sup = _supervisor(tmp_path)
+    code = sup.run_worker("daily", command=[sys.executable, "-c", _ENV_PROBE])
+
+    assert code == 0
+    row = sup.latest_runs()[0]
+    log_text = (tmp_path / "runtime" / "logs" / "supervisor" / f"{row['run_id']}.log").read_text()
+    assert "OPENBLAS=4" in log_text
+    sup.close()
+
+
 def test_failed_run_records_failure_and_returns_worker_exit_code(tmp_path) -> None:
     sup = _supervisor(tmp_path)
     code = sup.run_worker("production", command=[sys.executable, "-c", "import sys; sys.exit(3)"])

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ctypes
+import sys
 import tempfile
 from pathlib import Path
 
@@ -19,6 +21,45 @@ def test_stealth_runtime_priority_activation():
     # Should safely succeed on Windows or POSIX without raising errors
     res = enable_background_priority()
     assert isinstance(res, bool)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows memory priority API")
+def test_low_memory_priority_reads_back_low_on_windows():
+    from model_prediction import stealth_runtime
+
+    class _MemoryPriorityInformation(ctypes.Structure):
+        _fields_ = [("MemoryPriority", ctypes.c_ulong)]
+
+    assert stealth_runtime._set_low_memory_priority() is True
+
+    # Read back through a private WinDLL so argtypes changes stay local.
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+    kernel32.GetProcessInformation.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_int,
+        ctypes.c_void_p,
+        ctypes.c_ulong,
+    ]
+    kernel32.GetProcessInformation.restype = ctypes.c_int
+    info = _MemoryPriorityInformation()
+    ok = kernel32.GetProcessInformation(
+        kernel32.GetCurrentProcess(), 0, ctypes.byref(info), ctypes.sizeof(info)
+    )
+    assert ok
+    assert info.MemoryPriority == 2
+
+
+def test_low_memory_priority_failure_is_soft(monkeypatch):
+    from model_prediction import stealth_runtime
+
+    def _boom(*args, **kwargs):
+        raise OSError("no kernel32")
+
+    monkeypatch.setattr(ctypes, "WinDLL", _boom, raising=False)
+
+    assert stealth_runtime._set_low_memory_priority() is False
+    assert isinstance(enable_background_priority(), bool)
 
 
 def test_two_stage_separation_and_hard_edge_gate():

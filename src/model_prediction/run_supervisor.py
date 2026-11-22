@@ -409,6 +409,15 @@ class RunSupervisor:
         # latency, events seen, predictions, NO_BET, duration...).
         env["RUN_SUPERVISOR_RUN_ID"] = run_id
         env["RUN_SUPERVISOR_METRICS_PATH"] = str(log_path.with_suffix(log_path.suffix + ".metrics.json"))
+        # numpy and scipy each bundle an OpenBLAS whose per-thread buffer pool is
+        # sized to the core count at import (~740 MB private per process on this
+        # 12-core host). The 00:30 ET runs have died on "OpenBLAS error: Memory
+        # allocation still failed" and MemoryError; scripts/run_daily.ps1 capped
+        # it for its ingest jobs only. Applied to every supervised worker (daily,
+        # production, rebuild-shadow); setdefault so an operator value still wins.
+        # OMP threads are deliberately NOT capped: xgboost/sklearn use OpenMP for
+        # training and the daily worker has a 60-minute timeout.
+        env.setdefault("OPENBLAS_NUM_THREADS", "1")
         return env
 
     @staticmethod

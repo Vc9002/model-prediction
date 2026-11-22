@@ -20,13 +20,58 @@ _PROCESS_MODE_BACKGROUND_END = 0x00200000
 _BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
 _IDLE_PRIORITY_CLASS = 0x00000040
 
+# PROCESS_INFORMATION_CLASS.ProcessMemoryPriority and MEMORY_PRIORITY_LOW.
+_PROCESS_MEMORY_PRIORITY = 0
+_MEMORY_PRIORITY_LOW = 2
+
+
+def _set_low_memory_priority() -> bool:
+    """Best-effort: mark this process's pages as low memory priority (Windows).
+
+    Returns True only when the call succeeded; never raises.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+
+        class _MemoryPriorityInformation(ctypes.Structure):
+            _fields_ = [("MemoryPriority", ctypes.c_ulong)]
+
+        # Private WinDLL instance so these argtypes do not leak into other callers
+        # of the shared ctypes.windll.kernel32 in this process.
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+        kernel32.SetProcessInformation.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.c_ulong,
+        ]
+        kernel32.SetProcessInformation.restype = ctypes.c_int
+
+        info = _MemoryPriorityInformation(_MEMORY_PRIORITY_LOW)
+        ok = kernel32.SetProcessInformation(
+            kernel32.GetCurrentProcess(),
+            _PROCESS_MEMORY_PRIORITY,
+            ctypes.byref(info),
+            ctypes.sizeof(info),
+        )
+        if not ok:
+            logger.debug("SetProcessInformation(MemoryPriority) failed: error %s", ctypes.get_last_error())
+            return False
+        return True
+    except (OSError, AttributeError, ValueError, TypeError) as exc:
+        logger.debug("Failed to set low memory priority: %s", exc)
+        return False
+
 
 def enable_background_priority(idle_only: bool = False) -> bool:
-    """Demote current process to background/idle scheduling priority.
+    """Demote current process to BELOW_NORMAL (or IDLE) priority plus low memory priority.
 
-    On Windows, uses PROCESS_MODE_BACKGROUND_BEGIN to reduce both CPU scheduling
-    quantum and disk/network I/O priority so games and user applications experience
-    zero lag.
+    On Windows, sets the BELOW_NORMAL (or IDLE) priority class and, best-effort,
+    MEMORY_PRIORITY_LOW so games and user applications win CPU and page contention.
+    Background mode (PROCESS_MODE_BACKGROUND_BEGIN) is deliberately not used; see below.
     On Unix/macOS, lowers scheduling priority via os.nice(10).
     """
     if sys.platform == "win32":
@@ -48,6 +93,11 @@ def enable_background_priority(idle_only: bool = False) -> bool:
             if not success and not idle_only:
                 # Fallback to BELOW_NORMAL if background mode fails
                 success = bool(kernel32.SetPriorityClass(handle, _BELOW_NORMAL_PRIORITY_CLASS))
+
+            # Low memory priority makes the memory manager trim and repurpose this
+            # process's standby pages before a foreground app's, a footprint lever
+            # CPU priority does not touch. Return value ignored on purpose.
+            _set_low_memory_priority()
 
             if success:
                 logger.info("Enabled background OS priority on Windows (stealth mode active)")

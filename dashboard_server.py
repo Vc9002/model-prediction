@@ -28,6 +28,14 @@ import sys
 import time
 from http.server import ThreadingHTTPServer
 
+# numpy and scipy each bundle an OpenBLAS that commits a per-thread buffer pool
+# sized to the core count at import (~740 MB private on this 12-core host):
+# private bytes after `import dashboard_server` measured 903 MB -> 160 MB with one
+# thread, working set unchanged. The dashboard does no heavy linear algebra.
+# setdefault so an operator-set value wins; this must stay above the
+# model_prediction imports below because they load numpy transitively.
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
 import yaml  # noqa: F401 -- re-export for compat (tests read dashboard_server.yaml)
 
 from model_prediction.dashboard import data_service_handle  # noqa: F401 -- re-export for compat
