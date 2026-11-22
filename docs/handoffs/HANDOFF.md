@@ -16,10 +16,9 @@ tasks run the working tree, so do not edit source while a daily run is in progre
 
 ## 1. NCAAB (updated 2026-11-21 evening, quick 261121-hmc)
 
-- **Next action:** verify the first Daily after 2026-11-21 16:50 ET serves NCAAB moneyline rows with
-  model_id `ncaab-moneyline-v7m` (hash `5ea1cb06…`), spread rows still `ncaab-spread-v7`, and
-  `model_version` `ncaab-moneyline-v7m+ncaab-spread-v7+ncaab-total-v6`. Then read the addendum v4
-  scorecards (`outputs/ncaab/research_261120/P1_player_availability/`, `P2_returning_production_early/`).
+- **Serving verified:** the 18:30 ET Daily 2026-11-21 wrote NCAAB moneyline rows as
+  `ncaab-moneyline-v7m` (hash `5ea1cb06…`), spread `ncaab-spread-v7`, total `ncaab-total-v6`.
+- **Next action:** read the addendum v4 scorecards (`outputs/ncaab/research_261120/P1_player_availability/`, `P2_returning_production_early/`).
 - **Done 2026-11-21:** `ncaab-moneyline-v7m` (pure margin probability, A_ml_w0) promoted for the NCAAB
   moneyline only (`e865f518`, operator-approved after an all-season check: better log loss on 856 D1
   games, slightly worse on 178 priced games, market beats both). Rollback order: moneyline first
