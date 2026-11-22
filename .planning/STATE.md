@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-22T04:05:45.814Z"
+last_updated: "2026-11-22T05:17:13.886Z"
 last_activity: 2026-11-13
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 76bcd5207af269132d57b4accff5ef96a7bb2b41
+state_head: 75706abc3be09c6c9379b0d9980798c1b2f29720
 progress:
   total_phases: 4
   completed_phases: 0
@@ -135,6 +135,8 @@ None yet.
 | 261120-w6i | Best-pick CONFIRMED_BEST hardened: n>=30, Wilson 95% bound above bucket mean price, ROI>=15%, non-negative bucket and model-family CLV; open picks bucketed on first-sight edge; verified record needs a verified first row; post-start rows, nrfi scores and archived/removed keys excluded | 2026-11-20 | 0d937297 | [261120-w6i-harden-confirmed-best-in-best-pick-audit](./quick/261120-w6i-harden-confirmed-best-in-best-pick-audit/) |
 | 261120-nip | NCAAB program: mascot match fix; ncaab-spread-v7 promoted (own id, artifact hash, engine-pure guarded calibration, pre-tip CLV); research protocol with six candidates, none beats the close; A_ml_w0 (moneyline Elo weight 0) passed confirmation, promotion pending operator | 2026-11-21 | 2e8b2bca | [261120-nip-ncaab-improvement-program](./quick/261120-nip-ncaab-improvement-program/) |
 | 261121-uuv | NCAAB real Polymarket quotes: accept quotes without transactTime, 30-min quote window (672/683 decisions join on 11-21 replay) | 2026-11-21 | 76bcd520 | [261121-uuv-ncaab-quote-freshness-window-30-min](./quick/261121-uuv-ncaab-quote-freshness-window-30-min/) |
+| 261121-xaw | Settlement: no void on non-binary terminal prices; supervisor: exit 75 recorded as skipped | 2026-11-22 | 75706abc | [261121-xaw-settlement-and-supervisor-exit-75-fixes](./quick/261121-xaw-settlement-and-supervisor-exit-75-fixes/) |
+| 261121-xbn | NBA v7/v9 market-blend sign (B4) and v9 artifact key drift log + pinned test | 2026-11-22 | 75706abc | [261121-xbn-nba-v7-v9-blend-sign-and-v9-artifact-key](./quick/261121-xbn-nba-v7-v9-blend-sign-and-v9-artifact-key/) |
 
 ## Milestone History
 

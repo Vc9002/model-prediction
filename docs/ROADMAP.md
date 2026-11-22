@@ -330,3 +330,12 @@ Serving/replay consistency, exact derivative contract logging, canonical esports
 ## 2026-11-15 FCS-vs-FCS append (quick 261115-x4q)
 
 - Pinned cfb-fcs-append-rule-1 ACCEPT: holdout Brier 0.19036 to 0.18974 (delta -0.00062, CI [-0.00231, +0.00076]); neutral within noise. Applied 6,894 groups=[81] rows to the processed history only (16,392 rows loaded). One-time snapshot, not maintained by the daily ingest. No refit, no promotion.
+
+## 2026-11-22 — Project-review fixes and the decisions they leave (quick-261121-xaw, quick-261121-xbn)
+
+Detail and commit ids: `DEBUG.md` (2026-11-22). Open operator decisions:
+
+- **Non-binary terminal markets stay open.** A market that legitimately settles non-binary (a cancelled tennis match at a fair price such as 51c/49c, `tests/unit/test_auto_buyer_paths_and_fair_settle.py`) no longer closes as a push, so its pick stays open, shows in the settle report, and degrades `system_health` after 72 h until it is voided by hand. Decide whether to add an age-out void after N days once decided markets are shown to flip to clean 1/0. `portfolio/auto_buyer_ledger.py` (~2173) still books a push on non-binary outcomes. The 198 esports pushes already in the ledger were not re-graded.
+- **v9 artifact keys.** Honouring the unread keys, editing the v9 JSON, changing a default, or making the loader strict all change served numbers or the artifact hash: a new version through `model_promotion`, not an edit. The warning is INFO only.
+- **Exit 75 escalation.** A held daily lock now reads as degraded, never DOWN; there is no consecutive-skip escalation.
+- **Protected-file note.** `docs/AGENTS.md` lists the NBA model as protected; `nba_v7.py` and `nba_v9.py` were edited on an explicit operator request and are output-identical at weight 0.
