@@ -20,11 +20,11 @@ Detail in the `ROADMAP.md` section "2026-11-22 — Project-review fixes and the 
 - **Non-binary terminal markets stay open.** `_settle_by_resolution` no longer voids them; a market
   that legitimately settles non-binary needs a hand-void. Decide on an age-out void.
   `portfolio/auto_buyer_ledger.py` (~2173) still books a push on non-binary outcomes.
-- **207 earlier non-binary pushes** are in the ledger (198 esports, none in the six in-scope sports).
-  Decide whether to re-grade them.
+- **Esports non-binary pushes: re-graded where possible (2026-11-22).** BO3 confirmed 1 of 206; the other
+  205 (CS2 197, Dota2 7, LoL 1, across Main/Flat/research/gated) stay pushes because BO3 has no series for them or a
+  team name does not resolve. Closing them out needs another results source or alias additions; not owed.
 - **v9 unread/defaulted artifact keys** are logged and pinned by `tests/test_nba_v9_artifact_keys.py`
   only. Making them take effect is a new version through `model_promotion`.
-- **Exit 75** is now `skipped` and degrades `system_health`. Consecutive-skip escalation is not built.
 - **From the review, not touched:** paper quote age is unbounded (`max_quote_age_seconds` unset),
   and the live-order path in the auto-buyer worker is gated only by the saved `mode` (`paper`).
 
