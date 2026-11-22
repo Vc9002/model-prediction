@@ -56,6 +56,27 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+
+def _load_display_names():
+    """The shared edge bands. The Rainmeter widget imports this script under its own Python (with -I,
+    no repo package on the path), so fall back to loading the stdlib-only module by file path."""
+    try:
+        from model_prediction import display_names
+
+        return display_names
+    except ImportError:
+        import importlib.util
+
+        path = Path(__file__).resolve().parents[1] / "src" / "model_prediction" / "display_names.py"
+        spec = importlib.util.spec_from_file_location("_mp_display_names", path)
+        assert spec is not None and spec.loader is not None, path
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+
+_DISPLAY_NAMES = _load_display_names()
+
 DB_PATH = Path("E:/model-prediction-runtime/ledgers/ledgers.db")
 ET_TZ = zoneinfo.ZoneInfo("America/New_York")
 
@@ -156,21 +177,10 @@ class EdgeTierStats:
 
 
 def get_edge_bucket(edge: float) -> str:
-    pct = edge * 100.0
-    # Negative-edge flat calls are mostly favourites, so pooling them with 0-2% edges made
-    # that bucket look like a high-win-rate profit centre for picks the model itself dislikes.
-    if pct < 0.0:
-        return "< 0%"
-    elif pct < 2.0:
-        return "< 2%"
-    elif pct < 5.0:
-        return "2.0% - 4.9%"
-    elif pct < 8.0:
-        return "5.0% - 7.9%"
-    elif pct < 12.0:
-        return "8.0% - 11.9%"
-    else:
-        return ">= 12.0%"
+    # The shared bands (src/model_prediction/display_names.py): <0%, 0-2%, 2-5%, 5-8%, 8-12%, 12%+.
+    # Negative-edge flat calls are mostly favourites, so pooling them with 0-2% edges made that bucket
+    # look like a high-win-rate profit centre for picks the model itself dislikes; "<0%" stays apart.
+    return _DISPLAY_NAMES.edge_bucket(edge)
 
 
 @dataclass

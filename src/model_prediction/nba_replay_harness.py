@@ -34,6 +34,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import ArrayLike
 
+from .display_names import EDGE_BUCKETS as SHARED_EDGE_BUCKETS
 from .domain import EASTERN
 from .features.base import FeatureStore, GameRecord
 from .models.base import GamePrediction
@@ -289,7 +290,8 @@ def _rmse(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.sqrt(np.mean((a - b) ** 2)))
 
 
-EDGE_BUCKETS = ((0.0, 0.025), (0.025, 0.05), (0.05, 0.10), (0.10, 0.15), (0.15, 1.0))
+# The shared bands (display_names); this edge is model confidence over 50%, so never negative.
+EDGE_BUCKETS = tuple((lo, hi, label) for lo, hi, label in SHARED_EDGE_BUCKETS if lo is not None)
 
 
 def score_market(rows: Sequence[Mapping[str, Any]], market: str, draws: int = 2000) -> MarketScore | None:
@@ -327,12 +329,12 @@ def score_market(rows: Sequence[Mapping[str, Any]], market: str, draws: int = 20
         side_p = np.maximum(p_arr, 1.0 - p_arr)
         side_hit = np.where(p_arr >= 0.5, o_arr, 1.0 - o_arr)
         edge = side_p - 0.5
-        for lo, hi in EDGE_BUCKETS:
-            mask = (edge >= lo) & (edge < hi)
+        for lo, hi, label in EDGE_BUCKETS:
+            mask = (edge >= lo) & (edge < hi) if hi is not None else (edge >= lo)
             k = int(mask.sum())
             buckets.append(
                 {
-                    "bucket": f"{lo * 100:.1f}-{hi * 100:.1f}%" if hi < 1 else f"{lo * 100:.0f}%+",
+                    "bucket": label,
                     "n": k,
                     "claimed": float(side_p[mask].mean()) if k else None,
                     "hit": float(side_hit[mask].mean()) if k else None,

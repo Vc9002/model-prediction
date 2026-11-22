@@ -669,15 +669,15 @@ def test_archived_and_removed_rows_never_counted(db):
         **common,
     )
     engine = abp.HistoricalAuditEngine(db)
-    low = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "5.0% - 7.9%")]
+    low = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "5-8%")]
     assert low.all_rows.total_graded == 0
     assert low.verified.total_graded == 0
-    mid = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")]
+    mid = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8-12%")]
     assert (mid.verified.wins, mid.verified.losses) == (1, 0)
     assert mid.all_rows.total_graded == 1
     assert engine.first_sight_edge("mlb", "evt-c", "moneyline", "home", "m1") is None
     # The old-basis context map is deliberately unchanged: it still counts all three settled rows.
-    lr = engine.last_run_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")]
+    lr = engine.last_run_by_sport_mkt_bucket[("mlb", "moneyline", "8-12%")]
     assert lr.verified.wins == 3
 
 
@@ -774,19 +774,19 @@ def test_open_pick_bucketed_on_first_sight_edge(db):
     picks = abp.collect_open_pick_audits(db)
     assert len(picks) == 1
     pick = picks[0]
-    assert pick["bucket"] == "8.0% - 11.9%"
+    assert pick["bucket"] == "8-12%"
     assert pick["bucket_edge"] == pytest.approx(0.09)
     assert pick["verdict"] == "CONFIRMED_BEST"
 
     # The widget's 8-positional call has no bucket_edge, so it keeps bucketing on current edge.
     widget = engine.audit_candidate("mlb", "moneyline", "home", 0.03, 0.53, 0.5, "m1", VERIFIED)
-    assert widget["bucket"] == "2.0% - 4.9%"
+    assert widget["bucket"] == "2-5%"
     assert widget["verdict"] == "QUALIFIED_MODERATE"
     # The negative-edge trap still reads the current edge, whatever bucket_edge says.
     neg = engine.audit_candidate(
         "mlb", "moneyline", "home", -0.02, 0.48, 0.5, "m1", VERIFIED, bucket_edge=0.09
     )
-    assert neg["bucket"] == "8.0% - 11.9%"
+    assert neg["bucket"] == "8-12%"
     assert neg["verdict"] == "DOWNGRADE_TRAP"
 
 
@@ -810,11 +810,11 @@ def test_verified_record_requires_verified_first_row(db):
         **common,
     )
     engine = abp.HistoricalAuditEngine(db)
-    mid = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "5.0% - 7.9%")]
+    mid = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "5-8%")]
     assert (mid.all_rows.wins, mid.all_rows.losses) == (1, 0)
     assert mid.verified.total_graded == 0
     # HEAD let the later verified rerun stand in for the key and counted it here instead.
-    high = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", ">= 12.0%")]
+    high = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "12%+")]
     assert high.all_rows.total_graded == 0
     assert high.verified.total_graded == 0
 
@@ -846,7 +846,7 @@ def test_nrfi_rows_never_score_an_event(db):
         scores=(6, 4),
     )
     engine = abp.HistoricalAuditEngine(db)
-    v = engine.stats_by_sport_dir_bucket[("mlb", "over", "5.0% - 7.9%")].verified
+    v = engine.stats_by_sport_dir_bucket[("mlb", "over", "5-8%")].verified
     assert (v.wins, v.losses) == (1, 0)
 
 
@@ -879,7 +879,7 @@ def test_rows_created_at_or_after_start_never_first_sight(db):
         **common,
     )
     engine = abp.HistoricalAuditEngine(db)
-    bucket = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")]
+    bucket = engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8-12%")]
     assert bucket.all_rows.total_graded == 1
     assert bucket.verified.total_graded == 1
     assert engine.first_sight_edge("mlb", "evt-late", "moneyline", "home", "m1") is None
@@ -1067,7 +1067,7 @@ def test_clv_uses_last_same_line_verified_row_before_start(db):
         **settled,
     )
     engine = abp.HistoricalAuditEngine(db)
-    ver = engine.stats_by_sport_dir_bucket[("nba", "over", "5.0% - 7.9%")].verified
+    ver = engine.stats_by_sport_dir_bucket[("nba", "over", "5-8%")].verified
     assert ver.wins == 1
     assert ver.clv_moved == 1
     assert ver.clv_sum == pytest.approx(0.03)
@@ -1129,8 +1129,8 @@ def test_ncaab_row_buckets_on_served_probability_not_raw_column(db):
     assert engine.first_sight_edge("ncaab", "evt-served", "spread", "home", "m1") == pytest.approx(
         0.5079 - 0.5192
     )
-    assert engine.stats_by_sport_mkt_bucket[("ncaab", "spread", "< 0%")].all_rows.total_graded == 1
-    assert engine.stats_by_sport_mkt_bucket[("ncaab", "spread", "5.0% - 7.9%")].all_rows.total_graded == 0
+    assert engine.stats_by_sport_mkt_bucket[("ncaab", "spread", "<0%")].all_rows.total_graded == 1
+    assert engine.stats_by_sport_mkt_bucket[("ncaab", "spread", "5-8%")].all_rows.total_graded == 0
 
     (pick,) = abp.collect_open_pick_audits(db)
     assert pick["model_prob"] == pytest.approx(0.5079)
@@ -1143,4 +1143,4 @@ def test_empty_serving_probability_keeps_the_column_value(db):
     _add(db, event_id="evt-empty", edge=0.09, payload_extra={"serving_probability": ""})
     engine = abp.HistoricalAuditEngine(db)
     assert engine.first_sight_edge("mlb", "evt-empty", "moneyline", "home", "m1") == pytest.approx(0.09)
-    assert engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8.0% - 11.9%")].all_rows.total_graded == 1
+    assert engine.stats_by_sport_mkt_bucket[("mlb", "moneyline", "8-12%")].all_rows.total_graded == 1

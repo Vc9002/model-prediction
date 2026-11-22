@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .calibration import calibration_metrics
+from .display_names import edge_bucket
 
 _BOOTSTRAP_RESAMPLES = 2000
 _BOOTSTRAP_SEED = 42
@@ -145,16 +146,8 @@ def decide_sides(
 
 
 def _edge_bucket(edge: float) -> str:
-    """Coarse edge buckets for stability section."""
-    if edge < 0.0:
-        return "<0"
-    if edge < 0.02:
-        return "0-2%"
-    if edge < 0.05:
-        return "2-5%"
-    if edge < 0.10:
-        return "5-10%"
-    return ">=10%"
+    """Edge bucket for the stability section; the shared bands (display_names) used everywhere."""
+    return edge_bucket(edge)
 
 
 def _max_drawdown(pnls: Sequence[float]) -> float:
