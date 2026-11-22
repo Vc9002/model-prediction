@@ -39,6 +39,7 @@ from ..euroleague_forward import forecast_euroleague_sport
 from ..ledger import defer_sqlite_xlsx_exports
 from ..main_ledgers import MultiSportPickLedger
 from ..mlb_baseline_refresh import refresh_if_due
+from ..model_ledger import flush_pending_model_ledgers
 from ..nbl_forward import forecast_nbl_sport
 from ..research_ledgers import existing_research_ledgers
 from ..runtime_paths import RuntimePaths, rerouted_data_root
@@ -52,6 +53,7 @@ from .commands import (
     _restore_unreplaced,
     _summary,
 )
+from .event_horizon import horizon_skip_result, probe_event_horizon
 from .forecast import (
     _forecast_cfb_sport,
     _forecast_darts_sport,
@@ -325,6 +327,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     _t_pool_end = _t_start
     _t_forecast_end = _t_start
     _t_settle_end = _t_start
+    # A run killed mid-deferral leaves per-model ledger rows in a spool (model_ledger.defer_model_ledger_writes);
+    # readers already merge them, this just folds them into the workbooks the dashboard reads directly.
+    try:
+        flush_pending_model_ledgers(Path(ledger_path(config)).parent / "model_ledgers")
+    except Exception:
+        logger.warning("model-ledger spool recovery failed", exc_info=True)
     # Self-throttled to weekly (see mlb_baseline_refresh's module
     # docstring) -- safe to call every daily cron cycle since it's a
     # cheap no-op most of the time, but keeps park factors and league
@@ -838,6 +846,16 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # and repeated upstream reads for no decision-quality benefit.
     forecast_observed_at = utc_now()
     data_directory = Path(ledger_path(config)).parent
+    # One scoreboard per league, at a time no later than any task's own decision time, so a task is skipped
+    # only when it would have found no game left to price (see event_horizon). A failed probe never skips.
+    _horizon_started = time.monotonic()
+    from ..data_sources.espn import ESPNClient as _HorizonESPNClient
+
+    event_horizons = probe_event_horizon(
+        config, args.date, forecast_observed_at, _HorizonESPNClient().scoreboard
+    )
+    _horizon_seconds = round(time.monotonic() - _horizon_started, 1)
+    skipped_no_event_tasks: list[str] = []
     # Esports/KBO/NPB write to Main and Flat since the 2026-10-22 ledger merge, so the
     # Main/Flat clears above already cover them; the legacy research/gated ledgers
     # are no longer written and are not cleared.
@@ -854,6 +872,14 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             if not is_sport_daily_enabled(config, sport):
                 logger.info("Sport %s is off-season; skipping daily forecast.", sport.upper())
                 forecast_result[sport] = _skipped_sport_result(sport, "off_season", "season_concluded")
+                continue
+            _no_event_result = horizon_skip_result(event_horizons, sport.upper(), sport)
+            if _no_event_result is not None:
+                logger.info(
+                    "Sport %s has no event left to forecast on %s; skipping.", sport.upper(), args.date
+                )
+                forecast_result[sport] = _no_event_result
+                skipped_no_event_tasks.append(sport)
                 continue
             futures[
                 pool.submit(
@@ -1045,6 +1071,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 "reason": "season_concluded",
             }
             return
+        if _skip_for_horizon("wnba_spread", "WNBA"):
+            return
         # WNBA spread: Main+Flat, same routing as MLB spread/total
         # (operator directive 2026-08-03). Independent of WNBA
         # moneyline (already logged by the learned-sports pool above).
@@ -1083,6 +1111,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 "reason": "season_concluded",
             }
             return
+        if _skip_for_horizon("wnba_total", "WNBA"):
+            return
         try:
             forecast_result["wnba_total"] = _forecast_wnba_total_sport(
                 data_root=data_directory,
@@ -1108,7 +1138,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 "logged": 0,
             }
 
+    def _skip_for_horizon(result_key: str, league: str) -> bool:
+        no_event_result = horizon_skip_result(event_horizons, league, result_key)
+        if no_event_result is None:
+            return False
+        logger.info("%s has no event left to forecast on %s; skipping %s.", league, args.date, result_key)
+        forecast_result[result_key] = no_event_result
+        skipped_no_event_tasks.append(result_key)
+        return True
+
     def _nba_spread_task() -> None:
+        if _skip_for_horizon("nba_spread", "NBA"):
+            return
         try:
             forecast_result["nba_spread"] = _forecast_nba_spread_sport(
                 data_root=data_directory,
@@ -1135,6 +1176,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             }
 
     def _nba_total_task() -> None:
+        if _skip_for_horizon("nba_total", "NBA"):
+            return
         try:
             forecast_result["nba_total"] = _forecast_nba_total_sport(
                 data_root=data_directory,
@@ -1161,6 +1204,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             }
 
     def _nfl_spread_task() -> None:
+        if _skip_for_horizon("nfl_spread", "NFL"):
+            return
         try:
             forecast_result["nfl_spread"] = _forecast_nfl_spread_sport(
                 data_root=data_directory,
@@ -1189,6 +1234,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             }
 
     def _nfl_total_task() -> None:
+        if _skip_for_horizon("nfl_total", "NFL"):
+            return
         try:
             forecast_result["nfl_total"] = _forecast_nfl_total_sport(
                 data_root=data_directory,
@@ -1261,6 +1308,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             }
 
     def _cfb_task() -> None:
+        if _skip_for_horizon("ncaaf", "NCAAF"):
+            return
         try:
             forecast_result["ncaaf"] = _forecast_cfb_sport(
                 data_root=data_directory,
@@ -1807,6 +1856,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             "capture_task_seconds": capture_task_seconds,
             "forecast_sport_done_seconds": forecast_sport_done_seconds,
             "forecast_seconds": round(_t_forecast_end - _t_pool_end, 1),
+            "event_horizon_probe_seconds": _horizon_seconds,
+            "forecast_tasks_skipped_no_event": sorted(skipped_no_event_tasks),
             "settlement_seconds": round(_t_settle_end - _t_forecast_end, 1),
             "post_settlement_seconds": round(time.monotonic() - _t_settle_end, 1),
         },
