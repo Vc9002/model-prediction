@@ -14,7 +14,7 @@ from ..domain import (
     EASTERN,
     parse_utc,
 )
-from ..pricing import implied_probability
+from ..pricing import MAIN_LINE_ASK_BAND, implied_probability
 
 logger = logging.getLogger("model_prediction.cli")
 
@@ -39,7 +39,7 @@ def _main_call_eligible(eligibility: Any, *, edge: float, min_edge: float, max_e
 _NFL_PARTIAL_MARKET_TOKENS = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-", "-tt-", "-tt1h-", "-tt2h-")
 # A main line's long ask sits near 50% by construction; outside this band the row is
 # an alternate rung or a placeholder, never the game's spread/total.
-NFL_MAIN_LINE_ASK_BAND = (0.20, 0.80)
+NFL_MAIN_LINE_ASK_BAND = MAIN_LINE_ASK_BAND
 # Largest tolerated distance between a Polymarket line and the sportsbook consensus
 # before the contract is treated as an alternate rather than the main line.
 NFL_SPREAD_MAX_LINE_GAP = 6.0

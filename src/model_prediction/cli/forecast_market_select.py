@@ -14,30 +14,9 @@ from ..domain import (
     parse_utc,
 )
 from ..models.market_residual import MarketResidualModel
-from .forecast_nfl_support import NFL_MAIN_LINE_ASK_BAND
+from ..pricing import is_two_sided_main_rung as _is_two_sided_rung
 
 logger = logging.getLogger("model_prediction.cli")
-
-# Same band the NFL selector uses, applied to BOTH sides of a rung.
-MAIN_LINE_ASK_BAND = NFL_MAIN_LINE_ASK_BAND
-
-
-def _is_two_sided_rung(row: dict) -> bool:
-    """Both the long and the short ask sit inside MAIN_LINE_ASK_BAND.
-
-    Why (2026-11-22): ranking by the long ask alone let a placeholder rung win.
-    BKN@MEM 2026-11-14 had a real 227.5 total (bid 35c / ask 47c) and a 229.5 rung
-    quoted 2c / 49c; 49c is nearer 50% so 229.5 became "the main line" and the under
-    was priced at 98c. UTA@LAL 2026-11-18's whole ladder was 1c / 51c placeholders.
-    A rung nobody bids on is not the market's line; with none two-sided, decline.
-    """
-    low, high = MAIN_LINE_ASK_BAND
-    try:
-        long_ask = float(row["long"]["ask"])
-        short_ask = float(row["short"]["ask"])
-    except (KeyError, TypeError, ValueError):
-        return False
-    return low <= long_ask <= high and low <= short_ask <= high
 
 
 def _nba_volatility_features(artifact: dict, history, prediction) -> dict:

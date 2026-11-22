@@ -27,7 +27,7 @@ from ..config import PROJECT_ROOT
 from ..domain import EASTERN, parse_utc, utc_now
 from ..features.base import GameRecord
 from ..features.cfb_features import CFBGameRecord
-from ..pricing import implied_probability
+from ..pricing import implied_probability, is_two_sided_main_rung
 from ..production_registry import ProductionModelRegistry, compute_artifact_hash
 from .base import GamePrediction
 from .cfb_distribution import CFBDistributionType
@@ -454,6 +454,32 @@ def _freshest_capture(cands: list[Any], row_of: Callable[[Any], dict[str, Any]])
     return [c for c, t in zip(cands, seen, strict=True) if t is None or t >= floor]
 
 
+def _fresh_two_sided(cands: list[Any], row_of: Callable[[Any], dict[str, Any]]) -> list[Any]:
+    """Newest capture per rung, then the capture-freshness window, then the main-line band.
+
+    The band (both asks in 20-80%) rejects placeholders (2c bid / 49c ask, other side 98c) that
+    the long-ask ranking would otherwise prefer over a real market (quick 261122-ltz). Order
+    matters: latest-per-rung first so an older two-sided capture cannot stand in for a rung that
+    is now a placeholder, and the freshness floor before the band so a fresh placeholder still
+    marks older rungs as stale (otherwise the 2026-11-21 stale-rung bug returns).
+    """
+    fresh = _freshest_capture(_latest_per_rung(cands, row_of), row_of)
+    return [cand for cand in fresh if is_two_sided_main_rung(row_of(cand))]
+
+
+def _latest_per_rung(cands: list[Any], row_of: Callable[[Any], dict[str, Any]]) -> list[Any]:
+    latest: dict[str, Any] = {}
+    for cand in cands:
+        row = row_of(cand)
+        key = str(row.get("market_slug") or row.get("market_id") or row.get("line"))
+        seen = _observed(row)
+        prev = latest.get(key)
+        prev_seen = _observed(row_of(prev)) if prev is not None else None
+        if prev is None or (seen is not None and (prev_seen is None or seen >= prev_seen)):
+            latest[key] = cand
+    return list(latest.values())
+
+
 def _balance_then_newest(row: dict[str, Any]) -> tuple[float, float]:
     """Most balanced ask first; an exact tie (49c vs 51c) goes to the newer quote, not file order."""
     seen = _observed(row)
@@ -528,10 +554,10 @@ def _match_cfb_spread(
             continue
         cands.append((r, p1_side))
 
+    cands = _fresh_two_sided(cands, lambda item: item[0])
     if not cands:
         return None, None
 
-    cands = _freshest_capture(cands, lambda item: item[0])
     best, anchor_side = min(cands, key=lambda item: _balance_then_newest(item[0]))
     return best, anchor_side
 
@@ -593,10 +619,11 @@ def _match_cfb_total(
         if match_normal or match_reverse:
             cands.append(r)
 
+    cands = _fresh_two_sided(cands, lambda row: row)
     if not cands:
         return None
 
-    return min(_freshest_capture(cands, lambda row: row), key=_balance_then_newest)
+    return min(cands, key=_balance_then_newest)
 
 
 # A live event list fetched this long after the decision time postdates it and

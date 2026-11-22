@@ -15,6 +15,7 @@ from model_prediction.cli.forecast_market_select import (
 )
 from model_prediction.cli.forecast_nfl_support import _select_nfl_total_market
 from model_prediction.data_sources.mlb_market_odds import _select_full_game_market
+from model_prediction.models.college_football import _match_cfb_spread, _match_cfb_total
 
 
 def _row(slug: str, line: float, long_ask: float, short_ask: float, observed: str, team=None) -> dict:
@@ -121,3 +122,120 @@ def test_mlb_single_inning_total_is_never_the_full_game_total():
         ]
     }
     assert _select_full_game_market(event, "total")["line"] == 8.5
+
+
+def _cfb(
+    slug: str, kind: str, line: float, long_ask: float, short_ask: float, observed: str, title: str, team=None
+):
+    row = _row(slug, line, long_ask, short_ask, observed, team)
+    row.update({"market_type": kind, "event_title": title, "market_state": "MARKET_STATE_OPEN"})
+    return row
+
+
+SILL_INDST = "Southern Illinois vs. Indiana State"
+MORE_MRST = "Morehead State vs. Marist"
+
+
+def test_ncaaf_total_declines_an_all_placeholder_ladder():
+    # Southern Illinois vs Indiana State 2026-11-08 01:38Z: the 60.5 rung (1c / 50c) was priced, under at 99c.
+    rows = [
+        _cfb(
+            "tsc-cfb-sill-indst-2026-11-07-total-57pt5",
+            "total",
+            57.5,
+            0.63,
+            0.93,
+            "2026-11-08T01:35:52Z",
+            SILL_INDST,
+        ),
+        _cfb(
+            "tsc-cfb-sill-indst-2026-11-07-total-59pt5",
+            "total",
+            59.5,
+            0.65,
+            0.99,
+            "2026-11-08T01:36:02Z",
+            SILL_INDST,
+        ),
+        _cfb(
+            "tsc-cfb-sill-indst-2026-11-07-total-60pt5",
+            "total",
+            60.5,
+            0.50,
+            0.99,
+            "2026-11-08T01:35:52Z",
+            SILL_INDST,
+        ),
+    ]
+    assert _match_cfb_total("Southern Illinois", "Indiana State", rows) is None
+
+
+def test_ncaaf_spread_declines_an_all_placeholder_ladder():
+    # Morehead State vs Marist 2026-11-07: -2.5 at 5.5c / 48c; Marist +2.5 was bought at 94.5c.
+    rows = [
+        _cfb(
+            "asc-cfb-more-mrst-2026-11-07-neg-2pt5",
+            "spread",
+            -2.5,
+            0.48,
+            0.945,
+            "2026-11-07T19:48:01Z",
+            MORE_MRST,
+            "Morehead State",
+        ),
+        _cfb(
+            "asc-cfb-more-mrst-2026-11-07-neg-3pt5",
+            "spread",
+            -3.5,
+            0.44,
+            0.965,
+            "2026-11-07T19:48:01Z",
+            MORE_MRST,
+            "Morehead State",
+        ),
+    ]
+    assert _match_cfb_spread("Morehead State", "Marist", rows) == (None, None)
+
+
+def test_ncaaf_total_prefers_the_two_sided_rung_and_ignores_an_older_capture():
+    obs = "2026-11-08T01:35:52Z"
+    placeholder = _cfb(
+        "tsc-cfb-sill-indst-2026-11-07-total-60pt5", "total", 60.5, 0.50, 0.99, obs, SILL_INDST
+    )
+    real = _cfb("tsc-cfb-sill-indst-2026-11-07-total-55pt5", "total", 55.5, 0.46, 0.58, obs, SILL_INDST)
+    chosen = _match_cfb_total("Southern Illinois", "Indiana State", [placeholder, real])
+    assert chosen is not None and chosen["line"] == 55.5
+    older = _cfb(
+        "tsc-cfb-sill-indst-2026-11-07-total-60pt5",
+        "total",
+        60.5,
+        0.49,
+        0.53,
+        "2026-11-08T01:20:00Z",
+        SILL_INDST,
+    )
+    assert _match_cfb_total("Southern Illinois", "Indiana State", [older, placeholder]) is None
+
+
+def test_ncaaf_fresh_placeholder_still_marks_an_old_two_sided_rung_stale():
+    # The 2026-11-21 freshness rule must survive the band: a 05:45Z two-sided rung is not a price
+    # for a 14:08Z capture just because the fresh rung is a placeholder.
+    old_real = _cfb(
+        "tsc-cfb-sill-indst-2026-11-07-total-55pt5",
+        "total",
+        55.5,
+        0.47,
+        0.55,
+        "2026-11-07T05:45:00Z",
+        SILL_INDST,
+    )
+    fresh_placeholder = _cfb(
+        "tsc-cfb-sill-indst-2026-11-07-total-56pt5",
+        "total",
+        56.5,
+        0.49,
+        0.98,
+        "2026-11-07T14:08:00Z",
+        SILL_INDST,
+    )
+    assert _match_cfb_total("Southern Illinois", "Indiana State", [old_real, fresh_placeholder]) is None

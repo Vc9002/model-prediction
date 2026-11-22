@@ -1,6 +1,28 @@
 from __future__ import annotations
 
+from typing import Any
+
 from .domain import MarketType, PickResult
+
+# A main line's asks sit near 50% on both sides; outside this band a rung is an alternate or
+# a placeholder, never the game's spread/total. One copy for every main-line selector.
+MAIN_LINE_ASK_BAND = (0.20, 0.80)
+
+
+def is_two_sided_main_rung(row: dict[str, Any], band: tuple[float, float] = MAIN_LINE_ASK_BAND) -> bool:
+    """Both the long and the short ask of a snapshot row sit inside ``band``.
+
+    Why (2026-11-22): selectors ranked rungs by the long ask alone, so a rung nobody bids on
+    (BKN@MEM 2026-11-14: 229.5 quoted 2c / 49c beside a real 227.5 at 35c / 47c) became "the
+    main line" and its other side was priced at 1 - bid = 98c.
+    """
+    low, high = band
+    try:
+        long_ask = float(row["long"]["ask"])
+        short_ask = float(row["short"]["ask"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return low <= long_ask <= high and low <= short_ask <= high
 
 
 def american_to_decimal(american_odds: int) -> float:
