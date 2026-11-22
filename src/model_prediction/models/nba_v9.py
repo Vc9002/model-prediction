@@ -45,7 +45,12 @@ def artifact_key_drift(artifact: dict[str, Any], accepted: Sequence[str]) -> tup
 
 
 def _warn_on_artifact_key_drift(artifact: dict[str, Any], default_version: str) -> None:
-    """Emit one warning when an artifact has unread or code-defaulted keys. Never raises."""
+    """Log one INFO line when an artifact has unread or code-defaulted keys. Never raises.
+
+    INFO, not WARNING: the shipped v9 artifacts are known to drift (pinned in
+    tests/test_nba_v9_artifact_keys.py), so a WARNING would repeat on every forecast run. The daily
+    log is INFO-level, and a new misspelled key fails that test before it can ship.
+    """
     try:
         params = inspect.signature(NBAStructuralV9Engine.__init__).parameters
         accepted = [
@@ -55,7 +60,7 @@ def _warn_on_artifact_key_drift(artifact: dict[str, Any], default_version: str) 
         ]
         unread, defaulted = artifact_key_drift(artifact, accepted)
         if unread or defaulted:
-            _logger.warning(
+            _logger.info(
                 "NBA v9 artifact %s: %d key(s) never read by the engine %s; %d engine parameter(s) "
                 "absent from the artifact use code defaults %s",
                 artifact.get("model_version", default_version),

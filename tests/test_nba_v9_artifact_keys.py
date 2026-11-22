@@ -198,11 +198,12 @@ def _signature_params() -> dict[str, inspect.Parameter]:
     return dict(inspect.signature(NBAStructuralV9Engine.__init__).parameters)
 
 
-def test_from_artifact_logs_one_warning_naming_both_sets(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.WARNING, logger="model_prediction.models.nba_v9"):
+def test_from_artifact_logs_one_info_line_naming_both_sets(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.INFO, logger="model_prediction.models.nba_v9"):
         NBATotalModelV9.from_artifact(_load("nba-total-margin-v9"))
     records = [r for r in caplog.records if r.name == "model_prediction.models.nba_v9"]
     assert len(records) == 1
+    assert records[0].levelno == logging.INFO
     message = records[0].getMessage()
     assert "nba-total-margin-v9" in message
     assert "trend_total_weight" in message
@@ -212,7 +213,7 @@ def test_from_artifact_logs_one_warning_naming_both_sets(caplog: pytest.LogCaptu
 def test_from_artifact_does_not_warn_on_a_complete_artifact(caplog: pytest.LogCaptureFixture) -> None:
     full = {name: param.default for name, param in _signature_params().items() if name in ACCEPTED}
     full["moneyline_margin_weight"] = 0.3
-    with caplog.at_level(logging.WARNING, logger="model_prediction.models.nba_v9"):
+    with caplog.at_level(logging.INFO, logger="model_prediction.models.nba_v9"):
         NBASpreadModelV9.from_artifact(full)
     assert not [r for r in caplog.records if r.name == "model_prediction.models.nba_v9"]
 
