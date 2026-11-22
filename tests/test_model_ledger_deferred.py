@@ -134,3 +134,67 @@ def test_spool_is_never_mistaken_for_a_workbook(tmp_path, monkeypatch) -> None:
 def _no_leaked_deferral():
     yield
     assert not ml._model_ledger_writes_deferred()
+
+
+def test_reads_are_identical_just_before_and_after_the_flush(tmp_path) -> None:
+    ledger = ModelLedger(tmp_path / "m1.xlsx")
+    ledger.append_prediction(_record("e0"))
+    with defer_model_ledger_writes():
+        for i in range(1, 4):
+            ledger.append_prediction(_record(f"e{i}"))
+        before = ledger.rows()
+    assert ledger.rows() == before
+    assert [row["event_id"] for row in before] == ["e0", "e1", "e2", "e3"]
+
+
+def test_main_and_flat_hooks_for_one_decision_write_one_row_under_deferral(tmp_path) -> None:
+    """Both tiers call record_from_pick_request for the same pick; the dedupe must see the spool."""
+    from model_prediction.domain import League, MarketType, PickRequest
+    from model_prediction.eligibility import EligibilityResult
+    from model_prediction.entities import CanonicalTeam
+    from model_prediction.model_ledger import model_id_for, record_from_pick_request
+
+    request = PickRequest(
+        event_start_utc="2026-12-03T00:00:00Z",
+        event_id="event-1",
+        league=League.NBA,
+        away_team="A",
+        home_team="H",
+        market_type=MarketType.SPREAD,
+        selection="away",
+        line=-3.5,
+        sportsbook="polymarket_us",
+        american_odds=-110,
+        model_probability=0.6,
+        model_uncertainty=0.01,
+        model_version="nba-spread-margin-v9",
+        rationale="r",
+        risks="k",
+        observed_at_utc="2026-11-22T12:00:00Z",
+    )
+    away = CanonicalTeam("nba-a", League.NBA, "A", "A", True, None, None, ())
+    home = CanonicalTeam("nba-h", League.NBA, "H", "H", True, None, None, ())
+    eligibility = EligibilityResult(True, "CALL", "QUALIFIED", 1.5, 70, 0.08, 0.08, away, home)
+    model_id = model_id_for("NBA", "spread", "nba-spread-margin-v9")
+    assert model_id is not None
+    with defer_model_ledger_writes():
+        first = record_from_pick_request(tmp_path, request, eligibility)
+        second = record_from_pick_request(tmp_path, request, eligibility)
+        assert first is not None and second is None
+    assert len(ModelLedger(tmp_path / f"{model_id}.xlsx").rows()) == 1
+
+
+def test_a_spool_that_cannot_be_deleted_does_not_fail_the_mutation(tmp_path, monkeypatch) -> None:
+    ledger = ModelLedger(tmp_path / "m1.xlsx")
+    row = _append_then_crash(ledger, monkeypatch)
+    real_unlink = type(ledger.spool_path).unlink
+
+    def locked(self, *args, **kwargs):
+        if self == ledger.spool_path:
+            raise PermissionError("sharing violation")
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(type(ledger.spool_path), "unlink", locked)
+    assert ledger.flush_pending() == 1  # workbook replaced; the unlink failure is only logged
+    assert _workbook_ids(ledger.path) == {row["prediction_id"]}
+    assert [r["prediction_id"] for r in ledger.rows()] == [row["prediction_id"]]  # deduped by id

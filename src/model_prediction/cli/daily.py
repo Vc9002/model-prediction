@@ -329,10 +329,13 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     _t_settle_end = _t_start
     # A run killed mid-deferral leaves per-model ledger rows in a spool (model_ledger.defer_model_ledger_writes);
     # readers already merge them, this just folds them into the workbooks the dashboard reads directly.
-    try:
-        flush_pending_model_ledgers(Path(ledger_path(config)).parent / "model_ledgers")
-    except Exception:
-        logger.warning("model-ledger spool recovery failed", exc_info=True)
+    # Both roots the ledgers can write under (the flat ledger below uses data_root, the learned tasks use
+    # ledger_path(config).parent); a root with no spool is a cheap no-op.
+    for _spool_root in dict.fromkeys((Path(data_root), Path(ledger_path(config)).parent)):
+        try:
+            flush_pending_model_ledgers(_spool_root / "model_ledgers")
+        except Exception:
+            logger.warning("model-ledger spool recovery failed", exc_info=True)
     # Self-throttled to weekly (see mlb_baseline_refresh's module
     # docstring) -- safe to call every daily cron cycle since it's a
     # cheap no-op most of the time, but keeps park factors and league
@@ -1308,8 +1311,6 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             }
 
     def _cfb_task() -> None:
-        if _skip_for_horizon("ncaaf", "NCAAF"):
-            return
         try:
             forecast_result["ncaaf"] = _forecast_cfb_sport(
                 data_root=data_directory,

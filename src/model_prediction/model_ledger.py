@@ -614,8 +614,14 @@ class ModelLedger:
             _ROWS_CACHE.pop(str(self.path.resolve()), None)
         _write_predictions_atomic(self.path, rows)
         # ``rows`` always comes from _read_unlocked, so every spooled row is in the workbook now. A crash
-        # between the replace and this unlink only leaves duplicates that _read_unlocked ignores by id.
-        self.spool_path.unlink(missing_ok=True)
+        # (or a transient Windows sharing error) between the replace and this unlink only leaves duplicates
+        # that _read_unlocked ignores by id, so the mutation that already landed must not fail here.
+        try:
+            self.spool_path.unlink(missing_ok=True)
+        except OSError:
+            logging.getLogger(__name__).warning(
+                "could not delete folded spool %s", self.spool_path, exc_info=True
+            )
 
     def rows(self) -> list[dict[str, str]]:
         with self._lock():

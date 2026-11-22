@@ -97,10 +97,10 @@ def test_the_probe_only_asks_for_enabled_single_scoreboard_leagues() -> None:
         MLB={"leagues": ["MLB", "OTHER"]},
     )
     horizons = probe_event_horizon(
-        config, "2026-11-22", NOW, fetch, leagues=("NFL", "NBA", "WNBA", "MLB", "NCAAF")
+        config, "2026-11-22", NOW, fetch, leagues=("NFL", "NBA", "WNBA", "MLB", "NCAAB")
     )
-    assert sorted(asked) == [("NCAAF", "2026-11-22"), ("NFL", "2026-11-22")]
-    assert set(horizons) == {"NFL", "NCAAF"}
+    assert sorted(asked) == [("NCAAB", "2026-11-22"), ("NFL", "2026-11-22")]
+    assert set(horizons) == {"NFL", "NCAAB"}
 
 
 def test_skip_result_reads_as_an_empty_forecast_and_not_as_an_error() -> None:
@@ -137,14 +137,13 @@ def test_run_daily_probes_before_the_pool_and_gates_exactly_the_scoreboard_tasks
         ("_nba_total_task", "nba_total", "NBA"),
         ("_nfl_spread_task", "nfl_spread", "NFL"),
         ("_nfl_total_task", "nfl_total", "NFL"),
-        ("_cfb_task", "ncaaf", "NCAAF"),
         ("_wnba_spread_task", "wnba_spread", "WNBA"),
         ("_wnba_total_task", "wnba_total", "WNBA"),
     ):
         body = source.split(f"def {task}() -> None:", 1)[1].split("\n    def ", 1)[0]
         assert f'_skip_for_horizon("{key}", "{league}")' in body, task
     # Not scoreboard-driven: week-ahead lines, other discovery paths, and settlement never consult the probe.
-    for task in ("_nfl_early_task", "_tennis_task", "_mlb_totals_task", "_mlb_nrfi_task"):
+    for task in ("_nfl_early_task", "_tennis_task", "_mlb_totals_task", "_mlb_nrfi_task", "_cfb_task"):
         body = source.split(f"def {task}() -> None:", 1)[1].split("\n    def ", 1)[0]
         assert "_skip_for_horizon" not in body, task
     settle = source[source.index("if args.skip_settlement:") :]

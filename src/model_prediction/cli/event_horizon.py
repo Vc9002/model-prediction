@@ -28,10 +28,11 @@ from ..domain import parse_utc
 logger = logging.getLogger("model_prediction.cli")
 
 # League keys (config.models / ESPN scoreboard name) whose forecast tasks discover games from
-# ``ESPNClient.scoreboard(league, args.date)`` and drop started games themselves. NCAAB already returns early
-# on an empty scoreboard, and MLB totals/NRFI, esports and the rest use other discovery paths, so none of
-# those are listed.
-SCOREBOARD_LEAGUES: tuple[str, ...] = ("MLB", "NBA", "WNBA", "NFL", "NCAAF")
+# ``ESPNClient.scoreboard(league, args.date)`` and drop started games themselves. Deliberately absent: NCAAB
+# (already returns early on an empty scoreboard), NCAAF (build_cfb_slate also prices started games and records
+# Polymarket candidate evidence for them, so an empty-handed skip would not be equivalent; it costs about 4 s on
+# a no-game day), and MLB totals/NRFI, esports and the rest, which use other discovery paths.
+SCOREBOARD_LEAGUES: tuple[str, ...] = ("MLB", "NBA", "WNBA", "NFL")
 
 
 @dataclass(frozen=True)
