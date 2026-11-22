@@ -14,56 +14,52 @@ checkpoint `0af19ecd`: 9 in `tests/test_cli.py`, 1 each in `test_five_blind_spot
 targeted runs (`-o addopts='' -q`, never the full suite), then merge or hold. The scheduled
 tasks run the working tree, so do not edit source while a daily run is in progress.
 
-## 1. NCAAB (open, most expensive loss source)
+## 1. NCAAB (updated 2026-11-21 evening, quick 261121-hmc)
 
-- **Evidence:** `docs/NCAAB_LOSS_AUDIT_2026-11-10.md`. v6 Main spread 20/40 (+0.95u), total 11/36
-  (-25.78u); v3 away moneyline 13 of 151. Gates added: executable-quote requirement,
-  current-season sample >= 8, totals paused in Main.
-- **Forward check (pinned):** `ncaab-spread-v6`, spread, edge 5%-8%, picks created on or after
-  2026-11-12, dedupe on (event, selection, line, model) preferring Main over Flat. Report record,
-  ROI, mean model probability vs hit rate, verified-quote count. Baseline 11W-3L is post-hoc;
-  call it real only after about 50+ forward picks at roughly 58%+. Do not size up or gate on it.
-  Use `ledgers.db`, not the buyer ledger (buyer rows include manual early exits).
-- **Falsifiable next check from the audit:** once fresh quoted games settle, compare serving
-  probability vs outcome vs decision-time market probability per market and side (Brier, log loss,
-  calibration, line error) before restoring Main totals or considering a v7. Do not fit on the
-  evaluated dates.
-- **Structural finding, still unfixed:** pure Elo underrates home teams across most probability
-  buckets (worst at p_home 0.4-0.5, actual about 60%), consistent across ncaab/euroleague/acb/lnb/bbl.
-  Needs a real `elo_weight` x `offseason_regression` ablation on multi-season history. The local
-  NCAAB file covers one season, so `offseason_regression` cannot be tuned yet.
-- **2026-11-12 review fixes landed (`quick-261112-nc6`)**: #7 total baseline mismatch, #9 artifact
-  drift, #10 coherent moneyline, #11 early-season compression (tiered trend priors + additive
-  matchup), integer-line push mass; HCA 7.2 -> 5.0 / Elo 55 -> 45 and `total_sd` 13.5 -> 16.5
-  selected on validation. Evidence: `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md`,
-  `outputs/ncaab/ncaab_v6_review_ablation.md` (not market-relative). Both champions changed in
-  place under the same version string -- the forward check above now measures the fixed model;
-  rows created before 2026-11-12T07:00Z were priced by the old one.
-- **Settled-ledger replay of the fixed model** (`scripts/replay_ncaab_v6_all_settled.py`,
-  `outputs/ncaab/ncaab_v6_settled_replay.md`): all 1,167 settled Flat rows re-priced under the live
-  forward rule -- fixed vs pre-fix control: ML 46 bets +1.60u vs 71 bets -0.90u; spread 303 bets
-  -13.91u vs 329 bets -18.59u (8% hurdle: -2.24u vs -22.23u); total 79 bets -9.36u vs 142 bets
-  -16.92u. Better on every market, still negative on spreads/totals; every row is a sample 0-3
-  season-opener and 1,157 of 1,167 asks are indicative. Does not validate Main; the forward check
-  above does.
-- **Feature round landed (`quick-261112-nc6` round 2)**: history-derived non-D1 Elo prior and
-  AP-rank prior (8 Elo per slot) on the spread model; attempts-based tempo (FGA + 0.44 FTA from
-  the archived ESPN scoreboards, sensitivity 1.5) on the total model. Holdout margin MAE 16.5 ->
-  12.7, holdout moneyline Brier 0.122 -> 0.110 (pre-fix control 0.112); validation total MAE
-  13.78 -> 13.38. Early-season features were selected on the train window (validation has no
-  openers) -- see `docs/NCAAB_V6_REVIEW_FIXES_2026-11-12.md`. New data module:
-  `features/ncaab_scoreboard_stats.py`.
-- **2026-11-13**: Main totals restored (`df37969f`) behind the sample gate (>= 8) with a new
-  `models.NCAAB.main_totals_enabled` policy switch. Box scores backfilled for 2025-26 (6,483 games,
-  `scripts/backfill_ncaab_boxscores.py`, 99.97% history coverage); exact possessions tested as the
-  total tempo source and found indistinguishable from the shipped attempts proxy (not shipped).
-  Natural next model step: points-per-possession efficiency as the spread trend half.
-- **Open after the fixes (needs a second cross-season window or market lines to select on):**
-  early-season under-dispersion (served margin scale ~15 vs realised 22-24 in 2026-11; total
-  credibility widening x1.4 is now too wide on top of `total_sd` 16.5); `elo_weight_ramp_games`
-  (implemented, off); `offseason_retention` 0.2 vs 0.35. Do not pick these on the 2026-11 games --
-  that window is the locked holdout of the ablation.
-- `aba`, `nbl`, `wncaab` still have no game-result dataset and stay on the generic Elo config.
+- **Serving verified:** the 18:30 ET Daily 2026-11-21 wrote NCAAB moneyline rows as
+  `ncaab-moneyline-v7m` (hash `5ea1cb06…`), spread `ncaab-spread-v7`, total `ncaab-total-v6`.
+- **Next action:** read the addendum v4 scorecards (`outputs/ncaab/research_261120/P1_player_availability/`, `P2_returning_production_early/`).
+- **Done 2026-11-21:** `ncaab-moneyline-v7m` (pure margin probability, A_ml_w0) promoted for the NCAAB
+  moneyline only (`e865f518`, operator-approved after an all-season check: better log loss on 856 D1
+  games, slightly worse on 178 priced games, market beats both). Rollback order: moneyline first
+  (`model_promotion rollback --sport NCAAB --market moneyline` returns `ncaab-spread-v7`), then spread.
+  Buyer state v979 blacklists v7m (backup `*.pre-ncaab-v7m-20261121-165215.bak`). The forward-check
+  cohort SQL must include v7m moneyline rows (model_id `ncaab-moneyline-v7m`).
+- **Spread/total research (261121-hmc):** totals grid T1-T3 not eligible; v6 stays. Player boxes
+  2022-2026 backfilled (`data/research/ncaab_external/espn_player_boxes/`, 31,039 events) and PIT
+  player features built; addendum v4 (`5d4a3da5`, K spread 25) pins P1 availability and P2 returning
+  production. Confirmation needs 2014-2021 boxes, fetched only if a candidate is DEV_ELIGIBLE.
+- **06:00 Daily 2026-11-21 verified:** 69/69 NCAAB v7 rows and 16/16 total rows carry
+  `model_artifact_hash`; all NCAAB calibrators served identity; trial evaluated v7 (8 candidates, 0
+  orders); pre-tip capture idle before tips (87 open rows, none in window).
+- **Done 2026-11-21:** `ncaab-spread-v7` promoted for moneyline + spread (`c3f97a4a`; rollback
+  `ncaab-spread-v6` via `model_promotion rollback`, both markets). The `models.NCAAB.margin_engine` yaml
+  key is retired and fails the slate closed. Slate replay: v7 id served probabilities identical to the
+  v6-id/v7-engine serving (46/46). Live state: buyer state v937 blacklists v7 (NCAAB stays disabled in
+  all three markets); paper trial trades v7 only (backups `*.pre-ncaab-v7-id-*.bak`).
+- **Calibration changed (operator-approved):** NCAAB fits on `model_probability_raw`, engine-pure pools
+  (v6-labelled rows priced by the v7 engine fit v7), serving through `load_serving_calibrator` (sample
+  floor + OOF Brier gain). At the change all NCAAB calibrators resolved to identity (raw). Watch the
+  Daily `result["calibration"]` decisions.
+- **CLV:** NCAAB closes must be observed strictly after the decision; the 15-min buyer worker captures
+  pre-tip snapshots (NCAAB, tips within 25 min). First real captures from ~10:40 ET 2026-11-21. Check
+  settled NCAAB rows from 11-21 carry a close != decision price. The resolution-settle and auto-buyer
+  ledger paths got the same rule on 2026-11-21 (`9adde04e`, NCAAB/NCAAF, forward only). Open: NBA paper
+  rows have the same zero-CLV close (33 of 48); a top-up buy can still take a close observed between
+  the first fill and the top-up.
+- **Forward check (re-pinned by engine):** split on
+  `COALESCE(json_extract(json_extract(decision_payload_json,'$.model_input_snapshot_json'),'$.features.margin_engine'),'v6')`;
+  v7 cohort = (v6 id AND engine v7) OR v7 id. Spread 5-8% edge since 11-12 was 13-16 (n=29) at review.
+- **Research verdicts (dev window, 22,947 games):** no candidate has edge over the closing line; only
+  A_ml_w0 is DEV_ELIGIBLE. B1/B3 (scale) help cover log loss slightly but worsen moneyline; B2 cap,
+  C1/C2 per-possession, D1 preseason prior not eligible. Evidence: `docs/ncaab_review_2026-11-20/`,
+  `outputs/ncaab/research_261120/`.
+- **Team matching fixed (`cb1b980f`):** mascot kept when a spread lists first; UCA/UNCW/NAU aliases.
+- **Data:** CBBD key in `.env` as `CBBD_API_KEY` (3,000 calls/month shared with CFBD; ~176 used);
+  cbbdata has no valid key (client inert); Kaggle Massey dropped. History boxes 2021-22+ in
+  `data/research/ncaab_external/espn_boxscores/`.
+- **Still open:** NCAAB auto-buyer stays disabled by operator state; ledger `model_probability` column is
+  raw while the payload is served (documented; readers fixed in best-pick audit and ledger API).
 
 ## 2. Best-picks audit script (offered, not done)
 
@@ -97,11 +93,21 @@ slate / NFL slates / auto-buyer read them at serving time. Since `quick-261112-1
 own-model fit provenance and >= 100 outcomes, but the pipeline can still change a served transform with no
 promotion record. Decide whether that is acceptable or whether serving must pin a hash.
 
-## 4. NFL v8 challenger
+## 4. NFL v8 challenger (replayed 2026-11-15: not promotable; keep unqualified)
 
-`nfl-spread-structural-v8` (discrete-margin PMF) is an unqualified challenger. The replay over every
-settled spread ledger game is in `scripts/replay_nfl_v8_settled.py`; its result is not recorded in
-any doc. Run it, record Brier/ROI vs v7 with the 60/20/20 contract, and only then discuss promotion.
+`nfl-spread-structural-v8` projects the same margin as v7 in every game; only the distribution
+differs (discrete PMF with push mass), so it cannot repair a mean with no signal.
+
+- 1,489 completed games, flat 1u at a 52.4% ask: Brier 0.2494 vs v7 0.2496 (market 0.2500); favoured
+  side 51.4% vs 52.7%. At its own 3.5% gate: 75 bets 42-33 +5.18u, of which 2022 (inside the PMF fit
+  window) is +5.18u. Out of sample (2023+): 48 bets 26-22 +1.64u at 3.5%, 18 bets 9-9 -0.82u at 5%.
+  Fires cluster on 2.5/3.5/6.5/7.5 (46 bets 28-18), a post-hoc slice priced at an unshaded ask.
+- 60 settled Flat spread rows at their own line and ask (`scripts/replay_nfl_v8_settled.py`, repaired
+  2026-11-15 to re-price pre-11-11 four-column snapshots from the current store; output
+  `outputs/research/nfl_v8_settled_replay.json`): Brier ask 0.2447, fixed v7 0.2513, v8 0.2531.
+  `promotion_blocked: true` (v7 parity 7 of 24 rows within one point).
+- Possible use: valuing half points around 3 and 7 against real shaded two-sided asks, once a few weeks
+  of the week-ahead captures exist. Not a serving candidate.
 
 ## 5. Daily forecast speed and reliability
 
@@ -170,3 +176,130 @@ weather, guarded serving calibrator, and `scripts/replay_nfl_v7_all_settled.py`.
   the replay contradicts that. Either demote the evidence label (keeps them serving, blocks Main as
   qualified) or accept that the 5% Main hurdle will rarely fire (16 of 1,451 games, hit 37.5%).
 - **Open**: NFL moneyline (`nfl-elo-trend-lr-v4`) was not re-priced; 85 Flat picks 55W/29L +5.55u.
+
+## 8. NFL fix batch 2026-11-15 (`quick-261115-21e`; done, follow-ups open)
+
+Loss review: at executable quotes moneyline is 29-22 -9.91u (edge >= 8%: 0-8), spread edge >= 5% is
+6-14, totals 21-10 +15.82u. Model Brier loses to the ask in all three markets.
+
+- **Done.** Paper buyer rejects picks whose forecast flagged `input_qualified` false or (totals)
+  `weather_inputs_verified` false, read from the canonical ledger (`rejected_input_unqualified`;
+  first live cycle 06:40Z rejected the NE at DET and SEA at LV totals). `(nfl, spread)` is disabled in
+  the buyer, code constant and live state; `nfl-elo-trend-lr-v4` left the live whitelist (it was on
+  both lists; state backup `auto_buyer_state.json.pre-nfl-spread-off-lrv4-whitelist-20261115-063137.bak`).
+  Registry `evidence_status` is `historical_only` for v7 spread, v7 total and lr-v4. Dashboard
+  `performance()` no longer scores `model_opinion_no_executable_quote` rows and reports them under
+  `placeholder_priced_excluded`; this applies to every sport (210 settled Main rows, +47u: MLB 144,
+  WNBA 25, NFL 25, NBA 16).
+- **Open decision: NFL Main still follows the artifact, not the registry.** NFL spread/total gating
+  reads `qualification.qualified` in the v7 artifacts, so the evidence demotion is a label only. Wiring
+  NFL to the registry (as NBA is) would turn every NFL Main row into a paper call.
+- **Open decision: NFL totals in the buyer.** A weather-only total model selected on validation scores
+  0.2502 on the locked holdout (from 2025-09-28) against 0.2511 for served v7, whose edge >= 5% fires
+  are 13-17 -5.18u there. Recorded wind >= 12 mph went 105 unders / 60 overs through 2025-09 and
+  20 / 21 since. No total edge is validated; the +15.82u ledger record is 31 picks.
+- **Not changed, on evidence:** spread sd. Flat 12.8 vs 13.8 with the 1.25x heavy-line factor is
+  Brier-neutral on validation (0.24946 vs 0.24949) and slightly worse on holdout (0.25064 vs 0.25044).
+- **New shadow tool:** `scripts/nfl_price_edge_report.py [date]` lists Polymarket asks below the
+  no-vig DraftKings consensus for the same line. Unvalidated; one week of capture history.
+- **Blocked on data, with dates:** closing-line value (3 settled rows have a closing consensus; about
+  36 more after 2026-11-16 settlement, readable from roughly 2026-12-07 with four slates); forecast
+  weather validation (Open-Meteo captures began 2026-11-11); opener and line-movement tests (captures
+  began 2026-11-12; four weeks by 2026-12-10).
+- **Reversed the same day (operator directive: nothing comes off production, paper needs picks).**
+  `(nfl, spread)` and `(nfl, total)` are live in the buyer again (code and state, `f451f802`,
+  `b6d3177a`) and `nfl-elo-trend-lr-v4` is back on the live whitelist. It is still on the blacklist
+  from before 2026-11-15, so the buyer buys no NFL moneyline. The input gate stays. Do not propose
+  disabling a market as a fix; the two open decisions above are closed as "leave serving".
+- **Moneyline challenger `nfl-moneyline-margin-v1` (`3c6c6aca`).** The home-win probability
+  `nfl-spread-structural-v7` already derives from its margin, logged to Flat under its own model id
+  from the spread slate (`cli/forecast_nfl_moneyline_shadow.py`). 594 out-of-sample games
+  (2024-09-22..2026-10-08): Brier 0.2071 vs 0.2198 for lr-v4, paired gain +0.0127 (95% +0.0038..
+  +0.0213), 67.3% vs 66.0% winners. The gain is the sportsbook line inside the margin (pure
+  structural margin 0.2277, line alone 0.2068), so it is accuracy, not edge. Not promoted; promotion
+  needs Vincent's yes and `model_promotion promote`. One row (`b112db1191754f20`, PIT at CIN) was
+  written to the live Flat ledger at 21:27Z by a dry run that resolved to the runtime root.
+  **Next:** confirm the 23:30Z run logged the row beside lr-v4's and compare the two on results.
+- **Evaluated 2026-11-15:** `nfl_market_anchor_v1` walk-forward on live quote-backed calls: moneyline
+  0.2330 -> 0.2138 (41 rows) and spread 0.2653 -> 0.2408 (26) at weight 1.0, i.e. the market; total
+  gets worse, 0.2328 -> 0.2482 (25). Loss mechanism: moneyline picks 5%+ above the ask are 1-11.
+- **Not evaluated:** `nfl_joint_market_v3`, `nfl_joint_score_v1`. The anchor
+  needs timestamp-valid two-sided quotes per settled game; 121 executable-quote picks exist.
+
+## 9. NFL spread/total improvement search (2026-11-15 evening: nothing beats the line)
+
+Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped; closing line = 0.2500 / 50.0%.
+
+- 10 fixed candidates on existing inputs (Elo/form vs line, engine terms refit, line/pace/EPA, boosted
+  trees): best spread 0.2500 vs v7 0.2504 (895 games), best total 0.2497 vs 0.2505 (912). All inside noise.
+- **The replay's quarterbacks were wrong.** `QBResolver` has depth charts for 65 of 1,469 games; the other
+  1,404 fell back to the team's all-time attempts leader. Re-dumped with each game's actual starter (most
+  attempts in that game): the starter differs in 598 home / 618 away team-games, `c_qb` changes in 859.
+- With real starters v7 is unchanged: spread 0.2501, 52.7% (896); total 0.2506, 51.7% (913). The QB term
+  alone has corr 0.027 with the spread residual (0.72 with the line itself) and its fitted sign flips by
+  fold. 6 more candidates, none beats v7. The line already prices the quarterback.
+- Only stable signal: the v7 total deviation refits to a slope of 0.13-0.23 in every fold (right direction,
+  roughly 4x overconfident); gain +0.0010 Brier, 95% -0.0012..+0.0033, same side picked.
+- Live path checked: anchor line and priced Polymarket rung are the same contract and snapshot.
+- Not replayable on history: `nfl_joint_market_v3`, `nfl_joint_score_v1` (need frozen pregame packets).
+- Scripts are in the session scratchpad only (`st_search.py`, `dump_starters.py`, `qb_test.py`); nothing in
+  the repo changed. Untested and still open: opener/line-movement inputs (data from 2026-11-11 only).
+
+## 10. NFL opener / line-movement data (fetched 2026-11-15 night)
+
+- `data/research/nfl_openers/espn_odds_raw.jsonl` (1,489 events, ESPN core odds endpoint, all providers,
+  raw items) and `openers_parsed.json` (median non-live open/close per event). Openers exist for 826 games:
+  2023-10 onward (2021-2022 and early 2023 have none). Parsed close vs replay line: corr 0.996.
+- No fit, 826 games. At the CLOSE nothing works: betting with the move 299-315 (spread), 317-338 (total).
+- v7 re-anchored on the opener (swap the 0.8 market term): its deviation matches the direction the spread
+  later moved 344-279 (55.2%), 202-143 (58.6%) when the deviation is >= 0.5 pt; side vs the opener covers
+  427-382 (52.8%, not separable from 50%). With real starters: 58.4% / 62.0% / 53.7%.
+- **Not clean yet:** opener timestamps are unknown and the replay inputs are as of 6h before kickoff, so
+  the model may know a week of results (and, in the real-starter run, the starter) the opener did not.
+  Next step is prospective: price each NFL game when its line opens, log to Flat under its own id, and
+  measure CLV against the close. Not built.
+
+## 11. NFL replay extended to 2016 (2026-11-16)
+
+- nflverse weekly player stats 2015-2020 cached in `data/research/nfl_history/`; replay now 2,826 games
+  (was 1,489), real starters in 2,818. Dump is scratchpad-only (`dump_2016.py`, `big_test.py`).
+- v7 as served on 2016-2020, which it was never tuned on: spread 666-639 (51.0%), Brier 0.2503; total
+  664-663 (50.0%), Brier 0.2517. All 2,826: spread 52.0% +/-1.9%, total 50.8% +/-1.9%.
+- corr(model lean, result vs closing line): spread +0.013, total -0.0001. Season-forward refits
+  (2018-2026, 2,235 / 2,270 games) do not beat v7. The total model has no signal against the close.
+
+## 12. NFL early-line log (started 2026-11-16)
+
+- `scripts/nfl_early_line_log.py <date> [<date> ...]` prices upcoming NFL spread and total slates with the
+  serving v7 engines days before kickoff and appends first-sight rows to
+  `data/research/nfl_early/early_lines.jsonl`. It builds no ledger object and writes nothing else.
+- First run 2026-11-16 ~05:00Z: 13 games x 2 markets (11-16 MNF, 11-19 TNF, 11-22 Sunday), all with
+  Polymarket asks. The daily job now runs it once a day for the next seven days (`_nfl_early_task`).
+- Purpose: clean prospective test of section 10 (model vs early line predicts the move). Score each row
+  against the closing line and the result once the games settle.
+
+## 13. NBA v10 overhaul (started 2026-11-20)
+
+- **Next action:** none blocking; let the forward clocks run. Weekly, run
+  `python scripts/nba_v10/g2_report.py` (gate G2, v10 vs Main) and
+  `python scripts/nba_v10/forward_report.py` (test A line movement, test B injury latency); both
+  stay PENDING until their pre-registered n (G2 150 picks; A 400 games per market; B 100 events).
+- **Running (scheduled, research only):** `ModelPrediction-NbaPretipCapture` (registered 2026-11-21,
+  every 10 min 11:00-02:00 ET) captures ESPN odds (12 h slate) and Polymarket near tip, then in a
+  budgeted thread: official injury reports, ESPN box-score catch-up, nba-player-v10 shadow log,
+  T-C2 events (`<runtime>/research/nba_v10_forward/`, `<runtime>/injury_reports/nba/`). Skipped
+  00:15-01:20 ET. First full run 16:50 ET 11-21: exit 0, 8 reports, 5 player records, 2 T-C2 events.
+- **Results so far:** G1 FAIL for v9, v9.1 and the Phase 3 player layer (all lambda 0); v10 prices at
+  the DraftKings devig (verified on the 16:00 run) and its only edge is T-B (>= 3.0 points). G2 rules
+  pinned and amended before any pick scored (plan section 9). v9 keeps Main with edge sizing; Flat
+  calls everything.
+- **Checked 11-21 evening:** in-window pre-tip runs 19:10-19:50 ET (1-3 games inside 25 min of tip)
+  took 15-40 s, all exit 0. Their 2-12 HTTP 429s are Polymarket `/book` calls that the capture
+  retried through: 0 failures, 0 missing asks, no missing-quote events, no rate-limit pauses.
+- **Open:** `forward_report.py` does not yet compute the
+  test-A paired player-minus-v9 slope that PREREG_FORWARD.md section 5 requires (needed before
+  400 games). v10 spread rows carry `model_artifact_hash` null for the v9 spread source (totals have
+  it); upcoming games are treated as regular season in the forward log (fix before April); 2026
+  playoff games are absent from `nba_games_all.jsonl`; a pre-existing 311 s capture run (19:50Z
+  11-21) brushed the 300 s supervisor timeout.
+- **Leftover:** four empty locked worktrees under `.claude/worktrees/agent-*` (removal was denied).

@@ -14,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 from dataclasses import asdict, replace
 from datetime import UTC, datetime, timedelta
 from functools import partial
@@ -77,7 +78,14 @@ from ..production_registry import ProductionModelRegistry, compute_artifact_hash
 from ..runtime_paths import RuntimePaths
 from ..soccer_forward import build_soccer_total_slate
 from ..tennis_forward import build_tennis_slate
-from .commands import _clear_today_open, _research_models_dir, _rolling_models_write_dir
+from .commands import (
+    _clear_today_open,
+    _declined_slots,
+    _open_ncaab_rows,
+    _research_models_dir,
+    _restore_unreplaced_ncaab,
+    _rolling_models_write_dir,
+)
 from .forecast_market_select import (
     _load_market_residual_model,
     _nba_volatility_features,
@@ -87,6 +95,14 @@ from .forecast_market_select import (
     _select_nba_total_market,
     _select_wnba_spread_market,
     _select_wnba_total_market,
+)
+from .forecast_nba_anchor_v10 import log_nba_anchor_v10
+from .forecast_nba_anchor_v10 import spread_inputs as nba_anchor_v10_spread_inputs
+from .forecast_nba_anchor_v10 import total_inputs as nba_anchor_v10_total_inputs
+from .forecast_nfl_moneyline_shadow import (
+    log_nfl_margin_moneyline_shadow,
+    moneyline_shadow_input,
+    without_moneyline_shadow_rows,
 )
 from .forecast_nfl_support import (  # noqa: F401 -- re-exported: tests and callers import these from forecast
     NFL_DIVISIONS,
@@ -1635,12 +1651,194 @@ def _forecast_wnba_total_sport(
     )
 
 
+# ESPN's NBA displayName is "LA Clippers"; Polymarket's spread/moneyline `team` field is
+# "Los Angeles Clippers", which the shared _team_matches rejects, so Clippers road spreads
+# were never priced (NBA review 2026-11-20, B3). Loosening the shared matcher is what
+# produced the NCAAB UConn/Central Connecticut collisions, so NBA canonicalises exact
+# Los Angeles strings at its own call sites only, and only inside the comparison: the
+# model keeps ESPN's name because history (Elo, trends) is keyed on it.
+_NBA_TEAM_ALIASES = {
+    "la clippers": "los angeles clippers",
+    "l.a. clippers": "los angeles clippers",
+    "la lakers": "los angeles lakers",
+    "l.a. lakers": "los angeles lakers",
+}
+
+
+def _nba_canonical_team(name: str) -> str:
+    key = " ".join(str(name).casefold().split())
+    return _NBA_TEAM_ALIASES.get(key, key)
+
+
+def _nba_team_matches(team_name: str, side_description: str) -> bool:
+    from ..learned_forward import _team_matches
+
+    return _team_matches(_nba_canonical_team(team_name), _nba_canonical_team(side_description))
+
+
+def _nba_same_start_minute(quote_start: str, event_date: str) -> bool:
+    """Same tip minute, compared as instants.
+
+    ESPN dates read ``...T01:00Z`` and Polymarket ``...T01:00:00Z``, so ``[:16]`` works
+    today; an offset-form string (moneyline ledger rows store ``-0500``) names the same
+    instant with different characters. Unparseable input keeps the old string compare.
+    """
+    try:
+        return parse_utc(quote_start).replace(second=0, microsecond=0) == parse_utc(event_date).replace(
+            second=0, microsecond=0
+        )
+    except (TypeError, ValueError):
+        return str(quote_start)[:16] == str(event_date)[:16]
+
+
+def _nba_trend_engine(artifact: dict, history):
+    from ..features.trends import TrendEngine
+
+    gap = artifact.get("offseason_gap_days")
+    return TrendEngine(
+        history,
+        offseason_gap_days=float(gap) if gap is not None else None,
+        offseason_retention=float(artifact.get("offseason_retention", 0.50)),
+        isolate_postseason=bool(artifact.get("isolate_postseason", False)),
+    )
+
+
+def _nba_schedule_components(
+    history, away_team: str, home_team: str, event_start_utc: str, *, trend, offseason_gap_days
+) -> dict[str, Any]:
+    """Rest, back-to-back and true current-season games per team, for the stored snapshot.
+
+    Rest and b2b mirror NBAStructuralV9Engine.predict_games exactly (unfiltered history,
+    prior games strictly before tip, 3.0 days when there is none, b2b at <= 1.25 days) so
+    the stored flags are the ones the engine used. The engine's own
+    ``current_season_games_min`` counts lifetime rows (B1); this count uses
+    TrendEngine.current_season_games_played plus the season-opener override from
+    _nba_volatility_sample (last game older than the offseason gap => 0), because the
+    trend engine alone returns last season's trailing run before a team's first game.
+    """
+    start = parse_utc(event_start_utc)
+    out: dict[str, Any] = {}
+    counts = []
+    for side, team in (("away", away_team), ("home", home_team)):
+        prior = [g for g in history if g.start < start and team in (g.home_team, g.away_team)]
+        last = max((g.start for g in prior), default=None)
+        rest = (start - last).total_seconds() / 86400.0 if last is not None else 3.0
+        out[f"rest_days_{side}"] = round(rest, 4)
+        out[f"b2b_{side}"] = bool(rest <= 1.25)
+        season_opener = last is None or (offseason_gap_days is not None and rest > float(offseason_gap_days))
+        games = 0 if season_opener else int(trend.team_trend(team).current_season_games_played)
+        out[f"current_season_games_{side}"] = games
+        counts.append(games)
+    out["current_season_games_played_min"] = min(counts)
+    return out
+
+
+def _nba_market_mid_components(market: dict, selection_side: str) -> dict[str, Any]:
+    """Decision-time Polymarket mid of the exact quote row the call was priced on."""
+
+    def _mid(side: Any) -> float | None:
+        if not isinstance(side, dict):
+            return None
+        try:
+            if side.get("midpoint") is not None:
+                mid = float(side["midpoint"])
+            else:
+                mid = (float(side["bid"]) + float(side["ask"])) / 2.0
+        except (KeyError, TypeError, ValueError):
+            return None
+        return round(mid, 6) if 0 < mid < 1 else None
+
+    out: dict[str, Any] = {}
+    for key, side_key in (("long", "long"), ("short", "short"), ("selection", selection_side)):
+        value = _mid(market.get(side_key))
+        if value is not None:
+            out[f"decision_market_mid_{key}"] = value
+    observed = market.get("observed_at_utc")
+    if observed:
+        out["decision_market_quote_observed_at_utc"] = str(observed)
+    return out
+
+
+def _nba_pre_availability_means(model_predict, history, upcoming: list) -> dict[str, float]:
+    """Engine mean per event rerun with availability zeroed (diagnostic only, never served).
+
+    Rerun rather than subtract: the totals OT bump keys off |margin| thresholds that the
+    availability gap can cross, so served-minus-gap is not the counterfactual.
+    """
+    zeroed = [replace(game, availability_points_gap=0.0, availability_total_loss=0.0) for game in upcoming]
+    means: dict[str, float] = {}
+    for prediction in model_predict(history, zeroed):
+        inputs = prediction.inference_inputs or {}
+        mean = inputs.get("mean")
+        if mean is not None and math.isfinite(float(mean)):
+            means[str(prediction.event_id)] = float(mean)
+    return means
+
+
+def _nba_decision_components(
+    *,
+    history,
+    prediction,
+    upcoming_game,
+    market: dict,
+    selection_side: str,
+    trend,
+    offseason_gap_days,
+    pre_availability_means: dict[str, float],
+    market_type: str,
+) -> dict[str, Any]:
+    """New snapshot keys for loss attribution (NBA review B10). Fail-soft: a failure here
+    omits the keys and logs; it must never block or alter the call."""
+    try:
+        components: dict[str, Any] = {}
+        components.update(
+            _nba_schedule_components(
+                history,
+                prediction.away_team,
+                prediction.home_team,
+                prediction.event_start_utc,
+                trend=trend,
+                offseason_gap_days=offseason_gap_days,
+            )
+        )
+        components.update(_nba_market_mid_components(market, selection_side))
+        if upcoming_game is not None:
+            components["availability_points_gap_input"] = round(
+                float(upcoming_game.availability_points_gap), 4
+            )
+            components["availability_total_loss_input"] = round(
+                float(upcoming_game.availability_total_loss), 4
+            )
+        served = (prediction.inference_inputs or {}).get("mean")
+        pre = pre_availability_means.get(str(prediction.event_id))
+        if served is not None and pre is not None and math.isfinite(float(served)):
+            name = "margin" if market_type == "spread" else "total"
+            components[f"expected_{name}_pre_availability"] = round(pre, 4)
+            components[f"availability_{name}_component"] = round(float(served) - pre, 4)
+        return {
+            key: value
+            for key, value in components.items()
+            if not (isinstance(value, float) and not math.isfinite(value))
+        }
+    except (AttributeError, KeyError, TypeError, ValueError):
+        logger.warning("NBA decision components unavailable for %s", prediction.event_id, exc_info=True)
+        return {}
+
+
+def _nba_with_components(features: dict, components: dict[str, Any]) -> dict:
+    """Add-only merge: an engine key is never overwritten."""
+    merged = dict(features)
+    for key, value in components.items():
+        merged.setdefault(key, value)
+    return merged
+
+
 def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     """Price NBA spreads with BasketballModel's normal-CDF margin approach
     (nba-spread-margin-v1), matched against the main (most-balanced)
     Polymarket alternate line per game.
     """
-    from ..learned_forward import _team_matches, _teams
+    from ..learned_forward import _teams
     from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
@@ -1757,8 +1955,8 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         candidates = [
             row
             for row in spread_rows
-            if _team_matches(away_team, str(row.get("team") or ""))
-            and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
+            if _nba_team_matches(away_team, str(row.get("team") or ""))
+            and _nba_same_start_minute(str(row.get("event_start_utc") or ""), str(event["date"]))
         ]
         market = _select_nba_spread_market(candidates, as_of=observed_at)
         if market is None:
@@ -1803,28 +2001,36 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
     if model_version == "nba-spread-margin-v9":
         from ..models.nba_v9 import NBASpreadModelV9
 
-        spread_v9_model = NBASpreadModelV9.from_artifact(artifact)
-        predictions = [
-            p for p in spread_v9_model.predict_spreads(history, upcoming) if p.market_type == "spread"
-        ]
+        spread_predict = NBASpreadModelV9.from_artifact(artifact).predict_spreads
     elif model_version == "nba-spread-margin-v7":
         from ..models.nba_v7 import NBASpreadModelV7
 
-        spread_v7_model = NBASpreadModelV7.from_artifact(artifact)
-        predictions = [
-            p for p in spread_v7_model.predict_spreads(history, upcoming) if p.market_type == "spread"
-        ]
+        spread_predict = NBASpreadModelV7.from_artifact(artifact).predict_spreads
     elif model_version == "nba-spread-margin-v6":
         from ..models.nba_spread_v6 import NBASpreadModelV6
 
-        spread_v6_model = NBASpreadModelV6.from_artifact(artifact)
-        predictions = [
-            p for p in spread_v6_model.predict_spreads(history, upcoming) if p.market_type == "spread"
-        ]
+        spread_predict = NBASpreadModelV6.from_artifact(artifact).predict_spreads
     else:
-        predictions = [
-            p for p in legacy_model().predict_games(history, upcoming) if p.market_type == "spread"
-        ]
+        spread_predict = legacy_model().predict_games
+    predictions = [p for p in spread_predict(history, upcoming) if p.market_type == "spread"]
+
+    upcoming_by_event_id = {game.event_id: game for game in upcoming}
+    component_trend = None
+    pre_availability_means: dict[str, float] = {}
+    if predictions:
+        try:
+            component_trend = _nba_trend_engine(artifact, history)
+            if model_version in ("nba-spread-margin-v7", "nba-spread-margin-v9"):
+                pre_availability_means = _nba_pre_availability_means(spread_predict, history, upcoming)
+            else:
+                # Availability is not applied to these versions: the served mean is it.
+                pre_availability_means = {
+                    str(p.event_id): float(p.inference_inputs["mean"])
+                    for p in predictions
+                    if p.inference_inputs is not None
+                }
+        except (ArithmeticError, AttributeError, KeyError, TypeError, ValueError):
+            logger.warning("NBA spread decision components unavailable", exc_info=True)
 
     priced_contracts = []
     for prediction in predictions:
@@ -1843,10 +2049,21 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             continue
         from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
+        components = _nba_decision_components(
+            history=history,
+            prediction=prediction,
+            upcoming_game=upcoming_by_event_id.get(prediction.event_id),
+            market=market,
+            selection_side="long" if selection == "away" else "short",
+            trend=component_trend,
+            offseason_gap_days=offseason_gap_days,
+            pre_availability_means=pre_availability_means,
+            market_type="spread",
+        )
         model_snapshot = (
             build_scalar_snapshot(
                 artifact,
-                _nba_volatility_features(artifact, history, prediction),
+                _nba_with_components(_nba_volatility_features(artifact, history, prediction), components),
                 prediction.inference_inputs,
                 event_id=prediction.event_id,
                 event_start_utc=prediction.event_start_utc,
@@ -1883,6 +2100,13 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
             }
         )
 
+    # v10 challenger inputs, collected after v9's contracts are final; never touches them.
+    try:
+        anchor_v10_inputs = nba_anchor_v10_spread_inputs(predictions, market_by_event_id, events)
+    except Exception:  # challenger inputs are best-effort by design
+        logger.warning("nba-anchor-v10 spread inputs unavailable", exc_info=True)
+        anchor_v10_inputs = []
+
     return {
         "sport": "nba_spread",
         "model_name": "NBA Spread (composite margin normal CDF)",
@@ -1894,6 +2118,7 @@ def _forecast_nba_spread_slate(data_root, args_date: str, client) -> dict:
         "priced_contracts": priced_contracts,
         "unmatched": unmatched,
         "observed_at_utc": observed_at.isoformat(),
+        "anchor_v10_inputs": anchor_v10_inputs,
     }
 
 
@@ -1910,7 +2135,7 @@ def _forecast_nba_spread_sport(
     """Log NBA spread picks to Main (CALL only) + Flat (every candidate)."""
     forecast = _forecast_nba_spread_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
-    return _log_basketball_spread_picks(
+    result = _log_basketball_spread_picks(
         league=League.NBA,
         forecast=forecast,
         tag="nba_spread",
@@ -1923,6 +2148,42 @@ def _forecast_nba_spread_sport(
         main_ledger=main_ledger,
         flat_ledger=flat_ledger,
     )
+    return _with_nba_anchor_v10(
+        result,
+        "spread",
+        data_root=data_root,
+        args_date=args_date,
+        config=config,
+        registry=registry,
+        bans=bans,
+        flat_ledger=flat_ledger,
+    )
+
+
+def _with_nba_anchor_v10(
+    result: dict, market: str, *, data_root, args_date: str, config: dict, registry, bans, flat_ledger
+) -> dict:
+    """Log the nba-anchor-v10 Flat challenger AFTER v9 has been logged (Flat only, never Main).
+
+    Contained: a v10 failure is logged and reported here and never reaches the v9 rows.
+    """
+    try:
+        if flat_ledger is not None:
+            result["anchor_v10"] = log_nba_anchor_v10(
+                forecast=result,
+                market=market,
+                data_root=data_root,
+                args_date=args_date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                flat_ledger=flat_ledger,
+            )
+    except Exception:  # challenger logging is best-effort by design
+        logger.warning("nba-anchor-v10 %s challenger failed to log", market, exc_info=True)
+        result["anchor_v10"] = {"status": "error", "logged": 0}
+    result.pop("anchor_v10_inputs", None)
+    return result
 
 
 def _log_basketball_spread_picks(
@@ -2019,8 +2280,11 @@ def _log_basketball_spread_picks(
                 ):
                     eligibility = _downgrade_unserved(eligibility)
                 if eligibility.decision == "CALL":
+                    # Only Main gates. Flat logs every game x market, so a moneyline
+                    # that disagrees with the spread side stays in Flat (2026-11-17:
+                    # this call dropped 3 of 8 NBA moneylines from Flat on 11/16).
                     _supersede_incoherent_moneyline_calls(
-                        (flat_ledger, main_ledger),
+                        (main_ledger,),
                         event_id=str(contract["event_id"]),
                         selection=request.selection,
                         line=request.line,
@@ -2071,7 +2335,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     (nba-total-margin-v2), matched against the main (most-balanced)
     Polymarket alternate line per game.
     """
-    from ..learned_forward import _team_matches, _teams
+    from ..learned_forward import _teams
     from ..models.basketball import BasketballModel, UpcomingGame
 
     observed_at = utc_now()
@@ -2168,8 +2432,8 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             row
             for row in total_rows
             if (
-                _team_matches(away_team, str(row.get("team") or ""))
-                or _team_matches(home_team, str(row.get("team") or ""))
+                _nba_team_matches(away_team, str(row.get("team") or ""))
+                or _nba_team_matches(home_team, str(row.get("team") or ""))
                 or (
                     any(
                         w in str(row.get("event_title") or "").casefold()
@@ -2185,7 +2449,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                     )
                 )
             )
-            and str(row.get("event_start_utc") or "")[:16] == str(event["date"])[:16]
+            and _nba_same_start_minute(str(row.get("event_start_utc") or ""), str(event["date"]))
         ]
         market = _select_nba_total_market(candidates, as_of=observed_at)
         if market is None:
@@ -2232,26 +2496,36 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     if model_version == "nba-total-margin-v9":
         from ..models.nba_v9 import NBATotalModelV9
 
-        total_v9_model = NBATotalModelV9.from_artifact(artifact)
-        predictions = [
-            p for p in total_v9_model.predict_totals(history, upcoming) if p.market_type == "total"
-        ]
+        total_predict = NBATotalModelV9.from_artifact(artifact).predict_totals
     elif model_version == "nba-total-margin-v7":
         from ..models.nba_v7 import NBATotalModelV7
 
-        total_v7_model = NBATotalModelV7.from_artifact(artifact)
-        predictions = [
-            p for p in total_v7_model.predict_totals(history, upcoming) if p.market_type == "total"
-        ]
+        total_predict = NBATotalModelV7.from_artifact(artifact).predict_totals
     elif model_version == "nba-total-margin-v6":
         from ..models.nba_total_v6 import NBATotalModelV6
 
-        total_v6_model = NBATotalModelV6.from_artifact(artifact)
-        predictions = [
-            p for p in total_v6_model.predict_totals(history, upcoming) if p.market_type == "total"
-        ]
+        total_predict = NBATotalModelV6.from_artifact(artifact).predict_totals
     else:
-        predictions = [p for p in legacy_model().predict_games(history, upcoming) if p.market_type == "total"]
+        total_predict = legacy_model().predict_games
+    predictions = [p for p in total_predict(history, upcoming) if p.market_type == "total"]
+
+    upcoming_by_event_id = {game.event_id: game for game in upcoming}
+    component_trend = None
+    pre_availability_means: dict[str, float] = {}
+    if predictions:
+        try:
+            component_trend = _nba_trend_engine(artifact, history)
+            if model_version in ("nba-total-margin-v7", "nba-total-margin-v9"):
+                pre_availability_means = _nba_pre_availability_means(total_predict, history, upcoming)
+            else:
+                # Availability is not applied to these versions: the served mean is it.
+                pre_availability_means = {
+                    str(p.event_id): float(p.inference_inputs["mean"])
+                    for p in predictions
+                    if p.inference_inputs is not None
+                }
+        except (ArithmeticError, AttributeError, KeyError, TypeError, ValueError):
+            logger.warning("NBA total decision components unavailable", exc_info=True)
 
     from ..calibration_pipeline import load_serving_calibrator
 
@@ -2295,10 +2569,21 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
 
         from ..scalar_artifact_replay import build_snapshot as build_scalar_snapshot
 
+        components = _nba_decision_components(
+            history=history,
+            prediction=prediction,
+            upcoming_game=upcoming_by_event_id.get(prediction.event_id),
+            market=market,
+            selection_side="long" if selection == "over" else "short",
+            trend=component_trend,
+            offseason_gap_days=offseason_gap_days,
+            pre_availability_means=pre_availability_means,
+            market_type="total",
+        )
         model_snapshot = (
             build_scalar_snapshot(
                 artifact,
-                prediction.feature_basis,
+                _nba_with_components(prediction.feature_basis, components),
                 prediction.inference_inputs,
                 event_id=prediction.event_id,
                 event_start_utc=prediction.event_start_utc,
@@ -2343,6 +2628,15 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
             }
         )
 
+    # v10 challenger inputs (v9.1 totals engine), collected after v9's contracts are final.
+    try:
+        anchor_v10_inputs = nba_anchor_v10_total_inputs(
+            history, upcoming, predictions, market_by_event_id, events
+        )
+    except Exception:  # challenger inputs are best-effort by design
+        logger.warning("nba-anchor-v10 total inputs unavailable", exc_info=True)
+        anchor_v10_inputs = []
+
     return {
         "sport": "nba_total",
         "model_name": "NBA Total (composite trend/team normal CDF)",
@@ -2355,6 +2649,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         "unmatched": unmatched,
         "calibration": calibration_decision,
         "observed_at_utc": observed_at.isoformat(),
+        "anchor_v10_inputs": anchor_v10_inputs,
     }
 
 
@@ -2371,7 +2666,7 @@ def _forecast_nba_total_sport(
     """Log NBA total picks to Main (CALL only) + Flat (every candidate)."""
     forecast = _forecast_nba_total_slate(data_root, args_date, ESPNClient())
     model_config = config.get("models", {}).get("NBA", {})
-    return _log_basketball_total_picks(
+    result = _log_basketball_total_picks(
         league=League.NBA,
         forecast=forecast,
         tag="nba_total",
@@ -2386,6 +2681,40 @@ def _forecast_nba_total_sport(
         main_ledger=main_ledger,
         flat_ledger=flat_ledger,
     )
+    return _with_nba_anchor_v10(
+        result,
+        "total",
+        data_root=data_root,
+        args_date=args_date,
+        config=config,
+        registry=registry,
+        bans=bans,
+        flat_ledger=flat_ledger,
+    )
+
+
+def _snapshot_season_games_min(snapshot: Any, default: int = 15) -> int:
+    """Smaller team's current-season games, read from the stored model input snapshot.
+
+    build_snapshot stores the engine inputs under ``features``; the Over floor used to read
+    a ``feature_basis`` key that never exists, so it always saw the default and never fired
+    (NBA review 2026-11-20, B2). The true current-season count is preferred over the v9
+    engine's ``current_season_games_min``, which counts lifetime rows (B1). This runs above
+    the Flat append inside a try that only catches ValueError, so it must never raise:
+    unreadable values fall through to the default.
+    """
+    features = snapshot.get("features") if isinstance(snapshot, dict) else None
+    if not isinstance(features, dict):
+        return default
+    for key in ("current_season_games_played_min", "current_season_games_min"):
+        value = features.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        try:
+            return int(value)
+        except (OverflowError, TypeError, ValueError):
+            continue
+    return default
 
 
 def _log_basketball_total_picks(
@@ -2488,13 +2817,11 @@ def _log_basketball_total_picks(
                     eligibility = _downgrade_unserved(eligibility)
                 edge = float(contract["model_probability"]) - float(ask)
                 effective_min_total_edge = min_edge
-                if contract.get("selection") == "over":
-                    min_games = 15
-                    if contract.get("model_input_snapshot"):
-                        fb = contract["model_input_snapshot"].get("feature_basis", {})
-                        min_games = fb.get("current_season_games_min", 15)
-                    if min_games < 15:
-                        effective_min_total_edge = max(effective_min_total_edge, 0.09)
+                if (
+                    contract.get("selection") == "over"
+                    and _snapshot_season_games_min(contract.get("model_input_snapshot")) < 15
+                ):
+                    effective_min_total_edge = max(effective_min_total_edge, 0.09)
 
                 main_eligible = eligibility.decision == "CALL" and (
                     not nba_rules
@@ -2595,6 +2922,7 @@ def _forecast_nfl_spread_slate(
     )
 
     priced_contracts = []
+    moneyline_shadow_inputs: list[dict[str, Any]] = []
     unmatched: list[dict[str, str]] = []
 
     for event in events:
@@ -2816,6 +3144,21 @@ def _forecast_nfl_spread_slate(
                 is_neutral_site=is_neutral_site,
             )
 
+        # Captured before the spread-ask check on purpose: a game with no spread ask
+        # still has a margin, and the moneyline challenger prices off that margin.
+        shadow_input = moneyline_shadow_input(
+            event_id=event_id,
+            event_start_utc=str(event["date"]),
+            home_team=home_team,
+            away_team=away_team,
+            forecast=fc,
+            spread_home_line=spread_home_line,
+            input_qualified=input_qualified,
+            parent_model_version=model_version,
+        )
+        if shadow_input is not None:
+            moneyline_shadow_inputs.append(shadow_input)
+
         cover_prob = fc.prob_away_cover if anchor_is_away else fc.prob_home_cover
         if cover_prob >= 0.5:
             selection = "away" if anchor_is_away else "home"
@@ -2948,6 +3291,7 @@ def _forecast_nfl_spread_slate(
         ],
         "market_candidates": len(priced_contracts),
         "priced_contracts": priced_contracts,
+        "moneyline_shadow_inputs": moneyline_shadow_inputs,
         "unmatched": unmatched,
         "observed_at_utc": observed_at.isoformat(),
     }
@@ -3061,7 +3405,9 @@ def _forecast_nfl_spread_sport(
                     eligibility = _downgrade_unserved(eligibility)
                 flat_eligibility = eligibility
                 if eligibility.decision == "CALL":
-                    existing_for_event = exposure_source.rows(filters={"event_id": str(contract["event_id"])})
+                    existing_for_event = without_moneyline_shadow_rows(
+                        exposure_source.rows(filters={"event_id": str(contract["event_id"])})
+                    )
                     coherent, _ = validate_cross_market_pick_coherence(
                         "spread", request.selection, request.line, existing_for_event
                     )
@@ -3117,6 +3463,23 @@ def _forecast_nfl_spread_sport(
         except (EntityResolutionError, ValueError) as error:
             skipped.append({"event_id": contract["event_id"], "reason": str(error)[:200]})
 
+    if flat_ledger is not None:
+        # Same slate, same decision timestamp as the spread rows above. A failure
+        # here must never cost the spread picks, so it is contained and reported.
+        try:
+            forecast["moneyline_shadow"] = log_nfl_margin_moneyline_shadow(
+                forecast=forecast,
+                data_root=data_root,
+                args_date=args_date,
+                config=config,
+                registry=registry,
+                bans=bans,
+                flat_ledger=flat_ledger,
+                observed_now=observed_now,
+            )
+        except Exception:  # shadow logging is best-effort by design
+            logger.warning("nfl moneyline margin challenger failed to log", exc_info=True)
+            forecast["moneyline_shadow"] = {"status": "error", "logged": 0, "skipped": []}
     forecast["logged"] = len(logged)
     forecast["logged_event_ids"] = logged
     forecast["duplicate_pick_ids"] = duplicates
@@ -4180,6 +4543,7 @@ def _forecast_learned_sport(
                         )
                         if flat_mode and exposure_ledger is not None and request.league == League.NFL:
                             existing_for_event += ledger.rows(filters={"event_id": str(request.event_id)})
+                        existing_for_event = without_moneyline_shadow_rows(existing_for_event)
                         is_coherent, _ = validate_cross_market_pick_coherence(
                             candidate_market_type="moneyline",
                             candidate_selection=request.selection,
@@ -5428,8 +5792,26 @@ def _forecast_cfb_sport(
                 if contract.get("inference_inputs") is not None
                 else None
             )
+            if cfb_snapshot_json is None and (
+                contract.get("feature_capture") or contract.get("snapshot_mode") == "feature_capture"
+            ):
+                # v7.1 (feature_capture flag) and v5.1 (snapshot_mode) price without NB-engine replay inputs
+                # (bug hunt 2026-11-22 item 6): record every model input as a feature-capture snapshot under
+                # the contract's own artifact hash; never an exact replay.
+                cfb_snapshot_json = contract_snapshot_json(
+                    contract,
+                    sport="NCAAF",
+                    selection=str(contract["selection"]),
+                    line=None if contract["line"] is None else float(contract["line"]),
+                    probability=float(contract["model_probability"]),
+                    observed_at_utc=contract_obs,
+                    artifact_hash=str(contract.get("model_artifact_hash") or ""),
+                )
             contract_sportsbook = str(contract.get("sportsbook") or "espn_consensus")
             contract_slug = str(contract.get("market_slug") or "")
+            # A challenger contract (cfb-structural-v6.2) carries its own artifact hash; champion rows keep v5's.
+            contract_artifact_hash = str(contract.get("model_artifact_hash") or serving_artifact_hash)
+            contract_code_revision = str(contract.get("code_revision") or forecast["model_code_hash"])
             rationale_text = str(contract.get("rationale") or "")
             if contract_sportsbook == "polymarket_us" and contract_slug:
                 rationale_text = f"{rationale_text} Executable ask {ask:.4f} ({contract_slug})."
@@ -5455,12 +5837,12 @@ def _forecast_cfb_sport(
                 model_origin=ModelOrigin.STATISTICAL_MODEL,
                 model_enabled=model_enabled(model_config),
                 observed_at_utc=contract_obs,
-                model_artifact_hash=serving_artifact_hash,
+                model_artifact_hash=contract_artifact_hash,
                 calibration_method="cfb_key_number_engine",
                 calibration_version=m_version,
-                calibration_artifact_hash=serving_artifact_hash,
+                calibration_artifact_hash=contract_artifact_hash,
                 feature_schema_version="cfb-v1",
-                code_revision=str(forecast["model_code_hash"]),
+                code_revision=contract_code_revision,
                 model_input_snapshot_json=cfb_snapshot_json,
                 **(contract.get("market_lineage") or {}),
             )
@@ -6141,11 +6523,7 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     ncaab_prior = {}
     if log and replace_today and "ncaab" in main_ledger_sport_scope:
         for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
-            ncaab_prior[tier_name] = [
-                row
-                for row in source.rows()
-                if row.get("status") == "open" and str(row.get("league", "")).casefold() == "ncaab"
-            ]
+            ncaab_prior[tier_name] = _open_ncaab_rows(source)
     if is_flat:
         if replace_today and log:
             _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
@@ -6438,9 +6816,13 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     for sport in sports:
         if sport in results:
             if sport == "ncaab" and ncaab_prior:
-                for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
-                    restored = source.restore_unreplaced_picks(ncaab_prior[tier_name])
-                    results[sport][f"{tier_name}_unreplaced_restored"] = len(restored)
+                restored_counts = _restore_unreplaced_ncaab(
+                    {"main": ledger, "flat": flat_ledger},
+                    ncaab_prior,
+                    _declined_slots(results[sport]),
+                )
+                for tier_name, count in restored_counts.items():
+                    results[sport][f"{tier_name}_unreplaced_restored"] = count
             results[sport]["existing_started_picks"] = [
                 row for row in saved if str(row.get("league", "")).casefold() == sport.casefold()
             ]

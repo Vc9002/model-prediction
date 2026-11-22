@@ -1,0 +1,26 @@
+{
+  "component_max_abs_diff": {
+    "d1_away": 0.0,
+    "d1_home": 0.0,
+    "rg_c010_l02_k14": 0.0,
+    "sample": 0.0,
+    "v6_mean": 0.0,
+    "v6_p_home": 0.0,
+    "v6_scale": 0.0
+  },
+  "component_mismatch_counts": {},
+  "days": 15,
+  "export": "outputs/ncaab/research_261120/confirmation/cache/v7_served_export.jsonl",
+  "locked_events_excluded_from_history_and_map": true,
+  "passed": true,
+  "rows_in_reference": 780,
+  "rows_replayed": 780,
+  "season": 2026,
+  "stride": 10,
+  "v7_max_abs_diff_vs_export": {
+    "mu": 4.991029811662884e-11,
+    "p_ml": 4.987898982733441e-11,
+    "scale": 4.724576285752846e-11
+  },
+  "v7_rows_compared_to_export": 689
+}

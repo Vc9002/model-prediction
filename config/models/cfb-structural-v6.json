@@ -1,0 +1,166 @@
+{
+  "method": "cfb_structural_v6_additive_joint_ridge_bivariate_engine",
+  "model_version": "cfb-structural-v6",
+  "schema_version": "1",
+  "sport": "ncaaf",
+  "league": "NCAAF",
+  "positive_class": "home_win",
+  "distribution": "negative_binomial",
+  "margin_calibration": {
+    "intercept": 0.4043748461103549,
+    "slope": 0.8716255409209163
+  },
+  "total_calibration": {
+    "intercept": 21.389808678936788,
+    "slope": 0.6096887141685335
+  },
+  "margin_sd_table": {
+    "established": 16.346327492548937,
+    "fbs_vs_fcs": 16.755084899014047,
+    "thin_sample": 16.885410959686002
+  },
+  "total_sd_table": {
+    "established": 16.855480222947282,
+    "fbs_vs_fcs": 17.426918027204575,
+    "thin_sample": 16.717518755807525
+  },
+  "established_min_sample": 2,
+  "solver": {
+    "lambda": 0.1,
+    "w_prev": 0.2,
+    "result_buffer_hours": 5.0
+  },
+  "features": [
+    "projected_margin_home",
+    "projected_total",
+    "is_fbs_vs_fcs",
+    "sample_games"
+  ],
+  "note": "Research challenger only. Not routed, not registered as a champion, not in config/production.yaml or config/model.yaml. v6 is a better-calibrated probability model than v5 on the locked holdout, but its market-relative check shows no evidence of edge. Promotion is a separate governed decision.",
+  "qualification": {
+    "status": "research",
+    "qualified": false,
+    "locked_holdout": true,
+    "framework": "cfb_structural_v6_additive_joint_ridge_bivariate_engine",
+    "note": "RESEARCH_ONLY: shadow challenger, never qualified, never promoted, never routed."
+  },
+  "training": {
+    "frozen_fit_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70",
+    "frozen_fit_path": "outputs/ncaaf/cfb_v6_frozen_fit.json",
+    "as_of_utc": "2026-11-15T02:10:00Z",
+    "split": {
+      "train_end": "2022-11-11",
+      "validation_end": "2024-11-14"
+    },
+    "counts": {
+      "backfill_only_rows": 7591,
+      "burn_in_2016_games_excluded_existing": 734,
+      "holdout_rows_not_read_by_fit": 3456,
+      "no_call_unrated_or_no_history": 6,
+      "train": 4102,
+      "validation": 1591
+    },
+    "burn_in_season": 2016,
+    "grid": {
+      "k": [
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "lambda": [
+        0.1,
+        0.25,
+        0.5,
+        1.0,
+        2.0,
+        5.0,
+        12.0,
+        30.0
+      ],
+      "w_prev": [
+        0.1,
+        0.2,
+        0.3,
+        0.45,
+        0.6,
+        1.0
+      ]
+    },
+    "selection_rule": "max mean(margin, total gaussian log score) on validation; moneyline Brier tiebreak (D-SELECTION)",
+    "history_snapshot": {
+      "rows": 16378,
+      "sha256": "1fe90e1a11b8e5248003bff92ae62eec5bb17c4bd421a275b2f64ed36f1ced0c"
+    },
+    "backfill": {
+      "sha256": "cc704059e4684edb9e580dff5033433424ee34e6a5fe96995c7c272ae82d8bf4",
+      "rows": 16378,
+      "path": "data/research/ncaaf_v6/ncaaf_games_backfill.jsonl"
+    },
+    "pool_key": "__POOL_OTHER__"
+  },
+  "calibration": {
+    "holdout_v6_vs_v5_common_cohort": {
+      "n": 1527,
+      "v6": {
+        "brier": 0.17975,
+        "log_loss": 0.5333120266614275,
+        "ece": 0.022509362817547608,
+        "calibration_slope": 1.120626832412368,
+        "margin_log_score": -4.16303,
+        "total_log_score": -4.19659
+      },
+      "v5": {
+        "brier": 0.19003,
+        "log_loss": 0.5588924128400611,
+        "ece": 0.04480269596924934,
+        "calibration_slope": 1.0339751235160666,
+        "margin_log_score": -4.21093,
+        "total_log_score": -4.21155
+      },
+      "delta_v6_minus_v5": {
+        "brier": {
+          "ci_95_high": -0.005531,
+          "ci_95_low": -0.015245,
+          "dates": 169,
+          "point_estimate": -0.010287
+        },
+        "margin_abs_error": {
+          "ci_95_high": -0.331698,
+          "ci_95_low": -0.846821,
+          "dates": 169,
+          "point_estimate": -0.598595
+        },
+        "margin_log_score": {
+          "ci_95_high": 0.063952,
+          "ci_95_low": 0.030551,
+          "dates": 169,
+          "point_estimate": 0.047899
+        },
+        "total_log_score": {
+          "ci_95_high": 0.023988,
+          "ci_95_low": 0.00623,
+          "dates": 169,
+          "point_estimate": 0.014965
+        }
+      }
+    },
+    "market_check_575_first_look": {
+      "spread": {
+        "v6_corr_verdict": "positive correlation: yes (point +0.042); 95% CI [-0.023, +0.110] includes zero",
+        "v6_covered_n": 576
+      },
+      "total": {
+        "v6_corr_verdict": "positive correlation: no (point -0.011); 95% CI [-0.091, +0.054] includes zero",
+        "v6_covered_n": 575
+      }
+    },
+    "espn_closing_line_first_look": {
+      "espn_lines_sha256": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54",
+      "lined_events_in_file": 9364,
+      "note": "closing-line benchmark, no decision-time quotes; see outputs/ncaaf/cfb_v6_espn_market_check.md"
+    }
+  },
+  "artifact_hash": "db869a4d96642983697571a828301585cc08a834f4d28b738622a7f57b38e5d2"
+}

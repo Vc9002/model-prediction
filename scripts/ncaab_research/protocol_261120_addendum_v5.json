@@ -1,0 +1,93 @@
+{
+  "id": "ncaab-research-protocol-261120-addendum-v5",
+  "status": "PINNED 2026-11-22 ~00:35Z (19:35 ET 2026-11-21) by the coordinator, before any 2014-2021 player box was fetched and before any confirmation-window feature, line or outcome was joined to a P1 prediction.",
+  "amends": "addendum v4 (sha256 ccb107fc6f0b5b525337f8e48e7c9717b27afe824b78f7ea6c354f354618490e), windows.confirmation.player_data and, by line availability, windows.confirmation.season_years (see f_confirmation_seasons). Protocol v1 and addenda v2, v3 and v4 stay unedited and binding for everything else, including v4's grid, K, dev reads and verdicts, the 85% season-usability rule, the pass rule, and the CONFIRMATION_UNAVAILABLE rule.",
+  "program": "quick 261121-hmc, lane P (spread, player features), confirmation path of P1_player_availability (DEV_ELIGIBLE under v4: corr delta +0.0065, K25 lower bound +0.0013; commits 829f4d3a, 3d71b135)",
+  "written_before": "any 2014-2021 player box is fetched and any confirmation-window feature, line or outcome is joined to a P1 prediction. Work done before writing was outcome-free: the event export below, a 10-event probe of the ESPN summary for 2014-2021 (all 20 team boxes passed the box gate; scratch only, nothing written to the box tree), a dry run of the backfill against the export, a rebuild of the v4 table from the changed builder, and a 2022-only audit and build through the export.",
+  "hash_rule": "as v4: sha256 of json.dumps(<this object>, sort_keys=True, separators=(',', ':')), grader.canonical_sha256",
+  "why": "v4's confirmation clause says to fetch 2014-2021 boxes and build 2015-2022 features with the pinned scripts, 'season list extended, nothing else'. That cannot run: both pinned scripts read their event list and team schedules from data/research/ncaab_market/scoreboard.jsonl, which starts 2021-11-01 (season year 2022). Extending the season list alone yields no 2014-2021 events. A second event source is needed.",
+  "a_event_and_schedule_source": {
+    "source": "replay_261120.load_confirmation_history(), the event history the A_ml_w0 confirmation read already used. Season years 2014-2015 come from CBBD-converted games (the local cache, ESPN event ids from CBBD sourceId, no API call); 2016-2022 come from the ESPN scoreboard backfill (data/research/ncaab_market/backfill_261120/scoreboard.jsonl). First occurrence per event id; non-D1 stubs demoted (7 team-seasons, e.g. Lindenwood 2018-19).",
+    "export": {
+      "script": "scripts/ncaab_research/export_player_events_v5.py (new; calls load_confirmation_history and writes its events, unchanged in content, in the scoreboard.jsonl row format {date, events}; keeps only the fields the two scripts read; date = the event's sb_date)",
+      "file": "data/research/ncaab_external/player_events_v5/events_2014_2022.jsonl (untracked, 17.2 MB) with events_2014_2022.meta.json",
+      "events_by_season": {
+        "2014": 5948,
+        "2015": 5932,
+        "2016": 5951,
+        "2017": 5964,
+        "2018": 6003,
+        "2019": 6049,
+        "2020": 5767,
+        "2021": 4285,
+        "2022": 5976
+      },
+      "d1_vs_d1_by_season": {
+        "2014": 5503,
+        "2015": 5494,
+        "2016": 5514,
+        "2017": 5520,
+        "2018": 5533,
+        "2019": 5597,
+        "2020": 5328,
+        "2021": 3944,
+        "2022": 5485
+      },
+      "season_2022_check": "the export's 2022 events equal scoreboard.jsonl's 2022 completed events: same 5,976 ids, same dates. The 2022 boxes already on disk are reused (the dry run fetches 0 for 2022). One difference: the export demotes West Florida 2021-22 (one game) to non-D1, but the 2022 box files keep the conference id they were fetched with. Disclosed, not corrected. Checked outcome-free: the changed builder, run with --events <export> --seasons 2022 and PYTHONHASHSEED=0, gives 11,952 rows equal to the v4 table's 2022 rows (0 differences), and the audit's 2022 D1 pass rate is 0.9107."
+    },
+    "code_change": {
+      "scripts/backfill_ncaab_player_boxes.py": "iter_events(seasons, scope, path=SCOREBOARD) plus a --events PATH option (default scoreboard.jsonl). Nothing else.",
+      "scripts/ncaab_research/player_features_261121.py": "main() gains --events PATH (default scoreboard.jsonl), --seasons (default 2022-2026) and --out-dir (default data/research/ncaab_external/player_features); build keeps only box records whose season is in --seasons, so a season outside the list never becomes another season's prior. audit() takes the same events path and seasons and adds d1_team_games_box_pass_rate_by_season (the 85% rule's input). Every feature function (box_quality, team_games_from_record, load_schedule, build_prior_season, availability_features, prior_season_features, features_for_game, build_feature_rows, feature_summary) is byte-identical to the v4-pinned file; the git diff touches only audit() and main().",
+      "defaults_reproduce_v4": "rebuilt with default arguments, the changed builder gives the same 62,078 rows as the v4-pinned table. Every non-float value is equal, and floats are equal except ret_min_share_transfer_in and ret_gmsc_share_transfer_in, which differ by at most 2.2e-16. The cause is that the builder sums over a Python set, whose iteration order follows PYTHONHASHSEED, and that was already true of the v4-pinned builder. So the v4 table's bytes cannot be reproduced by any rebuild (neither field enters P1). Under a fixed PYTHONHASHSEED=0 the build is byte-deterministic (two runs gave the same sha256)."
+    },
+    "commands": [
+      "OPENBLAS_NUM_THREADS=1 .venv/Scripts/python scripts/ncaab_research/export_player_events_v5.py   (already run; output sha256 below)",
+      ".venv/Scripts/python scripts/backfill_ncaab_player_boxes.py --events data/research/ncaab_external/player_events_v5/events_2014_2022.jsonl --seasons 2018 2019 2020 --scope all",
+      "PYTHONHASHSEED=0 OPENBLAS_NUM_THREADS=1 .venv/Scripts/python scripts/ncaab_research/player_features_261121.py audit --events data/research/ncaab_external/player_events_v5/events_2014_2022.jsonl --seasons 2018 2019 2020 2022 --out-dir data/research/ncaab_external/player_features_v5",
+      "PYTHONHASHSEED=0 OPENBLAS_NUM_THREADS=1 .venv/Scripts/python scripts/ncaab_research/player_features_261121.py build --events data/research/ncaab_external/player_events_v5/events_2014_2022.jsonl --seasons 2018 2019 2020 2022 --out-dir data/research/ncaab_external/player_features_v5"
+    ],
+    "confirmation_rows": "the confirmation P1 inputs are the rows of player_features_v5/pit_player_features.jsonl for the usable seasons among 2018, 2019, 2020, 2022. The v4 development table stays as pinned and is not rebuilt."
+  },
+  "b_pinned_sha256": {
+    "line_ending_rule": "core.autocrlf=true in this checkout: tracked scripts are stored LF and checked out CRLF, and the v4 pins mixed the two forms (the backfill pin f195cc5e is its LF form, the builder pin a6efbde1 its CRLF form). Both forms are listed. The verifier should hash each script after normalising CRLF to LF and compare with lf_sha256. Data files are hashed raw.",
+    "scripts/backfill_ncaab_player_boxes.py": {
+      "lf_sha256": "3cf28c2ce45365f22f04cf8cebcae65e2467920bca2b242da873a1671d85e9d5",
+      "crlf_sha256": "47167db5a5360c1f7aa0a681031567a55ff984a31b2816ae389ee4ff11dd3b4a"
+    },
+    "scripts/ncaab_research/player_features_261121.py": {
+      "lf_sha256": "29ab4b838360ff28259039d5b1e368c07f798a398536927f4b7719d68f65999a",
+      "crlf_sha256": "511677eac538e9d438f5b7edd4e447fa6b7d6a9ea82582518ac4cb369101a71c"
+    },
+    "scripts/ncaab_research/export_player_events_v5.py": {
+      "lf_sha256": "391fc36017fc428f87d3638cc28dd99c8c46bdf54750ceb0f08404f7f5b7508b",
+      "crlf_sha256": "1233c114eb7e94f02d8e8500db30c498bd57b53ebb33fa8e4610a6783e72794e"
+    },
+    "scripts/ncaab_research/confirmation/replay_261120.py": "69235d8decc7e1cc2cb4ca5654d6486529eaeff17a30a79fc6e28bab591b8e90 (raw working copy, as confirmation_pin_a_ml_w0 records it)",
+    "data/research/ncaab_external/player_events_v5/events_2014_2022.jsonl": "14fbf653f04f86742ccf1f0e5a54b8fdd210175c1aaa8380d7dde8992508557b",
+    "data/research/ncaab_market/backfill_261120/scoreboard.jsonl": "5eeeb8fc64d02ba400dec5ed525376b0267fdbd7bb8a8fbb7d49ef64b9ddb43a",
+    "data/research/ncaab_external/player_features/pit_player_features.jsonl": "a9a406d87af14fc6ac9a6023dda79ad8ce8b02c0459825bebdc605f69f93062a (the v4 development table that (d) is fitted on, unchanged)",
+    "feature_table": "data/research/ncaab_external/player_features_v5/pit_player_features.jsonl does not exist yet. Its sha256 is recorded on the confirmation card after the build and before any line or outcome is joined; the grader re-hashes it on the read.",
+    "note": "grader_v4 refuses development calls from this working tree while the changed builder is checked out, because the file no longer hashes to v4's a6efbde1. The v4 dev reads are done. To restore the v4 bytes, run `git checkout 3d71b135 -- scripts/ncaab_research/player_features_261121.py`, which yields the CRLF form a6efbde1 under autocrlf. `git show` prints the LF blob, 0855b5a1, which v4's raw-byte check would refuse."
+  },
+  "c_season_usability": "unchanged from v4: a confirmation season counts only if at least 85% of its D1 team-games pass the box gate, decided outcome-free from the audit's d1_team_games_box_pass_rate_by_season before the read. A D1 team-game is a team-game whose team carries a conference id in the box record, which is taken from the event source at fetch time. Seasons below 85% are dropped and listed on the card. Fewer than 3 usable seasons means CONFIRMATION_UNAVAILABLE (v4 rule).",
+  "d_coefficients": "one OLS fit, no intercept, of the v4 P1 form on ALL development rows 2023-2026 together: target = margin - v7_mu (v7_mu exactly as v4's baseline_v7_mu), regressors dA = avail_top7_prev1(home) - avail_top7_prev1(away) and dL = top7_minutes_share_out_3plus(home) - top7_minutes_share_out_3plus(away), on cohort rows where all four inputs are non-null, inputs from the v4-pinned table. b1 and b2 are recorded on the confirmation card before any confirmation line or outcome is read, then applied unchanged: mu = v7_mu_confirmation + b1*dA + b2*dL, adjustment 0 when any input is null. v7_mu_confirmation is the served-constant v7 mean of the confirmation replay (replay_261120, as in confirmation_pin_a_ml_w0 arms.mu_v7_scale_v7), with v7's scale and dist. No refit on confirmation data.",
+  "e_date_quirk": {
+    "what": "the table's game_date is the scoreboard date. For a few late West Coast and Hawaii tips, that date is one day before the Eastern calendar day of the tip. Development: 15 such games in 2023-2026 (20 in 2022-2026). Verified in the dev boxes: exactly 2 team-rows (team ids 2250 and 2502, season 2023) use event 401484367, which tipped 2022-11-25 00:43 ET and carries table date 2022-11-24, for their next games on 2022-11-25. Those games tipped at 21:00 ET and 23:41 ET, about 20 hours after the 00:43 tip, so no information from after the decision is used. The 'strictly before Eastern midnight' rule is still broken for those 2 rows.",
+    "confirmation_exposure": "the export's sb_date is the ESPN scoreboard date for 2016-2022 (the same quirk: 9, 11, 10, 4, 4, 1, 5 events in 2016-2022) and the Eastern date of the tip for the CBBD-built 2014-2015 (0 events).",
+    "treatment": "disclosed, not fixed: fixing it changes the pinned builder's logic. The same tolerance applies in confirmation, where the builder runs as pinned and the quirk rows are kept."
+  },
+  "multiplicity": "K unchanged (spread_market_relative 25, cover_calibration 16, moneyline 16): confirmation is one read per candidate, as v1.",
+  "unchanged": "everything in protocol v1 and addenda v2-v4 not named above: the grid, K, the pass rule (plain one-sided 95% bound above 0 on spread_corr_delta_vs_v7, pooled over usable seasons), the confirmation lines (espn_backfill_261120), the lock, no refit, no shrink-to-market",
+  "fetch_estimate_moved": "the fetch-size estimate is in the .md (reviewer notes); it is not a protocol clause",
+  "f_confirmation_seasons": {
+    "season_years": [
+      2018,
+      2019,
+      2020,
+      2022
+    ],
+    "why": "The primary statistic (spread_corr_delta_vs_v7) needs a closing spread line, and the pinned confirmation line source (espn_backfill_261120) has spread lines only for season years 2018, 2019, 2020 and 2022 (CBBD lines stay refused). Seasons 2015-2017 can never enter the read, so v4's listed window 2015-2020 + 2022 narrows to these four. This follows from line availability counted outcome-free, not from any result.",
+    "fetch": "P1's inputs (avail_top7_prev1, top7_minutes_share_out_3plus) are same-season only, so no prior-season boxes are needed: fetch 2018, 2019 and 2020 only; 2022 boxes are already on disk.",
+    "usability": "v4 85% rule per season; at least 3 of the 4 seasons must be usable, else CONFIRMATION_UNAVAILABLE."
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "model_id": "cfb-structural-v6.1",
+  "spec_version": "cfb-v61-spec-1",
+  "quick_task": "261115-183",
+  "generated_at_utc": "2026-11-15T07:33:53Z",
+  "rule_sha256": "1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f",
+  "v6_frozen_params_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70",
+  "composition": "v6.1 = v6 + tracker (no source beyond the tracker is PIT_PASS)",
+  "total": "frozen v6 calibrated total (total_calibration.intercept + slope * grid[0.1|0.2][1], no floor) + tracker offset + sum of PIT_PASS total components",
+  "margin": "frozen v6 calibrated margin unchanged unless a spread component is PIT_PASS",
+  "tracker": {
+    "window": {
+      "kind": "days",
+      "size": 90
+    },
+    "grid_in_order": [
+      [
+        "days",
+        14
+      ],
+      [
+        "days",
+        30
+      ],
+      [
+        "days",
+        60
+      ],
+      [
+        "days",
+        90
+      ],
+      [
+        "games",
+        150
+      ],
+      [
+        "games",
+        300
+      ],
+      [
+        "games",
+        600
+      ]
+    ],
+    "day_window_min_games": 50,
+    "day_window_fallback_games": 150,
+    "result_buffer_hours": 5.0,
+    "result_buffer_rule": "a past game counts at decision time T only if start_utc + 5 h <= T (inclusive)",
+    "feed": "every non-forfeit game with a v6 grid projection at the frozen key (lined or not, FBS and FCS)",
+    "residual": "actual total - frozen v6 calibrated total",
+    "offset": "mean of the residual over the window; 0 when no eligible game",
+    "decision_time": "kickoff",
+    "selected_on": "select window only (L.tracker_select)",
+    "entry": "enters v6.1 by operator instruction regardless of its validation delta"
+  },
+  "shrinkage": {
+    "id": "D-183-SHRINK",
+    "factor": 0.5
+  },
+  "components": [],
+  "source_verdicts": {
+    "W2": {
+      "espn_total": "INSUFFICIENT_DATA",
+      "espn_spread": "INSUFFICIENT_DATA",
+      "intraday_polymarket": "DESCRIPTIVE_ONLY"
+    },
+    "W3": {
+      "total": "NOT_WORTH_BUILDING",
+      "spread": "NOT_WORTH_BUILDING"
+    },
+    "W4": {
+      "total": "NOT_WORTH_BUILDING",
+      "spread": "NOT_WORTH_BUILDING"
+    }
+  },
+  "inputs": {
+    "rule_file_canonical_sha256": "1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f",
+    "rule_file_lf_sha256": "2307a6641f9f8e461a2624dbe8bb7d6bf98cf11ded6b8a489fd3fd5fbea7f1f4",
+    "frozen_inputs_sha256": {
+      "cfb_v6_base_rows.jsonl": "30c3383c4de3824e5a3ee7cb76053facd18b0fe105097fec066bb9fc2980f4be",
+      "cfb_v5_base_rows.jsonl": "39c1cbd61e63b7dc1c029ad39b7c5b759aa1921296957d9070cb977bab2d187e",
+      "history_snapshot.jsonl": "1fe90e1a11b8e5248003bff92ae62eec5bb17c4bd421a275b2f64ed36f1ced0c",
+      "espn_lines.jsonl": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54"
+    },
+    "v6_frozen_fit_lf_sha256": "4a7e0f3acb860608438ea0a676ff3dc33e7a4c14f2677d60bdf6b7e45dc7d359",
+    "v5_artifact_lf_sha256": "fbff68717f8c9aff28e227c41b650b5b854404f46d1f4ca2d09ec8fc7cd05f38",
+    "v6_artifact_lf_sha256": "a7e33bfc6eabdbab2c040354ffcc24aa655ffa8a3a245ed027a9e5057def7272",
+    "workstream_outputs_lf_sha256": {
+      "cfb_total_level_tracker.json": "9d98e36e3dc0c3fd13eacdf036c5641c52ce8f680ef86c48a8be67dfa439b2f0",
+      "cfb_line_movement.json": "a8dabe380b5d26e25efe30ccff616534eb418e1bbc2b58bb5a9148b4496f5291",
+      "cfb_weather_bound.json": "78d162ee8c5949afd237f304e0f9aa371cded98e105788f52fdb11c0e6699216",
+      "cfb_qb_bound.json": "ac485eed1a30ac76923d6c977d74b040a707cf24d7266375b1cde868cd3bfd07"
+    },
+    "scripts_lf_sha256": {
+      "cfb_totals_lib.py": "43b166ebab053aa9cf5d178cae0c0a76fd743d6e6723b081d8fec8d6acdf1e8a",
+      "cfb_total_level_tracker.py": "fa63a1ad5166702eabe6eaa31ec6e9b540ac2bc8987fd13decbb1b29f9ff523c",
+      "cfb_line_movement.py": "046999042e0ad3c73eb7aae4fff758bec2f55cfaa3ec8c6b54f9837adfea58d7",
+      "cfb_weather_bound.py": "b53eb169dd5819f48a15d4b38cb98dd888b9044a422f3aecf0a07776955a32fa",
+      "cfb_qb_bound.py": "a1a911446f6f895917afe22b1f2508e3da661dd22861c5c2462e92d8b7945c94"
+    }
+  },
+  "nothing_tuned_after_freeze": true,
+  "spec_sha256": "8a3e5c6612aa72d0d9fc40b94d1ade4e40acb2ea649201750cbd74747db4573c"
+}

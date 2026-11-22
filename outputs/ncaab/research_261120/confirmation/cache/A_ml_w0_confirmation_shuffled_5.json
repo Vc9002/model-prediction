@@ -1,0 +1,107 @@
+{
+  "pin_id": "UNPINNED_PLUMBING",
+  "pin_sha256": null,
+  "window": "confirmation",
+  "seasons": [
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020,
+    2022
+  ],
+  "shuffled_outcomes": true,
+  "grid_name": "A_ml_w0",
+  "candidate": "A_ml_w0: p_home = P_t8(margin >= 1) under served v7 (Elo weight 0)",
+  "predictions_sha256": "d1c0f45a15ad6249300e0d28871a54d3c4814f5aaeb10433a385479e76c2d930",
+  "coverage_by_season": {
+    "2015": 1.0,
+    "2016": 1.0,
+    "2017": 1.0,
+    "2018": 1.0,
+    "2019": 1.0,
+    "2020": 1.0,
+    "2022": 1.0
+  },
+  "d1_vs_d1_events_by_season": {
+    "2015": 5494,
+    "2016": 5514,
+    "2017": 5520,
+    "2018": 5533,
+    "2019": 5597,
+    "2020": 5328,
+    "2022": 5485
+  },
+  "primary_moneyline_logloss_delta_vs_v7": {
+    "n": 38471,
+    "days": 989,
+    "delta": 0.034949,
+    "upper_one_sided_95": 0.037068,
+    "ci95_two_sided": [
+      0.032475,
+      0.037528
+    ],
+    "logloss_cand": 0.823927,
+    "logloss_v7": 0.788978
+  },
+  "verdict": "PLUMBING_ONLY",
+  "pass_rule": "n/a (plumbing)",
+  "by_season": {
+    "2015": {
+      "n": 5494,
+      "delta": 0.03934
+    },
+    "2016": {
+      "n": 5514,
+      "delta": 0.029773
+    },
+    "2017": {
+      "n": 5520,
+      "delta": 0.03521
+    },
+    "2018": {
+      "n": 5533,
+      "delta": 0.036637
+    },
+    "2019": {
+      "n": 5597,
+      "delta": 0.033649
+    },
+    "2020": {
+      "n": 5328,
+      "delta": 0.034512
+    },
+    "2022": {
+      "n": 5485,
+      "delta": 0.03554
+    }
+  },
+  "sensitivity_pooled_ex_2015": {
+    "n": 32977,
+    "days": 849,
+    "delta": 0.034217,
+    "upper_one_sided_95": 0.03643,
+    "ci95_two_sided": [
+      0.031687,
+      0.036884
+    ],
+    "logloss_cand": 0.820276,
+    "logloss_v7": 0.786059
+  },
+  "moneyline_brier_delta_vs_v7": 0.006136,
+  "lined_secondary_no_verdict": {
+    "line_source": "espn_backfill_261120",
+    "n": 20826,
+    "days": 564,
+    "delta": 0.035115,
+    "upper_one_sided_95": 0.037841,
+    "ci95_two_sided": [
+      0.031975,
+      0.038374
+    ],
+    "logloss_cand": 0.822075,
+    "logloss_v7": 0.78696
+  },
+  "generated_at_utc": "2026-11-21T12:09:36Z"
+}

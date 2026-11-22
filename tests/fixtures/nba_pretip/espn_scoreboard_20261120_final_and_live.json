@@ -1,0 +1,164 @@
+{
+ "events": [
+  {
+   "competitions": [
+    {
+     "attendance": 15488,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "id": "1",
+       "order": 0,
+       "score": "111",
+       "team": {
+        "abbreviation": "ATL",
+        "displayName": "Atlanta Hawks",
+        "id": "1",
+        "isActive": true,
+        "location": "Atlanta",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/atl.png",
+        "name": "Hawks"
+       },
+       "type": "team",
+       "winner": true
+      },
+      {
+       "homeAway": "away",
+       "id": "30",
+       "order": 1,
+       "score": "97",
+       "team": {
+        "abbreviation": "CHA",
+        "displayName": "Charlotte Hornets",
+        "id": "30",
+        "isActive": true,
+        "location": "Charlotte",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/cha.png",
+        "name": "Hornets"
+       },
+       "type": "team",
+       "winner": false
+      }
+     ],
+     "date": "2026-11-21T00:00Z",
+     "id": "401909305",
+     "neutralSite": false,
+     "status": {
+      "clock": 0.0,
+      "displayClock": "0.0",
+      "period": 4,
+      "type": {
+       "completed": true,
+       "detail": "Final",
+       "id": "3",
+       "name": "STATUS_FINAL",
+       "shortDetail": "Final",
+       "state": "post"
+      }
+     },
+     "timeValid": true,
+     "type": {
+      "abbreviation": "STD",
+      "id": "1"
+     }
+    }
+   ],
+   "date": "2026-11-21T00:00Z",
+   "id": "401909305",
+   "name": "Charlotte Hornets at Atlanta Hawks",
+   "shortName": "CHA @ ATL",
+   "status": {
+    "clock": 0.0,
+    "displayClock": "0.0",
+    "period": 4,
+    "type": {
+     "completed": true,
+     "detail": "Final",
+     "id": "3",
+     "name": "STATUS_FINAL",
+     "shortDetail": "Final",
+     "state": "post"
+    }
+   }
+  },
+  {
+   "competitions": [
+    {
+     "attendance": 17867,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "id": "26",
+       "order": 0,
+       "score": "74",
+       "team": {
+        "abbreviation": "UTAH",
+        "displayName": "Utah Jazz",
+        "id": "26",
+        "isActive": true,
+        "location": "Utah",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/utah.png",
+        "name": "Jazz"
+       },
+       "type": "team"
+      },
+      {
+       "homeAway": "away",
+       "id": "21",
+       "order": 1,
+       "score": "86",
+       "team": {
+        "abbreviation": "PHX",
+        "displayName": "Phoenix Suns",
+        "id": "21",
+        "isActive": true,
+        "location": "Phoenix",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/phx.png",
+        "name": "Suns"
+       },
+       "type": "team"
+      }
+     ],
+     "date": "2026-11-21T02:30Z",
+     "id": "401909311",
+     "neutralSite": false,
+     "status": {
+      "clock": 106.0,
+      "displayClock": "1:46",
+      "period": 3,
+      "type": {
+       "completed": false,
+       "detail": "1:46 - 3rd Quarter",
+       "id": "2",
+       "name": "STATUS_IN_PROGRESS",
+       "shortDetail": "1:46 - 3rd",
+       "state": "in"
+      }
+     },
+     "timeValid": true,
+     "type": {
+      "abbreviation": "STD",
+      "id": "1"
+     }
+    }
+   ],
+   "date": "2026-11-21T02:30Z",
+   "id": "401909311",
+   "name": "Phoenix Suns at Utah Jazz",
+   "shortName": "PHX @ UTAH",
+   "status": {
+    "clock": 106.0,
+    "displayClock": "1:46",
+    "period": 3,
+    "type": {
+     "completed": false,
+     "detail": "1:46 - 3rd Quarter",
+     "id": "2",
+     "name": "STATUS_IN_PROGRESS",
+     "shortDetail": "1:46 - 3rd",
+     "state": "in"
+    }
+   }
+  }
+ ]
+}

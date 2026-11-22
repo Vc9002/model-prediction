@@ -40,6 +40,48 @@ logger = logging.getLogger("model_prediction.calibration")
 
 ESPORTS_CALIBRATION_TITLES = frozenset({"cs2", "dota2", "lol", "valorant", "rainbow_six"})
 
+# Engine-pure NCAAB pools (operator decision 2026-11-21). ncaab-spread-v7 is the v6 artifact plus the
+# v7 margin engine, which served under the ncaab-spread-v6 id from 2026-11-16 (yaml margin_engine: v7).
+# The engine a row was priced with is its decision snapshot's features.margin_engine (absent before
+# 2026-11-16, i.e. v6). So a v6-labelled row priced by the v7 engine calibrates ncaab-spread-v7, and
+# the v6 calibrator, which keeps rollback calibrated, sees only v6-engine rows.
+NCAAB_SPREAD_V6_ID = "ncaab-spread-v6"
+NCAAB_SPREAD_V7_ID = "ncaab-spread-v7"
+NCAAB_MONEYLINE_V7M_ID = "ncaab-moneyline-v7m"
+# The one declared exception to "a calibrator is fitted on its own model's rows": the serving guard
+# accepts fit_model_versions within {model} + these source labels, nothing wider.
+CALIBRATION_POOL_SOURCES: dict[str, tuple[str, ...]] = {NCAAB_SPREAD_V7_ID: (NCAAB_SPREAD_V6_ID,)}
+CALIBRATION_POOL_NOTES: dict[str, str] = {
+    NCAAB_SPREAD_V7_ID: (
+        "engine-pure: ncaab-spread-v7 rows plus ncaab-spread-v6 rows whose decision snapshot "
+        "features.margin_engine == 'v7'"
+    ),
+    NCAAB_SPREAD_V6_ID: (
+        "engine-pure: ncaab-spread-v6 rows whose decision snapshot features.margin_engine is 'v6' or missing"
+    ),
+    # Deliberately absent from CALIBRATION_POOL_SOURCES: ncaab-spread-v7 moneyline rows are the Elo/margin
+    # blend, a different raw probability from v7m's margin-only one, so they must never fit its calibrator.
+    NCAAB_MONEYLINE_V7M_ID: "own rows only: ncaab-moneyline-v7m moneyline rows (no v7 blended rows)",
+}
+
+
+def _row_margin_engine(row: dict[str, Any]) -> str:
+    """The margin engine that priced ``row`` ("v6" when the snapshot is absent, unreadable or untagged)."""
+    snapshot = row.get("model_input_snapshot_json")
+    try:
+        payload = json.loads(snapshot) if isinstance(snapshot, str) else snapshot
+        engine = (payload.get("features") or {}).get("margin_engine")
+    except (AttributeError, TypeError, ValueError):
+        return "v6"
+    return str(engine).strip().lower() if engine else "v6"
+
+
+def _calibration_group_model(model_version: str, row: dict[str, Any]) -> str:
+    """The calibrator a settled row trains: its own label, except v7-engine rows labelled ncaab-spread-v6."""
+    if model_version == NCAAB_SPREAD_V6_ID and _row_margin_engine(row) == "v7":
+        return NCAAB_SPREAD_V7_ID
+    return model_version
+
 
 def _esports_calibration_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     """One latest settled decision per contract/model, ordered by decision time.
@@ -157,16 +199,23 @@ def extract_settled_model_predictions(
             else:
                 continue
 
-            # Parse model probability
+            # Parse model probability. NCAAB payloads carry the SERVED (already calibrated) value in
+            # model_probability and the engine's own value in model_probability_raw; serving applies the
+            # calibrator to the raw value, so it must be fitted on raw, never on its own output (2026-11-21:
+            # 222 settled NCAAB rows had been priced under a non-identity calibrator).
+            row_sport = str(row.get("sport") or row.get("league") or "").strip().lower()
+            probability_fields: tuple[str, ...] = (
+                "model_probability",
+                "probability",
+                "calibrated_probability",
+                "serving_probability",
+            )
+            if row_sport == "ncaab":
+                probability_fields = ("model_probability_raw", *probability_fields)
             raw_prob = next(
                 (
                     row.get(name)
-                    for name in (
-                        "model_probability",
-                        "probability",
-                        "calibrated_probability",
-                        "serving_probability",
-                    )
+                    for name in probability_fields
                     if row.get(name) is not None and row.get(name) != ""
                 ),
                 None,
@@ -191,6 +240,7 @@ def extract_settled_model_predictions(
             model_version = str(row.get("model_version") or row.get("model_id") or "unknown").strip()
             if not model_version or model_version == "unknown":
                 continue
+            model_version = _calibration_group_model(model_version, row)
 
             key = (sport, market, model_version, tier_name)
             if key not in results:
@@ -530,8 +580,15 @@ def run_full_calibration_pipeline(
                 # Groups are keyed by the row's own model_version, so by
                 # construction this transform was fitted on the model's own
                 # settled live rows -- the provenance the serving guard requires.
-                "fit_model_versions": [r.model_version],
+                # The declared engine-pure pool (CALIBRATION_POOL_SOURCES) is the
+                # one exception, and it is recorded here rather than hidden.
+                "fit_model_versions": [r.model_version, *CALIBRATION_POOL_SOURCES.get(r.model_version, ())],
                 "fit_source": FIT_SOURCE_SETTLED_LIVE_ROWS,
+                **(
+                    {"fit_pool": CALIBRATION_POOL_NOTES[r.model_version]}
+                    if r.model_version in CALIBRATION_POOL_NOTES
+                    else {}
+                ),
             }
             _calibrator_artifact_path(cal_data_dir, r.model_version, r.market).write_text(
                 json.dumps(artifact_payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -662,7 +719,9 @@ def serving_guard_reason(payload: dict[str, Any], model_version: str, market: st
         fit_source = payload.get("fit_source")
         if not isinstance(fit_versions, list) or not fit_versions or fit_source is None:
             return "unknown_fit_provenance"
-        if {str(v) for v in fit_versions} != {model_version}:
+        declared = {model_version, *CALIBRATION_POOL_SOURCES.get(model_version, ())}
+        fit_set = {str(v) for v in fit_versions}
+        if model_version not in fit_set or not fit_set <= declared:
             return "foreign_fit_provenance"
         if str(fit_source) not in ALLOWED_SERVING_FIT_SOURCES:
             return "foreign_fit_provenance"

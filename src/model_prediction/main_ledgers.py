@@ -17,6 +17,7 @@ use Main + Flat through the daily learned forecast and derivative paths.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -389,8 +390,13 @@ class MultiSportPickLedger:
             sport_rows = [row for row in rows if str(row.get("league", "")).casefold() == sport]
             ledger.restore_rows_for_rollback(sport_rows, reason)
 
-    def restore_unreplaced_picks(self, prior_rows: list[dict[str, str]]) -> list[str]:
+    def restore_unreplaced_picks(
+        self,
+        prior_rows: list[dict[str, str]],
+        exclude_slots: Iterable[tuple[str, str, str]] = (),
+    ) -> list[str]:
         """Reconcile refresh gaps within each sport's canonical ledger."""
+        exclude_slots = tuple(exclude_slots)
         restored: list[str] = []
         for sport in {str(row.get("league", "")).casefold() for row in prior_rows}:
             if not sport:
@@ -398,7 +404,8 @@ class MultiSportPickLedger:
             ledger = self._ledger_for_league(sport)
             restored.extend(
                 ledger.restore_unreplaced_picks(
-                    [row for row in prior_rows if str(row.get("league", "")).casefold() == sport]
+                    [row for row in prior_rows if str(row.get("league", "")).casefold() == sport],
+                    exclude_slots,
                 )
             )
         return restored

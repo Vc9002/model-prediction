@@ -18,6 +18,9 @@ from model_prediction.college_basketball_forward import forecast_ncaab_sport
 from model_prediction.features.base import GameRecord
 from model_prediction.main_ledgers import MultiSportPickLedger
 
+# The served v6 model defines D1 as membership in its conference map (team_priors).
+_D1_TEAMS = {name: 1500.0 for name in ("Away", "Home", "MajorAway", "MajorHome", "SmallCollege")}
+
 
 def _run(tmp_path, monkeypatch, *, sample: int, policy: dict) -> dict:
     monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
@@ -82,6 +85,7 @@ def _run(tmp_path, monkeypatch, *, sample: int, policy: dict) -> dict:
 
     class SpreadModel:
         version = "ncaab-spread-v6"
+        team_priors = _D1_TEAMS
 
         def predict_games(self, history, upcoming):
             return []

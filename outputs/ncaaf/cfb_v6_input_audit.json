@@ -1,0 +1,1646 @@
+{
+  "as_of_utc": "2026-11-15T02:10:00Z",
+  "env": {
+    "MODEL_PREDICTION_LEDGER": null
+  },
+  "generated_at_utc": "2026-11-15T02:17:24Z",
+  "history": {
+    "data/historical/ncaaf_games_all.jsonl": {
+      "drive_or_play_like_keys": {
+        "away_epa_per_play": 7724,
+        "away_success_rate": 7724,
+        "home_epa_per_play": 7724,
+        "home_success_rate": 7724,
+        "possessions": 7724
+      },
+      "epa_diagnostics": {
+        "away_epa_exactly_zero": 152,
+        "both_epa_exactly_zero": 50,
+        "corr_epa_diff_vs_margin": 0.4007396267411847,
+        "corr_home_epa_vs_total": 0.13728915472948963,
+        "decimals_max": 3,
+        "home_epa_exactly_zero": 137,
+        "rows": 7724,
+        "values_rounded_to_3dp": true
+      },
+      "epa_fields": {
+        "away_epa_per_play": {
+          "distinct_values": 331,
+          "max": 0.6,
+          "min": -0.357,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              0.0,
+              152
+            ],
+            [
+              -0.011,
+              87
+            ],
+            [
+              -0.006,
+              83
+            ],
+            [
+              -0.009,
+              81
+            ]
+          ]
+        },
+        "home_epa_per_play": {
+          "distinct_values": 339,
+          "max": 0.7,
+          "min": -0.357,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              0.0,
+              137
+            ],
+            [
+              0.029,
+              91
+            ],
+            [
+              -0.026,
+              86
+            ],
+            [
+              0.006,
+              84
+            ]
+          ]
+        }
+      },
+      "key_counts": {
+        "away_epa_per_play": 7724,
+        "away_qb_experience_starts": 7724,
+        "away_returning_production": 7724,
+        "away_score": 7965,
+        "away_success_rate": 7724,
+        "away_team": 7965,
+        "away_team_id": 241,
+        "away_transfer_index": 7724,
+        "competition_type": 241,
+        "elevation_ft": 7724,
+        "event_id": 7965,
+        "event_start_utc": 7965,
+        "home_epa_per_play": 7724,
+        "home_qb_experience_starts": 7724,
+        "home_returning_production": 7724,
+        "home_score": 7965,
+        "home_success_rate": 7724,
+        "home_team": 7965,
+        "home_team_id": 241,
+        "home_transfer_index": 7724,
+        "is_dome": 7724,
+        "is_neutral_site": 7724,
+        "league": 241,
+        "parser_version": 241,
+        "possessions": 7724,
+        "raw_hash": 241,
+        "raw_source": 241,
+        "season_type": 241,
+        "season_year": 7965,
+        "status": 241,
+        "temperature_f": 7724,
+        "timezone_diff_hours": 7724,
+        "travel_distance_miles": 7724,
+        "week": 7724,
+        "wind_mph": 7724
+      },
+      "legacy_rows_without_parser_version": 7724,
+      "neutral_site_and_week": {
+        "absent_rows_are_exactly_the_parser_version_rows": true,
+        "is_neutral_site_absent": 241,
+        "is_neutral_site_present": 7724,
+        "week_absent": 241,
+        "week_present": 7724
+      },
+      "newest_rows_keys_with_epa_or_possession": {},
+      "newest_rows_with_parser_version": 241,
+      "parser_versions": {
+        "espn-scoreboard-1": 241
+      },
+      "possession_fields": {
+        "away_success_rate": {
+          "distinct_values": 1,
+          "max": 0.42,
+          "min": 0.42,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              0.42,
+              7724
+            ]
+          ]
+        },
+        "home_success_rate": {
+          "distinct_values": 1,
+          "max": 0.42,
+          "min": 0.42,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              0.42,
+              7724
+            ]
+          ]
+        },
+        "possessions": {
+          "distinct_values": 1,
+          "max": 12.5,
+          "min": 12.5,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              12.5,
+              7724
+            ]
+          ]
+        }
+      },
+      "raw_sources_newest": 21,
+      "rows": 7965,
+      "rows_by_season": {
+        "2016": 734,
+        "2017": 751,
+        "2018": 764,
+        "2019": 753,
+        "2020": 518,
+        "2021": 776,
+        "2022": 778,
+        "2023": 792,
+        "2024": 800,
+        "2025": 793,
+        "2026": 506
+      },
+      "sha256": "659e33b21de95e02633251c5614df3b63f9fea62898a140bd7efaa83e525ecb7",
+      "weather_fields": {
+        "is_dome": {
+          "distinct_values": 2,
+          "max": null,
+          "min": null,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              false,
+              7542
+            ],
+            [
+              true,
+              182
+            ]
+          ]
+        },
+        "precipitation_in": {
+          "distinct_values": 0,
+          "max": null,
+          "min": null,
+          "rows_absent": 7965,
+          "rows_with_value": 0,
+          "top_values": []
+        },
+        "temperature_f": {
+          "distinct_values": 2,
+          "max": 72.0,
+          "min": 65.0,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              65.0,
+              7542
+            ],
+            [
+              72.0,
+              182
+            ]
+          ]
+        },
+        "wind_mph": {
+          "distinct_values": 2,
+          "max": 5.0,
+          "min": 0.0,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              5.0,
+              7542
+            ],
+            [
+              0.0,
+              182
+            ]
+          ]
+        }
+      },
+      "weather_pairs_legacy_dome_rows": {
+        "72.0F/0.0mph": 182
+      },
+      "weather_pairs_legacy_outdoor_rows": {
+        "65.0F/5.0mph": 7542
+      }
+    },
+    "data/processed/ncaaf/games.jsonl": {
+      "drive_or_play_like_keys": {
+        "away_epa_per_play": 7724,
+        "away_success_rate": 7724,
+        "home_epa_per_play": 7724,
+        "home_success_rate": 7724,
+        "possessions": 7724
+      },
+      "epa_diagnostics": {
+        "away_epa_exactly_zero": 152,
+        "both_epa_exactly_zero": 50,
+        "corr_epa_diff_vs_margin": 0.4007396267411847,
+        "corr_home_epa_vs_total": 0.13728915472948963,
+        "decimals_max": 3,
+        "home_epa_exactly_zero": 137,
+        "rows": 7724,
+        "values_rounded_to_3dp": true
+      },
+      "epa_fields": {
+        "away_epa_per_play": {
+          "distinct_values": 331,
+          "max": 0.6,
+          "min": -0.357,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              0.0,
+              152
+            ],
+            [
+              -0.011,
+              87
+            ],
+            [
+              -0.006,
+              83
+            ],
+            [
+              -0.009,
+              81
+            ]
+          ]
+        },
+        "home_epa_per_play": {
+          "distinct_values": 339,
+          "max": 0.7,
+          "min": -0.357,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              0.0,
+              137
+            ],
+            [
+              0.029,
+              91
+            ],
+            [
+              -0.026,
+              86
+            ],
+            [
+              0.006,
+              84
+            ]
+          ]
+        }
+      },
+      "key_counts": {
+        "away_epa_per_play": 7724,
+        "away_qb_experience_starts": 7724,
+        "away_returning_production": 7724,
+        "away_score": 7965,
+        "away_success_rate": 7724,
+        "away_team": 7965,
+        "away_team_id": 241,
+        "away_transfer_index": 7724,
+        "competition_type": 241,
+        "elevation_ft": 7724,
+        "event_id": 7965,
+        "event_start_utc": 7965,
+        "home_epa_per_play": 7724,
+        "home_qb_experience_starts": 7724,
+        "home_returning_production": 7724,
+        "home_score": 7965,
+        "home_success_rate": 7724,
+        "home_team": 7965,
+        "home_team_id": 241,
+        "home_transfer_index": 7724,
+        "is_dome": 7724,
+        "is_neutral_site": 7724,
+        "league": 241,
+        "parser_version": 241,
+        "possessions": 7724,
+        "raw_hash": 241,
+        "raw_source": 241,
+        "season_type": 241,
+        "season_year": 7965,
+        "status": 241,
+        "temperature_f": 7724,
+        "timezone_diff_hours": 7724,
+        "travel_distance_miles": 7724,
+        "week": 7724,
+        "wind_mph": 7724
+      },
+      "legacy_rows_without_parser_version": 7724,
+      "neutral_site_and_week": {
+        "absent_rows_are_exactly_the_parser_version_rows": true,
+        "is_neutral_site_absent": 241,
+        "is_neutral_site_present": 7724,
+        "week_absent": 241,
+        "week_present": 7724
+      },
+      "newest_rows_keys_with_epa_or_possession": {},
+      "newest_rows_with_parser_version": 241,
+      "parser_versions": {
+        "espn-scoreboard-1": 241
+      },
+      "possession_fields": {
+        "away_success_rate": {
+          "distinct_values": 1,
+          "max": 0.42,
+          "min": 0.42,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              0.42,
+              7724
+            ]
+          ]
+        },
+        "home_success_rate": {
+          "distinct_values": 1,
+          "max": 0.42,
+          "min": 0.42,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              0.42,
+              7724
+            ]
+          ]
+        },
+        "possessions": {
+          "distinct_values": 1,
+          "max": 12.5,
+          "min": 12.5,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              12.5,
+              7724
+            ]
+          ]
+        }
+      },
+      "raw_sources_newest": 21,
+      "rows": 7965,
+      "rows_by_season": {
+        "2016": 734,
+        "2017": 751,
+        "2018": 764,
+        "2019": 753,
+        "2020": 518,
+        "2021": 776,
+        "2022": 778,
+        "2023": 792,
+        "2024": 800,
+        "2025": 793,
+        "2026": 506
+      },
+      "sha256": "659e33b21de95e02633251c5614df3b63f9fea62898a140bd7efaa83e525ecb7",
+      "weather_fields": {
+        "is_dome": {
+          "distinct_values": 2,
+          "max": null,
+          "min": null,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              false,
+              7542
+            ],
+            [
+              true,
+              182
+            ]
+          ]
+        },
+        "precipitation_in": {
+          "distinct_values": 0,
+          "max": null,
+          "min": null,
+          "rows_absent": 7965,
+          "rows_with_value": 0,
+          "top_values": []
+        },
+        "temperature_f": {
+          "distinct_values": 2,
+          "max": 72.0,
+          "min": 65.0,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              65.0,
+              7542
+            ],
+            [
+              72.0,
+              182
+            ]
+          ]
+        },
+        "wind_mph": {
+          "distinct_values": 2,
+          "max": 5.0,
+          "min": 0.0,
+          "rows_absent": 241,
+          "rows_with_value": 7724,
+          "top_values": [
+            [
+              5.0,
+              7542
+            ],
+            [
+              0.0,
+              182
+            ]
+          ]
+        }
+      },
+      "weather_pairs_legacy_dome_rows": {
+        "72.0F/0.0mph": 182
+      },
+      "weather_pairs_legacy_outdoor_rows": {
+        "65.0F/5.0mph": 7542
+      }
+    },
+    "files_identical_rows": true,
+    "files_identical_sha256": true
+  },
+  "injury_snapshots": {
+    "all_position_entry_status": {
+      "Active": 258,
+      "Out": 129
+    },
+    "dir": "data/availability/ncaaf/espn_injury_snapshots",
+    "distinct_team_player_position_status_entries": 3,
+    "distinct_teams_any_position": 3,
+    "distinct_teams_with_any_qb_entry": 0,
+    "entries_per_snapshot_max": 3,
+    "entries_per_snapshot_min": 3,
+    "entries_total_all_positions": 387,
+    "observed_at_max": "2026-11-15T01:30:52.490178+00:00",
+    "observed_at_min": "2026-10-25T02:11:41.583294+00:00",
+    "qb_entries_total_across_snapshots": 0,
+    "qb_entries_with_penalising_status_snapshot_level": 0,
+    "qb_entry_status": {},
+    "qb_penalising_distinct_team_player_status": [],
+    "snapshots": 129,
+    "snapshots_with_zero_qb_entries": 129
+  },
+  "ledger": {
+    "as_of_filter": "created_at_utc <= 2026-11-15T02:10:00Z",
+    "event_start_max": "2026-11-15",
+    "event_start_min": "2026-08-29",
+    "events": 607,
+    "extras": {
+      "payload_strings_that_failed_to_decode": {
+        "examples": [],
+        "rows": 0
+      },
+      "presence_by_model": {
+        "cfb-spread-v1": {
+          "has_away_qb_value_adjustment": 0,
+          "has_home_qb_value_adjustment": 0,
+          "has_qb_availability_key": 0,
+          "has_weather_evidence_key": 0,
+          "has_weather_total_adjustment": 594,
+          "qb_value_adjustment_nonzero": 0,
+          "rows": 604,
+          "weather_total_adjustment_nonzero": 0,
+          "with_features_block": 604
+        },
+        "cfb-structural-v2": {
+          "has_away_qb_value_adjustment": 0,
+          "has_home_qb_value_adjustment": 0,
+          "has_qb_availability_key": 0,
+          "has_weather_evidence_key": 0,
+          "has_weather_total_adjustment": 1145,
+          "qb_value_adjustment_nonzero": 0,
+          "rows": 1145,
+          "weather_total_adjustment_nonzero": 0,
+          "with_features_block": 1145
+        },
+        "cfb-structural-v3": {
+          "has_away_qb_value_adjustment": 0,
+          "has_home_qb_value_adjustment": 0,
+          "has_qb_availability_key": 0,
+          "has_weather_evidence_key": 252,
+          "has_weather_total_adjustment": 544,
+          "qb_value_adjustment_nonzero": 0,
+          "rows": 544,
+          "weather_total_adjustment_nonzero": 3,
+          "with_features_block": 544
+        },
+        "cfb-structural-v4": {
+          "has_away_qb_value_adjustment": 96,
+          "has_home_qb_value_adjustment": 96,
+          "has_qb_availability_key": 96,
+          "has_weather_evidence_key": 1614,
+          "has_weather_total_adjustment": 1614,
+          "qb_value_adjustment_nonzero": 0,
+          "rows": 1614,
+          "weather_total_adjustment_nonzero": 15,
+          "with_features_block": 1614
+        },
+        "cfb-structural-v5": {
+          "has_away_qb_value_adjustment": 1119,
+          "has_home_qb_value_adjustment": 1119,
+          "has_qb_availability_key": 1119,
+          "has_weather_evidence_key": 1119,
+          "has_weather_total_adjustment": 1119,
+          "qb_value_adjustment_nonzero": 0,
+          "rows": 1119,
+          "weather_total_adjustment_nonzero": 7,
+          "with_features_block": 1119
+        },
+        "cfb-total-v1": {
+          "has_away_qb_value_adjustment": 0,
+          "has_home_qb_value_adjustment": 0,
+          "has_qb_availability_key": 0,
+          "has_weather_evidence_key": 0,
+          "has_weather_total_adjustment": 592,
+          "qb_value_adjustment_nonzero": 0,
+          "rows": 602,
+          "weather_total_adjustment_nonzero": 0,
+          "with_features_block": 602
+        },
+        "college-football-v1": {
+          "has_away_qb_value_adjustment": 0,
+          "has_home_qb_value_adjustment": 0,
+          "has_qb_availability_key": 0,
+          "has_weather_evidence_key": 0,
+          "has_weather_total_adjustment": 491,
+          "qb_value_adjustment_nonzero": 0,
+          "rows": 501,
+          "weather_total_adjustment_nonzero": 0,
+          "with_features_block": 501
+        }
+      },
+      "recorded_capture_sha256_distinct": 722,
+      "recorded_capture_sha256_found_in_file": {
+        "repo": 722,
+        "runtime": 0
+      },
+      "recorded_capture_sha256_total_in_file": {
+        "repo": 740,
+        "runtime": 128
+      },
+      "weather_key_census": {
+        "decision.model_input_snapshot_json.features.weather_evidence": {
+          "non_empty": 2925,
+          "occurrences": 2985,
+          "rows_with_key": 2985
+        },
+        "decision.model_input_snapshot_json.features.weather_inputs_verified": {
+          "non_empty": 2985,
+          "occurrences": 2985,
+          "rows_with_key": 2985
+        },
+        "decision.model_input_snapshot_json.features.weather_total_adjustment": {
+          "non_empty": 6099,
+          "occurrences": 6099,
+          "rows_with_key": 6099
+        },
+        "decision.weather_factor": {
+          "non_empty": 0,
+          "occurrences": 6129,
+          "rows_with_key": 6129
+        },
+        "feature.features.weather_evidence": {
+          "non_empty": 2985,
+          "occurrences": 2985,
+          "rows_with_key": 2985
+        },
+        "feature.features.weather_inputs_verified": {
+          "non_empty": 2985,
+          "occurrences": 2985,
+          "rows_with_key": 2985
+        },
+        "feature.features.weather_total_adjustment": {
+          "non_empty": 6099,
+          "occurrences": 6099,
+          "rows_with_key": 6099
+        },
+        "feature.model_input_snapshot.features.weather_evidence": {
+          "non_empty": 2925,
+          "occurrences": 2985,
+          "rows_with_key": 2985
+        },
+        "feature.model_input_snapshot.features.weather_inputs_verified": {
+          "non_empty": 2985,
+          "occurrences": 2985,
+          "rows_with_key": 2985
+        },
+        "feature.model_input_snapshot.features.weather_total_adjustment": {
+          "non_empty": 6099,
+          "occurrences": 6099,
+          "rows_with_key": 6099
+        }
+      },
+      "weather_total_adjustment_nonzero_cross_tab": [
+        {
+          "created_date": "2026-10-31",
+          "evidence_source": "open_meteo:forecast",
+          "model_id": "cfb-structural-v3",
+          "rows": 3
+        },
+        {
+          "created_date": "2026-11-04",
+          "evidence_source": "open_meteo:forecast",
+          "model_id": "cfb-structural-v4",
+          "rows": 8
+        },
+        {
+          "created_date": "2026-11-07",
+          "evidence_source": "open_meteo:forecast",
+          "model_id": "cfb-structural-v4",
+          "rows": 3
+        },
+        {
+          "created_date": "2026-11-13",
+          "evidence_source": "open_meteo:forecast",
+          "model_id": "cfb-structural-v4",
+          "rows": 4
+        },
+        {
+          "created_date": "2026-11-14",
+          "evidence_source": "open_meteo:forecast",
+          "model_id": "cfb-structural-v5",
+          "rows": 7
+        }
+      ],
+      "weather_total_adjustment_nonzero_rows": [
+        {
+          "adjustment": -0.36,
+          "created": "2026-11-14T17:09:18.242122Z",
+          "created_before_event_start": true,
+          "event": "401871060",
+          "event_start": "2026-11-14T20:00Z",
+          "evidence_observed_at_utc": "2026-11-14T17:01:44.068137+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v5",
+          "pick_id": "3e809704a42b4958",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.36,
+          "created": "2026-11-14T17:09:18.242122Z",
+          "created_before_event_start": true,
+          "event": "401871060",
+          "event_start": "2026-11-14T20:00Z",
+          "evidence_observed_at_utc": "2026-11-14T17:01:44.068137+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v5",
+          "pick_id": "2ac5d70374694b52",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.36,
+          "created": "2026-11-14T17:09:18.242122Z",
+          "created_before_event_start": true,
+          "event": "401871060",
+          "event_start": "2026-11-14T20:00Z",
+          "evidence_observed_at_utc": "2026-11-14T17:01:44.068137+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v5",
+          "pick_id": "0bb6adce92654b29",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.03,
+          "created": "2026-11-14T05:40:02.879536Z",
+          "created_before_event_start": true,
+          "event": "401858520",
+          "event_start": "2026-11-14T17:00Z",
+          "evidence_observed_at_utc": "2026-11-14T05:34:25.333697+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v5",
+          "pick_id": "da516c6ea67143fd",
+          "tier": "main",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.03,
+          "created": "2026-11-14T05:40:02.879536Z",
+          "created_before_event_start": true,
+          "event": "401858520",
+          "event_start": "2026-11-14T17:00Z",
+          "evidence_observed_at_utc": "2026-11-14T05:34:25.333697+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v5",
+          "pick_id": "87ed5635a9244b1a",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.03,
+          "created": "2026-11-14T05:40:02.879536Z",
+          "created_before_event_start": true,
+          "event": "401858520",
+          "event_start": "2026-11-14T17:00Z",
+          "evidence_observed_at_utc": "2026-11-14T05:34:25.333697+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v5",
+          "pick_id": "82b5a7f4a5264e8f",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.03,
+          "created": "2026-11-14T05:40:02.879536Z",
+          "created_before_event_start": true,
+          "event": "401858520",
+          "event_start": "2026-11-14T17:00Z",
+          "evidence_observed_at_utc": "2026-11-14T05:34:25.333697+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v5",
+          "pick_id": "1e821ebc7d574f5f",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-11-13T14:05:54.991608Z",
+          "created_before_event_start": true,
+          "event": "401858526",
+          "event_start": "2026-11-14T02:00Z",
+          "evidence_observed_at_utc": "2026-11-13T14:02:12.746178+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "aa9b771f79d64397",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-11-13T14:05:54.991608Z",
+          "created_before_event_start": true,
+          "event": "401858526",
+          "event_start": "2026-11-14T02:00Z",
+          "evidence_observed_at_utc": "2026-11-13T14:02:12.746178+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "a27aa4ffe08446d8",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-11-13T14:05:54.991608Z",
+          "created_before_event_start": true,
+          "event": "401858526",
+          "event_start": "2026-11-14T02:00Z",
+          "evidence_observed_at_utc": "2026-11-13T14:02:12.746178+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "a00203e7085a464e",
+          "tier": "main",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-11-13T14:05:54.991608Z",
+          "created_before_event_start": true,
+          "event": "401858526",
+          "event_start": "2026-11-14T02:00Z",
+          "evidence_observed_at_utc": "2026-11-13T14:02:12.746178+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "1c848f3cb6ad42bd",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.17,
+          "created": "2026-11-07T17:07:45.250405Z",
+          "created_before_event_start": true,
+          "event": "401869927",
+          "event_start": "2026-11-07T19:30Z",
+          "evidence_observed_at_utc": "2026-11-07T17:03:49.758774+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "d45abf119be543cd",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.17,
+          "created": "2026-11-07T17:07:45.250405Z",
+          "created_before_event_start": true,
+          "event": "401869927",
+          "event_start": "2026-11-07T19:30Z",
+          "evidence_observed_at_utc": "2026-11-07T17:03:49.758774+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "4f29a36218494f54",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.17,
+          "created": "2026-11-07T17:07:45.250405Z",
+          "created_before_event_start": true,
+          "event": "401869927",
+          "event_start": "2026-11-07T19:30Z",
+          "evidence_observed_at_utc": "2026-11-07T17:03:49.758774+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "1f053c9e8e1641e0",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.11,
+          "created": "2026-11-04T21:10:11.630133Z",
+          "created_before_event_start": true,
+          "event": "401866456",
+          "event_start": "2026-11-05T00:30Z",
+          "evidence_observed_at_utc": "2026-11-04T21:02:54.087324+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "f6023920a4ce45bd",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.11,
+          "created": "2026-11-04T21:10:11.630133Z",
+          "created_before_event_start": true,
+          "event": "401866456",
+          "event_start": "2026-11-05T00:30Z",
+          "evidence_observed_at_utc": "2026-11-04T21:02:54.087324+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "f3a662e3317f4947",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.11,
+          "created": "2026-11-04T21:10:11.630133Z",
+          "created_before_event_start": true,
+          "event": "401866456",
+          "event_start": "2026-11-05T00:30Z",
+          "evidence_observed_at_utc": "2026-11-04T21:02:54.087324+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "d6fe53f5d8564d51",
+          "tier": "main",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.11,
+          "created": "2026-11-04T21:10:11.630133Z",
+          "created_before_event_start": true,
+          "event": "401866456",
+          "event_start": "2026-11-05T00:30Z",
+          "evidence_observed_at_utc": "2026-11-04T21:02:54.087324+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "491de58a8bae45ad",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -0.11,
+          "created": "2026-11-04T21:10:11.630133Z",
+          "created_before_event_start": true,
+          "event": "401866456",
+          "event_start": "2026-11-05T00:30Z",
+          "evidence_observed_at_utc": "2026-11-04T21:02:54.087324+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "3c06c6021fc04163",
+          "tier": "main",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-11-04T11:10:13.523484Z",
+          "created_before_event_start": true,
+          "event": "401866456",
+          "event_start": "2026-11-05T00:30Z",
+          "evidence_observed_at_utc": "2026-11-04T11:02:17.985035+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "dc96094715004274",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-11-04T11:10:13.523484Z",
+          "created_before_event_start": true,
+          "event": "401866456",
+          "event_start": "2026-11-05T00:30Z",
+          "evidence_observed_at_utc": "2026-11-04T11:02:17.985035+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "b3e3269d8cb347fc",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-11-04T11:10:13.523484Z",
+          "created_before_event_start": true,
+          "event": "401866456",
+          "event_start": "2026-11-05T00:30Z",
+          "evidence_observed_at_utc": "2026-11-04T11:02:17.985035+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v4",
+          "pick_id": "16e4986b22cf418c",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-10-31T05:04:50.369203Z",
+          "created_before_event_start": true,
+          "event": "401856733",
+          "event_start": "2026-10-31T23:45Z",
+          "evidence_observed_at_utc": "2026-10-31T05:01:30.404304+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v3",
+          "pick_id": "ed4988cac29247ac",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-10-31T05:04:50.369203Z",
+          "created_before_event_start": true,
+          "event": "401856733",
+          "event_start": "2026-10-31T23:45Z",
+          "evidence_observed_at_utc": "2026-10-31T05:01:30.404304+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v3",
+          "pick_id": "c7d0b1ecdb724ba8",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        },
+        {
+          "adjustment": -1.8,
+          "created": "2026-10-31T05:04:50.369203Z",
+          "created_before_event_start": true,
+          "event": "401856733",
+          "event_start": "2026-10-31T23:45Z",
+          "evidence_observed_at_utc": "2026-10-31T05:01:30.404304+00:00",
+          "evidence_source": "open_meteo:forecast",
+          "is_dome": false,
+          "model_id": "cfb-structural-v3",
+          "pick_id": "57f81c1e10ac4371",
+          "tier": "flat",
+          "weather_inputs_verified": true
+        }
+      ]
+    },
+    "filter": "sport = 'ncaaf', all tiers, all statuses, created_at_utc <= 2026-11-15T02:10:00Z",
+    "ledger_db": "E:\\model-prediction-runtime\\ledgers\\ledgers.db",
+    "opened_mode": "sqlite uri mode=ro",
+    "payload_presence": {
+      "decision_payload": 6129,
+      "feature_payload": 6129
+    },
+    "qb_cell_row_created_at_range": [
+      "2026-11-12T11:06:33.235182Z",
+      "2026-11-15T01:39:57.810652Z"
+    ],
+    "qb_latest_row_per_event": {
+      "reason": {
+        "starter_absent_from_report": 122
+      },
+      "side_cells_nonzero_qb_value_adjustment": 0,
+      "side_cells_starter_prob_below_0_99": 0,
+      "side_cells_starter_unresolved": 0,
+      "side_cells_total": 1214,
+      "side_cells_with_qb_availability": 122,
+      "side_cells_without_qb_availability": 1092,
+      "starter_prob": {
+        "1.0": 122
+      },
+      "status": {
+        "not_listed": 122
+      }
+    },
+    "qb_row_level": {
+      "reason": {
+        "starter_absent_from_report": 2430
+      },
+      "side_cells_nonzero_qb_value_adjustment": 0,
+      "side_cells_starter_prob_below_0_99": 0,
+      "side_cells_starter_unresolved": 0,
+      "side_cells_total": 12258,
+      "side_cells_with_qb_availability": 2430,
+      "side_cells_without_qb_availability": 9828,
+      "starter_prob": {
+        "1.0": 2430
+      },
+      "status": {
+        "not_listed": 2430
+      }
+    },
+    "rows": 6129,
+    "rows_by_market": {
+      "moneyline": 1829,
+      "spread": 2133,
+      "total": 2167
+    },
+    "rows_by_model": {
+      "cfb-spread-v1": 604,
+      "cfb-structural-v2": 1145,
+      "cfb-structural-v3": 544,
+      "cfb-structural-v4": 1614,
+      "cfb-structural-v5": 1119,
+      "cfb-total-v1": 602,
+      "college-football-v1": 501
+    },
+    "rows_by_tier_status": {
+      "flat/open": 72,
+      "flat/settled": 670,
+      "flat/superseded": 3624,
+      "main/open": 15,
+      "main/settled": 1073,
+      "main/superseded": 675
+    },
+    "rows_with_feature_block_by_event_start_month": {
+      "2026-08": 24,
+      "2026-09": 1308,
+      "2026-10": 2184,
+      "2026-11": 2613
+    },
+    "starter_name_stability_latest_row_per_event": {
+      "examples": {},
+      "games_per_team_distribution": {
+        "1": 122
+      },
+      "teams_with_named_starter": 122,
+      "teams_with_two_or_more_distinct_starter_names": 0
+    },
+    "weather_event_level_any_row": {
+      "events": 607,
+      "has_feature_block": 607,
+      "nonzero_adj": 6,
+      "open_meteo_evidence": 173,
+      "qb_cell": 61,
+      "qb_prob_below_0_99": 0,
+      "raw_weather_key": 0
+    },
+    "weather_latest_row_per_event": {
+      "has_weather_total_adjustment_field": 598,
+      "is_dome": {
+        "<absent>": 9,
+        "False": 585,
+        "True": 13
+      },
+      "n": 607,
+      "nonzero_adjustment_events": [
+        "401869927"
+      ],
+      "raw_weather_key_paths": {},
+      "rows_with_event_before_weather_file_coverage": 374,
+      "rows_with_nonnull_raw_wind_temp_precip_key": 0,
+      "rows_with_open_meteo_forecast_evidence": 173,
+      "weather_evidence_source": {
+        "<empty evidence {}>": 5,
+        "<key absent>": 423,
+        "cfb_team_catalog:indoor": 6,
+        "open_meteo:forecast": 173
+      },
+      "weather_inputs_verified": {
+        "<absent>": 423,
+        "False": 5,
+        "True": 179
+      },
+      "weather_total_adjustment_nonzero": 1,
+      "weather_total_adjustment_nonzero_values": [
+        -0.17
+      ],
+      "with_feature_features_block": 607,
+      "without_feature_block": 0
+    },
+    "weather_row_level": {
+      "has_weather_total_adjustment_field": 6099,
+      "is_dome": {
+        "<absent>": 30,
+        "False": 5933,
+        "True": 166
+      },
+      "n": 6129,
+      "nonzero_adjustment_events": [
+        "401856733",
+        "401858520",
+        "401858526",
+        "401866456",
+        "401869927",
+        "401871060"
+      ],
+      "raw_weather_key_paths": {},
+      "rows_with_event_before_weather_file_coverage": 2765,
+      "rows_with_nonnull_raw_wind_temp_precip_key": 0,
+      "rows_with_open_meteo_forecast_evidence": 2829,
+      "weather_evidence_source": {
+        "<empty evidence {}>": 60,
+        "<key absent>": 3144,
+        "cfb_team_catalog:indoor": 96,
+        "open_meteo:forecast": 2829
+      },
+      "weather_inputs_verified": {
+        "<absent>": 3144,
+        "False": 60,
+        "True": 2925
+      },
+      "weather_total_adjustment_nonzero": 25,
+      "weather_total_adjustment_nonzero_values": [
+        -1.8,
+        -0.36,
+        -0.17,
+        -0.11,
+        -0.03
+      ],
+      "with_feature_features_block": 6129,
+      "without_feature_block": 0
+    }
+  },
+  "qb_probes": {
+    "passing_leader_note": "The function returns whichever athlete the scoreboard lists first under passingLeader or passingYards; it carries no game-day depth-chart or snap information.",
+    "passing_leader_synthetic_competitor": [
+      "42",
+      "Season Yards Leader"
+    ],
+    "resolver": {
+      "no snapshot": {
+        "reason": "no_injury_snapshot_before_decision",
+        "starter_prob": 1.0,
+        "status": "no_report"
+      },
+      "starter absent from report": {
+        "reason": "starter_absent_from_report",
+        "starter_prob": 1.0,
+        "status": "not_listed"
+      },
+      "starter listed Out": {
+        "reason": "starter_listed_on_report",
+        "starter_prob": 0.0,
+        "status": "Out"
+      },
+      "team with no entries at all": {
+        "reason": "starter_absent_from_report",
+        "starter_prob": 1.0,
+        "status": "not_listed"
+      }
+    }
+  },
+  "qb_trace": {
+    "extractor_adjustment_field": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 779,
+      "text": "away_qb_value_adjustment=away_qb_adj,"
+    },
+    "extractor_discount_gate": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 659,
+      "text": "away_qb_adj = (1.0 - qb_starter_prob_away) * -4.5 if qb_starter_prob_away < 0.99 else 0.0"
+    },
+    "forecast_leader_call": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 938,
+      "text": "away_qb_id, away_qb_name = passing_leader_from_competitor(away)"
+    },
+    "forecast_prob_to_game": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 969,
+      "text": "qb_starter_prob_away=away_qb.starter_prob,"
+    },
+    "forecast_resolve_call": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 940,
+      "text": "away_qb = resolve_cfb_qb_availability("
+    },
+    "history_qb_experience_field": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 53,
+      "text": "home_qb_experience_starts: int | None = None"
+    },
+    "history_qb_experience_reads": [],
+    "no_evidence_prob": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 57,
+      "text": "starter_prob=1.0,"
+    },
+    "not_listed_prob": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 173,
+      "text": "starter_prob=1.0,"
+    },
+    "not_listed_reason": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 175,
+      "text": "reason=\"starter_absent_from_report\","
+    },
+    "not_listed_status": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 174,
+      "text": "status=\"not_listed\","
+    },
+    "passing_leader_def": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 90,
+      "text": "def passing_leader_from_competitor(competitor: dict[str, Any]) -> tuple[str | None, str | None]:"
+    },
+    "passing_leader_docstring": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 93,
+      "text": "The season passing leader is the de facto starter; ESPN offers no college depth"
+    },
+    "passing_leader_groups": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 97,
+      "text": "if str(group.get(\"name\") or \"\") not in (\"passingLeader\", \"passingYards\"):"
+    },
+    "status_map": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 29,
+      "text": "STATUS_STARTER_PROBABILITY: dict[str, float] = {"
+    },
+    "unmapped_status_prob": {
+      "file": "src/model_prediction/features/cfb_qb_availability.py",
+      "line": 162,
+      "text": "probability = 1.0"
+    }
+  },
+  "unverified_code_claims": [],
+  "verdicts": {
+    "drive_or_play_fields_present": false,
+    "pace_conclusion": "No drive or play data exists in the history, possessions is a single constant, and EPA has no recorded provenance, so v6 pace cannot be measured and is estimated from scoring through the additive points ratings.",
+    "possession_fields_constant": true,
+    "qb_discount_fired_side_cells": 0,
+    "qb_nonzero_adjustment_side_cells": 0,
+    "qb_side_cells_with_qb_availability": 2430,
+    "weather_adjustment_nonzero_events": 6,
+    "weather_adjustment_nonzero_rows": 25,
+    "weather_open_meteo_evidence_rows": 2829,
+    "weather_raw_reading_rows": 0,
+    "weather_rows_total": 6129,
+    "weather_term_never_fitted": true,
+    "weather_training_history_placeholder": true
+  },
+  "weather_file_coverage": {
+    "repo": {
+      "distinct_game_dates": 18,
+      "exists": true,
+      "forecast_observed_at_max": "2026-11-14T23:36:24.708858+00:00",
+      "forecast_observed_at_min": "2026-10-27T05:00:49.739867+00:00",
+      "forecast_rows_hash_verified": 740,
+      "game_dates_max": "2026-11-14",
+      "game_dates_min": "2026-10-23",
+      "path": "E:\\MP\\data\\weather\\ncaaf_historical.jsonl",
+      "rows": 767,
+      "sha256": "1c628ef981a57cba3db2c5cb24077b967e4a483d6b6d8077182b271416210714",
+      "sources": {
+        "open_meteo:archive": 18,
+        "open_meteo:forecast": 749
+      }
+    },
+    "runtime": {
+      "distinct_game_dates": 1,
+      "exists": true,
+      "forecast_observed_at_max": "2026-10-26T07:16:49.875772+00:00",
+      "forecast_observed_at_min": "2026-10-25T22:50:41.250706+00:00",
+      "forecast_rows_hash_verified": 128,
+      "game_dates_max": "2026-10-31",
+      "game_dates_min": "2026-10-31",
+      "path": "E:\\model-prediction-runtime\\weather\\ncaaf_historical.jsonl",
+      "rows": 128,
+      "sha256": "b10844220c018243c8b2061002b62711254f1c0f244798f4ae888c5ae654a0a7",
+      "sources": {
+        "open_meteo:forecast": 128
+      }
+    }
+  },
+  "weather_never_fitted": {
+    "cfb_v5_research_weather_references": [
+      {
+        "line": 696,
+        "text": "\"- Weather and QB channels inert in this data (placeholder weather fields; no PIT injury source before 2026-11).\","
+      }
+    ],
+    "extractor_reads_of_history_record_weather": [],
+    "literal_coefficients": [
+      {
+        "file": "src/model_prediction/features/cfb_features.py",
+        "line": 626,
+        "text": "weather_total_adj -= 0.28 * (effective_wind - 14.0)"
+      },
+      {
+        "file": "src/model_prediction/features/cfb_features.py",
+        "line": 628,
+        "text": "weather_total_adj -= 1.8"
+      },
+      {
+        "file": "src/model_prediction/features/cfb_features.py",
+        "line": 630,
+        "text": "weather_total_adj -= 0.05 * (32.0 - effective_temp)"
+      }
+    ],
+    "v5_artifact_weather_references": [
+      {
+        "line": 41,
+        "text": "\"weather_total_adjustment\","
+      }
+    ]
+  },
+  "weather_probes": {
+    "catalog": {
+      "Michigan Wolverines": {
+        "canonical": "Michigan Wolverines",
+        "is_dome": false
+      },
+      "Syracuse Orange": {
+        "canonical": "Syracuse Orange",
+        "is_dome": true
+      }
+    },
+    "extractor": [
+      {
+        "case": "weather None/None/None, outdoor home",
+        "effective_precipitation_in": 0.0,
+        "effective_temperature_f": 70.0,
+        "effective_wind_mph": 5.0,
+        "is_dome": false,
+        "weather_total_adjustment": 0.0
+      },
+      {
+        "case": "weather 70F / 5 mph / 0 in, outdoor home",
+        "effective_precipitation_in": 0.0,
+        "effective_temperature_f": 70.0,
+        "effective_wind_mph": 5.0,
+        "is_dome": false,
+        "weather_total_adjustment": 0.0
+      },
+      {
+        "case": "weather None/None/None, dome home",
+        "effective_precipitation_in": 0.0,
+        "effective_temperature_f": 70.0,
+        "effective_wind_mph": 5.0,
+        "is_dome": true,
+        "weather_total_adjustment": 0.0
+      },
+      {
+        "case": "wind 20 mph / 20 F / 0.2 in, outdoor home",
+        "effective_precipitation_in": 0.2,
+        "effective_temperature_f": 20.0,
+        "effective_wind_mph": 20.0,
+        "is_dome": false,
+        "weather_total_adjustment": -4.08
+      },
+      {
+        "case": "wind 20 mph / 20 F / 0.2 in, dome home",
+        "effective_precipitation_in": 0.2,
+        "effective_temperature_f": 20.0,
+        "effective_wind_mph": 20.0,
+        "is_dome": true,
+        "weather_total_adjustment": 0.0
+      }
+    ],
+    "resolver": [
+      {
+        "case": "outdoor home, game date before file coverage (2026-09-05)",
+        "provenance": {},
+        "result": [
+          null,
+          null,
+          null,
+          false
+        ]
+      },
+      {
+        "case": "neutral site with no venue name",
+        "provenance": {
+          "source": "neutral_site_venue_unknown"
+        },
+        "result": [
+          null,
+          null,
+          null,
+          false
+        ]
+      },
+      {
+        "case": "dome home team (catalog)",
+        "provenance": {
+          "home_team": "Syracuse Orange",
+          "source": "cfb_team_catalog:indoor"
+        },
+        "result": [
+          70.0,
+          0.0,
+          0.0,
+          true
+        ]
+      }
+    ]
+  },
+  "weather_trace": {
+    "dome_return": {
+      "file": "src/model_prediction/features/multi_sport_weather.py",
+      "line": 760,
+      "text": "return (70.0, 0.0, 0.0, True)"
+    },
+    "extractor_default_precip": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 621,
+      "text": "effective_precip = precipitation_in if precipitation_in is not None else 0.0"
+    },
+    "extractor_default_temp": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 619,
+      "text": "effective_temp = temperature_f if temperature_f is not None else 70.0"
+    },
+    "extractor_default_wind": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 620,
+      "text": "effective_wind = wind_mph if wind_mph is not None else 5.0"
+    },
+    "extractor_dome_gate": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 624,
+      "text": "if not is_dome:"
+    },
+    "extractor_dome_source": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 541,
+      "text": "is_dome = home_obj.is_dome"
+    },
+    "extractor_neutral_not_dome": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 546,
+      "text": "is_dome = False"
+    },
+    "extractor_precip_term": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 627,
+      "text": "if effective_precip > 0.05:"
+    },
+    "extractor_temp_term": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 629,
+      "text": "if effective_temp < 32.0:"
+    },
+    "extractor_wind_term": {
+      "file": "src/model_prediction/features/cfb_features.py",
+      "line": 625,
+      "text": "if effective_wind > 14.0:"
+    },
+    "forecast_call": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 925,
+      "text": "w_temp, w_wind, w_precip, is_dome = resolve_cfb_game_weather("
+    },
+    "none_returns": [
+      {
+        "claim": "neutral site, no venue name: unknown weather",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 763,
+        "text": "provenance_out.update({\"source\": \"neutral_site_venue_unknown\"})"
+      },
+      {
+        "claim": "weather file missing: unknown weather",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 807,
+        "text": "if not weather_file.exists():"
+      },
+      {
+        "claim": "decision time at or after kickoff, or no event start: unknown weather",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 820,
+        "text": "if decision_time >= event_time:"
+      },
+      {
+        "claim": "record is not an Open-Meteo forecast: skipped",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 856,
+        "text": "if rec.get(\"source\") != \"open_meteo:forecast\":"
+      },
+      {
+        "claim": "capture hash mismatch: skipped",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 858,
+        "text": "if rec.get(\"capture_sha256\") != _weather_capture_hash(rec):"
+      },
+      {
+        "claim": "forecast captured after decision time or at/after kickoff: skipped",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 864,
+        "text": "if event_time is None or captured > decision_time or captured >= event_time:"
+      },
+      {
+        "claim": "no hourly slot for the kickoff hour: skipped",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 869,
+        "text": "target_hour = times.index(target)"
+      },
+      {
+        "claim": "temp, wind and precip must all be non-null to count as a hit",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 890,
+        "text": "if None not in (temp_f, wind_mph, precip_in):"
+      },
+      {
+        "claim": "no surviving record: (None, None, None, False)",
+        "file": "src/model_prediction/features/multi_sport_weather.py",
+        "line": 904,
+        "text": "return (latest[1], latest[2], latest[3], False) if latest else (None, None, None, False)"
+      }
+    ],
+    "predict_matchup": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 973,
+      "text": "preds = model.predict_matchup(history, upcoming, project_missing_lines=True)"
+    },
+    "upcoming_precip": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 965,
+      "text": "precipitation_in=w_precip,"
+    },
+    "upcoming_temp": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 964,
+      "text": "temperature_f=w_temp,"
+    },
+    "upcoming_wind": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 963,
+      "text": "wind_mph=w_wind,"
+    },
+    "verified_flag": {
+      "file": "src/model_prediction/models/college_football.py",
+      "line": 936,
+      "text": "weather_inputs_verified = is_dome or None not in (w_temp, w_wind, w_precip)"
+    },
+    "weather_file_path": {
+      "file": "src/model_prediction/features/multi_sport_weather.py",
+      "line": 766,
+      "text": "Path(data_root) / \"weather\" / \"ncaaf_historical.jsonl\","
+    }
+  }
+}

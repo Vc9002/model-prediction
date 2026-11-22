@@ -1,0 +1,283 @@
+{
+  "artifact_hash": "d4d6ee9d1fda5f1166861d94ac84036c4fd0353c75275225d3ed499c89feb305",
+  "frozen_at_utc": "2026-11-21T21:13:28+00:00",
+  "league": "NCAAF",
+  "margin_distribution": {
+    "centring": "mean",
+    "early_games": 4,
+    "key_log_multipliers": [
+      0.06344823980827284,
+      -0.2317267971258822,
+      1.0160033054852127,
+      0.08014811044236388,
+      -0.18447557633945913,
+      0.04659826623313075,
+      0.935489946562113,
+      -0.16074218017679456,
+      -0.7416293382575583,
+      0.3495748686133952,
+      -0.18132759519543318,
+      -0.6978167457329066,
+      -0.4632149411746254,
+      0.44656966266654163,
+      -0.4493124437817162,
+      -0.45427100743382437,
+      0.24994667165839912,
+      0.050136579781539986,
+      -0.361341830797443,
+      -0.2797561826423143,
+      0.571623522431238,
+      -0.3608202866406537,
+      -0.19673990242374706,
+      0.3216907173872368,
+      -0.04932181438741707,
+      -0.5147134362787836,
+      -0.010161853262487041,
+      0.556369688205517
+    ],
+    "key_max": 28,
+    "recentre_iterations": 4,
+    "sd_coef": [
+      2.828523696014426,
+      -0.026268186689578945,
+      0.04001358588333857,
+      0.07113093346676871,
+      -0.013801331921244251
+    ],
+    "sd_scale": 10.0,
+    "sd_terms": [
+      "const",
+      "abs_mu/10",
+      "(total-55)/10",
+      "early",
+      "fbs_vs_fcs"
+    ],
+    "sd_total_centre": 55.0,
+    "support": 130
+  },
+  "method": "cfb_v7_pit_pbp_ridge_ratings_linear_points_keyed_margin_pmf",
+  "model_version": "cfb-structural-v7",
+  "note": "RESEARCH CHALLENGER (quick-261121-v7), never a champion, never Main, never the auto-buyer. Registered, not routed (challengers.NCAAF holds one model per market). Fit on train only, selected on validation, holdout read once under the pinned rule; market-relative numbers are design-informed.",
+  "point_in_time": {
+    "research_decision_time": "min(kickoff, 08:00 America/New_York on the kickoff's ET date)",
+    "result_buffer_hours": 5.0,
+    "rule": "a game feeds ratings only if kickoff + result_buffer_hours <= decision time"
+  },
+  "prior": {
+    "arm": "cfbd_portal",
+    "cfbd_fields": {
+      "pout": "portal_out_stars_sum",
+      "rec": "recruiting_points_4yr_weighted",
+      "ret": "returning_off_ppa_pct",
+      "tal": "talent_prev_season"
+    },
+    "cfbd_values": "current-revised (as_published_verified false); preseason rows only",
+    "cov_def": {
+      "exp": {
+        "pout": -0.00018749428771014644,
+        "rec": 0.0008755944354964144,
+        "tal": -0.001783387495593043
+      },
+      "plays": {
+        "pout": 0.6688464267498263,
+        "rec": -0.7177059234435097,
+        "tal": 0.6438893340722669
+      },
+      "ppd": {
+        "pout": 0.0019187865517090812,
+        "rec": 0.005072632334945161,
+        "tal": -0.021086377037287957
+      },
+      "pts": {
+        "pout": -0.2508162526421099,
+        "rec": 0.282444800799982,
+        "tal": -0.3750518468463437
+      },
+      "sr": {
+        "pout": 0.002097009734492872,
+        "rec": 0.0010572572035558799,
+        "tal": -0.003510241436320938
+      },
+      "to": {
+        "pout": -0.00046108831896411544,
+        "rec": 0.00016709002560608193,
+        "tal": -3.906258494960324e-05
+      },
+      "ypp": {
+        "pout": 0.049260247521357825,
+        "rec": 0.05883087006500447,
+        "tal": -0.12676764362927295
+      }
+    },
+    "cov_off": {
+      "exp": {
+        "pout": 0.000580203040698774,
+        "rec": -0.0015990665298063348,
+        "ret": 0.004281056540919835,
+        "ret_x_prev": 0.04988731764601161,
+        "tal": 0.0029229110081975215
+      },
+      "plays": {
+        "pout": 0.44420014548819003,
+        "rec": -0.47676420311259116,
+        "ret": 0.26627299044929587,
+        "ret_x_prev": 0.02053186187063838,
+        "tal": 0.4270966122270723
+      },
+      "ppd": {
+        "pout": 0.03940574811228946,
+        "rec": -0.017782262824586628,
+        "ret": 0.16504579475201767,
+        "ret_x_prev": 0.06065879600930938,
+        "tal": 0.05433463609140189
+      },
+      "pts": {
+        "pout": 0.6934426220323209,
+        "rec": -0.41305902121708543,
+        "ret": 1.6408075589504696,
+        "ret_x_prev": 0.04494825150820092,
+        "tal": 0.7655991239074368
+      },
+      "sr": {
+        "pout": 0.0027375329769974794,
+        "rec": -0.0006770214472549413,
+        "ret": 0.012262894676543602,
+        "ret_x_prev": 0.048332725141360305,
+        "tal": 0.0024003368026113718
+      },
+      "to": {
+        "pout": -0.0003204919676111044,
+        "rec": -0.0001874318604157707,
+        "ret": -0.000981039800874401,
+        "ret_x_prev": -0.016753648138966466,
+        "tal": 9.913830188999458e-05
+      },
+      "ypp": {
+        "pout": 0.043929210611605304,
+        "rec": -0.04865072060031811,
+        "ret": 0.24857772512253157,
+        "ret_x_prev": 0.13752418304680045,
+        "tal": 0.11349986580609306
+      }
+    },
+    "finals_team_lambda": 1.0,
+    "half_life_days": 45.0,
+    "lam_def": {
+      "exp": 3.8699476149202487,
+      "plays": 4.343816988926267,
+      "ppd": 2.511133237534985,
+      "pts": 2.2027890441563027,
+      "sr": 2.073100231475454,
+      "to": 12.027992948668288,
+      "ypp": 5.634871018002001
+    },
+    "lam_off": {
+      "exp": 3.5980819353999975,
+      "plays": 3.9124869357983294,
+      "ppd": 2.234767056677977,
+      "pts": 2.20873458706507,
+      "sr": 2.072955311472965,
+      "to": 9.99686428837689,
+      "ypp": 4.525960587047073
+    },
+    "lambda_multiplier": 0.5,
+    "league_lambda": 20.0,
+    "rho_def": {
+      "exp": 0.431605208743735,
+      "plays": 0.4546816486490111,
+      "ppd": 0.6243892293947902,
+      "pts": 0.6336550832778022,
+      "sr": 0.5608419810873164,
+      "to": 0.16773249873656085,
+      "ypp": 0.3534490910447429
+    },
+    "rho_off": {
+      "exp": 0.4201018754560769,
+      "plays": 0.45193770925343524,
+      "ppd": 0.6059062253212347,
+      "pts": 0.6015715867582165,
+      "sr": 0.635502149685869,
+      "to": 0.2508524717036828,
+      "ypp": 0.3508700042432078
+    }
+  },
+  "promotion_protocol_hash": "fd7e9d0f2a8f5bbc22e8a7b3eadb101f3577488de1cc5854c985becd81ff00d3",
+  "qualification": {
+    "note": "Research only; the 2027 forward gate (docs/CFB_V7_2027_GATE.md) decides; promotion only via model_promotion promote.",
+    "qualified": false,
+    "status": "challenger"
+  },
+  "schema_version": "1",
+  "sport": "ncaaf",
+  "stage2": {
+    "coef": [
+      31.520976964963488,
+      -0.055846162583419456,
+      46.49346909903983,
+      0.6895772759455143,
+      0.5824519361427463,
+      0.14827476547115737,
+      33.12183687577265
+    ],
+    "features": [
+      "e_sr",
+      "e_ypp",
+      "e_exp",
+      "e_ppd",
+      "e_pts",
+      "e_plays",
+      "e_to"
+    ],
+    "intercept": -16.642981576962303,
+    "margin_calibration": {
+      "intercept": -1.6239482394617175,
+      "slope": 1.090148445529102
+    },
+    "total_calibration": {
+      "intercept": 9.129257474054391,
+      "slope": 0.8381305426685484
+    }
+  },
+  "total_distribution": {
+    "bucket_sds": [
+      15.11916693431488,
+      15.998482105377567,
+      16.496767186945167,
+      18.50590626397405
+    ],
+    "buckets": [
+      [
+        0.0,
+        45.0
+      ],
+      [
+        45.0,
+        52.0
+      ],
+      [
+        52.0,
+        60.0
+      ],
+      [
+        60.0,
+        999.0
+      ]
+    ],
+    "support": 180
+  },
+  "training": {
+    "holdout_verdict": "PASS -> WIRE AS CHALLENGER",
+    "report_sha256": "ae7b792b164ea35003202064a49a6eaf38d2821fcf5c5c5434bf69ec93e1f5c4",
+    "rule_sha256": "fd7e9d0f2a8f5bbc22e8a7b3eadb101f3577488de1cc5854c985becd81ff00d3",
+    "selected": {
+      "arm": "cfbd_portal",
+      "combo": "cfbd_portal_m0.5_hl45",
+      "feature_set": "full",
+      "half_life_days": 45.0,
+      "lambda_multiplier": 0.5
+    },
+    "spec_sha256": "90fd539af9f0ab2a98f574f463a017607a2c14f08524a492a3eac228aeaea1c4",
+    "train_end": "2022-11-11",
+    "validation_end": "2024-11-14"
+  }
+}

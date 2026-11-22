@@ -1,5 +1,55 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-22 — NCAAF/NCAAB bug hunt fixes and bad-price archive (quick-261122-nbf)
+
+- **Selectors (7af9d47d)**: spread/total rungs last seen >30 min before the game's newest capture no longer win on balance (11-21: 33 rows, 4 Main, priced off hours-old rungs after the day-ahead capture b87d6452); exact balance ties go to the newer quote; HALTED/untimed books skipped; v6.2 no longer logs 1e-12 "0.0000-edge" picks.
+- **Settlement (b1d48666)**: NCAAF spread/moneyline closes resolve the side by team identity and title position (NM State, UMass, San José, App State, Georgia Southern "Eagles", "Fightin' Blue Hens" were blank); resolution settle applies `ncaaf_settlement_slug` and declines ambiguous outcomes; a losing whole-number spread was graded a push in resolution scores; NCAAF name fallback never pairs namesakes; NCAAB fallback dropped the bare-mascot rule and fails closed on two different matching games (NCAAB 53c03c58cbaa4a05 Samford @ USC Upstate 11-18 was settled 78-72 W on UNCG @ Gardner-Webb; real 64-74 L; 0U row, left in place).
+- **Archive (operator "Archive bad old rows", 2026-11-22)**: 33 settled NCAAF rows via `archive_settled_rows`: 12 priced on another game's contract (pre-32528f57 one-word team join, 10-24..11-07; 2 Main +2.40U, 10 Flat +11.54U, all wins) and 21 opening-weekend legacy rows with a fabricated 50c decision price (Flat, 11-10, -2.97U). Archive `data/archive/2026-11-22-ncaaf-bad-price-rows/` (MANIFEST.json, settled_rows.jsonl); backups `ledgers.db.pre-ncaaf-bad-price-2026-11-22-*.bak`, `E:\model-prediction-runtime\backups\ncaaf-bad-price-2026-11-22-*`. Not archived (not in the approved list): 881b2c77229146ee (NM State 10-21 v2 Flat, priced at the other side's ask, graded W, contract bought lost).
+- Evidence: `outputs/ncaaf/bug_hunt/{settlement,pricing,models}.md`, NCAAB replay `outputs/ncaab/ncaab_v7_vs_v6_daily.md`.
+
+## 2026-11-21 — NCAAF Polymarket quote side guessed from an unresolvable label (quick-261121-qsd)
+
+- **Bug**: `_match_cfb_spread` / `_match_cfb_moneyline` decided which team a quote's line belongs to by resolving its `team` label and fell back to home. Polymarket labels Arizona "University of Arizona" (also "NM State", "U. of Idaho", bare mascots early season). On 11-21 Arizona -10.5 at Kansas State (both "Wildcats") was read as Kansas State -10.5, so v5, v6.2 and v7 each priced "Arizona +10.5" at the Kansas State +10.5 ask (52%): phantom edges of 31-42% on Flat (v5 Main's 8% max-edge gate kept it out of Main and the buyer).
+- **Evidence**: the quote's `team` is the title's first team on 22,256 of 22,256 resolvable spread labels and 1,165 of 1,165 moneyline labels; the spread long description equals the line on 94,072 of 94,072 rows. Ledger rows with a recoverable slug: 828 consistent, 13 flipped (3 open Flat Arizona rows 11-21, 8 superseded, 2 NM State v2 Flat 10-21 incl. one settled +0.83U). 1,856 older rows carry no slug.
+- **Fix**: side from the title position already matched to ESPN away/home; the label only cross-checks (`_quote_label_side`) and a contradiction fails closed. Tests in `tests/test_cfb_serving_parity.py`, mutation-proven. Operator: "void the Arizona pick" (2026-11-22 ~01:25Z): the 3 open Flat spread rows (v5 `a73eac39a721493a`, v6.2 `fb2d86e1e11f4877`, v7 `ac24d71045194a76`) voided through `PickLedger.void` (push, 0U, audit event), backup `ledgers.db.pre-arizona-void-20261122.bak`; that game's moneyline/total rows were priced correctly and stay.
+
+## 2026-11-21 — NCAAF overhaul execution: v5 identity/FCS/sign fixes, CLV close bounds, capture queue, ledger integrity, stale-price test, ESPN play crawl (quick-261121-spt/lgc/plb/idf/pbp)
+
+Operator: "go ahead execute all" on the ROADMAP NCAAF overhaul plan (2026-11-20). v5 stays champion and keeps picking; nothing was disabled.
+
+- **v5 team identity (c116bd75 -> cherry-picked, `features/cfb_team_identity.py`)**: history matched teams by exact display name, so App State (7/3 games in 2026), San José State (7/4) and Hawaii (5/5) were split across two names and rated on half a season (also Hawaii 2016-19/2021-26, SJSU 2021-24, UConn 2016; Southern Miss, UL Monroe, UTSA, Sam Houston, FIU across seasons). Now one canonical key (ESPN id, else normalised name joined from id-bearing rows before kickoff), reusing v6's `TeamResolver`.
+- **FBS/FCS class (a0e30316, b9c79c0c, 8f3be391)**: `resolve_team` had no season and left 351 of 497 names unresolved; the old rule labelled 1,703 of 1,782 FCS team-seasons as FBS, so `is_fbs_vs_fcs` and the Main `block_fcs` gate failed open. Class now comes per season from ESPN feed groups (80/81), unknown fails closed to not-FBS with a warning; one class-driven conference fallback for team, Elo and efficiency opponents; a slate team's known ESPN id beats its display name. Point-in-time on 732 FBS-involved 2026 games: new rule wrong on 2 (week-0 FCS-to-FBS movers), old rule wrong on 124.
+- **Efficiency sign bug (549b5ef2)**: `adj_scored = s_pts - opp_offset*0.35` ran opposite to its comment, adding +6.3 points for scoring against FCS (offset -18) and shrinking points against the SEC. Flipped. Impact on 427 settled 2026 games (10-01..11-19): Brier HEAD 0.2174, identity/class fixes 0.2148, plus sign flip 0.2149; margin MAE 13.39 -> 13.06; FBS-vs-FBS flat. The 11-21 slate's FBS-vs-FCS games move to the FBS favourite (Tennessee Tech @ Mississippi State home win 36.0% -> 64.5%; HEAD projected the SEC home team to lose by 5.1). No calibration constant changed; v5's margin slope looks mildly under-stretched (actual on raw projection slope 1.53 vs artifact 1.3189; 21+ favourites projected 28.3 vs actual 32.8) but 427 games is not enough to refit. Per-game extraction 0.11 -> 0.30 s. `tests/test_cfb_team_identity.py` (11 tests, each mutation-proven).
+- **CLV closes (0630faa2, acd665f9, b3043df7 -> ffcee729, a29305c5, 8016e594)**: `closing_snapshot` only bounded the quote by the ledger row's kickoff, so six 10-24 rows priced on another game's contract (New Haven vs CCSU, 16:00Z) took its 17:03Z in-play 99c quote as their close. A close must now be observed before the earlier of the row's and the contract's own kickoff, in an OPEN market, at the row's own line; Over/Under matched by whole word ("Thundering Herd" read as Under); the long-side default for unmatched selections is removed; every blank CLV logs a reason. Cross-sport recheck of 3,497 stored closes: six 99c -> 56c, two wrong-side stored closes (NBA `cbf96945def24f2a`, NCAAB `bc6b84b5dcc4423e`), 146 soccer double-chance/draw closes now blank (stored values were wrong), 2 MLB blank (HALTED book). Stored values were not rewritten.
+- **Polymarket capture (6f6101e1)**: the /book queue kept each game's markets together, so a 600 s budget cut left late kickoffs with nothing; now moneylines first, then each game's main lines, then alternates. 10-17 moneyline-only was Polymarket's league feed carrying winner markets only (fixed earlier by event-detail hydration a5e7d1a9); 11-07 was the first 429 abandoning the queue (fixed earlier by 79487b2c); every full-game 11-07 row has `timestamp_valid` false. Capture runs only inside the daily job and only for today's ET slate (`cli/daily.py:298-306`), so there is no day-ahead quote and stored closes can be ~3 h stale. Known limit: a row matched to the wrong game at decision time still gets that game's pre-kickoff close (title check rejected clean abbreviated titles, dropped).
+- **Ledger integrity (cde2c4e7 + operator-approved archive)**: `archive_settled_rows` hard-failed `cfb_replay_engine_identity_mismatch` on v1-v4 rows because the engine source changed after capture (settle/void/update only warned); archive now warns too (`tests/test_esports_replay.py::test_archive_settled_rows_survives_stale_code_hash_under_sqlite_authority`, mutation-proven). The failed first attempt left one orphan `settled_pick_archived` audit event (39ad8fec..., pick 26e45acf41d047be) before the real one. Archived 34 settled NCAAF rows: 23 priced on another game's quote (incl. Main 5f785b3ec8f3454d ODU @ Louisiana Tech and Flat 2b9c7715d9304cf5 South Carolina vs Tennessee on the Charleston Southern contract; the two 10-31 quote records are no longer in the snapshot file, so at most one row per record could have been genuine), 3 with a `void_reason` still settled, 8 duplicate Flat copies at a line 0.5-1 point off a Main pick. Main settled -80.34U -> -80.24U; Flat -65.56U -> -78.58U (the collided rows had netted about +17U). Archive `data/archive/2026-11-21-ncaaf-integrity-rows/` (MANIFEST.json, MANIFEST_phase2.json, MANIFEST_phase3.json); backups `E:\model-prediction-runtime\ledgers\ledgers.db.pre-ncaaf-integrity-2026-11-21-*.bak`. Ole Miss @ Oklahoma (Sunday 11-15 18:00Z) verified real and correctly graded.
+- **Stale-price test (ee49c5d6, 336de2b3; `outputs/ncaaf/cfb_stale_price_test.md`)**: pinned model-free rule (buy the Polymarket rung at the anchor line when the ask is cheap). ESPN-close arm (UPPER BOUND, look-ahead): 222 picks 118-104, ROI +13.3% [-3.9%, +27.8%]; spreads +7.3%, totals +18.1%, both CIs span zero; clean DraftKings as-of arm n 4. Verdict INCONCLUSIVE, so the blend stays in v6.2. 569 of 731 ESPN-lined 2026 events have a Polymarket match. About 42% of Polymarket "spread"/"total" rows are half/quarter/team-total markets; live pricing already excludes them (`models/college_football.py:411,489`).
+- **ESPN play-by-play (efc434a5, cb09e962)**: stratified sample of 394 games: 93.1% of FBS-involved and 81.1% of FCS-FCS usable (drives, >= 80 plays, fields present, final score reconciles); weak cells 2022 FBS-involved and FCS-FCS 2017/2018/2022. Full resumable crawl of 16,399 games running (`python scripts/cfb_espn_pbp_crawl.py status`, log `data/research/ncaaf_v7/crawl.log`). Features (`scripts/cfb_pbp_features.py`): success rate 0.421, yards/play 5.78, garbage-time flag on pre-play margin; ESPN scores are post-play and goal-to-go distance is stored as 0.
+
+## 2026-11-20 — Best-pick CONFIRMED_BEST was a winner's-curse label; hardened with 30-decision, Wilson-vs-price and closing-line gates (quick-261120-w6i)
+
+- **Defect and evidence.** In forward use `CONFIRMED_BEST` was anti-predictive: tracker picks labelled confirmed went 19W-27L, -14.07U; picks confirmed from buckets under 10 graded claimed a 76% win rate and hit 34% (12-23, -18.18U), while buckets with 10-29 graded went 7-4; closes on confirmed picks moved against the logged price 27 times and for it 12. Cause: `MIN_GRADED=4` plus a 60% WR / +15% ROI hurdle picks the luckiest of hundreds of small buckets.
+- **Fix (9ec2eb63, 0d937297).** CONFIRMED_BEST now needs n >= 30 verified decisions, a one-sided 95% Wilson lower bound above the bucket's stake-weighted mean first-sight price, ROI >= 15%, non-negative bucket CLV (>= 8 moved keys, negative mean means UNPROVEN) and no model-family veto (>= 20 moved keys, mean CLV <= 0 means under review), plus the unchanged verified candidate quote. The flat 60% win-rate gate and its constant were deleted on purpose: it is the even-price vig heuristic, blocks profitable underdog buckets and is looser than the price comparator for favourites. A statistically confirmed bucket is never a trap. Tests 17 to 28; revert proofs observed for the n>=30/Wilson gate (3 tests fail under the old 60%/15% rule) and the bucket CLV gate.
+- **First-sight basis bugs (same commits).** D1 open picks are bucketed on their first-sight edge via `first_sight_edge` and keyword-only `audit_candidate(bucket_edge=)` (4 of 122 open rows were their own first sighting). D2 a key is verified evidence only when its first row is verified (202 of 2,388 verified keys took a later rerun's row, 104 landed in another bucket). D3 nrfi rows are never an event score source. D4 rows created at/after their own start, or with an unparseable start, never become first sight. D5 keys with any archived/removed row are excluded whole (16 of 22 still had live rows).
+- **Live before/after, `--all-open`, 122 open rows, back to back, read-only.** HEAD: 13 CONFIRMED_BEST / 64 QUALIFIED_MODERATE / 45 DOWNGRADE_TRAP, engine build 1.46 s. New: 0 / 88 / 34, engine build 1.42 s. 65 picks changed bucket on first-sight edge; 6 carry UNPROVEN, 30 carry under review. Widget contract check (8-positional call, evidence fields, `_connect_ro`, `DB_PATH`, `ET_TZ`) passes on both.
+- **What passes.** No bucket on the ledger clears the full bar today. Nearest: MLB totals over 2.0-4.9% (59W-45L, n=104, ROI +15.6%, bound 48.7% vs 49.0 cent mean price, 6 moved keys), out of season. Families under review: NBA moneyline v4 and v5, NBA spread v9, NBA total-under v9, NFL moneyline v4.
+- **Open items (not done).** Soccer draw grading; zero-unit rows; SQL performance rewrite; the external Rainmeter logger. The logger already passes `bucket_edge` to `audit_candidate` and calls `first_sight_edge` when the engine has it, so no logger change is needed (corrected from the plan's original open item).
+
+## 2026-11-20 — Best-pick audit bucketed on the last pre-game rerun, not the first sighting (quick-261120-gaq)
+
+- **Defect: population selection, not arithmetic.** `scripts/audit_best_picks.py` bucketed each decision on the edge of its settled row, which is the last of up to four daily reruns. That conditions on line movement after the pick was offered, so winners whose edge grew and losers whose edge shrank migrated out of the band. Results and `pnl_units` were verified correct.
+- **Evidence.** NBA total v9 under 5-8% read 8W-1L, +77.4% ROI; a manual tracker's 8 first-sight unders in that band went 3-5 and all 5 losers had left the band by the final run (first-in-band 11W-10L, +3.5% ROI). NBA moneyline pooled 5-8% read 8W-1L verified, +47.6% ROI against about +11% at first sighting.
+- **Fix (2a48135f).** Buckets now use each decision's earliest open/superseded/settled row (verified: earliest verified row), graded at that row's own line and price (own result, else final scores, else same-line settled sibling, else skipped). Archived/removed rows are never read. The old basis survives as `last_run_by_*` maps, `last_run_evidence` and one "Context, last pre-game run (old basis)" flag; thresholds, basis strings and return keys are unchanged.
+- **Measured, live ledger.** NBA total v9 under 5-8%: first sight 1W-5L, -67.3% ROI vs last run 8W-1L, +77.4% (pooled unders: 4W-11L, -47.1% vs 13W-3L, +61.1%). NBA moneyline pooled 5-8% verified: 9W-5L, +5.9% vs 8W-1L, +47.6%. NBA spread v9 5-8%: 6W-3L, +31.7% vs 8W-3L, +41.3%. The verdict for an NBA total v9 under at +6.5% edge moves from CONFIRMED_BEST to DOWNGRADE_TRAP. 494 first-sight keys could not be graded and are skipped. The tracker's 11W-10L is a different population, so it is reported, not reconciled.
+- **Old basis preserved.** The new `last_run_by_*` maps equal HEAD's `stats_by_*` maps on the live ledger: identical key sets, identical wins/losses/pushes, pnl and staked within 1e-6. The score-grading rule agrees with the ledger's own settled results on every in-scope NBA/NCAAF/NFL/MLB/WNBA/NCAAB row checked (soccer moneyline draws and tennis sets differ, both out of scope).
+
+## 2026-11-18 — health audit (`quick-261118-hlt`)
+
+- **Settlement name variance.** `_settle_by_resolution` matched sides by substring only, so clubs spelled differently by the ledger and Polymarket (Oerebro Hockey/HK, Anadolu Efes Istanbul/SK, Besiktas Istanbul/JK) never resolved and would have been voided by the 7-day rule although the markets had resolved as wins. Fixed with a fail-closed distinctive-token second pass (`16f92f3b`). Euroleague and hockey results histories only refresh inside their forecast block, so they stop while switched off; settlement must not depend on them.
+- **`system_health` economics check** now exempts the writer's `[UNQUOTED_SHADOW:]` marker (placeholder-priced NCAAB calls stake nothing by design, quick 261115-1m3); unmarked silent-zero rows (Flat MLB class) still report.
+- **`market_quotes.db` corruption.** Single-bit flips (bit 0x08) left 8 rows where the table and the two indexes disagree (`soccer`/`sgccer`, `mlb`/`elb`, event_id `mlb-`/`mdb-`); the health monitor reported them as stale sports. Repaired under the daily lock with a backup. `PRAGMA quick_check` does NOT compare indexes with the table; use `integrity_check`. Suspect memory or storage hardware (python.exe crashes, 00:30 memory exhaustion, bugcheck 0x139 on 11-07): run a RAM test.
+- **Dashboard** died 11-16 (python.exe crash) and its logon-only task never restarted it; restarted 11-18.
+
 ## 2026-11-13 — CLAUDE.md session history moved here (operator directive: trim CLAUDE.md to working rules)
 
 The dated sections below lived in the root `CLAUDE.md` from 2026-08-13 to 2026-11-13 and were moved
@@ -205,6 +255,599 @@ change how you should work here:
   is CI-generated evidence (CONSOLIDATION.md policy) — a local 404 is
   expected. Soccer's Odds API credential remains a known-DEGRADED external
   dependency. The two launchd research agents are loaded and producing.
+
+## 2026-11-15 — NCAAF totals: information-source tests, cfb-structural-v6.1 and the 11-14 retrospective replay (quick-261115-183)
+
+**Bottom line.** The operator asked for information the NCAAF closing total cannot price quickly (level drift, line
+movement, weather, QB status), a better totals model, and a forward-only test of the lopsided / FBS-vs-FCS tilt. Under a
+rule written down before any validation or holdout number existed, **no source beyond the level tracker passed**. v6.1 is
+therefore frozen v6 plus the walk-forward level tracker and nothing else (the tracker entered by operator instruction, not
+by a passing test). It removes part of v6's over lean, adds no error gain, and **does not beat the closing line**. The
+tilt is pre-registered for a forward test that needs 704 games. No promotion decision. v6.1 is not routed.
+
+**Rule and pre-registration.** The pinned rule (`outputs/ncaaf/cfb_totals_sources_rule.json`, canonical-JSON sha256
+`1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f`) and the lopsided pre-registration were committed in
+`8ebdc514`, before any workstream output; `57520a29` made the evaluator fail closed on any failed fetch. Every output
+carries the same rule hash and each workstream read the holdout exactly once (`holdout_reads` 1). Windows by kickoff date
+on lined games: select to 2022-11-11, validation 2022-11-12 to 2024-11-14, holdout 2024-11-15 to 2026-11-13 (already seen
+in earlier v6 checks, so any read is a one-time look). Primary statistic per source: dMSE = MSE(close-only OLS) minus
+MSE(close plus source OLS) on validation, coefficients fit on select; PASS needs the validation date-clustered 95% CI
+lower bound above 0 and a positive holdout point estimate. Bootstrap B 1,000, seed 20261115.
+
+| source | market | n select / validation / holdout | validation dMSE [95% CI] | holdout dMSE (point) | verdict |
+|---|---|---|---|---|---|
+| W1 level tracker (days 90, chosen on select only) | total | 4,590 / 1,790 / 1,861 (MAE and bias, not dMSE) | MAE v6.1 minus v6 +0.004 [-0.049, +0.057] | +0.048 [-0.045, +0.151] (MAE diff) | enters by operator instruction; no taxonomy verdict |
+| W2 ESPN open-to-close movement | total | 4 / 1,064 / 1,861 | not interpretable (select n 4) | not interpretable | INSUFFICIENT_DATA |
+| W2 ESPN open-to-close movement | spread | 4 / 1,063 / 1,853 | not interpretable (select n 4) | not interpretable | INSUFFICIENT_DATA |
+| W2 intraday Polymarket ladders (2026) | total, spread | no select or validation data | none | none | DESCRIPTIVE_ONLY |
+| W3 observed weather (wind, precipitation, cold) | total | 4,135 / 1,617 / 1,677 | +0.142 [-0.351, +0.587] | +0.057 | NOT_WORTH_BUILDING |
+| W3 observed weather (wind times expected margin) | spread | 4,232 / 1,616 / 1,668 | +0.022 [-0.051, +0.100] | +0.030 | NOT_WORTH_BUILDING |
+| W4 QB (backup start, QB changed; post hoc) | total | 542 / 1,566 / 1,607 | +0.703 [-0.449, +1.900] | -0.789 | NOT_WORTH_BUILDING |
+| W4 QB (home-minus-away flag differences; post hoc) | spread | 542 / 1,565 / 1,608 | +1.986 [-0.229, +4.082] | +2.569 | NOT_WORTH_BUILDING |
+
+Caveats that matter for reading the table. **W2:** ESPN carries open values only for 4 games in 2017 and from 2023-10-17
+(select window 4 rows, validation 59.4%, holdout 100%), so the pinned test cannot run; the labelled exploratory refit
+(coefficients fit on validation rows with open values) gives totals dMSE +0.140 [-0.140, +0.439] and spreads -0.647
+[-1.499, +0.320] on the holdout, and neither is a verdict input. ESPN open and close are untimestamped, so even a pass could
+only have been an upper bound. The intraday part uses Polymarket-lineage ladder quotes, not ESPN lines; "main line" is the
+ladder rung whose over (or home-side) midpoint is nearest 50% at each snapshot, and the last pre-kickoff rung failed its
+line-only agreement gate against the ESPN close on 7 of the 8 definitions (totals correlation 0.853, median absolute
+difference 1.0 point; one spread sensitivity cut passed at correlation 0.976), so its exploratory outcome numbers (for
+example totals: outcome beyond the close in the movement direction by +2.03 points [+0.22, +4.07] on 376 holdout games)
+are not usable evidence. **W3:** Open-Meteo archive weather, 131 venues, 1,266 of 1,266 venue-seasons cached; observed
+weather is already an upper bound (the line knows the forecast), and it still failed, so the forecast stage did not run
+and weather is not worth building. **W4:** starters derived from box-score pass attempts (post hoc, leaky), 2022 onward,
+so the select window is only 2022 up to 11-11; the spread holdout point is positive but the validation interval includes
+zero, so no PASS. No weather or QB source reached UPPER_BOUND_PASS, so no point-in-time retest is owed.
+
+**Level tracker.** Residual = actual total minus the v6 calibrated total, mean over a trailing window of games that finished
+(start plus 5 h, inclusive) before kickoff; grid 14, 30, 60, 90 days then 150, 300, 600 games, day windows under 50 games
+fall back to the last 150. Chosen on select only: days 90 (select RMSE 17.021 against 16.981 untracked, so the tracker does
+not even improve the select fit).
+
+| window (lined games) | v6 bias | v6.1 bias | v6 over lean | v6.1 over lean | corr(model - line, actual - line), v6 to v6.1 |
+|---|---|---|---|---|---|
+| select, n 4,590 | -0.41 | -0.09 | 47.5% | 50.6% | -0.003 to -0.004 |
+| validation, n 1,790 | +0.38 | -0.37 | 66.0% | 58.7% | 0.059 to 0.055 |
+| holdout, n 1,861 | +0.50 | -0.36 | 63.9% | 57.7% | -0.030 to -0.026 |
+
+Expected result partly confirmed: the tracker removes the over lean on select (47.5% to 50.6%) but only part of it on
+validation (66.0% to 58.7%) and holdout (63.9% to 57.7%). It adds
+no edge (correlation with the closing-line residual unchanged and not distinguishable from zero in holdout) and no MAE gain.
+
+**v6.1 contents and comparison.** `outputs/ncaaf/cfb_v61_spec.json` (spec_sha256
+`8a3e5c6612aa72d0d9fc40b94d1ade4e40acb2ea649201750cbd74747db4573c`): frozen v6 calibrated total plus the days-90 tracker;
+components empty; spreads v6 unchanged; frozen v6 params sha256 `6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70`
+unchanged. Nothing was tuned after the freeze.
+
+| holdout, 1,861 lined games (2024-11-15 to 2026-11-13) | MAE | bias | over lean |
+|---|---|---|---|
+| closing line | 12.39 | -0.79 | n/a |
+| v6 | 12.99 | +0.50 | 63.9% |
+| v6.1 | 13.04 | -0.36 | 57.7% |
+
+On the common-v5 holdout cohort (1,511 games) v5 is 13.13, v6 13.02, v6.1 13.00 against a line of 12.52. Paired MAE
+differences on the 1,861 holdout games (date-clustered 95% CI): v6.1 minus v6 +0.048 [-0.045, +0.151]; v6.1 minus line
++0.647 [+0.442, +0.854]. **v6.1 does not beat the closing line, and the closing line is significantly better.** Select
+(v6.1 minus line +0.535 [+0.383, +0.689]) and validation (+0.280 [+0.105, +0.474]) say the same. Full tables:
+`outputs/ncaaf/cfb_v61_comparison.md`.
+
+**11-14 RETROSPECTIVE REPLAY** (`outputs/ncaaf/cfb_v61_replay_1114.md`; 11-14 is inside the data the tilt was found on, so
+none of this tests the tilt). Settled at run time (2026-11-15 about 07:38Z): 117 games listed in the window (kickoff
+2026-11-14T10:00Z to 2026-11-15T10:00Z, groups 80 and 81), all 117 completed, 0 forfeits, 0 unfinished, 0 v6 no-calls, 116
+with an ESPN closing total (1 game has no line and is excluded from the line comparison). Closing lines fetched into the new
+file `data/research/ncaaf_v6/espn_lines_20261114.jsonl` (the pinned `espn_lines.jsonl` untouched); the last kickoffs
+(03:30Z to 04:00Z on 11-15) were fetched 3.65 to 4.15 hours after kickoff, shortly after those games ended, which is earlier
+than the 6-hour rule the forward evaluator uses. Fresh v6 projections matched the frozen research rows on the 92 overlapping
+games with max absolute difference 0.0. Tracker offsets applied: mean -0.84 points (range -1.10 to -0.77, 1,270 to 1,363
+games averaged).
+
+| cohort A, lined games (n 116) | MAE | bias | over lean |
+|---|---|---|---|
+| v6 | 13.32 | +5.69 | 69.0% |
+| v6.1 | 13.02 | +4.85 | 60.3% |
+| closing line | 12.53 | +3.97 | n/a |
+
+The day was high-scoring: the closing line itself was 3.97 points low on average. v6.1 minus v6 -0.31 [-0.46, -0.16],
+v6.1 minus line +0.49 [-0.19, +1.18], v6 minus line +0.80 [+0.07, +1.52] (game-level bootstrap, one date). On the 55
+FBS-involved games that also carry a v5 ledger projection: v5 12.62 (bias +5.13, over lean 56.4%), v6 13.10 (+6.39, 76.4%),
+v6.1 12.65 (+5.51, 63.6%), line 11.39 (+4.45). **Lopsided / FBS-vs-FCS subset: n = 1** (Boston College at Notre Dame,
+closing home spread -29.5; v6 MAE 5.01, v6.1 4.24, line 3.50) and **FBS-vs-FCS n = 0**, so the subset says nothing.
+
+Cohort B (52 events with a settled flat-tier `cfb-structural-v5` total row; 3 more flat total rows for completed games were
+still open in the ledger at run time and are not in cohort B; prices are the ledger's ESPN-consensus price on the ledger side
+and 1.0476 minus it on the other side, a 4.76% vig, flat 1 unit, percentages only):
+
+| cohort B | picks | W-L-P | PnL | ROI |
+|---|---|---|---|---|
+| v5 (ledger rows' own results) | 52 | 18-34-0 | -16.77 U | -32.2% |
+| v6 | 52 | 19-33-0 | -15.27 U | -29.4% |
+| v6.1 | 52 | 20-32-0 | -13.43 U | -25.8% |
+| v5, 2-8% edge view | 20 | 5-15-0 | -10.11 U | -50.5% |
+| v6, 2-8% edge view | 20 | 8-12-0 | -4.66 U | -23.3% |
+| v6.1, 2-8% edge view | 19 | 7-12-0 | -5.44 U | -28.7% |
+
+v6 and v6.1 chose different sides on 1 of the 52 rows. Cohort B MAE on its rows: v5 12.29, v6 12.82, v6.1 12.32, line 11.21;
+v6.1 minus line +1.11 [+0.10, +2.21]. Every variant lost money on 11-14 at these prices; one Saturday validates nothing.
+The seam check passed: a fresh v6.1 instance with offset 0 and a fresh v6 instance gave exactly equal over, under and push
+probabilities on all 52 cohort-B rows and all 117 cohort-A rows.
+
+**Lopsided / FBS-vs-FCS pre-registration.** `outputs/ncaaf/cfb_lopsided_prereg.json`, sha256
+`45dbd546543e345559d39422ef77d17b7d8721302c5bc314882f89f2deff4d22`, registered_at_utc 2026-11-15T06:28:59Z, committed in
+`8ebdc514`. Tilt = closing home spread of 28 points or more, or exactly one side FBS; predicted direction actual minus
+closing total above 0, expected size +1.5 points; primary metric mean(actual - closing total) with a one-sided date-clustered
+bootstrap lower bound above 0; minimum n 704 qualifying games with kickoff strictly after the registration time (alpha
+0.05, power 0.8, residual SD 16.0). About 100 to 180 qualifying lined games a season, so the decision is no earlier than
+about 2030 and more likely later. Evaluate with `python scripts/cfb_lopsided_prereg.py evaluate` (prints INSUFFICIENT N
+below 704 and never reads a game at or before the registration time); `verify` re-checks the hash. The evaluator was not
+run. The 55.2% over on 972 games before registration is cited only as the origin of the hypothesis.
+
+**Task 2 (src port and forward capture), gate OPEN.** The runs.db gate (no daily row in status `started`; the newest daily
+row is not the gate) was open before each edit batch and before the commit. `src/model_prediction/models/cfb_structural_v61.py`
+subclasses the v6 model overriding `calibrate_means` only; the tracker window, buffer and fallback come from the hash-verified
+`config/models/cfb-structural-v6.1.json` (built from the frozen spec; `base_artifact_hash` ties it to the v6 artifact). It is
+bit-exact: 200 of 200 fixture rows and all 14,639 research rows match the research tracker with maximum absolute difference
+0.0 (offsets, games averaged, and the floored served total). It is inert (no reference from `learned_forward.py`,
+`config/production.yaml` or `config/model.yaml`; a clean-subprocess probe confirms serving never loads it). Three mutations
+each made tests fail (buffer 5 h to 0, window 90 to 89 days, fallback minimum 50 to 40); the fallback mutation also failed the
+fixture parity test, and a synthetic 49/50 boundary test pins it independently.
+`src/model_prediction/data_sources/espn_cfb_pregame_capture.py` is the fail-soft forward capture (append-only JSONL under the
+runtime root via `RuntimePaths`, `observed_at_utc` read after each response, records at or after kickoff dropped, prices
+stored only as implied probabilities, hard request, time and event budgets). The depth-chart probe found no QB slot (core
+`depthcharts` answers 400 "not supported for football|college-football", site `depthchart` returns `{}`), so the record says
+`qb_depth: endpoint_unavailable`; the league injury feed holds 3 stale entries. A live run into a scratch root wrote one real
+record. `tests/test_cfb_structural_v6.py`'s v6-inertness scan lists the v6.1 module as the one allowed v6 subclass (a one-hunk
+edit). **The capture is not wired into the daily run:** the call-site rule required the sibling's `espn.py` commit, and its
+actual commits (`403df5f3`, `fbe7cb6c`, `3b9728fc`) did not touch `espn.py` or `daily.py`, so `daily.py` was left alone (it
+has no uncommitted hunks) and the call site is a documented follow-up in `docs/ROADMAP.md`.
+
+**What remains.** (1) Wire `capture_cfb_pregame_snapshots` into the daily run behind the NCAAF switch (try/except, a new
+step key) and let it accumulate a season of timestamped pregame lines, injuries and, once a source exists, QB depth; only then
+can W2, QB and injury sources be retested point in time. (2) The ESPN open feed starts 2023-10-17, so the pinned W2 test is
+untestable on the select window; a different window split is a new decision, not made here. (3) The lopsided tilt waits for 704
+forward games. (4) The four pre-existing non-verifying artifacts in `tests/test_artifact_hash_verification.py`
+(`nba-moneyline-v8`, `nba-spread-margin-v8`, `nba-total-margin-v8`, `tennis-games-markov-v3`) are untouched and still fail that
+test. No promotion decision. v6.1 is not routed.
+
+## 2026-11-15 — NFL: the paper buyer bought from Flat what Main had declined; placeholder prices inflated the record (quick-261115-21e)
+
+- **Symptom.** Pre-kickoff review of the 2026-11-15 slate: three NFL rows were buy candidates although
+  Main had rejected them -- SEA at LV spread and total (`input_qualified` false) and NE at DET over
+  49.5 (neutral site, no pregame weather).
+- **Cause.** `AutoPolymarketBuyer.evaluate_and_execute` merges Main and Flat and, since the
+  2026-11-11 "tags name destinations" change, rejects only `decision != CALL` and `PAPER_CALL_*`.
+  The dashboard pick readers it consumes do not project `feature_payload_json`, so the input flags the
+  forecast writes never reached the buyer.
+- **Fix.** `_load_pick_input_flags` reads the flags from the canonical ledger by pick id (the stored
+  values are the strings "True"/"False"); `_has_unqualified_inputs` rejects explicit false, weather for
+  totals only, and fails closed for NFL spread/total when the ledger cannot be read. Regression test
+  `tests/test_auto_buyer_input_gate.py`, shown to fail with the gate removed.
+- **Second finding.** 210 settled Main rows carry sportsbook `model_opinion_no_executable_quote`: no
+  quote matched, the row was priced at the 52.38% lay, and favourites were paid as coin flips (+47u
+  in total). `dashboard.picks.performance` now excludes them from the record and reports the count.
+- **Reproduction.** Row-level NFL loss tables: ledger `ledger_records`, `sport='nfl'`,
+  `status='settled'`, de-duplicated on (event, market, selection, line, model) preferring Main, split
+  on `market_quote_provenance`. v8 and total-refit numbers: `docs/handoffs/HANDOFF.md` sections 4, 8.
+
+## 2026-11-15 — NCAAF: v6 open items: ingest groups 80/81, measured v5 history backfill, known-team gate, checkout-proof pin (quick-261115-0pq)
+
+**Bottom line.** The operator approved fixing the four open items from the v6 entry below. Two shipped (the known-team
+gate and the checkout-proof lib pin). The live-history backfill and the NCAAF `groups=80/81` ingest were **measured first
+and rejected by a rule written down before the numbers existed**, so neither shipped and the live history files are
+byte-identical to their start state.
+
+### B: measured impact of completing the live history on v5 (verdict REJECT)
+`scripts/cfb_v5_history_impact.py` carries its acceptance rule as the constant `RULE` (id `cfb-v5-history-impact-rule-1`,
+sha256 `f780ad86a2b3ab378382d873cdbd02455b5b5900c4c46e721726d3c6c2f5a236`). The script was committed (`403df5f3`, blob
+`6010d8af8285`) before its first run and never changed afterwards; the report records the same blob sha. The rule: replay the
+v5 serving artifact point-in-time on the same 1,527 locked-holdout event ids (2024-11-15 to 2026-11-12) with arm (i) the live
+history and arm (ii) the live history plus the recorded append set; ACCEPT only if the Brier delta (ii minus i, date-clustered
+bootstrap point estimate, 2,000 resamples) is at most +0.001 and the margin and total Gaussian log-score deltas are each at
+least -0.005. Arm (i) must first reproduce the recorded v5 numbers.
+
+Arm (i) reproduces: n 1,527, Brier 0.18933, margin log score -4.21265, total log score -4.21155, and the 575/576
+reference-line gate passes on every row (corr -0.0328 / +0.0090, side records 218-257 and 264-233, SDs and MAEs within tolerance).
+
+| holdout (1,527 events) | arm (i) live | arm (ii) live + append | delta (ii - i) | 95% CI |
+|---|---|---|---|---|
+| Brier | 0.18933 | 0.19040 | **+0.001065** | [-0.000815, +0.002998] |
+| margin log score | -4.21265 | -4.20970 | +0.002951 | [-0.004547, +0.010515] |
+| total log score | -4.21155 | -4.20731 | +0.004240 | [-0.001014, +0.009189] |
+| log loss (informational) | 0.557265 | 0.559138 | +0.001873 | |
+| accuracy (informational) | 71.19% | 70.14% | -1.05 points | |
+
+The Brier delta is 0.000065 over the pinned limit, so the verdict is **REJECT**, from the rule as written. The log scores
+improve and the Brier interval includes zero, so this is a marginal call, not a finding that the extra games are bad: all
+1,527 holdout probabilities move (max 24.5 points of home-win probability) and accuracy drops 1.05 points. 575/576
+reference lines, informational only, 1,133 of 1,151 projection pairs change: totals corr -0.0328 [-0.119, +0.041] to +0.0005
+[-0.075, +0.071] (side 218-257 to 209-242), spreads +0.0090 [-0.090, +0.105] to +0.0113 [-0.081, +0.108] (side 264-233 to
+258-247); spread MAE 14.64 to 14.17 points. The champion's fitted calibration and SD table were fit on the gappy history, so
+feeding it a complete one moves its inputs away from its fit; shipping that would be an unvalidated change to the serving
+champion's inputs.
+
+Append set (recorded, not applied): 1,478 events, sha256 `7d0f9cafff801ed758b7f20d913db28176a1a63466be8aa1adf072583da80cbb`,
+FBS-FCS 1,101, FBS-FBS 376, FCS-FCS 1 (the one FCS-FCS event is listed in both feeds), by season 2016 154, 2017 137, 2018 134,
+2019 146, 2020 50, 2021 127, 2022 128, 2023 135, 2024 128, 2025 148, 2026 191. The plan expected about 1,513: the live files
+grew from 7,965 to 8,014 rows between planning and the run, and 35 of those 49 new rows are FBS-FBS events that were in the
+backfill.
+
+Live files: `data/processed/ncaaf/games.jsonl` and `data/historical/ncaaf_games_all.jsonl` are 8,014 rows and 5,510,866 bytes,
+sha256 `a934dd88dc035d800eb2d4fba8211e470d1fb92fa24310bf2b9fceb1f3cc230f`, identical at the measurement and at the final
+check. Nothing was appended, so no backup was needed and `scripts/cfb_backfill_live_history.py` was not written.
+
+### A: ingest groups 80/81 (not shipped)
+Not shipped, by the plan's own coupling rule: the go-forward ingest would shift v5's inputs the same way the rejected
+backfill does, leaving a history that is gappy before a date and complete after it. `ESPNClient.scoreboard`, `ingest.py`
+and `tests/test_ingest.py` are unchanged. The design is kept for a later decision: a new `scoreboard_ncaaf_divisions`
+client method (groups 80 then 81, limit 500, merged by event id) used only by the NCAAF ingest branch, appending only
+FBS-involved non-forfeit rows. Re-opening it needs either a v5 refit on the complete history (validation-split, not a
+decision on this holdout) or an operator waiver of the rule.
+
+### C: v6 known-team gate (shipped)
+`TeamResolver.is_known(name)` is true for a history name or one `resolve_team` can alias; `project()` raises
+`NO_CALL_CFB_V6_UNRATED_TEAM` for any other name before `book.identity`, instead of letting an unknown name pool into the
+season's shared lower-division identity. The frozen math, `RatingBook._key`, the solve and `scripts/cfb_v6_lib.py` are
+untouched. Against the real resolver on the frozen snapshot an invented name is not known and a real or aliased one is.
+Parity over every cached row: 14,822 rows, 14,639 projections, max abs difference 0.0, 183 of 183 cached no-calls matching,
+**0 newly declined**, frozen params sha256 unchanged. Tests (three, in `tests/test_cfb_structural_v6.py`): an invented name
+declines, a real pooled lower-division team from history still projects, an aliased unseen name still projects.
+
+### D: checkout-proof lib pin (shipped)
+Deviation from the brief's wording. `canonical_params` hashes every frozen-fit key except `params_sha256` and
+`generated_at_utc`, and `code.cfb_v6_lib_sha256` is one of those keys, so re-pinning the lib hash inside
+`outputs/ncaaf/cfb_v6_frozen_fit.json` would change the frozen params sha256 (forbidden) and break the test that pins it. The
+frozen-fit file stays byte-identical to HEAD; `verify_frozen` instead hashes the lib after normalising line endings to CRLF
+(`lib_sha256_crlf`), and CRLF-normalising either the CRLF working copy or the LF blob gives the existing pin `fe42c288...`.
+`cmd_parity` now reports rows the src extractor declines but the research cache projected as `newly_declined` and fails on
+any. Proof: verify-frozen passes on the CRLF working file and on the LF blob from `git show HEAD:scripts/cfb_v6_lib.py`; a
+one-byte edit of that blob fails (negative control); `cfb_v6_market_check.py v6 --check-only`, the residual and pool-audit
+callers all return `6e38b14ca486...`.
+
+### Prove-it-fails
+Each C test was proven by a mutation of `cfb_features_v6.py`, the file restored and its sha256 compared equal: the gate
+deleted (`if False`) fails the invented-name test; an over-broad gate that also declines pooled identities fails the real
+pooled team test; dropping the `resolve_team` fallback from `is_known` fails the aliased-name test. The impact script's
+arm (i) reproduction gate is its own control: it must match the recorded v5 numbers before any verdict other than STOP. The
+C tests were written after the gate rather than RED-first. `ruff check src/ tests/` clean; `tests/test_ingest.py` and
+`tests/test_cfb_structural_v6.py` give 32 passed in a detached worktree at `C:/wt0pq` on the C commit.
+
+No promotion. v6 is not routed; v5 parameters and gates unchanged.
+
+## 2026-11-15 — NCAAF: cfb-structural-v6 shadow challenger and market-relative check (quick-261114-srb)
+
+**Bottom line.** v6 is a better-calibrated probability model than v5 on the locked holdout, and it shows **no
+market-relative edge**. Nothing was promoted, routed or wired: v5 stays the NCAAF champion, v6 is a research
+artifact that no serving module imports. The decision for the operator is at the end of this entry.
+
+### Why (the 2026-11-14 loss review of v5)
+
+Over the 575 lined 2026 games the v5 projections carry no skill against the market line, and are compressed:
+
+- **Totals:** corr(model - line, actual - line) -0.033 (95% CI [-0.119, +0.041]); model side record 218-257
+  (it takes the wrong side more often than not); model total SD 4.13 against a line SD 5.71 and an actual SD 16.76.
+- **Spreads:** corr +0.009 (CI [-0.090, +0.105]); side 264-233; MAE 14.64 against 11.65 for the line;
+  margin SD 11.78 (model) / 16.35 (line) / 22.37 (actual); on 117 lines of 21+ the model's mean favourite margin
+  is 16.64 against a line of 34.22 and an actual of 33.84, and it takes the underdog 107 times.
+- The v6 harness regenerates these from the ledger DB and the v5 artifact and refuses to continue if it cannot
+  reproduce them (gate passed).
+
+### Five projection defects, and what v6 does instead
+
+1. Matchup was an averaged half-sum of an offence number and a defence number; v6 is additive: league average
+   + offence deviation + opponent defence deviation + home term (offence +10 vs defence +8 over 28 projects 46,
+   not the half-sum 37; pinned by a test shown to fail when the half-sum is substituted).
+2. Opponent strength entered through conference-tier offsets and an Elo channel; v6 solves every rated team
+   jointly (weighted ridge, one solve per distinct eligible-game set), so each opponent enters through its own
+   rating. No conference table or team list exists in v6. Pooled pseudo-team per season for lower-division
+   singletons.
+3. Pace: no drive or play data exists (see audit below); v6 carries tempo through the offence and defence
+   points ratings instead of a constant.
+4. Fixed total baselines (49.5 / 54.0) are replaced by the rolling league scoring average `mu` solved with the
+   ratings.
+5. v5 fitted its mean calibration and per-slice margin SDs, but on the v4 projection, with one total SD and
+   hand-set line-dependent widening and conference scale carried over. v6 refits the calibration on its own
+   projection, fits per-slice outcome-residual SDs for BOTH margin and total (established / thin sample /
+   FBS-vs-FCS) on train only, chooses on validation, and drops the line-dependent widening and the conference scale.
+
+A game feeds the ratings only if kickoff + 5 hours is at or before the decision time (stricter than v5's
+`start < observed`, which admits a game in progress). v4/v5's hand-set altitude, travel, bye, weather and QB
+adjustments are not carried into v6; their raw inputs (wind, temperature, precipitation, QB starter probability)
+are recorded verbatim in the v6 feature payload (None stays None) so the audit is possible going forward.
+
+### The history gap (item 6)
+
+The existing history (7,965 events, sha256 `659e33b21de95e02633251c5614df3b63f9fea62898a140bd7efaa83e525ecb7`)
+misses almost every game that involves a lower-division team. ESPN scoreboard with groups=80 and groups=81
+(read-only, 440 requests, 0 failures, all 11 seasons 2016-2026) lists 16,378 completed events; all 7,965
+existing events are in it with **0 score disagreements**.
+
+- **FBS-vs-FCS:** the history holds 6-12 games a season against 98-126 on ESPN (2020: 2 of 34), so it misses roughly
+  90-95% in every season (2016: 10 of 113; 2025: 6 of 126).
+- **FCS-vs-FCS:** 0-16 a season against 653-752 (2020: 0 of 24), so it misses 98-100%.
+  (`ESPNClient.scoreboard` sends no `groups` parameter for NCAAF, the likely cause.)
+- **2026:** 878 of 1,384 completed games are missing (226 of 731 FBS-involved). FBS teams are missing a mean
+  2.46 games each (median 2, max 7), which confirms "about 2 per team". Week 6 is missing entirely
+  (108 of 108 games, 58 FBS-involved). Week 11 is mostly ingest lag (93 of 104, 35 of 46 FBS-involved).
+  The "16 of 65 on 2026-09-26" claim is confirmed by the US-Eastern date (65 FBS-involved games, 16 missing).
+- **Backfill:** 16,378 rows, sha256 `cc704059e4684edb9e580dff5033433424ee34e6a5fe96995c7c272ae82d8bf4`, parser
+  `cfb-v6-backfill-1`, under `data/research/ncaaf_v6/` (gitignored). The live history files were only read.
+  v6 uses the backfill as rating input; scored games are the existing-history events (D-FIT-COHORT), the
+  backfill-only FBS-involved games are scored separately.
+- Consequence for v5: its live ratings are built from this gap-ridden history. Fixing ingest is an open item
+  below, not done here.
+
+### Input audit (weather, QB, pace)
+
+- **Weather is plumbed with real forecasts but fires on 0.4% of rows at most 1.8 points and was never fitted.**
+  Across 6,129 NCAAF ledger rows (607 events) the adjustment is non-zero on 25 rows (0.4%; 0.9% of the 2,829 rows
+  that carried a real forecast), on 6 events, largest 1.8 total points. Forecast capture began 2026-10-23.
+  Training history carries constant placeholders (5 mph / 65 F on 7,542 rows, 0 / 72 on 182), so the wind,
+  precipitation and cold coefficients are hand-set literals that were never fitted or validated.
+- **QB adjustment is dead:** the -4.5 point backup discount fired on 0 of 2,430 recorded side cells; the
+  injury feed holds 387 entries over 129 snapshots with no QB entries; the "starter" is the season passing leader
+  (not a point-in-time starter) and a starter missing from the report is scored as available (1.0).
+- **No pace data:** no possession or drive fields exist; `possessions` is the constant 12.5 on all 7,724 legacy rows
+  (absent on the 241 newest), success rate the constant 0.42, `home_epa_per_play` has no recorded provenance
+  (339 distinct values, absent on the 241 newest).
+
+### ESPN historical closing-line dataset
+
+9,364 lined events (FBS-FBS and FBS-FCS completed games 2016-2026, forfeits excluded), sha256
+`2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54`, selection rule `espn-lines-rule-1`
+(median across non-live providers, fixed before any outcome was joined; rule sha256
+`ee23e34e91544b797a1feaa9c6ab604fa79597671f6bec110dd34df4b806ee97`). These are **closing/final pregame lines
+with no per-quote `observed_at`: a closing-line benchmark, not decision-time quotes.** From 2024 each event carries
+one book (ESPN BET 2024-25, DraftKings 2025-26).
+
+### v6 frozen fit and holdout
+
+Frozen before the holdout or any market check ran: params sha256
+`6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70` (`outputs/ncaaf/cfb_v6_frozen_fit.json`).
+Selected ridge 0.1, previous-season weight 0.2, established threshold 2 current-season games, result buffer 5 h.
+Margin calibration 0.4044 + 0.8716 x raw margin; total calibration 21.3898 + 0.6097 x raw total. Margin SD
+16.35 established / 16.89 thin sample / 16.76 FBS-vs-FCS; total SD 16.86 / 16.72 / 17.43. Split: train 4,102 events
+to 2022-11-11, validation 1,591 to 2024-11-14, holdout after that; 2016 is burn-in (734 existing games excluded).
+Caveat: the grid was extended downward twice on validation before freezing and the chosen ridge 0.1 is the
+smallest value in the final grid (an edge selection).
+
+Locked holdout, common cohort n 1,527 (2024-11-15 to 2026-11-12), scored once; v5 incumbent check: analytic Brier
+0.19003 against the recorded engine 0.18933 (n 1,527):
+
+| metric | v6 | v5 | v6 minus v5 (date-clustered 95% CI) |
+|---|---|---|---|
+| moneyline Brier | 0.17975 | 0.19003 | -0.01029 [-0.01524, -0.00553] |
+| log loss | 0.5333 | 0.5589 | |
+| ECE | 0.0225 | 0.0448 | |
+| calibration slope | 1.121 | 1.034 | |
+| margin log score | -4.1630 | -4.2109 | +0.0479 [+0.0306, +0.0640] |
+| total log score | -4.1966 | -4.2115 | +0.0150 [+0.0062, +0.0240] |
+| margin MAE | 12.286 | 12.885 | -0.599 [-0.847, -0.332] |
+
+v6's Brier is lower in each of 2024 (n 233), 2025 (n 793) and 2026 (n 501) and in every SD slice (established, thin sample, FBS-vs-FCS). Backfill-only FBS-involved
+games (n 384, scored separately): Brier 0.1046, ECE 0.0629, margin MAE 14.54.
+
+### Market-relative checks (FIRST LOOK, frozen fit `6e38b14c...`)
+
+Correlation of (model - line) with (actual - line); a positive value is the evidence of edge, and about zero means none.
+
+| set | totals v6 | totals v5 | spreads v6 | spreads v5 |
+|---|---|---|---|---|
+| 575-game reference (design-informed, inside the holdout window) | -0.011 [-0.091, +0.054] | -0.033 [-0.119, +0.041] | +0.042 [-0.023, +0.110] | +0.009 [-0.090, +0.105] |
+| ESPN lines, holdout window, common set | -0.008 [-0.057, +0.041] (n 1,511) | -0.040 [-0.097, +0.016] | +0.019 [-0.027, +0.066] (n 1,512) | +0.019 [-0.032, +0.068] |
+| ESPN lines, fit window, common set | +0.028 [-0.001, +0.058] (n 5,567) | +0.023 [-0.006, +0.051] | -0.009 [-0.041, +0.022] (n 5,574) | +0.004 [-0.024, +0.033] |
+
+Every interval includes zero. Over all 8,279 lined totals v6 is +0.010 [-0.015, +0.034]; over all 8,376 lined spreads
+-0.007 [-0.032, +0.018]. On the 575 reference v6 fixes much of the spread compression (margin SD 14.82 against v5's
+11.78 and a line of 16.35; MAE 12.56 against 14.64; the 21+ favourite margin 28.74 against 16.64) and does not fix
+the total (model SD 5.04 against a line of 5.71), yet side records are 232-256 on totals and 237-246 on spreads.
+Fixing compression was necessary, not sufficient, and it did not buy edge.
+
+Caveats, all binding: (1) the ESPN lines are closing lines, so a model with no edge against the close can still
+differ from a decision-time quote; (2) single book from 2024 (the fit window mixes providers); (3) fit-window games
+fitted both models' calibration, so the holdout window is the clean test; (4) the 575 reference and its 2026 season
+sit inside the holdout window and were used to motivate v6, so they are not independent evidence; (5) against the
+575 reference the pinned ESPN spreads show 13 sign flips of 576 (inferred to be reference-side line-pair repeats,
+not verified); (6) per-season cuts (totals 2024 +0.095 [+0.005, +0.176], 2026 -0.089 [-0.170, -0.013]) are looks
+among many and not findings; (7) the moneyline Brier gain is against v5's own calibration, not against market
+prices, and no moneyline market comparison was made.
+
+### Item 7 (market-anchored residual): not done, now feasible
+
+It was blocked locally (the only lined games were the 575). The ESPN lines now make it feasible (9,364 events, 8,279
+totals and 8,376 spreads covered by v6). Recorded as a follow-up; nothing was fitted on any line.
+
+### Port into src, parity and inertness
+
+`features/cfb_features_v6.py` and `models/cfb_structural_v6.py` carry the frozen math (copied from the research
+copy `scripts/cfb_v6_lib.py`, kept as the historical copy that the frozen-fit pin covers). `cfb_v6_research.py
+parity` recomputes the cache through the src extractor: **14,639 projections, max abs difference 0.0**, 183 no-call
+rows matching (the simulated moneyline probability differs from the analytic Normal one by at most 0.035 on 50
+holdout rows, mean 0.017; informational). `config/models/cfb-structural-v6.json` (qualification `research`, not
+qualified, no gates block) verifies its own artifact hash. `tests/test_cfb_structural_v6.py` pins the additive form,
+point-in-time, opponent rating, rolling baseline, raw weather/QB, fail-closed, loader, artifact and, in a clean
+subprocess, that learned_forward, college_football and cli.daily never load either v6 module and that
+production.yaml and model.yaml do not name it. Design call and RISK to know before anyone routes v6: a team name never seen in the history resolves to the season's
+pooled lower-division pseudo-team and is projected, not declined (checked on the real snapshot: an invented home team
+against Ohio State projects a raw margin of -90.9 with 9 sample games, no NO_CALL). `NO_CALL_CFB_V6_UNRATED_TEAM`
+fires for a rated name with no game in the window and for any name when no pooled team exists. The frozen math is
+unchanged (parity is bit-exact); any serving use would need a known-team gate first.
+
+### Decision for the operator
+
+No promotion decision was made and v6 is not routed. Options: (a) leave v6 shadow-only (nothing here shows edge,
+so there is no case to route it); (b) run item 7 on the ESPN lines (a market-anchored residual, with the closing-line
+caveat), the only route left to a market-relative signal from these inputs; (c) if better-calibrated probabilities
+are wanted on their own, a separate governed promotion with a market-relative test on decision-time quotes.
+
+Open items: the daily ingest still lacks `groups=80/81` (v5's live ratings stay on the gap-ridden history); the
+ESPN lines and backfill live under `data/research/ncaaf_v6/` (untracked); QB point-in-time starter data does not
+exist; there is no drive or play data for pace.
+
+## 2026-11-14 — Project audit: the forecast step's time was ledger re-reads and replayed simulations, not pricing; pytest wrote into the live runtime root (quick-261114-prf)
+
+**Symptom.** The 14:00 daily spent 1,589 s of 1,886 s in the forecast step: NCAAF 1,567 s,
+NCAAB 702 s (`timing.forecast_sport_done_seconds`). Separately, the live
+`logs/auto_buyer_cycle_history.jsonl` held 64 rows marked `LIVE_EXECUTION` with
+`forecast_date` 2026-08-30 (every one evaluated 5 picks and placed no order), written 2026-10-24
+to 2026-11-13. Other `LIVE_EXECUTION` rows with no forecast date are real runs (12,593 picks
+evaluated, 147.78 USD placed on 2026-11-10 and 11-11) and are not test output.
+
+**Root causes.**
+
+1. `PickLedger._append_record` read the ledger's whole tier/sport slice for one duplicate check,
+   on every append. Timed read-only against the live `ledgers.db` (1.25 GB, 50,949 records):
+   flat/ncaaf 4,216 rows 1.9 s, flat/ncaab 8,442 rows 2.5 s, main/ncaab 4,624 rows 1.4 s. A
+   contract is appended to two tiers, a slate is hundreds of contracts, and the slice grows every
+   day (82% of flat/ncaaf is retired rows that are read, parsed and then dropped). The XLSX
+   rebuild was already deferred (`defer_sqlite_xlsx_exports`); the read that fed it was not.
+2. `record_from_pick_request` read the model's whole workbook twice (dedupe, then append) and
+   rewrote it once per appended pick, and read it again when the same pick arrived from the
+   second tier: 0.4 s per read at 1,000 rows.
+3. `cfb_replay.replay_inputs` restores the recorded RNG state, so its simulation is a pure
+   function of its inputs, but it was re-run every time: once per listed ladder rung in the
+   slate build (about 3,600 replays, 93% of a 128 s slate build by stack sample), twice in
+   `build_snapshot` (build, then validate), once in `PickRequest.validate`, once per ledger
+   write. One simulation is 0.033 s; nothing was slow, it was only repeated.
+4. `auto_executor`, `auto_buyer_ledger` and `polymarket_execute` call `RuntimePaths.resolve()` at
+   import. Under pytest that reached the live runtime root by three routes: the variable is set
+   machine-wide and `tests/conftest.py` cleared it only in an autouse fixture, after collection
+   had imported those modules; `RuntimePaths.resolve()` falls back to the repo `.env`, which
+   names the live root; and `polymarket_execute`, `auto_executor` and `dashboard/common.py` each
+   carried a copy of a loader that puts every `.env` line, live Polymarket credentials
+   included, into `os.environ` at import. Their path constants therefore pointed at the live
+   runtime root for the whole session, and `test_auto_buyer_cycle_tracking` (live mode, mocked
+   executor) patched `DATA` and the state file but not `AUTO_BUYER_CYCLE_HISTORY_PATH`.
+   `test_buyer_fails_closed_when_stale_quote_refresh_has_network_error` exposed the second
+   route: it builds a default buyer, which read the live state file's one-hour lookahead and
+   failed or passed depending on the checkout it ran in. The live buyer ledger, audit log, state file and the
+   paper root (`paper_auto_buyer/`: ledger, history, state) were scanned read-only for test
+   identities and hold none; the pollution is the main cycle history only.
+
+**Fix.**
+
+- `RuntimeLedgerStore.records/pick_rows` take `event_id` (served by `idx_ledger_records_event`);
+  `_append_record` reads only the event's rows while the export is deferred and falls back to
+  the full read otherwise, including when the deferral ends between the check and the write.
+- `ModelLedger._read_unlocked` serves a copy from a cache keyed on (mtime, size, inode); a write
+  drops the entry. Rows are cached from real reads only: the workbook round trip is not an
+  identity.
+- `cfb_replay._MemoizedReplayEngine` caches the simulated score arrays on (engine parameters, RNG
+  state, score means); the lines only threshold them. It subclasses the engine in `cfb_replay.py`
+  because `models/cfb_distribution.py` must not change: its sha256 is `engine_source_sha256` in
+  every stored snapshot, and editing it would fail replay validation for every open NCAAF pick.
+- `tests/conftest.py` drops the env var and sets `MODEL_PREDICTION_SKIP_DOTENV=1` at import,
+  before any `model_prediction` import. `runtime_paths.dotenv_disabled()` reads the flag:
+  `RuntimePaths.resolve()` skips its `.env` fallback, and the three duplicated loaders are
+  replaced by one `runtime_paths.load_dotenv_into_environ()` that honours it. Nothing in
+  production sets the flag; with it unset the modules still load the runtime root and the
+  credentials from `.env` (checked). The cycle-tracking test patches the history path. A first
+  version that only popped the variable passed in a worktree with no `.env` and did nothing in
+  the real checkout; the isolation test now asserts the paths are the repo default, not merely
+  different from the shell's value.
+- Three stale pins the 2026-11-14 triage missed, failing at HEAD: two buyer tests relied on
+  `nba-moneyline-v9` being in the default whitelist (removed 2026-11-12); one model-ledger test
+  asserted tennis spread is unmapped (it maps to `tennis-games-markov-v4`) and that an unmapped
+  market is a no-op (it falls back to the model version).
+
+**Evidence.**
+
+- Targeted read vs full read on a `backup()` copy of the live ledger, through `PickLedger`:
+  2,651 events, 7,147 rows, nine tier/sport slices, 0 row-set mismatches, 0 duplicate-verdict
+  differences; 0.6-5.6 ms per event against 0.14-1.84 s per slice.
+- Replay memo on a 35-rung ladder at 200,000 draws: 1.08 s cold, 0.16 s first pass, 0.04 s
+  repeat, probabilities identical.
+- Each new test fails with its fix reverted and passes with it restored
+  (`test_deferred_append_reads_only_the_events_own_rows`,
+  `test_rows_cache_sees_external_writes_and_is_not_mutable_by_callers`,
+  `test_memoized_replay_equals_a_cold_simulation`, `tests/test_runtime_root_test_isolation.py`).
+- The profiling run of `build_cfb_slate` (no ledgers passed) wrote one candidate-evidence packet,
+  `research/college_contract_candidates/ncaaf/2026-11-14/c1669b1e...json` at 15:38 ET. It is a
+  real observation by production code, outside the scheduled runs.
+
+**Not done here (see ROADMAP Horizon 3 item 6).** The 52 polluted history rows are still in the
+live file: identify them by `mode == "LIVE_EXECUTION"` and `forecast_date == "2026-08-30"`. The
+per-model workbook is still rewritten once per appended pick.
+
+## 2026-11-14 — Event-detail quote pass ahead of the paced /book capture (quick-261114-mzz)
+
+**Symptom.** The 21:00Z daily (`daily-20261114T210002Z-126544`, commit 87d41d45) captured 203
+contracts and left 955 `skipped_after_time_budget` at its 600 s cap (NCAAF 322, NCAAB 56). The
+paced `/book` pass that fixed the abandon-on-429 defect (entry below) is correct but slow: it
+sustains about 20 contracts a minute on the IP-wide limit, so a full college slate (about 1,500
+NCAAB and 1,900 NCAAF contracts) cannot fit in 600 s.
+
+**Evidence.** `GET /v1/events/slug/{slug}` returned both top-of-book quotes on 525 of 530 slate
+markets, matched live `/bbo` exactly on 26 of 27 spot checks, and served 40 requests in 1.1 s with
+no 429. Observed while planning (read-only GETs, 21:36Z): the detail market `status` is
+`MARKET_STATUS_OPEN` (the readers gate on `MARKET_STATE_OPEN`), with `active true`, `closed false`,
+`ep3Status "OPEN"`; the response is CDN-cached (`max-age=30`, an `Age` header); `/bbo` has no
+`transactTime` either and is CDN-cached the same way, so a `/bbo` row already has
+`transact_time_utc None` and no sizes; the detail `updatedAt` was 07:25Z on a 21:36Z read, so it is
+market-metadata time and is never used as a quote time.
+
+**Design** (`data_sources/polymarket_us.py`, `capture_slate_snapshots`).
+
+- Pass 1 (event detail): one request per upcoming in-scope event (priority leagues first, then
+  other leagues' events that hold an open-pick slug), spaced 0.25 s
+  (`EVENT_DETAIL_MIN_REQUEST_INTERVAL_SECONDS`), inside `max_capture_seconds`. For every slate
+  market of the event it writes a row with `reconstruction_status_source`
+  `live_gateway_event_detail_quote`, `usage` `prospective_executable_bbo`, `market_state`
+  `MARKET_STATE_OPEN`, `bid_size`/`ask_size`/`transact_time_utc` None, `observed_at_utc` stamped
+  after the response arrives, and `quote_cache_age_seconds` from the `Age` header. Rows pass through
+  the same `_annotate_capture` as `/book` rows, so they carry the identical field set.
+- Fail closed per market (`_event_detail_quote_book`): status open, active, not closed,
+  `ep3Status` absent or `OPEN`, finite `0 < bid < ask < 1`, and the line equal to the slate's when
+  both exist; anything else writes no row and is fetched by pass 2. `market_state` is mapped to
+  `MARKET_STATE_OPEN` only from the verified open status, so an event-detail row is exactly as
+  executable as a `/bbo` row, never looser.
+- Fail soft per event: an HTTP, parse or type error counts in `event_detail_failures` and the pass
+  continues; a 429 ends the pass (the limit is IP-wide and pass 2 needs the budget). Ladder pruning
+  does not apply to pass 1 (every rung is in the same response); it still applies to pass 2.
+- Pass 2 (`/book`) keeps its contract set, pacer and budget. Each tier is now a stable partition,
+  contracts with no event-detail quote first, then the quoted ones, so the paced budget reaches
+  unquoted markets before it refreshes the ladder shortlist for depth. A later `/book` row wins
+  over an earlier event-detail row in `_latest_capture_per_market`, `_fresh_latest_per_slug` and
+  `PolymarketSnapshotStore.latest` (pinned by a test).
+
+**Decisions.**
+
+- `captured`, `captured_by_league`, `missing_executable_ask`, `timestamp_invalid_count` and
+  `nba_missing_quote_event_ids` count rows written by both passes, because consumers read
+  `captured` as snapshots persisted (`ncaab_paper_trial` sums it); `captured_by_source` gives the
+  split. New keys only: `event_detail_events`, `event_detail_captured`, `event_detail_failures`,
+  `captured_by_source`, `covered_book_failures`; none removed or renamed.
+- A `/book` failure or skip on a market pass 1 already quoted is `covered_book_failures`, not
+  `failures`: `failures`, `skipped_after_time_budget` and `skipped_after_rate_limit` keep meaning
+  "contracts left with no snapshot from this run". `event_detail_failures` is never added to
+  `failures`, since those markets fall through to pass 2.
+- A client without `event_detail` (test stubs, legacy) captures exactly as before.
+
+**Reader audit.** The only code naming a `reconstruction_status_source` outside this module is
+`research_quote_contracts.py:68`, which requires `live_gateway_market_and_book_response` and so
+already rejects `/bbo` rows; there is no `/bbo` allow-list to extend and it was not touched. The
+executable-quote gates read `market_state == "MARKET_STATE_OPEN"`, `provider`, `reconstructed`,
+`timestamp_valid` and `usage`, all of which event-detail rows satisfy. `college_contract_evidence`
+also needs a parseable `transact_time_utc`, so it rejects `/bbo` and event-detail rows alike; the
+`/book` rows from pass 2 (ladder shortlist) keep serving it. No reader or gate was edited.
+
+**Live proof** (read-only GETs; `cli polymarket-slate --date 2026-11-14`, 21:49Z to 22:04Z, runtime
+root unchanged; nothing posted to any order endpoint).
+
+| | events asked | `event_detail_captured` | `captured` | by source (detail / bbo / book) | `elapsed_seconds` | `failures` | rate-limit pauses |
+|---|---|---|---|---|---|---|---|
+| NCAAB | 34 | 1491 | 1619 | 1491 / 18 / 110 | 367.2 | 0 | 3 |
+| NCAAF | 30 | 1910 | 2107 | 1910 / 34 / 163 | 531.6 | 162 | 3 |
+
+`event_detail_failures` 0 and `source_rate_limited` false on both; pass 1 took about 7 s for 34
+events. NCAAF `failures` 162 are 160 `capture_time_budget_exhausted` and two `invalid_executable_bbo`;
+all 162 are contracts of games already under way (checked against the slate's start times), in
+the secondary tier on its 120 s cap, which pass 1 does not cover. Every upcoming-game contract
+got a snapshot. Spot checks of
+three stored event-detail rows per slate against a live `/bbo` GET: NCAAB 41.0%/42.0%,
+79.0%/81.0%, 57.0%/58.0% (bid/ask) equal the live 41.0/42.0, 79.0/81.0, 57.0/58.0; NCAAF
+61.0/62.0, 58.0/59.0, 21.0/22.0 equal the live 61.0/62.0, 58.0/59.0, 21.0/22.0. No event-detail
+row has `timestamp_valid` false or a missing ask. Compare the 21:00Z daily: 203 captured.
+Code: commit e8e2ed47 (8 `test_event_detail_*` tests in `tests/test_polymarket_us.py`).
 
 ## 2026-11-14 — Prospective BBO capture abandoned on the first 429 and starved NCAAF; NCAAF priced off ESPN consensus (debug bbo-capture-429-starves-ncaaf)
 
@@ -5427,3 +6070,23 @@ Do not add `--log` to the forecast audit.
    does not pass as evidence of positive ROI.
 12. Reproduce a new versioned report from one stable green checkout. Keep model
    quality separate from executable-price profitability.
+
+## 2026-11-15 (quick-261114-srb addendum): item 7 and the pooled-team check
+
+Both follow-ups from the v6 entry above are done. Neither changes its verdict. Frozen fit sha256 6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70 is unchanged.
+
+- **Item 7, market-anchored residual (`scripts/cfb_v6_residual.py`, commit 145255b3): NO PICK on both markets.** Rule `cfb-v6-residual-rule-1` (sha256 6b7cc7595a58c69aff5aab636643265fee4d34ffb767cda82c6d58b9ee67bb4f) was hashed before any data loaded. Fit window through 2022-11-11, validation 2022-11-12 to 2024-11-14, holdout window left unscored. Spreads: validation slope -0.045 [-0.207, +0.128], out-of-sample MSE delta +0.017 [-0.061, +0.098]. Totals: validation slope +0.216 [+0.033, +0.398] but the fit-window slope was -0.012 [-0.138, +0.106], so applying the fit coefficients is worse than the line (MSE delta -0.156 [-0.245, -0.068] in the line's favour). Book-only median gives the same verdicts. A line-anchored challenger collapses to the line and would decline every game. The ESPN lines are closing benchmarks without observed_at, so this does not test decision-time quotes.
+- **Pooled-team check (`scripts/cfb_v6_pool_audit.py`, commit e83e5f8c): the reported numbers stand.** Zero scored games in the holdout (1,527), the 575/576 reference or the ESPN-lined cohorts had an FBS side rated as the pooled lower-division team. 148 FBS team-events (Florida International, Missouri State, Sacramento State) lack a `resolve_team` alias but are rated under stable ESPN-id keys. A second look excluding them: holdout Brier delta -0.00992 [-0.01495, -0.00505] against -0.01029; every market-relative correlation keeps its sign and its zero-inclusion.
+- **Still open for the operator, not changed here:** (1) the live daily ingest sends no `groups` parameter for NCAAF, so v5's ratings sit on history missing most FBS-vs-FCS games and all of 2026 week 6; fixing it shifts v5's inputs and needs a governed decision; (2) v6 needs a known-team gate before any serving use, because an unseen name falls into the pooled team instead of declining; (3) `tests/test_artifact_hash_verification.py` fails on four non-v6 artifacts and failed before this work; (4) the frozen-fit pin on `scripts/cfb_v6_lib.py` matches the CRLF working file, not the LF blob, so `verify-frozen` fails on an LF-only checkout.
+
+
+## 2026-11-15 NCAAF history backfill, capture wiring, hash-test documentation (quick 261115-w7k)
+
+- Operator waived the pinned history-impact REJECT (holdout Brier delta +0.001065 vs +0.001 limit, CI spans zero). Applied the 1,478-game FBS-involved backfill to data/processed/ncaaf/games.jsonl (append set sha256 7d0f9caf..., loaded history 9,498 rows) and shipped the groups=80/81 NCAAF ingest. No refit, no promotion.
+- Forward capture is wired into the daily run as a fail-soft step (step1m_cfb_pregame_capture).
+- The four non-verifying artifacts are documented evidence, not drift: three NBA v8 files embed a label, tennis-games-markov-v3 a stale hash. Listed in KNOWN_NON_VERIFIERS.
+- Still open: ~6,900 FCS-vs-FCS events not appended; v5 refit on the complete history not done; line-movement retest needs a season of capture.
+
+## 2026-11-15 FCS-vs-FCS append (quick 261115-x4q)
+
+- Pinned cfb-fcs-append-rule-1 ACCEPT: holdout Brier 0.19036 to 0.18974 (delta -0.00062, CI [-0.00231, +0.00076]); neutral within noise. Applied 6,894 groups=[81] rows to the processed history only (16,392 rows loaded). One-time snapshot, not maintained by the daily ingest. No refit, no promotion.

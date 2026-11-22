@@ -98,7 +98,7 @@ def test_ci_imports_of_checked_in_config_resolve() -> None:
     from model_prediction.production_registry import ProductionModelRegistry
 
     registry = ProductionModelRegistry.load(Path(__file__).resolve().parents[1])
-    # Entry count is pinned once, in test_production_registry (89 entries, 49 available).
+    # Entry count is pinned once, in test_production_registry (90 entries, 50 available).
     assert len(registry.entries) == len(registry.available_entries()) + len(registry.problem_entries())
     assert "nba-spread-margin-v6" in registry.entries
     assert "nba-total-margin-v6" in registry.entries

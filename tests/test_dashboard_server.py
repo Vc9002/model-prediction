@@ -13,6 +13,17 @@ import model_prediction.dashboard.orders as dashboard_orders
 from model_prediction.audit import AuditLog
 
 
+@pytest.fixture(autouse=True)
+def _runtime_root_is_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Point the runtime root at an empty directory for every test in this file.
+
+    Snapshot lookups prefer the runtime root's odds tree over the test's own DATA
+    directory. Without this, the repo-local data/ (which holds real 2026-08-04
+    snapshots once the .env fallback is disabled under pytest) answered first.
+    """
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(tmp_path / "no-runtime-root"))
+
+
 def _configure_archive(monkeypatch, tmp_path: Path, rows: list[dict], patch_dash) -> Path:
     archive_path = tmp_path / "archive.json"
     patch_dash("ARCHIVE_FILE", archive_path)

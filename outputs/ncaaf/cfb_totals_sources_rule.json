@@ -1,0 +1,194 @@
+{
+  "rule_version": "totals-sources-rule-1",
+  "quick_task": "261115-183",
+  "purpose": "Pinned evaluation rule for the NCAAF totals information-source tests (W2 line movement, W3 weather, W4 QB), the walk-forward level tracker (W1), the v6.1 composition, the 2026-11-14 retrospective replay and the lopsided pre-registration. Committed before any validation or holdout number exists. Every later output records rule_sha256 = sha256 of the canonical JSON (sorted keys, compact separators, ensure_ascii) of this whole file, which is line-ending independent.",
+  "decisions": ["D-183-RULE", "D-183-PRIMARY", "D-183-VERDICTS", "D-183-HOLDOUT", "D-183-TRACKER", "D-183-SHRINK", "D-183-REPLAY", "D-183-PREREG"],
+  "operator_instruction": "Better means better level, bias and error than v6. The closing line stays the benchmark and is expected to win. The tracker enters v6.1 by operator instruction regardless of its validation delta.",
+  "frozen_inputs": {
+    "directory": "data/research/ncaaf_v6/totals_inputs_20261115",
+    "note": "Untracked frozen copies of four untracked inputs. Every script reads only the copies and refuses on a sha256 mismatch. The origin files may keep changing (a sibling session owns them); the copies are the evidence.",
+    "files": {
+      "cfb_v6_base_rows.jsonl": {
+        "origin": "outputs/ncaaf/cfb_v6_base_rows.jsonl",
+        "sha256": "30c3383c4de3824e5a3ee7cb76053facd18b0fe105097fec066bb9fc2980f4be",
+        "rows": 14822
+      },
+      "cfb_v5_base_rows.jsonl": {
+        "origin": "outputs/ncaaf/cfb_v5_base_rows.jsonl",
+        "sha256": "39c1cbd61e63b7dc1c029ad39b7c5b759aa1921296957d9070cb977bab2d187e",
+        "rows": 7960
+      },
+      "history_snapshot.jsonl": {
+        "origin": "data/research/ncaaf_v6/history_snapshot.jsonl",
+        "sha256": "1fe90e1a11b8e5248003bff92ae62eec5bb17c4bd421a275b2f64ed36f1ced0c",
+        "rows": 16378
+      },
+      "espn_lines.jsonl": {
+        "origin": "data/research/ncaaf_v6/espn_lines.jsonl",
+        "sha256": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54",
+        "rows": 9364,
+        "espn_lines_rule_sha256": "ee23e34e91544b797a1feaa9c6ab604fa79597671f6bec110dd34df4b806ee97",
+        "espn_lines_rule_version": "espn-lines-rule-1",
+        "never_append": true
+      }
+    }
+  },
+  "frozen_models": {
+    "v6_params_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70",
+    "v6_frozen_fit_file": "outputs/ncaaf/cfb_v6_frozen_fit.json",
+    "v6_selected_grid_key": "0.1|0.2",
+    "v6_total_calibrated_as": "total_calibration.intercept + total_calibration.slope * raw_total, raw_total = grid[key][1], no floor",
+    "v6_margin_calibrated_as": "margin_calibration.intercept + margin_calibration.slope * raw_margin, raw_margin = grid[key][0]",
+    "v5_artifact": "config/models/cfb-structural-v5.json",
+    "v5_artifact_sha256_lf_normalised": "fbff68717f8c9aff28e227c41b650b5b854404f46d1f4ca2d09ec8fc7cd05f38",
+    "v5_total_calibrated_as": "max(24, total_calibration.intercept + total_calibration.slope * proj_total)",
+    "v5_margin_calibrated_as": "margin_calibration.intercept + margin_calibration.slope * proj_margin",
+    "v6_artifact_sha256_lf_normalised": "a7e33bfc6eabdbab2c040354ffcc24aa655ffa8a3a245ed027a9e5057def7272",
+    "assertion": "assert_v6_frozen() compares the stored and the recomputed params hash to v6_params_sha256 (not verify-frozen, which may fail on an LF checkout)."
+  },
+  "windows": {
+    "basis": "the `date` field of each cfb_v6_base_rows row (kickoff date as stored)",
+    "select": {"start": null, "end": "2022-11-11"},
+    "validation": {"start": "2022-11-12", "end": "2024-11-14"},
+    "holdout": {"start": "2024-11-15", "end": "2026-11-13", "note": "already looked at in earlier v6 checks; any read here is a one-time look"},
+    "post_holdout": {"start": "2026-11-14", "note": "never scored in any window statistic; used only by the 2026-11-14 replay"},
+    "burn_in": "rows with season <= burn_in_season (2016) in the frozen fit are excluded; the base-row file starts in 2017",
+    "cohort": "lined games: forfeits (history_snapshot is_forfeit) dropped; v6 must have a grid projection at the selected key; a total market row needs a selected total_line, a spread market row needs a selected home_spread_line (ESPN espn-lines-rule-1 `selected` block); rows with a no_call have no grid and are dropped",
+    "v5_cohort": "the common cohort for v5 comparisons is lined rows that also have a v5 base row"
+  },
+  "bootstrap": {
+    "kind": "date-clustered nonparametric",
+    "cluster": "date",
+    "B": 1000,
+    "seed": 20261115,
+    "generator": "a fresh numpy default_rng(seed) per call, never a shared stream, so a CI does not depend on call order across scripts",
+    "ci": "percentile 2.5 and 97.5 (two-sided 95 percent); one-sided bound = 5th percentile",
+    "fixed_coefficients": "select-window OLS coefficients are fit once and stay fixed while validation (or holdout) dates are resampled",
+    "minimum_resamples": 1000
+  },
+  "primary": {
+    "statistic": "dMSE = MSE(baseline) - MSE(with_source) on validation rows (positive = the source helps)",
+    "totals": {"y": "actual total", "close": "close total", "baseline": "OLS of y on [1, close] fit on the select rows of that source's cohort", "with_source": "OLS of y on [1, close, pinned features] fit on the same select rows"},
+    "spreads": {"y": "home margin (home score minus away score)", "close": "-home_spread_line (expected home margin)", "baseline": "OLS of y on [1, close]", "with_source": "OLS of y on [1, close, pinned features]"},
+    "source_cohort": "rows of the market's lined cohort in which every pinned feature (and the pinned close column) is non-missing",
+    "pass_rule": "validation 95 percent CI lower bound > 0 AND the one-time holdout point estimate of dMSE > 0",
+    "exploratory": "everything else (MAE, correlation, subgroup, per-season, any other feature) is labelled exploratory and never decides a verdict",
+    "forecast_retest": "fit on the select rows with the observed features, evaluate on validation/holdout rows by substituting the forecast columns (eval_features); the baseline and its coefficients are unchanged"
+  },
+  "sources": {
+    "W2": {
+      "name": "ESPN open-to-close line movement",
+      "tier": "leaky",
+      "tier_reason": "ESPN open and close blocks carry no observed_at; the movement is only known at close, so a pass is an upper bound",
+      "open_definition": "per event: median over eligible non-live providers (eligibility as espn-lines-rule-1 select_lines, i.e. not is_live) of the provider's open value: total_open, falling back to initial_over_under; home_ps_open, falling back to initial_spread (taken as stored, home-signed, never conditioned on the closing favourite). Each value passes the espn-lines plausibility bounds (|spread| <= 70, total in [15, 120]). The 'Opening' provider (provider_id 23, 2016-2017) contributes its own current line as an open value and is excluded from the close median.",
+      "close_definition": "per event: median over the same eligible providers of provider_values (the espn-lines-rule-1 per-provider value), excluding provider_id 23",
+      "season_exclusions": "Caesars-family providers (provider_name casefolded starts with 'caesar') are excluded from both open and close in seasons 2017 and 2018 (in-play contamination); the movement cohort's close is the median of the remaining eligible providers",
+      "orientation_audit": "report, never resolve: the count of provider rows whose initial_spread sign disagrees with fav_side",
+      "min_providers": 1,
+      "totals": {"features": ["move_total"], "flags": [], "close_col": "mv_close_total", "y_col": "actual", "formula": "move_total = close total - open total (movement cohort values)"},
+      "spreads": {"features": ["move_spread"], "flags": [], "close_col": "mv_close_margin", "y_col": "margin", "formula": "move_spread = close home line - open home line; mv_close_margin = -(movement-cohort close home line)"},
+      "intraday_2026": {"tier": "descriptive", "verdict": "DESCRIPTIVE_ONLY", "rule": "from the runtime root's odds/ncaaf/<date>/polymarket_snapshots.jsonl and market_quotes.db (read-only): the main-line rung is the ladder rung whose over (or home-side) midpoint is nearest 50 percent at each observed_at_utc; movement = last pre-kickoff main rung minus first observed main rung; compared with actual minus the ESPN close; no select/validation data exists, so no verdict beyond DESCRIPTIVE_ONLY"}
+    },
+    "W3": {
+      "name": "Open-Meteo weather bound",
+      "tier": "leaky",
+      "tier_reason": "archive weather is the observed outcome, which the closing line already prices from the forecast; a pass is an upper bound",
+      "exclusions": "dome home teams (resolve_team(...).is_dome) and neutral-site games; FBS home teams with latitude and longitude only",
+      "game_window": "hourly rows with timestamp in [floor_hour(kickoff UTC), floor_hour(kickoff UTC) + 3 h), i.e. three rows; hourly values are transformed first, then averaged",
+      "totals": {"features": ["wind_mph", "precip_in", "cold_f"], "flags": [], "close_col": "line", "y_col": "actual", "formula": "wind_mph = window mean of wind_speed_10m (mph); precip_in = window mean of precipitation (inch); cold_f = window mean of max(0, 40 - temperature_2m in F)"},
+      "spreads": {"features": ["wind_x_margin"], "flags": [], "close_col": "close_margin", "y_col": "margin", "formula": "wind_x_margin = wind_mph * close expected home margin / 10, close expected home margin = -home_spread_line"},
+      "forecast_retest": {
+        "tier": "pit",
+        "tier_reason": "Open-Meteo historical-forecast archive values are forecasts issued before the hour; a pass is PIT_PASS with a lead-time caveat",
+        "run_only_if": "the observed test passes the pass_rule on that market",
+        "eval_feature_columns": {"totals": ["wind_mph_fc", "precip_in_fc", "cold_f_fc"], "spreads": ["wind_x_margin_fc"]},
+        "coverage": "2022 onward only"
+      }
+    },
+    "W4": {
+      "name": "QB starter bound",
+      "tier": "leaky",
+      "tier_reason": "starters are derived post hoc from box-score pass attempts; the pregame availability is not observed",
+      "cohort": "FBS-vs-FBS lined games only (game_class == 'FBS-FBS')",
+      "starter_definition": "starter = the team's passer with the most pass attempts in that game; qb_changed = starter differs from the team's previous game starter; backup_start = starter differs from the team's season-to-date attempts leader over prior games (the first game of a season is 0, counted)",
+      "totals": {"features": ["backup_start_sum", "qb_changed_sum"], "flags": ["backup_start_sum", "qb_changed_sum"], "close_col": "line", "y_col": "actual", "formula": "backup_start_sum = backup_start_home + backup_start_away; qb_changed_sum = qb_changed_home + qb_changed_away (each 0, 1 or 2)"},
+      "spreads": {"features": ["backup_start_diff", "qb_changed_diff"], "flags": ["backup_start_diff", "qb_changed_diff"], "close_col": "close_margin", "y_col": "margin", "formula": "home minus away of the same flags (-1, 0 or 1)"}
+    }
+  },
+  "verdicts": {
+    "taxonomy": ["NOT_WORTH_BUILDING", "INSUFFICIENT_DATA", "UPPER_BOUND_PASS", "PIT_PASS", "DESCRIPTIVE_ONLY"],
+    "provisional_value": "PROVISIONAL_PENDING_FINAL",
+    "provisional_note": "a non-final run (no --final) never reads holdout rows and returns this value instead of a taxonomy verdict unless the verdict is INSUFFICIENT_DATA or DESCRIPTIVE_ONLY, which do not depend on the holdout",
+    "INSUFFICIENT_DATA": {"min_select_n": 400, "min_validation_n": 300, "min_flagged_per_window": 30, "flagged_definition": "a flag feature (the source's `flags` list) is flagged on a row when its value is not 0; the count is taken on the select window and on the validation window separately, per flag feature; either window below 30 for any flag feature triggers it", "n_definition": "rows of the source cohort that carry every pinned feature, per window"},
+    "NOT_WORTH_BUILDING": "the pass_rule fails; numbers are recorded",
+    "UPPER_BOUND_PASS": "the pass_rule passes for a tier 'leaky' feature (observed weather, post-hoc QB flags, untimestamped ESPN open/close movement); outcome = build a forward capture or a point-in-time retest; never enters v6.1",
+    "PIT_PASS": "the pass_rule passes for a tier 'pit' feature (observable before kickoff); may enter v6.1 under D-183-SHRINK",
+    "DESCRIPTIVE_ONLY": "tier 'descriptive': no select/validation data (2026 intraday snapshots)",
+    "agents_rule": "AGENTS.md: retrospective features that cannot prove they were observable before event start are rejected from the model"
+  },
+  "holdout_protocol": {
+    "reads": "each workstream computes its holdout numbers in exactly one `--final` run after its script is finished; the output records the script sha256 (line-ending normalised to LF) and holdout_reads = 1",
+    "rerun": "a --final re-run after an edit increments holdout_reads (previous output's value + 1) and the report says so with both script hashes",
+    "nonfinal_runs": "never touch holdout rows"
+  },
+  "tracker": {
+    "id": "D-183-TRACKER",
+    "feed": "every non-forfeit row of the frozen cfb_v6_base_rows copy with a v6 grid projection at the frozen selected key (lined or not, FBS and FCS), including post-holdout rows as history",
+    "residual": "r = actual total - frozen v6 calibrated total",
+    "decision_time": "the game's kickoff",
+    "result_buffer": "a past game counts only if start_utc + 5 h <= T (inclusive; identical to v6 D-RES-BUFFER and scripts/cfb_v6_lib.py advance(): limit = cutoff - 5 h, bisect_right)",
+    "offset": "mean of r over the window; no eligible game gives offset 0 and is flagged; a game window larger than the eligible count uses all eligible games",
+    "windows": {
+      "grid_in_order": [["days", 14], ["days", 30], ["days", 60], ["days", 90], ["games", 150], ["games", 300], ["games", 600]],
+      "day_window": "eligible games with start >= T - N days (lower edge inclusive)",
+      "day_window_fallback": "a day window holding fewer than 50 eligible games falls back to the last 150 eligible games",
+      "game_window": "the last N eligible games in kickoff order, ties broken by event_id"
+    },
+    "selection": "lowest RMSE of (v6 + offset) vs actual on select-window lined games (total line present); ties go to the earlier grid entry",
+    "line_tracker_diagnostic": "the same tracker on (actual - close total); diagnostic only",
+    "entry": "the tracker enters v6.1 by operator instruction regardless of its validation delta, which is reported with its CI"
+  },
+  "shrinkage": {
+    "id": "D-183-SHRINK",
+    "rule": "a PIT_PASS component enters v6.1 as 0.5 x its select-window OLS coefficient (the with_source coefficient) times the select-mean-centred feature, added to the total (or margin) after the tracker",
+    "factor": 0.5
+  },
+  "v61_composition": {
+    "model_id": "cfb-structural-v6.1",
+    "total": "frozen v6 calibrated total + tracker offset (window chosen on the select window only) + sum of shrunk PIT_PASS total components",
+    "spread": "v6 unchanged unless a spread source is PIT_PASS, then margin + the shrunk component",
+    "never": "no leaky-tier component, no component that is not PIT_PASS, and nothing tuned after cfb_v61_spec.json is frozen",
+    "frozen_files_unchanged": ["config/models/cfb-structural-v6.json", "config/models/cfb-structural-v5.json", "outputs/ncaaf/cfb_v6_frozen_fit.json"]
+  },
+  "replay": {
+    "id": "D-183-REPLAY",
+    "label": "RETROSPECTIVE REPLAY",
+    "label_reason": "2026-11-14 is inside the data the lopsided tilt was found on; the tilt's real test is the pre-registered forward evaluation",
+    "decision_time": "kickoff",
+    "history": "data/research/ncaaf_v6/history_snapshot.jsonl topped up from ESPN scoreboards (groups 80 and 81, completed games only), with the v6 extractor's 5 h result buffer; the tracker uses only games with start + 5 h <= kickoff, each projected by v6 at its own kickoff",
+    "cohort_A": "every completed 2026-11-14 game (event start in [2026-11-14T10:00Z, 2026-11-15T10:00Z), groups 80 and 81, FBS and FCS; v6 no-calls counted)",
+    "cohort_B": "the latest settled flat-tier cfb-structural-v5 total row per event in the runtime ledgers.db for that window",
+    "closes": "ESPN core odds fetched after every game is final into data/research/ncaaf_v6/espn_lines_20261114.jsonl using espn-lines-rule-1 (trim_item, select_lines)",
+    "v61_probabilities": "script-local subclass of CFBStructuralV6Model overriding only calibrate_means (calibrated total + offset; margin unchanged); seam check: a fresh v6.1 instance with offset 0 and a fresh v6 instance over the same rows in the same order give exactly equal probabilities on every cohort-B row",
+    "pnl": {
+      "pick": "each cohort-B row gets one flat 1U pick on the side with the larger model probability minus ask",
+      "ask": "the ledger's market_probability for the ledger side and 1.0476 minus it for the other side (standard 4.76 percent vig)",
+      "edge_view": "also the 2-8 percent edge view (v5 Main gate analogue)",
+      "v5_pnl": "the ledger row's own result at 1U",
+      "units": "percentages and units only, never American odds"
+    },
+    "v5_projection": "calibrated v5 total from the latest pre-kickoff ledger row's projected_total: max(24, intercept + slope x projected_total) with the v5 artifact's total_calibration",
+    "report": "cohorts A and B separately with n, and the lopsided / FBS-vs-FCS subset of each, for v5, v6, v6.1 and the line: MAE, bias, over lean, flat-1U PnL and ROI percent, W-L-P, the 2-8 percent edge view"
+  },
+  "comparison": {
+    "models": ["v5 (common cohort)", "v6", "v6.1", "closing line"],
+    "windows": ["select", "validation", "holdout"],
+    "metrics": ["MAE", "RMSE", "bias", "over lean (share of model > close, ties excluded)", "corr(model - line, actual - line)"],
+    "verdict": "v6.1 beats the closing line only if the holdout paired MAE difference (v6.1 minus line) has its 95 percent CI entirely below 0"
+  },
+  "safety": {
+    "http": "read-only GET with a generic User-Agent, no project, person or repo identifier; no order or execute endpoint",
+    "odds_format": "percentages and probabilities only, never American odds"
+  },
+  "prereg_reference": "outputs/ncaaf/cfb_lopsided_prereg.json (D-183-PREREG), written after this file and committed in the same step-0 commit"
+}

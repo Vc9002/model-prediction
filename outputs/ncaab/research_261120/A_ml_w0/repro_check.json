@@ -1,0 +1,13 @@
+{
+  "n_pred": 22963,
+  "n_export": 22963,
+  "n_shared": 22963,
+  "ids_equal": true,
+  "max_abs_mu_diff": 4.9989123951377223e-11,
+  "max_abs_scale_diff": 4.724576285752846e-11,
+  "switch_off_w05_max_abs_p_diff": 4.9998893913993925e-11,
+  "abs_p_change_vs_served": {
+    "mean": 0.03283342810313935,
+    "max": 0.18649840006350604
+  }
+}

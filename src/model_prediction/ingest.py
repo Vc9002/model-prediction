@@ -25,7 +25,12 @@ from typing import Any, cast
 import httpx
 
 from .audit import AuditLog
-from .data_sources.espn import SPORT_LEAGUES, ESPNClient, parse_pregame_and_closing_markets
+from .data_sources.espn import (
+    NCAAF_SCOREBOARD_QUERY_VERSION,
+    SPORT_LEAGUES,
+    ESPNClient,
+    parse_pregame_and_closing_markets,
+)
 from .domain import eastern_today
 
 SPORTS = tuple(SPORT_LEAGUES)
@@ -34,6 +39,7 @@ SPORTS = tuple(SPORT_LEAGUES)
 # completed_tennis_singles_matches changes meaningfully — consumers can
 # tell which parser version produced a normalized row.
 PARSER_VERSION = "espn-scoreboard-1"
+NCAAF_PARSER_VERSION = "espn-scoreboard-ncaaf-groups-1"
 
 _NONTERMINAL_STATES = {"in", "pre"}
 
@@ -143,6 +149,10 @@ class Ingestor:
                         and cached_payload.get("_scoreboard_query_version") != "ncaab_division_i_v1"
                     )
                     or (
+                        sport_key == "ncaaf"
+                        and cached_payload.get("_scoreboard_query_version") != NCAAF_SCOREBOARD_QUERY_VERSION
+                    )
+                    or (
                         bool(cached_payload.get("events"))
                         and (
                             not completed_events
@@ -156,7 +166,11 @@ class Ingestor:
                 payload = cached_payload
             else:
                 try:
-                    payload = self.client.scoreboard(league, game_date)
+                    payload = (
+                        self.client.scoreboard_ncaaf_divisions(game_date)
+                        if sport_key == "ncaaf"
+                        else self.client.scoreboard(league, game_date)
+                    )
                 except (httpx.HTTPError, ValueError) as error:
                     return (
                         "error",
@@ -191,6 +205,10 @@ class Ingestor:
                 # would misattribute WTA matches to ATP (see that function's
                 # docstring), so `league` is deliberately not overwritten here.
                 fresh = ESPNClient.completed_tennis_singles_matches(payload)
+            elif sport_key == "ncaaf":
+                fresh = ESPNClient.completed_ncaaf_games(payload)
+                for game in fresh:
+                    game["league"] = league
             else:
                 fresh = ESPNClient.completed_games(payload)
                 for game in fresh:
@@ -198,7 +216,7 @@ class Ingestor:
             for game in fresh:
                 game["raw_source"] = f"espn:{league}:{game_date}"
                 game["raw_hash"] = raw_hash
-                game["parser_version"] = PARSER_VERSION
+                game["parser_version"] = NCAAF_PARSER_VERSION if sport_key == "ncaaf" else PARSER_VERSION
             return (status, fresh, None)
 
         if len(leagues) > 1 and self.rate_limit_seconds == 0.0:

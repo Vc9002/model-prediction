@@ -1,0 +1,114 @@
+{
+  "accept_checks": {
+    "brier": true,
+    "margin_log_score": true,
+    "total_log_score": true
+  },
+  "arm_i": {
+    "accuracy": 0.7014,
+    "brier": 0.19036,
+    "calibration_slope": 1.0171204297754677,
+    "coverage_50": 0.5278,
+    "coverage_80": 0.816,
+    "coverage_95": 0.964,
+    "ece": 0.02203552062868369,
+    "log_loss": 0.5590819925828119,
+    "margin_bias": 1.214,
+    "margin_log_score": -4.2097,
+    "margin_resid_sd": 16.185,
+    "mean_margin_sd": 17.162,
+    "mean_total_sd": 17.288,
+    "n": 1527,
+    "total_bias": -0.898,
+    "total_coverage_80": 0.8206,
+    "total_log_score": -4.20731,
+    "total_resid_sd": 16.162
+  },
+  "arm_ii": {
+    "accuracy": 0.7046,
+    "brier": 0.18974,
+    "calibration_slope": 1.0343406992732989,
+    "coverage_50": 0.5285,
+    "coverage_80": 0.816,
+    "coverage_95": 0.9627,
+    "ece": 0.02351263785199733,
+    "log_loss": 0.5581839376588952,
+    "margin_bias": 1.358,
+    "margin_log_score": -4.21032,
+    "margin_resid_sd": 16.187,
+    "mean_margin_sd": 17.141,
+    "mean_total_sd": 17.288,
+    "n": 1527,
+    "total_bias": -0.899,
+    "total_coverage_80": 0.8212,
+    "total_log_score": -4.20685,
+    "total_resid_sd": 16.154
+  },
+  "as_of_utc": "2026-11-15T21:24:20Z",
+  "deltas_arm_ii_minus_arm_i": {
+    "brier": {
+      "ci_95_high": 0.00076278,
+      "ci_95_low": -0.00230979,
+      "dates": 169,
+      "metric": "candidate_brier_minus_incumbent",
+      "point_estimate": -0.00062479,
+      "resamples": 2000
+    },
+    "margin_log_score": {
+      "ci_95_high": 0.004607,
+      "ci_95_low": -0.005895,
+      "dates": 169,
+      "point_estimate": -0.000626
+    },
+    "total_log_score": {
+      "ci_95_high": 0.001845,
+      "ci_95_low": -0.000838,
+      "dates": 169,
+      "point_estimate": 0.000463
+    }
+  },
+  "fcs_set": {
+    "by_season": {
+      "2016": 662,
+      "2017": 664,
+      "2018": 661,
+      "2019": 723,
+      "2020": 24,
+      "2021": 665,
+      "2022": 691,
+      "2023": 670,
+      "2024": 737,
+      "2025": 745,
+      "2026": 652
+    },
+    "count": 6894,
+    "sha256": "6bbf70ac422a28059fb0f129860dc90922f8c3ca99be30a5966d9788f0c81b30"
+  },
+  "history_rows": {
+    "arm_i": 9498,
+    "arm_ii": 16392
+  },
+  "holdout_events_with_changed_probability": 1527,
+  "live_copies": {
+    "historical": {
+      "bytes": 5513688,
+      "rows": 8020,
+      "sha256": "19ad99e266548254114da5df37419b4ea096751bb03225e599c36bcd4886e0f0",
+      "source": "data/historical/ncaaf_games_all.jsonl"
+    },
+    "processed": {
+      "bytes": 6392201,
+      "rows": 9498,
+      "sha256": "7b50b030918baabcc13532f6c7cd70822594d4933ce41a4a43be48d22b6146a4",
+      "source": "data/processed/ncaaf/games.jsonl"
+    }
+  },
+  "live_sha256_at_measurement": {
+    "historical": "19ad99e266548254114da5df37419b4ea096751bb03225e599c36bcd4886e0f0",
+    "processed": "7b50b030918baabcc13532f6c7cd70822594d4933ce41a4a43be48d22b6146a4"
+  },
+  "max_abs_probability_change": 0.46701599999999993,
+  "rule_sha256": "f4668a71388eb177eefa92b72aa452504b70ca220d1f3d0e71117cd17075eba2",
+  "runtime_seconds": 119.5,
+  "verdict": "ACCEPT"
+}

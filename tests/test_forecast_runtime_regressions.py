@@ -26,6 +26,8 @@ def isolated_roots(tmp_path, monkeypatch):
     paths = RuntimePaths.for_test(tmp_path)
     monkeypatch.setattr(runtime_paths, "_default_repo_root", lambda: paths.repo_root)
     monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
+    # conftest disables the .env fallback for the suite; this helper tests that fallback.
+    monkeypatch.delenv("MODEL_PREDICTION_SKIP_DOTENV", raising=False)
     (paths.repo_root / ".env").write_text(
         f'MODEL_PREDICTION_RUNTIME_ROOT="{paths.runtime_root}"\n', encoding="utf-8"
     )
@@ -308,3 +310,22 @@ def test_model_coverage_does_not_hide_missing_flat_behind_main(tmp_path):
     report = build_report(tmp_path, db, "2026-10-25", {})
     assert report["missing_flat_lanes"] == 1
     assert report["lanes"][0]["flat_coverage"]["main_without_flat_event_ids"] == ["e2"]
+
+
+def test_only_main_ledger_may_retire_incoherent_moneyline_calls():
+    """Flat logs every game x market; only Main gates (2026-11-17: Flat lost 3 of 8 NBA moneylines)."""
+    import ast
+    import inspect
+
+    from model_prediction.cli import forecast
+
+    calls = [
+        node
+        for node in ast.walk(ast.parse(inspect.getsource(forecast)))
+        if isinstance(node, ast.Call)
+        and getattr(node.func, "id", "") == "_supersede_incoherent_moneyline_calls"
+    ]
+    assert calls, "call site moved; update this guard"
+    for call in calls:
+        ledgers = ast.unparse(call.args[0])
+        assert "flat_ledger" not in ledgers, ledgers

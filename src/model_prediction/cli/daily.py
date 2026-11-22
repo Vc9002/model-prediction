@@ -44,8 +44,12 @@ from ..research_ledgers import existing_research_ledgers
 from ..runtime_paths import RuntimePaths, rerouted_data_root
 from .commands import (
     _clear_today_open,
+    _declined_slots,
+    _evaluated_slots,
     _polymarket_slate,
     _research_models_dir,
+    _restorable_open_rows,
+    _restore_unreplaced,
     _summary,
 )
 from .forecast import (
@@ -68,6 +72,7 @@ from .forecast import (
     _refresh_esports_ratings,
     _refresh_international_baseball_ratings,
 )
+from .nfl_early_line_log import log_nfl_early_lines
 from .settle import _settle_all_unsettled
 from .state import (
     DAILY_ADDITIONAL_SPORTS,
@@ -159,18 +164,78 @@ def _finalize_daily_report(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
-def _serialized_polymarket_captures(slate_capture: Any, week_ahead_capture: Any) -> Any:
-    """Run the slate BBO capture, then the NFL week-ahead book capture, in one thread.
+def _serialized_polymarket_captures(slate_capture: Any, *later_captures: Any) -> Any:
+    """Run the slate BBO capture, then each later book capture in order, in one thread.
 
-    Both draw on one IP-wide gateway rate limit. Run side by side in the daily
+    All draw on one IP-wide gateway rate limit. Run side by side in the daily
     pool (2026-11-14: 34-73 s each, fully overlapping), each one's burst drew
-    429s that ended the other's queue. The week-ahead still runs when the
-    slate capture raises; the slate capture's result or exception is returned.
+    429s that ended the other's queue. The later captures still run when the
+    slate capture raises, and one raising does not stop the next; the slate
+    capture's result or exception is returned.
     """
     try:
         return slate_capture()
     finally:
-        week_ahead_capture()
+        for later_capture in later_captures:
+            try:
+                later_capture()
+            except Exception:
+                logger.warning("Serialized Polymarket capture failed", exc_info=True)
+
+
+def _run_ncaaf_day_ahead_capture(config, game_date: str) -> dict[str, Any]:
+    """Polymarket NCAAF books for D+1 and D+2, so a pre-game-day line series exists (quick 261121-dac).
+
+    Optional by construction: a disabled NCAAF daily forecast skips it, and any failure is returned as a
+    status dict. ``step1n_ncaaf_day_ahead_quotes`` is deliberately not in ``_material_daily_errors``.
+    """
+    try:
+        if not is_sport_daily_enabled(config, "NCAAF"):
+            return {"status": "skipped", "reason": "ncaaf_daily_forecast_disabled"}
+        from .commands import capture_ncaaf_polymarket_day_ahead
+
+        return capture_ncaaf_polymarket_day_ahead(config, game_date)
+    except Exception:
+        logger.warning("NCAAF Polymarket day-ahead capture failed for %s", game_date, exc_info=True)
+        return {"status": "error"}
+
+
+def _run_cfb_pregame_capture(config, data_root, game_date: str) -> dict[str, Any]:
+    """Forward capture of timestamped NCAAF pregame lines and injuries (quick 261115-w7k).
+
+    Optional by construction: a disabled NCAAF daily forecast skips it, and any failure is returned as a
+    status dict. ``step1m_cfb_pregame_capture`` is deliberately not in ``_material_daily_errors``, so this can
+    never turn the daily run red.
+    """
+    try:
+        if not is_sport_daily_enabled(config, "NCAAF"):
+            return {"status": "skipped", "reason": "ncaaf_daily_forecast_disabled"}
+        from ..data_sources.espn_cfb_pregame_capture import capture_cfb_pregame_snapshots
+
+        return capture_cfb_pregame_snapshots(data_root, game_date)
+    except Exception:
+        logger.warning("NCAAF pregame capture failed for %s", game_date, exc_info=True)
+        return {"status": "error"}
+
+
+def _run_ncaaf_v7_pbp_update(config, data_root) -> dict[str, Any]:
+    """Incremental ESPN play-by-play for cfb-structural-v7 (quick 261121-v7l): scoreboard discovery (FBS and
+    FCS feeds), new final games' summaries, new team-game rows, under the runtime root's ncaaf_v7 tree.
+
+    Runs in the capture pool, which is joined before any forecast. Optional by construction: a disabled NCAAF
+    daily forecast skips it, a failure is returned as a status dict and v7 then no-calls the affected teams
+    (NO_CALL_V7_PBP_MISSING). v5 and v6.2 never read this data. ``step1o_ncaaf_v7_pbp`` is deliberately not in
+    ``_material_daily_errors``.
+    """
+    try:
+        if not is_sport_daily_enabled(config, "NCAAF"):
+            return {"status": "skipped", "reason": "ncaaf_daily_forecast_disabled"}
+        from ..data_sources.cfb_pbp_live import update_from_data_root
+
+        return update_from_data_root(data_root)
+    except Exception:
+        logger.warning("NCAAF v7 play-by-play update failed", exc_info=True)
+        return {"status": "error"}
 
 
 def _skipped_sport_result(sport: str, status: str, reason: str) -> dict[str, Any]:
@@ -470,6 +535,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             logger.warning("CFB injury report capture failed for %s", args.date, exc_info=True)
             cfb_injuries_result = {"status": "error"}
 
+    cfb_pregame_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_cfb_pregame():
+        nonlocal cfb_pregame_result
+        cfb_pregame_result = _run_cfb_pregame_capture(config, data_root, args.date)
+
+    ncaaf_v7_pbp_result: dict[str, Any] = {"status": "skipped"}
+
+    def _update_ncaaf_v7_pbp():
+        nonlocal ncaaf_v7_pbp_result
+        ncaaf_v7_pbp_result = _run_ncaaf_v7_pbp_update(config, data_root)
+
     cfb_weather_result: dict[str, Any] = {"status": "skipped"}
 
     def _capture_cfb_weather():
@@ -517,6 +594,12 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         except Exception:
             logger.warning("NFL Polymarket week-ahead capture failed for %s", args.date, exc_info=True)
             nfl_week_ahead_result["polymarket"] = {"status": "error"}
+
+    ncaaf_day_ahead_result: dict[str, Any] = {"status": "skipped"}
+
+    def _capture_ncaaf_day_ahead_polymarket():
+        nonlocal ncaaf_day_ahead_result
+        ncaaf_day_ahead_result = _run_ncaaf_day_ahead_capture(config, args.date)
 
     def _capture_mlb_probables():
         nonlocal mlb_probables_result
@@ -665,6 +748,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             _serialized_polymarket_captures,
             lambda: _timed("polymarket_slate", _polymarket_slate, slate_args, config),
             lambda: _timed("nfl_week_ahead_polymarket", _capture_nfl_week_ahead_polymarket),
+            # Last, under its own budget: it must never delay today's slate or the NFL books.
+            lambda: _timed("ncaaf_day_ahead_polymarket", _capture_ncaaf_day_ahead_polymarket),
         )
         f1 = io_pool.submit(_timed, "wnba", _capture_wnba)
         f2 = io_pool.submit(_timed, "priors", _build_priors)
@@ -683,7 +768,10 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         f15 = io_pool.submit(_timed, "ncaab_boxscores", _capture_ncaab_boxscores)
         f16 = io_pool.submit(_timed, "nfl_weather", _capture_nfl_weather)
         f17 = io_pool.submit(_timed, "nfl_week_ahead_consensus", _capture_nfl_week_ahead_consensus)
-        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17):
+        f18 = io_pool.submit(_timed, "cfb_pregame_capture", _capture_cfb_pregame)
+        # Joined below with the rest of the pool, so it always finishes before NCAAF forecasting starts.
+        f19 = io_pool.submit(_timed, "ncaaf_v7_pbp", _update_ncaaf_v7_pbp)
+        for f in (f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17, f18, f19):
             f.result()  # Wait for all, surface exceptions
         try:
             slate = f0.result()
@@ -730,9 +818,16 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         statcast_aggregates_result = {"status": "off_season", "reason": "season_concluded"}
 
     cleared_ledgers: list[Any] = [ledger]
+    # Captured BEFORE the clear so picks the refresh does not replace can be reopened
+    # afterwards (see _restore_unreplaced). The clear below spans every league in Main and
+    # Flat; the daily path used to restore nothing and only run_forecast restored NCAAB.
+    flat_ledger = MultiSportPickLedger(data_root, flat=True)
+    restore_prior = {
+        "main": _restorable_open_rows(ledger, config),
+        "flat": _restorable_open_rows(flat_ledger, config),
+    }
     _clear_today_open(ledger, args.date, by_event_date=True)
     # Also clear and forecast for flat ledger
-    flat_ledger = MultiSportPickLedger(data_root, flat=True)
     cleared_ledgers.append(flat_ledger)
     _clear_today_open(flat_ledger, args.date, by_event_date=True)
     max_data_age = float(config["project"].get("maximum_data_age_hours", 12))
@@ -1121,6 +1216,26 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 "logged": 0,
             }
 
+    def _nfl_early_task() -> None:
+        # Research only: first-seen prices for games still days away. Skipped under pytest
+        # because it reaches ESPN for seven future dates; it must never fail or slow the run.
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return
+        try:
+            forecast_result["nfl_early"] = {
+                "sport": "nfl_early",
+                "logged": 0,
+                **log_nfl_early_lines(data_directory, now=utc_now()),
+            }
+        except Exception as exc:
+            logger.warning("NFL early-line log failed", exc_info=True)
+            forecast_result["nfl_early"] = {
+                "sport": "nfl_early",
+                "status": "error",
+                "reason": str(exc),
+                "logged": 0,
+            }
+
     def _tennis_task() -> None:
         try:
             forecast_result["tennis"] = _forecast_tennis_sport(
@@ -1320,6 +1435,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         (_nba_total_task, "nba_total", ("nba", "nba_total")),
         (_nfl_spread_task, "nfl_spread", ("nfl", "nfl_spread")),
         (_nfl_total_task, "nfl_total", ("nfl", "nfl_total")),
+        (_nfl_early_task, "nfl_early", ("nfl", "nfl_early")),
     )
 
     with ThreadPoolExecutor(max_workers=16) as research_pool:
@@ -1372,6 +1488,18 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 for cl in cleared_ledgers:
                     _rollback_pre_clear(cl)
                 raise
+    # Slots a gate declined (NCAAB reports them) plus every slot a result shows was evaluated
+    # this run stay retired; only unevaluated slots are reopened. Must run before the
+    # `candidates` pop below.
+    restore_excluded = [
+        slot for result in forecast_result.values() for slot in _declined_slots(result)
+    ] + _evaluated_slots(forecast_result, restore_prior)
+    unreplaced_restored = _restore_unreplaced(
+        {"main": ledger, "flat": flat_ledger}, restore_prior, restore_excluded
+    )
+    for result in forecast_result.values():
+        if isinstance(result, dict):
+            result.pop("declined_slots", None)
     flat_result = {
         sport: forecast_result.get(f"_flat_{sport}", forecast_result.get(sport, {}))
         for sport in DAILY_LEARNED_SPORTS
@@ -1691,6 +1819,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             "bbo_capture": slate.get("prospective_bbo_capture", {}),
         },
         "step2_3_forecast_and_log": forecast_result,
+        "step2_3_unreplaced_restored": unreplaced_restored,
         "step3b_polymarket_odds_snapshots": odds_by_sport,
         "step4_settlement": settlement,
         "step4b_calibration": calibration_result,
@@ -1704,6 +1833,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
         "step1j_cfb_weather": cfb_weather_result,
         "step1k_nfl_weather": nfl_weather_result,
         "step1l_nfl_week_ahead_quotes": nfl_week_ahead_result,
+        "step1m_cfb_pregame_capture": cfb_pregame_result,
+        "step1n_ncaaf_day_ahead_quotes": ncaaf_day_ahead_result,
+        "step1o_ncaaf_v7_pbp": ncaaf_v7_pbp_result,
         "step1c_mlb_probable_starters": {
             "captured_events": len(mlb_probables_result),
             "archive": "data/point_in_time/mlb_probable_starters.jsonl",

@@ -1,0 +1,23 @@
+{
+ "close::polymarket_us::moneyline": 56,
+ "close::polymarket_us::spread": 23,
+ "close::polymarket_us::total": 85,
+ "close_equals_entry": 27,
+ "flag::CLOSE_DIFFERS_FROM_INDEPENDENT": 7,
+ "flag::CLOSE_EQUALS_DECISION_PRICE": 27,
+ "flag::CLOSE_FROM_WRONG_SIDE": 6,
+ "flag::CLOSE_MISSING_BUT_AVAILABLE": 54,
+ "flag::CLOSE_NOT_FOUND_IN_ARCHIVE": 5,
+ "flag::CLOSE_NOT_VALID_TIME_OR_SIDE": 75,
+ "flag::KICKOFF_DRIFT>30m": 25,
+ "flag::OPEN_GAME_FINAL>6h": 6,
+ "flag::PNL_FORMULA_MISMATCH": 12,
+ "flag::VOIDED_BUT_GAME_COMPLETED": 3,
+ "flag::WHOLE_LINE_SPREAD": 123,
+ "no_close::espn_consensus::moneyline": 468,
+ "no_close::espn_consensus::spread": 524,
+ "no_close::espn_consensus::total": 534,
+ "no_close::polymarket_us::moneyline": 133,
+ "no_close::polymarket_us::spread": 182,
+ "no_close::polymarket_us::total": 117
+}

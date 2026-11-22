@@ -1,0 +1,74 @@
+[
+ {
+  "season": 2023,
+  "firstName": "Marcus",
+  "lastName": "Washington",
+  "position": "CB",
+  "origin": "Georgia",
+  "destination": "Louisville",
+  "transferDate": "2023-04-23T14:39:00.000Z",
+  "rating": 0.92,
+  "stars": 4,
+  "eligibility": "Immediate"
+ },
+ {
+  "season": 2023,
+  "firstName": "Rian",
+  "lastName": "Davis",
+  "position": "LB",
+  "origin": "Georgia",
+  "destination": "UCF",
+  "transferDate": "2023-04-17T22:25:00.000Z",
+  "rating": 0.89,
+  "stars": 3,
+  "eligibility": "Immediate"
+ },
+ {
+  "season": 2023,
+  "firstName": "Smoke",
+  "lastName": "Bouie",
+  "position": "CB",
+  "origin": "Texas A&M",
+  "destination": "Georgia",
+  "transferDate": "2022-12-15T03:10:00.000Z",
+  "rating": 0.92,
+  "stars": 4,
+  "eligibility": "Immediate"
+ },
+ {
+  "season": 2023,
+  "firstName": "Shone",
+  "lastName": "Washington",
+  "position": "DL",
+  "origin": "Georgia",
+  "destination": "East Mississippi C.C.",
+  "transferDate": "2023-03-16T16:29:00.000Z",
+  "rating": 0.87,
+  "stars": 3,
+  "eligibility": "Immediate"
+ },
+ {
+  "season": 2023,
+  "firstName": "Jaheim",
+  "lastName": "Singletary",
+  "position": "CB",
+  "origin": "Georgia",
+  "destination": "Arkansas",
+  "transferDate": "2023-01-13T18:29:00.000Z",
+  "rating": 0.92,
+  "stars": 4,
+  "eligibility": "Immediate"
+ },
+ {
+  "season": 2023,
+  "firstName": "Dominic",
+  "lastName": "Lovett",
+  "position": "WR",
+  "origin": "Missouri",
+  "destination": "Georgia",
+  "transferDate": "2022-12-05T20:28:00.000Z",
+  "rating": 0.94,
+  "stars": 4,
+  "eligibility": "Immediate"
+ }
+]

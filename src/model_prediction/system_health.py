@@ -38,6 +38,7 @@ from typing import Any
 import yaml
 
 from .config import PROJECT_ROOT, is_sport_daily_enabled
+from .domain import parse_utc
 from .production_registry import ProductionModelRegistry
 from .production_store import (
     read_latest_prediction_utc,
@@ -70,50 +71,43 @@ def _stale_open_rows(paths: RuntimePaths) -> dict[str, Any]:
         return {"available": False, "open_over_24h": 0, "open_over_72h": 0}
     connection = sqlite3.connect(f"file:{paths.ledgers_db}?mode=ro", uri=True, timeout=10.0)
     connection.row_factory = sqlite3.Row
-    cutoff_24 = (datetime.now(UTC) - timedelta(hours=_STALE_OPEN_WARN_HOURS)).isoformat()
-    cutoff_72 = (datetime.now(UTC) - timedelta(hours=_STALE_OPEN_HARD_HOURS)).isoformat()
+    now = datetime.now(UTC)
+    cutoff_24 = now - timedelta(hours=_STALE_OPEN_WARN_HOURS)
+    cutoff_72 = now - timedelta(hours=_STALE_OPEN_HARD_HOURS)
     try:
-        by_sport = {
-            str(row["sport"]): int(row["n"])
-            for row in connection.execute(
-                """
-                SELECT sport, COUNT(*) AS n FROM ledger_records
-                WHERE status = 'open' AND event_start_utc < ?
-                GROUP BY sport ORDER BY n DESC
-                """,
-                (cutoff_24,),
-            )
-        }
-        open_over_72h = int(
-            connection.execute(
-                """
-                SELECT COUNT(*) FROM ledger_records
-                WHERE status = 'open' AND event_start_utc < ?
-                """,
-                (cutoff_72,),
-            ).fetchone()[0]
-        )
-        samples = [
+        open_rows = [
             dict(row)
             for row in connection.execute(
-                """
-                SELECT pick_id, sport, event_start_utc, market_type
-                FROM ledger_records
-                WHERE status = 'open' AND event_start_utc < ?
-                ORDER BY event_start_utc ASC
-                LIMIT 10
-                """,
-                (cutoff_24,),
+                "SELECT pick_id, sport, event_start_utc, market_type FROM ledger_records WHERE status = 'open'"
             )
         ]
     finally:
         connection.close()
+    # Starts are stored as written: ...Z, ...+00:00 and moneyline rows' -0500 offset form. A string
+    # compare in SQL orders those by characters, not instants, so they are compared parsed here
+    # (stored values are never rewritten). An unparseable start cannot be judged and is counted.
+    stale: list[tuple[datetime, dict[str, Any]]] = []
+    unparseable = 0
+    for row in open_rows:
+        try:
+            start = parse_utc(str(row["event_start_utc"]))
+        except (TypeError, ValueError):
+            unparseable += 1
+            continue
+        if start < cutoff_24:
+            stale.append((start, row))
+    stale.sort(key=lambda item: item[0])
+    by_sport: dict[str, int] = {}
+    for _, row in stale:
+        by_sport[str(row["sport"])] = by_sport.get(str(row["sport"]), 0) + 1
+    by_sport = dict(sorted(by_sport.items(), key=lambda item: -item[1]))
     return {
         "available": True,
-        "open_over_24h": sum(by_sport.values()),
-        "open_over_72h": open_over_72h,
+        "open_over_24h": len(stale),
+        "open_over_72h": sum(1 for start, _ in stale if start < cutoff_72),
         "by_sport": by_sport,
-        "samples": samples,
+        "samples": [row for _, row in stale[:10]],
+        "unparseable_start": unparseable,
     }
 
 
@@ -214,6 +208,11 @@ def _ledger_economics(paths: RuntimePaths) -> dict[str, Any]:
               WHERE status = 'settled' AND result IN ('win', 'loss')
                 AND COALESCE(reason_code, json_extract(decision_payload_json, '$.reason_code'), '') != 'OPERATOR_REQUESTED_RETROSPECTIVE_UNPRICED'
                 AND COALESCE(json_extract(decision_payload_json, '$.call_type'), '') != 'retrospective_model_tracking'
+                -- Placeholder-priced NCAAB calls stake nothing by design (quick 261115-1m3): no
+                -- executable quote and a 50% slate price, so any P&L would be fictitious. The
+                -- marker is the writer's own signature; matching it (not just units=0) keeps the
+                -- Flat MLB silent-zero bug visible.
+                AND COALESCE(json_extract(decision_payload_json, '$.rationale'), '') NOT LIKE '%[UNQUOTED_SHADOW:%'
             ), effective AS (
               SELECT *,
                      CASE WHEN ledger_units > 0 THEN ledger_units ELSE research_units END AS effective_units,
@@ -253,6 +252,7 @@ def _ledger_economics(paths: RuntimePaths) -> dict[str, Any]:
                   WHERE status = 'settled' AND result IN ('win', 'loss')
                     AND COALESCE(reason_code, json_extract(decision_payload_json, '$.reason_code'), '') != 'OPERATOR_REQUESTED_RETROSPECTIVE_UNPRICED'
                     AND COALESCE(json_extract(decision_payload_json, '$.call_type'), '') != 'retrospective_model_tracking'
+                    AND COALESCE(json_extract(decision_payload_json, '$.rationale'), '') NOT LIKE '%[UNQUOTED_SHADOW:%'
                 )
                 SELECT ledger_tier, sport, pick_id, result, reason_code,
                        effective_units, effective_pnl

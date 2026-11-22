@@ -1,0 +1,95 @@
+{
+  "cbbd_conversion": {
+    "dropped": {
+      "not_final": 64
+    },
+    "team_name_source": {
+      "cbbd_display_name": 111,
+      "espn_backfill": 23649
+    }
+  },
+  "conference_crosswalk": {
+    "A-10": "3",
+    "ACC": "2",
+    "ASUN": "46",
+    "Am. East": "1",
+    "American": "62",
+    "Big 12": "8",
+    "Big East": "4",
+    "Big Sky": "5",
+    "Big South": "6",
+    "Big Ten": "7",
+    "Big West": "9",
+    "CAA": "10",
+    "CUSA": "11",
+    "Horizon": "45",
+    "Indep.": "43",
+    "Ivy": "12",
+    "MAC": "14",
+    "MEAC": "16",
+    "MVC": "18",
+    "Metro": "13",
+    "Mountain West": "44",
+    "NEC": "19",
+    "OVC": "20",
+    "Pac-12": "21",
+    "Patriot": "22",
+    "SEC": "23",
+    "SWAC": "26",
+    "SoCon": "24",
+    "Southland": "25",
+    "Summit": "49",
+    "Sun Belt": "27",
+    "UAC": "30",
+    "WCC": "29"
+  },
+  "espn_team_ids_with_several_names": {},
+  "events_by_season": {
+    "2014": 5948,
+    "2015": 5932,
+    "2016": 5951,
+    "2017": 5964,
+    "2018": 6003,
+    "2019": 6049,
+    "2020": 5767,
+    "2021": 4285,
+    "2022": 5976
+  },
+  "non_d1_stubs_demoted": [
+    {
+      "games": 1,
+      "season_year": 2019,
+      "team": "Le Moyne Dolphins"
+    },
+    {
+      "games": 1,
+      "season_year": 2019,
+      "team": "Lindenwood Lions"
+    },
+    {
+      "games": 1,
+      "season_year": 2019,
+      "team": "Utah Tech Trailblazers"
+    },
+    {
+      "games": 2,
+      "season_year": 2020,
+      "team": "Lindenwood Lions"
+    },
+    {
+      "games": 1,
+      "season_year": 2021,
+      "team": "Mercyhurst Lakers"
+    },
+    {
+      "games": 3,
+      "season_year": 2021,
+      "team": "Queens University Royals"
+    },
+    {
+      "games": 1,
+      "season_year": 2022,
+      "team": "West Florida Argonauts"
+    }
+  ]
+}

@@ -33,7 +33,7 @@ from typing import Any
 import yaml
 
 from .config import PROJECT_ROOT
-from .production_registry import ProductionModelRegistry
+from .production_registry import ProductionModelRegistry, remove_challenger_route
 from .runtime_paths import RuntimePaths, migrate_legacy_state
 
 _PROMOTIONS_SCHEMA = """
@@ -183,9 +183,8 @@ def promote(
     champions = svc.setdefault("champions", {})
     champions.setdefault(sport.upper(), {})[market] = new_model_id
     challengers = svc.setdefault("challengers", {})
-    sport_challengers = challengers.get(sport.upper())
-    if isinstance(sport_challengers, dict) and sport_challengers.get(market) == new_model_id:
-        del sport_challengers[market]
+    # The promoted model leaves its own challenger route; any other listed challenger stays.
+    remove_challenger_route(challengers.get(sport.upper()), market, new_model_id)
 
     candidate_entry = _model_entry(config, new_model_id)
     if candidate_entry is not None:
@@ -284,8 +283,8 @@ def reject_challenger(
     challengers = svc.setdefault("challengers", {})
     sport_challengers = challengers.get(sport.upper()) or challengers.get(sport) or {}
 
-    if market in sport_challengers and sport_challengers[market] == challenger_model_id:
-        del sport_challengers[market]
+    # A list route loses only the rejected id (a ``==`` test never matched a list, so it kept picking).
+    remove_challenger_route(sport_challengers, market, challenger_model_id)
 
     now = datetime.now(UTC).isoformat()
     rejection_id = f"reject-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:6]}"

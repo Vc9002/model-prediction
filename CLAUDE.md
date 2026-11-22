@@ -39,12 +39,16 @@ are switched off, not deleted:
   daily forecast task consults (`cli/daily.py`), so re-enabling a sport is a
   one-line config change. `tests/test_focus_sports_config.py` pins the list.
 - Their code, artifacts, and calibrators stay in place. Settlement of
-  already-open picks and score ingestion continue so history stays
-  continuous. `cli forecast --sport <x>` still works for a manual run.
+  already-open picks continues (results APIs, else Polymarket resolution),
+  but score-history ingestion does NOT for sports whose history refreshes
+  only inside their forecast block (Euroleague, hockey, esports/KBO/NPB), so
+  settlement of their open picks must not depend on that history
+  (2026-11-18: four winning picks nearly voided). `cli forecast --sport <x>`
+  still works for a manual run.
 - In `config/production.yaml` their 40 registry entries carry
   `enabled: false` and their `champions:` / `challengers:` routes are
   removed; `model_lifecycle.SUPPORTED_MARKETS` lists only the six sports.
-  `tests/test_production_registry.py` pins 89 entries, 49 available, 40
+  `tests/test_production_registry.py` pins 92 entries, 52 available, 40
   disabled-by-scope with a contract that still resolves.
 - **Re-enabling esports, KBO, or NPB needs a backfill first.** Their Elo
   ratings refresh only inside the daily forecast block (14-day incremental

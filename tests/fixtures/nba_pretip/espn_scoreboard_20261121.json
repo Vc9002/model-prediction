@@ -1,0 +1,539 @@
+{
+ "events": [
+  {
+   "competitions": [
+    {
+     "attendance": 0,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "id": "20",
+       "order": 0,
+       "score": "0",
+       "team": {
+        "abbreviation": "PHI",
+        "displayName": "Philadelphia 76ers",
+        "id": "20",
+        "isActive": true,
+        "location": "Philadelphia",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/phi.png",
+        "name": "76ers"
+       },
+       "type": "team"
+      },
+      {
+       "homeAway": "away",
+       "id": "15",
+       "order": 1,
+       "score": "0",
+       "team": {
+        "abbreviation": "MIL",
+        "displayName": "Milwaukee Bucks",
+        "id": "15",
+        "isActive": true,
+        "location": "Milwaukee",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/mil.png",
+        "name": "Bucks"
+       },
+       "type": "team"
+      }
+     ],
+     "date": "2026-11-21T18:00Z",
+     "id": "401910023",
+     "neutralSite": false,
+     "odds": [
+      {
+       "awayTeamOdds": {
+        "favorite": false,
+        "favoriteAtOpen": false,
+        "team": {
+         "abbreviation": "MIL",
+         "displayName": "Milwaukee Bucks",
+         "id": "15",
+         "name": "Bucks"
+        },
+        "underdog": true
+       },
+       "details": "PHI -11.5",
+       "homeTeamOdds": {
+        "favorite": true,
+        "favoriteAtOpen": true,
+        "team": {
+         "abbreviation": "PHI",
+         "displayName": "Philadelphia 76ers",
+         "id": "20",
+         "name": "76ers"
+        },
+        "underdog": false
+       },
+       "moneyline": {
+        "away": {
+         "close": {
+          "odds": "+474"
+         },
+         "open": {
+          "odds": "+346"
+         }
+        },
+        "displayName": "Moneyline",
+        "home": {
+         "close": {
+          "odds": "-650"
+         },
+         "open": {
+          "odds": "-446"
+         }
+        }
+       },
+       "overUnder": 229.5,
+       "pointSpread": {
+        "away": {
+         "close": {
+          "line": "+11.5",
+          "odds": "-105"
+         },
+         "open": {
+          "line": "+11.5",
+          "odds": "-105"
+         }
+        },
+        "displayName": "Spread",
+        "home": {
+         "close": {
+          "line": "-11.5",
+          "odds": "-115"
+         },
+         "open": {
+          "line": "-11.5",
+          "odds": "-115"
+         }
+        }
+       },
+       "provider": {
+        "displayName": "DraftKings",
+        "id": "100",
+        "name": "DraftKings",
+        "priority": 1
+       },
+       "spread": -11.5,
+       "total": {
+        "displayName": "Total",
+        "over": {
+         "close": {
+          "line": "o229.5",
+          "odds": "-110"
+         },
+         "open": {
+          "line": "o228.5",
+          "odds": "-110"
+         }
+        },
+        "under": {
+         "close": {
+          "line": "u229.5",
+          "odds": "-110"
+         },
+         "open": {
+          "line": "u228.5",
+          "odds": "-110"
+         }
+        }
+       }
+      }
+     ],
+     "status": {
+      "clock": 0.0,
+      "displayClock": "0.0",
+      "period": 0,
+      "type": {
+       "completed": false,
+       "detail": "Sat, November 21st at 1:00 PM EST",
+       "id": "1",
+       "name": "STATUS_SCHEDULED",
+       "shortDetail": "11/21 - 1:00 PM EST",
+       "state": "pre"
+      }
+     },
+     "timeValid": true,
+     "type": {
+      "abbreviation": "STD",
+      "id": "1"
+     }
+    }
+   ],
+   "date": "2026-11-21T18:00Z",
+   "id": "401910023",
+   "name": "Milwaukee Bucks at Philadelphia 76ers",
+   "shortName": "MIL @ PHI",
+   "status": {
+    "clock": 0.0,
+    "displayClock": "0.0",
+    "period": 0,
+    "type": {
+     "completed": false,
+     "detail": "Sat, November 21st at 1:00 PM EST",
+     "id": "1",
+     "name": "STATUS_SCHEDULED",
+     "shortDetail": "11/21 - 1:00 PM EST",
+     "state": "pre"
+    }
+   }
+  },
+  {
+   "competitions": [
+    {
+     "attendance": 0,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "id": "6",
+       "order": 0,
+       "score": "0",
+       "team": {
+        "abbreviation": "DAL",
+        "displayName": "Dallas Mavericks",
+        "id": "6",
+        "isActive": true,
+        "location": "Dallas",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/dal.png",
+        "name": "Mavericks"
+       },
+       "type": "team"
+      },
+      {
+       "homeAway": "away",
+       "id": "12",
+       "order": 1,
+       "score": "0",
+       "team": {
+        "abbreviation": "LAC",
+        "displayName": "LA Clippers",
+        "id": "12",
+        "isActive": true,
+        "location": "LA",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/lac.png",
+        "name": "Clippers"
+       },
+       "type": "team"
+      }
+     ],
+     "date": "2026-11-22T01:00Z",
+     "id": "401910025",
+     "neutralSite": false,
+     "odds": [
+      {
+       "awayTeamOdds": {
+        "favorite": false,
+        "favoriteAtOpen": false,
+        "team": {
+         "abbreviation": "LAC",
+         "displayName": "LA Clippers",
+         "id": "12",
+         "name": "Clippers"
+        },
+        "underdog": true
+       },
+       "details": "DAL -5.5",
+       "homeTeamOdds": {
+        "favorite": true,
+        "favoriteAtOpen": true,
+        "team": {
+         "abbreviation": "DAL",
+         "displayName": "Dallas Mavericks",
+         "id": "6",
+         "name": "Mavericks"
+        },
+        "underdog": false
+       },
+       "moneyline": {
+        "away": {
+         "close": {
+          "odds": "+180"
+         },
+         "open": {
+          "odds": "+168"
+         }
+        },
+        "displayName": "Moneyline",
+        "home": {
+         "close": {
+          "odds": "-217"
+         },
+         "open": {
+          "odds": "-201"
+         }
+        }
+       },
+       "overUnder": 229.5,
+       "pointSpread": {
+        "away": {
+         "close": {
+          "line": "+5.5",
+          "odds": "-110"
+         },
+         "open": {
+          "line": "+5.5",
+          "odds": "-110"
+         }
+        },
+        "displayName": "Spread",
+        "home": {
+         "close": {
+          "line": "-5.5",
+          "odds": "-110"
+         },
+         "open": {
+          "line": "-5.5",
+          "odds": "-110"
+         }
+        }
+       },
+       "provider": {
+        "id": "100",
+        "name": "DraftKings",
+        "priority": 1
+       },
+       "spread": -5.5,
+       "total": {
+        "displayName": "Total",
+        "over": {
+         "close": {
+          "line": "o229.5",
+          "odds": "-112"
+         },
+         "open": {
+          "line": "o229.5",
+          "odds": "-106"
+         }
+        },
+        "under": {
+         "close": {
+          "line": "u229.5",
+          "odds": "-108"
+         },
+         "open": {
+          "line": "u229.5",
+          "odds": "-114"
+         }
+        }
+       }
+      }
+     ],
+     "status": {
+      "clock": 0.0,
+      "displayClock": "0.0",
+      "period": 0,
+      "type": {
+       "completed": false,
+       "detail": "Sat, November 21st at 8:00 PM EST",
+       "id": "1",
+       "name": "STATUS_SCHEDULED",
+       "shortDetail": "11/21 - 8:00 PM EST",
+       "state": "pre"
+      }
+     },
+     "timeValid": true,
+     "type": {
+      "abbreviation": "STD",
+      "id": "1"
+     }
+    }
+   ],
+   "date": "2026-11-22T01:00Z",
+   "id": "401910025",
+   "name": "LA Clippers at Dallas Mavericks",
+   "shortName": "LAC @ DAL",
+   "status": {
+    "clock": 0.0,
+    "displayClock": "0.0",
+    "period": 0,
+    "type": {
+     "completed": false,
+     "detail": "Sat, November 21st at 8:00 PM EST",
+     "id": "1",
+     "name": "STATUS_SCHEDULED",
+     "shortDetail": "11/21 - 8:00 PM EST",
+     "state": "pre"
+    }
+   }
+  },
+  {
+   "competitions": [
+    {
+     "attendance": 0,
+     "competitors": [
+      {
+       "homeAway": "home",
+       "id": "16",
+       "order": 0,
+       "score": "0",
+       "team": {
+        "abbreviation": "MIN",
+        "displayName": "Minnesota Timberwolves",
+        "id": "16",
+        "isActive": true,
+        "location": "Minnesota",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/min.png",
+        "name": "Timberwolves"
+       },
+       "type": "team"
+      },
+      {
+       "homeAway": "away",
+       "id": "29",
+       "order": 1,
+       "score": "0",
+       "team": {
+        "abbreviation": "MEM",
+        "displayName": "Memphis Grizzlies",
+        "id": "29",
+        "isActive": true,
+        "location": "Memphis",
+        "logoDark": "https://a.espncdn.com/i/teamlogos/nba/500-dark/scoreboard/mem.png",
+        "name": "Grizzlies"
+       },
+       "type": "team"
+      }
+     ],
+     "date": "2026-11-22T01:00Z",
+     "id": "401910026",
+     "neutralSite": false,
+     "odds": [
+      {
+       "awayTeamOdds": {
+        "favorite": false,
+        "favoriteAtOpen": false,
+        "team": {
+         "abbreviation": "MEM",
+         "displayName": "Memphis Grizzlies",
+         "id": "29",
+         "name": "Grizzlies"
+        },
+        "underdog": true
+       },
+       "details": "MIN -5.5",
+       "homeTeamOdds": {
+        "favorite": true,
+        "favoriteAtOpen": true,
+        "team": {
+         "abbreviation": "MIN",
+         "displayName": "Minnesota Timberwolves",
+         "id": "16",
+         "name": "Timberwolves"
+        },
+        "underdog": false
+       },
+       "moneyline": {
+        "away": {
+         "close": {
+          "odds": "+180"
+         },
+         "open": {
+          "odds": "+160"
+         }
+        },
+        "displayName": "Moneyline",
+        "home": {
+         "close": {
+          "odds": "-217"
+         },
+         "open": {
+          "odds": "-191"
+         }
+        }
+       },
+       "overUnder": 227.5,
+       "pointSpread": {
+        "away": {
+         "close": {
+          "line": "+5.5",
+          "odds": "-110"
+         },
+         "open": {
+          "line": "+5.5",
+          "odds": "-115"
+         }
+        },
+        "displayName": "Spread",
+        "home": {
+         "close": {
+          "line": "-5.5",
+          "odds": "-110"
+         },
+         "open": {
+          "line": "-5.5",
+          "odds": "-105"
+         }
+        }
+       },
+       "provider": {
+        "id": "100",
+        "name": "DraftKings",
+        "priority": 1
+       },
+       "spread": -5.5,
+       "total": {
+        "displayName": "Total",
+        "over": {
+         "close": {
+          "line": "o227.5",
+          "odds": "-106"
+         },
+         "open": {
+          "line": "o227.5",
+          "odds": "-110"
+         }
+        },
+        "under": {
+         "close": {
+          "line": "u227.5",
+          "odds": "-115"
+         },
+         "open": {
+          "line": "u227.5",
+          "odds": "-110"
+         }
+        }
+       }
+      }
+     ],
+     "status": {
+      "clock": 0.0,
+      "displayClock": "0.0",
+      "period": 0,
+      "type": {
+       "completed": false,
+       "detail": "Sat, November 21st at 8:00 PM EST",
+       "id": "1",
+       "name": "STATUS_SCHEDULED",
+       "shortDetail": "11/21 - 8:00 PM EST",
+       "state": "pre"
+      }
+     },
+     "timeValid": true,
+     "type": {
+      "abbreviation": "STD",
+      "id": "1"
+     }
+    }
+   ],
+   "date": "2026-11-22T01:00Z",
+   "id": "401910026",
+   "name": "Memphis Grizzlies at Minnesota Timberwolves",
+   "shortName": "MEM @ MIN",
+   "status": {
+    "clock": 0.0,
+    "displayClock": "0.0",
+    "period": 0,
+    "type": {
+     "completed": false,
+     "detail": "Sat, November 21st at 8:00 PM EST",
+     "id": "1",
+     "name": "STATUS_SCHEDULED",
+     "shortDetail": "11/21 - 8:00 PM EST",
+     "state": "pre"
+    }
+   }
+  }
+ ]
+}

@@ -23,6 +23,7 @@ def _unpaced_capture(monkeypatch) -> None:
     Pacing itself is pinned by the tests that set the interval explicitly.
     """
     monkeypatch.setattr(polymarket_us, "CAPTURE_MIN_REQUEST_INTERVAL_SECONDS", 0.0, raising=False)
+    monkeypatch.setattr(polymarket_us, "EVENT_DETAIL_MIN_REQUEST_INTERVAL_SECONDS", 0.0, raising=False)
 
 
 class _FakeClock:
@@ -337,6 +338,52 @@ def test_snapshot_store_uses_last_observation_before_game(tmp_path) -> None:
     assert closing["long"]["price"] == 0.53
 
 
+def test_closing_snapshot_never_returns_a_quote_taken_after_the_contracts_own_kickoff(tmp_path) -> None:
+    """2026-10-24: six NCAAF rows kicking 19:30Z-02:00Z had been priced on a 16:00Z game's
+    total contract; bounded only by the row's kickoff, its 17:03Z in-play 99c book became
+    their close."""
+    store = PolymarketSnapshotStore(tmp_path / "snapshots.jsonl")
+    for observed, under_ask in (("2026-10-24T11:45:30Z", 0.56), ("2026-10-24T17:03:06Z", 0.99)):
+        store.append(
+            {
+                "market_slug": "tsc-cfb-nhc-cencon-2026-10-24-total-56pt5",
+                "event_start_utc": "2026-10-24T16:00:00Z",
+                "observed_at_utc": observed,
+                "market_state": "MARKET_STATE_OPEN",
+                "market_type": "total",
+                "line": 56.5,
+                "long": {"description": "Over", "ask": 0.5},
+                "short": {"description": "Under", "ask": under_ask},
+            }
+        )
+
+    closing = store.closing_snapshot("tsc-cfb-nhc-cencon-2026-10-24-total-56pt5", "2026-10-24T19:30Z")
+
+    assert closing is not None
+    assert closing["short"]["ask"] == 0.56
+
+
+def test_closing_snapshot_skips_a_book_that_is_not_open(tmp_path) -> None:
+    store = PolymarketSnapshotStore(tmp_path / "snapshots.jsonl")
+    for observed, state, price in (
+        ("2026-11-14T15:00:00Z", "MARKET_STATE_OPEN", 0.52),
+        ("2026-11-14T15:55:00Z", "MARKET_STATE_HALTED", 0.97),
+    ):
+        store.append(
+            {
+                "market_slug": "market",
+                "event_start_utc": "2026-11-14T16:00:00Z",
+                "observed_at_utc": observed,
+                "market_state": state,
+                "long": {"ask": price},
+            }
+        )
+
+    closing = store.closing_snapshot("market", "2026-11-14T16:00:00Z")
+
+    assert closing is not None and closing["long"]["ask"] == 0.52
+
+
 def test_snapshot_store_tolerates_corrupted_lines_and_bad_timestamps(tmp_path) -> None:
     snapshot_path = tmp_path / "snapshots_corrupted.jsonl"
     store = PolymarketSnapshotStore(snapshot_path)
@@ -564,19 +611,20 @@ def test_capture_fetches_scope_leagues_round_robin_before_out_of_scope_and_start
     )
 
     assert source.calls == [
-        # An open pick's contract first (its CLV history), whatever its league.
-        "epl-c",
         # Scope leagues interleaved, each in kickoff order.
         "nba-1",
         "cfb-1",
         "nba-2",
         "cfb-2",
-        # Then out-of-scope leagues and started games, interleaved.
+        # Then out-of-scope leagues and started games, interleaved. The open pick
+        # in EPL (epl-c) waits here: its league is switched off, so it must not
+        # take primary budget ahead of in-scope games.
         "epl-a",
         "cfb-live",
         "epl-b",
+        "epl-c",
     ]
-    assert result["primary_contracts"] == 5 and result["secondary_contracts"] == 3
+    assert result["primary_contracts"] == 4 and result["secondary_contracts"] == 4
 
 
 def test_capture_time_budget_reaches_every_scope_league_before_any_out_of_scope_one(
@@ -604,6 +652,57 @@ def test_capture_time_budget_reaches_every_scope_league_before_any_out_of_scope_
     assert result["skipped_after_time_budget"] == 5
     assert result["source_rate_limited"] is False
     assert clock.now <= 1003.0
+
+
+def test_capture_time_budget_gives_every_event_its_moneyline_before_any_second_line(
+    tmp_path, monkeypatch
+) -> None:
+    """Kickoff order alone kept an event's markets together, so a cut budget left late
+    kickoffs with no quote at all (NCAAF Saturdays: ~470 /book contracts, ~357 per run)."""
+    _FakeClock(monkeypatch)
+    monkeypatch.setattr(polymarket_us, "CAPTURE_MIN_REQUEST_INTERVAL_SECONDS", 1.0, raising=False)
+    now = datetime(2026, 11, 21, 15, tzinfo=UTC)
+
+    def _line(slug: str, market_type: str, long_price: float) -> dict:
+        return {
+            "market_slug": slug,
+            "market_type": market_type,
+            "sides": [{"is_long": True, "price_probability": long_price}],
+        }
+
+    def _game(event_id: str, hours: float) -> dict:
+        return {
+            "event_id": event_id,
+            "event_start_utc": (now + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "markets": [
+                {"market_slug": f"{event_id}-ml", "market_type": "moneyline"},
+                _line(f"{event_id}-spread-alt", "spread", 0.80),
+                _line(f"{event_id}-spread-main", "spread", 0.51),
+                _line(f"{event_id}-total-main", "total", 0.49),
+            ],
+        }
+
+    source = _Recorder()
+    capture_slate_snapshots(
+        source,
+        {"NCAAF": [_game("early", 1), _game("mid", 2), _game("late", 3)]},
+        tmp_path,
+        "2026-11-21",
+        now=now,
+        priority_leagues=frozenset({"NCAAF"}),
+        max_workers=1,
+        max_capture_seconds=5.5,
+    )
+
+    assert source.calls == [
+        "early-ml",
+        "mid-ml",
+        "late-ml",
+        # Then each event's most balanced spread and total, before any alternate rung.
+        "early-spread-main",
+        "early-total-main",
+        "mid-spread-main",
+    ]
 
 
 def test_capture_secondary_tier_has_its_own_short_budget(tmp_path) -> None:
@@ -1218,7 +1317,8 @@ def test_priority_league_shortlists_each_game_before_other_sports(tmp_path) -> N
         priority_leagues=frozenset({"NBA"}),
         max_workers=1,
     )
-    assert client.slate_calls[:4] == ["near", "close", "near2", "close2"]
+    # Breadth-first: each game's most balanced line, then each game's second line.
+    assert client.slate_calls[:4] == ["close", "near2", "near", "close2"]
     assert client.slate_calls[-1] == "mlb"
     assert result["skipped_ladder_alternates"] == 2
     assert result["nba_missing_quote_event_ids"]["spread"] == []
@@ -1377,3 +1477,345 @@ def test_capture_falls_back_to_snapshot_for_incomplete_slate_market(tmp_path) ->
         ]
     }
     assert capture_slate_snapshots(Legacy(), events, tmp_path, "2026-10-22")["captured"] == 1
+
+
+# --- event-detail quote pass (quick-261114-mzz) ------------------------------------------------
+
+_DETAIL_NOW = datetime(2026, 10, 22, 10, tzinfo=UTC)
+
+
+def _detail_market(slug: str, bid: float | None, ask: float | None, **overrides) -> dict:
+    def quote(value: float | None):
+        return None if value is None else {"value": f"{value:.4f}", "currency": "USD"}
+
+    market = {
+        "slug": slug,
+        "status": "MARKET_STATUS_OPEN",
+        "active": True,
+        "closed": False,
+        "ep3Status": "OPEN",
+        "line": -3.5,
+        "bestBidQuote": quote(bid),
+        "bestAskQuote": quote(ask),
+    }
+    market.update(overrides)
+    return market
+
+
+def _detail(event_slug: str, markets: list[dict], age: float | None = 12.0):
+    return polymarket_us.EventDetail(event={"slug": event_slug, "markets": markets}, cache_age_seconds=age)
+
+
+def _detail_slate_event(event_slug: str, slugs: list[str], hours: float = 2) -> dict:
+    start = (_DETAIL_NOW + timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return {
+        "event_id": f"id-{event_slug}",
+        "event_slug": event_slug,
+        "title": f"Title {event_slug}",
+        "event_start_utc": start,
+        "markets": [_slate_market(slug) for slug in slugs],
+    }
+
+
+class _EventDetailClient(_SlateClient):
+    def __init__(self, details: dict) -> None:
+        super().__init__()
+        self.details = details
+        self.detail_calls: list[str] = []
+        self.fetch_stamps: list[datetime] = []
+        self.book_failures: dict[str, Exception] = {}
+
+    def event_detail(self, slug: str):
+        self.detail_calls.append(slug)
+        self.fetch_stamps.append(polymarket_us.utc_now())
+        outcome = self.details[slug]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    def snapshot_from_slate(self, event: dict, market: dict) -> dict:
+        failure = self.book_failures.get(market["market_slug"])
+        if failure is not None:
+            self.slate_calls.append(market["market_slug"])
+            raise failure
+        return super().snapshot_from_slate(event, market)
+
+
+class _AdvancingClock:
+    """utc_now() that moves one second per call, so capture order is observable."""
+
+    def __init__(self, monkeypatch, start: datetime) -> None:
+        self.now = start
+        monkeypatch.setattr(polymarket_us, "utc_now", self)
+
+    def __call__(self) -> datetime:
+        self.now += timedelta(seconds=1)
+        return self.now
+
+
+def _read_rows(tmp_path, sport: str, day: str) -> list[dict]:
+    path = PolymarketSnapshotStore.for_sport_date(tmp_path, sport, day).path
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _detail_rows(tmp_path, sport: str, day: str) -> list[dict]:
+    return [
+        row
+        for row in _read_rows(tmp_path, sport, day)
+        if row.get("reconstruction_status_source") == "live_gateway_event_detail_quote"
+    ]
+
+
+def _http_status_error(status: int) -> httpx.HTTPStatusError:
+    request = httpx.Request("GET", "https://example.test/x")
+    return httpx.HTTPStatusError("boom", request=request, response=httpx.Response(status, request=request))
+
+
+def test_event_detail_returns_event_and_cdn_cache_age() -> None:
+    slug = "cbb-a-b-2026-11-14"
+
+    def make(headers: dict[str, str]) -> PolymarketUSClient:
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.url.path == f"/v1/events/slug/{slug}"
+            return httpx.Response(200, json={"event": {"slug": slug, "markets": []}}, headers=headers)
+
+        return PolymarketUSClient(
+            "https://example.test", httpx.Client(transport=httpx.MockTransport(handler))
+        )
+
+    detail = make({"Age": "27"}).event_detail(slug)
+    assert isinstance(detail, polymarket_us.EventDetail)
+    assert detail.event == {"slug": slug, "markets": []}
+    assert detail.cache_age_seconds == 27.0
+    assert make({}).event_detail(slug).cache_age_seconds is None
+    assert make({"Age": "abc"}).event_detail(slug).cache_age_seconds is None
+
+
+def test_event_detail_pass_writes_one_quote_per_quoted_slate_market_from_one_request(
+    tmp_path, monkeypatch
+) -> None:
+    clock = _AdvancingClock(monkeypatch, _DETAIL_NOW + timedelta(seconds=60))
+    quotes = {"m1": (0.55, 0.59), "m2": (0.40, 0.45), "m3": (0.62, 0.66)}
+    client = _EventDetailClient(
+        {"ev-1": _detail("ev-1", [_detail_market(slug, bid, ask) for slug, (bid, ask) in quotes.items()])}
+    )
+    events = {"NBA": [_detail_slate_event("ev-1", list(quotes))]}
+    result = capture_slate_snapshots(client, events, tmp_path, "2026-10-22", now=_DETAIL_NOW, max_workers=1)
+
+    assert client.detail_calls == ["ev-1"]
+    assert result["event_detail_events"] == 1
+    assert result["event_detail_captured"] == 3
+    assert result["event_detail_failures"] == 0
+    assert result["captured_by_source"]["live_gateway_event_detail_quote"] == 3
+    rows = _detail_rows(tmp_path, "nba", "2026-10-22")
+    assert sorted(row["market_slug"] for row in rows) == ["m1", "m2", "m3"]
+    fetch_stamp = client.fetch_stamps[0]
+    assert clock.now > fetch_stamp
+    for row in rows:
+        bid, ask = quotes[row["market_slug"]]
+        assert row["usage"] == "prospective_executable_bbo"
+        assert row["market_state"] == "MARKET_STATE_OPEN"
+        assert row["reconstructed"] is False
+        assert row["long"]["ask"] == ask and row["long"]["bid"] == bid
+        assert row["short"]["ask"] == round(1 - bid, 6)
+        assert row["short"]["bid"] == round(1 - ask, 6)
+        assert row["long"]["bid_size"] is None and row["long"]["ask_size"] is None
+        assert row["transact_time_utc"] is None
+        assert row["quote_cache_age_seconds"] == 12.0
+        assert row["timestamp_valid"] is True
+        assert row["league"] == "NBA"
+        assert row["event_id"] == "id-ev-1" and row["event_slug"] == "ev-1"
+        assert row["market_type"] == "spread" and row["line"] == -3.5
+        # The quote cannot predate the response that carried it.
+        assert polymarket_us.parse_utc(row["observed_at_utc"]) > fetch_stamp
+
+
+def test_event_detail_pass_skipped_for_clients_without_event_detail(tmp_path) -> None:
+    client = _SlateClient()
+    events = {"NBA": [_detail_slate_event("ev-1", ["m1", "m2", "m3"])]}
+    result = capture_slate_snapshots(client, events, tmp_path, "2026-10-22", now=_DETAIL_NOW, max_workers=1)
+    assert client.slate_calls == ["m1", "m2", "m3"]
+    assert result["captured"] == 3
+    assert result["event_detail_events"] == result["event_detail_captured"] == 0
+    assert result["event_detail_failures"] == 0
+    assert "live_gateway_event_detail_quote" not in result["captured_by_source"]
+
+
+def test_event_detail_unquoted_crossed_or_closed_markets_fall_through_to_book_pass_first(tmp_path) -> None:
+    markets = [
+        _detail_market("m1", 0.50, 0.54),
+        _detail_market("m2", 0.50, None),
+        _detail_market("m3", 0.50, 0.54),
+        _detail_market("m4", 0.60, 0.55),
+        _detail_market("m5", 0.50, 0.54, closed=True),
+    ]
+    client = _EventDetailClient({"ev-1": _detail("ev-1", markets)})
+    events = {"NBA": [_detail_slate_event("ev-1", ["m1", "m2", "m3", "m4", "m5"])]}
+    result = capture_slate_snapshots(client, events, tmp_path, "2026-10-22", now=_DETAIL_NOW, max_workers=1)
+
+    assert sorted(row["market_slug"] for row in _detail_rows(tmp_path, "nba", "2026-10-22")) == ["m1", "m3"]
+    assert result["event_detail_captured"] == 2
+    assert client.slate_calls == ["m2", "m4", "m5", "m1", "m3"]
+
+
+def test_event_detail_http_error_falls_through_and_429_stops_the_pass(tmp_path) -> None:
+    def build(first_outcome):
+        client = _EventDetailClient(
+            {
+                "ev-a": first_outcome,
+                "ev-b": _detail("ev-b", [_detail_market("b1", 0.50, 0.54), _detail_market("b2", 0.40, 0.44)]),
+            }
+        )
+        events = {
+            "NBA": [
+                _detail_slate_event("ev-a", ["a1", "a2"], hours=2),
+                _detail_slate_event("ev-b", ["b1", "b2"], hours=3),
+            ]
+        }
+        return client, events
+
+    client, events = build(_http_status_error(500))
+    result = capture_slate_snapshots(
+        client, events, tmp_path / "a", "2026-10-22", now=_DETAIL_NOW, max_workers=1
+    )
+    assert client.detail_calls == ["ev-a", "ev-b"]
+    assert result["event_detail_events"] == 2
+    assert result["event_detail_failures"] == 1
+    assert result["event_detail_captured"] == 2
+    assert result["failures"] == 0
+    assert {"a1", "a2"} <= set(client.slate_calls)
+
+    client, events = build(_rate_limit_error("ev-a"))
+    result = capture_slate_snapshots(
+        client, events, tmp_path / "b", "2026-10-22", now=_DETAIL_NOW, max_workers=1
+    )
+    assert client.detail_calls == ["ev-a"]
+    assert result["event_detail_failures"] == 1
+    assert result["event_detail_captured"] == 0
+    assert sorted(client.slate_calls) == ["a1", "a2", "b1", "b2"]
+
+
+def test_event_detail_quotes_every_ladder_rung_while_book_pass_keeps_the_shortlist(tmp_path) -> None:
+    event = _ladder_event({"far": 0.95, "near": 0.52, "mid": 0.70, "close": 0.49})
+    event["event_slug"] = "ev-ladder"
+    detail = _detail(
+        "ev-ladder", [_detail_market(slug, 0.45, 0.50) for slug in ("far", "near", "mid", "close")]
+    )
+    client = _EventDetailClient({"ev-ladder": detail})
+    result = capture_slate_snapshots(
+        client,
+        {"NCAAF": [event]},
+        tmp_path,
+        "2026-10-22",
+        now=_DETAIL_NOW,
+        ladder_keep=1,
+        max_workers=1,
+    )
+    # NCAAF is excluded from event-detail (no transactTime), so the kept rung is
+    # priced by /book alone and the alternates are still pruned.
+    assert result["event_detail_captured"] == 0
+    assert client.slate_calls == ["close"]
+    assert result["skipped_ladder_alternates"] == 3
+
+
+def test_event_detail_covered_market_book_failure_is_not_a_capture_failure(tmp_path) -> None:
+    detail = _detail("ev-1", [_detail_market("m1", 0.50, 0.54), _detail_market("m2", 0.50, None)])
+    client = _EventDetailClient({"ev-1": detail})
+    client.book_failures = {"m1": ValueError("book gone"), "m2": ValueError("no quote anywhere")}
+    events = {"NBA": [_detail_slate_event("ev-1", ["m1", "m2"])]}
+    result = capture_slate_snapshots(client, events, tmp_path, "2026-10-22", now=_DETAIL_NOW, max_workers=1)
+
+    assert result["failures"] == 1
+    assert [detail["market_slug"] for detail in result["failure_details"]] == ["m2"]
+    assert result["failures_by_league"] == {"NBA": 1}
+    assert result["covered_book_failures"] == 1
+    assert result["captured"] == 1
+    assert result["event_detail_captured"] == 1
+
+
+def test_event_detail_row_loses_to_a_later_book_row_in_latest_capture_readers(tmp_path, monkeypatch) -> None:
+    from model_prediction.cli.forecast_market_select import _fresh_latest_per_slug
+    from model_prediction.models.college_football import _latest_capture_per_market
+
+    _AdvancingClock(monkeypatch, _DETAIL_NOW + timedelta(seconds=60))
+
+    class _ClockedBook(_EventDetailClient):
+        def snapshot_from_slate(self, event: dict, market: dict) -> dict:
+            self.slate_calls.append(market["market_slug"])
+            return {
+                "market_slug": market["market_slug"],
+                "event_start_utc": event["event_start_utc"],
+                "observed_at_utc": polymarket_us.iso_utc(polymarket_us.utc_now()),
+                "reconstruction_status_source": "live_gateway_market_and_book_response",
+                "market_state": "MARKET_STATE_OPEN",
+                "long": {"ask": 0.57},
+                "short": {"ask": 0.45},
+            }
+
+    client = _ClockedBook({"ev-1": _detail("ev-1", [_detail_market("m1", 0.50, 0.54)])})
+    events = {"NBA": [_detail_slate_event("ev-1", ["m1"])]}
+    capture_slate_snapshots(client, events, tmp_path, "2026-10-22", now=_DETAIL_NOW, max_workers=1)
+
+    rows = _read_rows(tmp_path, "nba", "2026-10-22")
+    assert [row["reconstruction_status_source"] for row in rows] == [
+        "live_gateway_event_detail_quote",
+        "live_gateway_market_and_book_response",
+    ]
+    for pick in (_latest_capture_per_market(rows), _fresh_latest_per_slug(rows, None)):
+        assert [row["reconstruction_status_source"] for row in pick] == [
+            "live_gateway_market_and_book_response"
+        ]
+
+
+def test_open_pick_in_switched_off_league_does_not_take_primary_budget() -> None:
+    """An open pick in an out-of-scope league must not ahead-of-queue in-scope games."""
+    now = datetime(2026, 11, 15, 12, 0, tzinfo=UTC)
+    future = (now + timedelta(hours=3)).isoformat()
+    nba_event = {"event_start_utc": future}
+    atp_event = {"event_start_utc": future}
+    nba_market = {"market_slug": "nba-open-market"}
+    atp_open_market = {"market_slug": "atp-open-pick"}
+    entries = [
+        ("ATP", "tennis", atp_event, atp_open_market),
+        ("NBA", "basketball", nba_event, nba_market),
+    ]
+    primary, secondary = polymarket_us._capture_tiers(
+        entries,
+        priority_leagues=frozenset({"NBA"}),
+        keep_slugs=frozenset({"atp-open-pick"}),
+        now=now,
+    )
+    assert [entry[3]["market_slug"] for entry in primary] == ["nba-open-market"]
+    assert [entry[3]["market_slug"] for entry in secondary] == ["atp-open-pick"]
+
+
+def test_event_detail_pass_skips_ncaaf_because_its_quotes_carry_no_transact_time() -> None:
+    """NCAAF quotes need a transactTime for the evidence check, which event-detail never carries."""
+    now = datetime(2026, 11, 15, 12, tzinfo=UTC)
+    future = (now + timedelta(hours=5)).isoformat()
+
+    class _Detail:
+        event: dict = {"markets": []}  # noqa: RUF012 - fixture, never mutated
+        cache_age_seconds = 0.0
+
+    class _Client:
+        def __init__(self) -> None:
+            self.requested: list[str] = []
+
+        def event_detail(self, slug: str) -> _Detail:
+            self.requested.append(slug)
+            return _Detail()
+
+    event = {"event_slug": "cfb-miss-okl", "event_start_utc": future, "event_id": "1"}
+    market = {"market_slug": "tsc-cfb-miss-okl-total", "market_id": "9", "sides": [{}]}
+    client = _Client()
+    outcome = polymarket_us._capture_event_detail_quotes(
+        client,
+        [("NCAAF", "football", event, market)],
+        priority_leagues=None,
+        keep_slugs=frozenset(),
+        now=now,
+        deadline=None,
+    )
+    assert client.requested == []
+    assert outcome.results == []

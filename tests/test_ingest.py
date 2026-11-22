@@ -306,3 +306,102 @@ def test_bootstrap_walks_the_date_range(tmp_path) -> None:
     ingestor = Ingestor(tmp_path, client=FakeESPN(), rate_limit_seconds=0)
     summary = ingestor.bootstrap("wnba", "2026-07-01", "2026-07-03")
     assert summary["days"] == 3
+
+
+def _ncaaf_event(event_id: str, *, neutral=False, status="STATUS_FINAL", week=3) -> dict:
+    return {
+        "id": event_id,
+        "date": "2026-09-19T23:00Z",
+        "week": {"number": week},
+        "season": {"year": 2026, "type": 2, "slug": "regular-season"},
+        "competitions": [
+            {
+                "neutralSite": neutral,
+                "type": {"abbreviation": "STD"},
+                "status": {"type": {"completed": True, "name": status}},
+                "competitors": [
+                    {"homeAway": "away", "score": "10", "team": {"id": "1", "displayName": "A"}},
+                    {"homeAway": "home", "score": "20", "team": {"id": "2", "displayName": "H"}},
+                ],
+            }
+        ],
+    }
+
+
+def test_ncaaf_divisions_issue_two_pinned_queries_and_merge_by_id(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(self, url, params):
+        calls.append(dict(params))
+        events = {80: ["a", "both"], 81: ["both", "low"]}[params["groups"]]
+        return {"events": [_ncaaf_event(e) for e in events]}
+
+    monkeypatch.setattr(ESPNClient, "_get", fake_get)
+    payload = ESPNClient().scoreboard_ncaaf_divisions("2026-09-19")
+    assert calls == [
+        {"dates": "20260919", "groups": 80, "limit": 500},
+        {"dates": "20260919", "groups": 81, "limit": 500},
+    ]
+    assert [e["id"] for e in payload["events"]] == ["a", "both", "low"]
+    assert payload["_event_feed_groups"] == {"a": [80], "both": [80, 81], "low": [81]}
+
+
+def test_non_ncaab_scoreboards_keep_the_default_query(monkeypatch) -> None:
+    seen = []
+    monkeypatch.setattr(ESPNClient, "_get", lambda self, url, params: seen.append(dict(params)) or {"events": []})
+    for league in ("NCAAF", "NFL", "NBA", "MLB"):
+        ESPNClient().scoreboard(league, "2026-09-19")
+    assert seen == [{"dates": "20260919", "limit": 100}] * 4
+
+
+def test_ncaaf_ingest_keeps_fbs_involved_rows_with_pinned_fields(tmp_path) -> None:
+    class FakeNcaaf:
+        calls = 0
+
+        def scoreboard_ncaaf_divisions(self, game_date):
+            self.calls += 1
+            return {
+                "events": [
+                    _ncaaf_event("fbs", neutral=True),
+                    _ncaaf_event("low"),
+                    _ncaaf_event("forfeit", status="STATUS_FORFEIT"),
+                ],
+                "_event_feed_groups": {"fbs": [80], "low": [81], "forfeit": [80]},
+                "_scoreboard_query_version": "ncaaf_groups_80_81_v1",
+            }
+
+    ingestor = Ingestor(tmp_path, client=FakeNcaaf(), rate_limit_seconds=0)
+    summary = ingestor.ingest_scores("ncaaf", "2026-09-19")
+    assert summary["new_games_appended"] == 1
+    row = json.loads(ingestor.processed_path("ncaaf").read_text().strip())
+    assert row["event_id"] == "fbs"
+    assert row["is_neutral_site"] is True and row["week"] == 3 and row["espn_season_type_id"] == 2
+    assert row["feed_groups"] == [80] and row["league"] == "NCAAF"
+    assert row["parser_version"] == "espn-scoreboard-ncaaf-groups-1"
+    assert len(row) == 20
+
+
+def test_ncaaf_past_date_featured_feed_cache_is_refetched(tmp_path) -> None:
+    class FakeNcaaf:
+        calls = 0
+
+        def scoreboard_ncaaf_divisions(self, game_date):
+            self.calls += 1
+            return {"events": [], "_scoreboard_query_version": "ncaaf_groups_80_81_v1"}
+
+    fake = FakeNcaaf()
+    ingestor = Ingestor(tmp_path, client=fake, rate_limit_seconds=0)
+    raw_path = ingestor.raw_dir("ncaaf", "2026-01-10") / "scores_ncaaf.json"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_text(json.dumps({"events": []}))
+    assert ingestor.ingest_scores("ncaaf", "2026-01-10")["fetched"] == 1
+    assert ingestor.ingest_scores("ncaaf", "2026-01-10")["cached"] == 1
+    assert fake.calls == 1
+
+
+def test_mlb_ingest_rows_keep_their_key_set_and_parser_version(tmp_path) -> None:
+    ingestor = Ingestor(tmp_path, client=FakeESPN(), rate_limit_seconds=0)
+    ingestor.ingest_scores("mlb", "2026-07-10")
+    row = json.loads(ingestor.processed_path("mlb").read_text().strip())
+    assert row["parser_version"] == "espn-scoreboard-1"
+    assert "feed_groups" not in row and "week" not in row

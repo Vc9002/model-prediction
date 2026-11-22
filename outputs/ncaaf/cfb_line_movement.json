@@ -1,0 +1,1893 @@
+{
+  "rule_sha256": "1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f",
+  "rule_version": "totals-sources-rule-1",
+  "script": "cfb_line_movement.py",
+  "script_sha256": "046999042e0ad3c73eb7aae4fff758bec2f55cfaa3ec8c6b54f9837adfea58d7",
+  "generated_at_utc": "2026-11-15T06:51:49Z",
+  "final": true,
+  "frozen_inputs_sha256": {
+    "cfb_v6_base_rows.jsonl": "30c3383c4de3824e5a3ee7cb76053facd18b0fe105097fec066bb9fc2980f4be",
+    "cfb_v5_base_rows.jsonl": "39c1cbd61e63b7dc1c029ad39b7c5b759aa1921296957d9070cb977bab2d187e",
+    "history_snapshot.jsonl": "1fe90e1a11b8e5248003bff92ae62eec5bb17c4bd421a275b2f64ed36f1ced0c",
+    "espn_lines.jsonl": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54"
+  },
+  "v6_frozen_params_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70",
+  "holdout_reads": 1,
+  "holdout_note": null,
+  "quick_task": "261115-183",
+  "workstream": "W2",
+  "verdicts": {
+    "espn_total": {
+      "verdict": "INSUFFICIENT_DATA",
+      "reason": "select n 4 < 400"
+    },
+    "espn_spread": {
+      "verdict": "INSUFFICIENT_DATA",
+      "reason": "select n 4 < 400"
+    },
+    "intraday_polymarket": {
+      "verdict": "DESCRIPTIVE_ONLY",
+      "reason": "no select/validation data"
+    }
+  },
+  "espn_open_close": {
+    "tier": "leaky",
+    "audit": {
+      "espn_events": 9364,
+      "initial_spread_sign_conflicts_total": 330,
+      "initial_spread_sign_conflicts_note": "provider rows whose initial_spread sign disagrees with fav_side, counted over every event; reported, never resolved (the rule pins the stored home-signed value)",
+      "events_with_open_total": 3828,
+      "events_with_open_spread": 3822
+    },
+    "coverage_by_season": [
+      {
+        "season": 2017,
+        "games": 1541,
+        "total_lined": 785,
+        "total_with_open": 4,
+        "total_nonzero_move": 4,
+        "spread_lined": 873,
+        "spread_with_open": 4,
+        "spread_nonzero_move": 4,
+        "first_date_with_open_total": "2017-08-26"
+      },
+      {
+        "season": 2018,
+        "games": 1550,
+        "total_lined": 852,
+        "total_with_open": 0,
+        "total_nonzero_move": 0,
+        "spread_lined": 870,
+        "spread_with_open": 0,
+        "spread_nonzero_move": 0,
+        "first_date_with_open_total": null
+      },
+      {
+        "season": 2019,
+        "games": 1611,
+        "total_lined": 884,
+        "total_with_open": 0,
+        "total_nonzero_move": 0,
+        "spread_lined": 884,
+        "spread_with_open": 0,
+        "spread_nonzero_move": 0,
+        "first_date_with_open_total": null
+      },
+      {
+        "season": 2020,
+        "games": 587,
+        "total_lined": 567,
+        "total_with_open": 0,
+        "total_nonzero_move": 0,
+        "spread_lined": 567,
+        "spread_with_open": 0,
+        "spread_nonzero_move": 0,
+        "first_date_with_open_total": null
+      },
+      {
+        "season": 2021,
+        "games": 1475,
+        "total_lined": 848,
+        "total_with_open": 0,
+        "total_nonzero_move": 0,
+        "spread_lined": 848,
+        "spread_with_open": 0,
+        "spread_nonzero_move": 0,
+        "first_date_with_open_total": null
+      },
+      {
+        "season": 2022,
+        "games": 1588,
+        "total_lined": 894,
+        "total_with_open": 0,
+        "total_nonzero_move": 0,
+        "spread_lined": 894,
+        "spread_with_open": 0,
+        "spread_nonzero_move": 0,
+        "first_date_with_open_total": null
+      },
+      {
+        "season": 2023,
+        "games": 1586,
+        "total_lined": 910,
+        "total_with_open": 424,
+        "total_nonzero_move": 388,
+        "spread_lined": 910,
+        "spread_with_open": 424,
+        "spread_nonzero_move": 390,
+        "first_date_with_open_total": "2023-10-17"
+      },
+      {
+        "season": 2024,
+        "games": 1657,
+        "total_lined": 877,
+        "total_with_open": 877,
+        "total_nonzero_move": 720,
+        "spread_lined": 875,
+        "spread_with_open": 875,
+        "spread_nonzero_move": 743,
+        "first_date_with_open_total": "2024-08-24"
+      },
+      {
+        "season": 2025,
+        "games": 1678,
+        "total_lined": 931,
+        "total_with_open": 931,
+        "total_nonzero_move": 757,
+        "spread_lined": 924,
+        "spread_with_open": 924,
+        "spread_nonzero_move": 721,
+        "first_date_with_open_total": "2025-08-23"
+      },
+      {
+        "season": 2026,
+        "games": 1366,
+        "total_lined": 731,
+        "total_with_open": 731,
+        "total_nonzero_move": 618,
+        "spread_lined": 731,
+        "spread_with_open": 731,
+        "spread_nonzero_move": 616,
+        "first_date_with_open_total": "2026-08-29"
+      }
+    ],
+    "cohort_by_window": {
+      "total": {
+        "select": {
+          "lined": 4590,
+          "with_open": 4,
+          "nonzero_move": 4,
+          "open_coverage_of_lined": 0.0008714596949891067
+        },
+        "validation": {
+          "lined": 1790,
+          "with_open": 1064,
+          "nonzero_move": 918,
+          "open_coverage_of_lined": 0.5944134078212291
+        },
+        "holdout": {
+          "lined": 1861,
+          "with_open": 1861,
+          "nonzero_move": 1532,
+          "open_coverage_of_lined": 1.0
+        },
+        "post_holdout": {
+          "lined": 38,
+          "with_open": 38,
+          "nonzero_move": 33,
+          "open_coverage_of_lined": 1.0
+        }
+      },
+      "spread": {
+        "select": {
+          "lined": 4696,
+          "with_open": 4,
+          "nonzero_move": 4,
+          "open_coverage_of_lined": 0.0008517887563884157
+        },
+        "validation": {
+          "lined": 1789,
+          "with_open": 1063,
+          "nonzero_move": 930,
+          "open_coverage_of_lined": 0.5941866964784795
+        },
+        "holdout": {
+          "lined": 1853,
+          "with_open": 1853,
+          "nonzero_move": 1506,
+          "open_coverage_of_lined": 1.0
+        },
+        "post_holdout": {
+          "lined": 38,
+          "with_open": 38,
+          "nonzero_move": 34,
+          "open_coverage_of_lined": 1.0
+        }
+      }
+    },
+    "primary": {
+      "total": {
+        "source": "W2",
+        "market": "total",
+        "stage": "observed",
+        "tier": "leaky",
+        "result": {
+          "market": "total",
+          "features": [
+            "move_total"
+          ],
+          "eval_features": null,
+          "close_col": "mv_close_total",
+          "y_col": "actual",
+          "n_select": 4,
+          "n_validation": 1064,
+          "n_holdout": 1861,
+          "flag_counts": {},
+          "final": true,
+          "validation": {
+            "mse_baseline": 766.8573266980468,
+            "mse_with_source": 645.5408110928417,
+            "dmse": 121.31651560520497,
+            "ci_lo": 99.72299840329815,
+            "ci_hi": 139.55886856274796,
+            "B": 1000,
+            "seed": 20261115
+          },
+          "holdout": {
+            "mse_baseline": 749.7158047994699,
+            "mse_with_source": 627.5717250755821,
+            "dmse": 122.14407972388778,
+            "point_estimate_only": true
+          },
+          "baseline_coef": [
+            87.67297077187585,
+            -0.24794136277260043
+          ],
+          "source_coef": [
+            57.26878102592485,
+            0.23035484464054395,
+            -2.8741986884843804
+          ],
+          "select_feature_means": {
+            "move_total": -0.5625
+          },
+          "exploratory": {
+            "label": "exploratory, not a verdict input",
+            "select_in_sample_dmse": 30.493854029533033,
+            "validation_dmae": 2.601939618268332
+          }
+        },
+        "verdict": {
+          "verdict": "INSUFFICIENT_DATA",
+          "reason": "select n 4 < 400"
+        },
+        "interpretable": false,
+        "interpretable_note": "NOT INTERPRETABLE: coefficients fit on select n = 4; the pinned test is untestable (no open values in the select window)"
+      },
+      "spread": {
+        "source": "W2",
+        "market": "spread",
+        "stage": "observed",
+        "tier": "leaky",
+        "result": {
+          "market": "spread",
+          "features": [
+            "move_spread"
+          ],
+          "eval_features": null,
+          "close_col": "mv_close_margin",
+          "y_col": "margin",
+          "n_select": 4,
+          "n_validation": 1063,
+          "n_holdout": 1853,
+          "flag_counts": {},
+          "final": true,
+          "validation": {
+            "mse_baseline": 712.478616893824,
+            "mse_with_source": 2751.247652718229,
+            "dmse": -2038.7690358244045,
+            "ci_lo": -2295.390484720177,
+            "ci_hi": -1827.364316523604,
+            "B": 1000,
+            "seed": 20261115
+          },
+          "holdout": {
+            "mse_baseline": 780.8697555113722,
+            "mse_with_source": 2716.734639660095,
+            "dmse": -1935.8648841487227,
+            "point_estimate_only": true
+          },
+          "baseline_coef": [
+            11.33751263902933,
+            1.9754021509329907
+          ],
+          "source_coef": [
+            34.50295566502462,
+            2.2453201970443364,
+            9.147783251231523
+          ],
+          "select_feature_means": {
+            "move_spread": -2.1875
+          },
+          "exploratory": {
+            "label": "exploratory, not a verdict input",
+            "select_in_sample_dmse": 118.86831280448571,
+            "validation_dmae": -22.87887697502961
+          }
+        },
+        "verdict": {
+          "verdict": "INSUFFICIENT_DATA",
+          "reason": "select n 4 < 400"
+        },
+        "interpretable": false,
+        "interpretable_note": "NOT INTERPRETABLE: coefficients fit on select n = 4; the pinned test is untestable (no open values in the select window)"
+      }
+    },
+    "exploratory": {
+      "label": "EXPLORATORY: not a verdict input",
+      "select": {
+        "total": {
+          "n": 4,
+          "n_nonzero_move": 4,
+          "note": "fewer than 30 rows; no statistics"
+        },
+        "spread_expected_home_margin_move": {
+          "n": 4,
+          "n_nonzero_move": 4,
+          "note": "fewer than 30 rows; no statistics"
+        }
+      },
+      "validation": {
+        "total": {
+          "n": 1064,
+          "n_nonzero_move": 918,
+          "mean_move": -0.5897556390977443,
+          "mean_abs_move": 1.924342105263158,
+          "zero_move_share": 0.13721804511278196,
+          "corr_move_outcome": {
+            "point": -0.011984578581746917,
+            "lo": -0.06877157829620704,
+            "hi": 0.05114223029218313
+          },
+          "slope_outcome_per_point_move": {
+            "point": -0.07857354134221742,
+            "lo": -0.44817430436150185,
+            "hi": 0.33356048295948326
+          },
+          "mean_outcome_in_move_direction": {
+            "point": -0.013616557734204794,
+            "lo": -0.9487017800212539,
+            "hi": 0.8626707013039477,
+            "lower_one_sided_5pct": -0.746186364354742,
+            "B": 1000,
+            "seed": 20261115
+          },
+          "continuation_share": {
+            "point": 0.4928806133625411,
+            "lo": 0.46120016163793104,
+            "hi": 0.523749982768569,
+            "lower_one_sided_5pct": 0.4661064914133397,
+            "B": 1000,
+            "seed": 20261115,
+            "n_decided": 913
+          },
+          "size_buckets_abs_move": {
+            "(0,1]": {
+              "n": 339,
+              "mean_outcome_in_move_direction": {
+                "point": 1.5162241887905605,
+                "lo": 0.17398804922046127,
+                "hi": 2.8687595716495395,
+                "lower_one_sided_5pct": 0.36806191523126264,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5059171597633136
+            },
+            "(1,3]": {
+              "n": 402,
+              "mean_outcome_in_move_direction": {
+                "point": -0.43034825870646765,
+                "lo": -1.7659058626033057,
+                "hi": 0.8324057870440211,
+                "lower_one_sided_5pct": -1.5338996508220595,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.49373433583959897
+            },
+            ">3": {
+              "n": 177,
+              "mean_outcome_in_move_direction": {
+                "point": -1.997175141242938,
+                "lo": -4.562940262430939,
+                "hi": 0.7951849489795912,
+                "lower_one_sided_5pct": -4.217955537789804,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.4659090909090909
+            }
+          },
+          "by_direction": {
+            "move_up": {
+              "n": 350,
+              "mean_outcome_in_move_direction": {
+                "point": 1.8964285714285714,
+                "lo": 0.0482387955182073,
+                "hi": 3.7392953431372544,
+                "lower_one_sided_5pct": 0.37463309286703783,
+                "B": 1000,
+                "seed": 20261115
+              }
+            },
+            "move_down": {
+              "n": 568,
+              "mean_outcome_in_move_direction": {
+                "point": -1.190580985915493,
+                "lo": -2.523205291578126,
+                "hi": 0.20294272428046536,
+                "lower_one_sided_5pct": -2.298967083910076,
+                "B": 1000,
+                "seed": 20261115
+              }
+            }
+          }
+        },
+        "spread_expected_home_margin_move": {
+          "n": 1063,
+          "n_nonzero_move": 930,
+          "mean_move": -0.11147695202257761,
+          "mean_abs_move": 1.6966133584195673,
+          "zero_move_share": 0.1251175917215428,
+          "corr_move_outcome": {
+            "point": 0.050552056440088464,
+            "lo": -0.014790582578251225,
+            "hi": 0.11448973980290572
+          },
+          "slope_outcome_per_point_move": {
+            "point": 0.3168135634321094,
+            "lo": -0.09581680013427453,
+            "hi": 0.6319126591203301
+          },
+          "mean_outcome_in_move_direction": {
+            "point": 0.21451612903225806,
+            "lo": -0.5766749037932545,
+            "hi": 1.0557023426323318,
+            "lower_one_sided_5pct": -0.4475048601005276,
+            "B": 1000,
+            "seed": 20261115
+          },
+          "continuation_share": {
+            "point": 0.5184381778741866,
+            "lo": 0.48362198311314447,
+            "hi": 0.5525380686920084,
+            "lower_one_sided_5pct": 0.49023822642105547,
+            "B": 1000,
+            "seed": 20261115,
+            "n_decided": 922
+          },
+          "size_buckets_abs_move": {
+            "(0,1]": {
+              "n": 392,
+              "mean_outcome_in_move_direction": {
+                "point": -0.7053571428571429,
+                "lo": -2.14816715542522,
+                "hi": 0.8971912347848485,
+                "lower_one_sided_5pct": -1.9441305793246995,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.4987146529562982
+            },
+            "(1,3]": {
+              "n": 402,
+              "mean_outcome_in_move_direction": {
+                "point": 0.9713930348258707,
+                "lo": -0.49610558776872155,
+                "hi": 2.267111761546189,
+                "lower_one_sided_5pct": -0.1983255998751295,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5402010050251256
+            },
+            ">3": {
+              "n": 136,
+              "mean_outcome_in_move_direction": {
+                "point": 0.6286764705882353,
+                "lo": -1.6276765212399542,
+                "hi": 3.037565530799475,
+                "lower_one_sided_5pct": -1.330792062047749,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5111111111111111
+            }
+          },
+          "by_direction": {
+            "move_up": {
+              "n": 431,
+              "mean_outcome_in_move_direction": {
+                "point": 0.9767981438515081,
+                "lo": -0.3662133670401186,
+                "hi": 2.248340832465665,
+                "lower_one_sided_5pct": -0.14472951688296604,
+                "B": 1000,
+                "seed": 20261115
+              }
+            },
+            "move_down": {
+              "n": 499,
+              "mean_outcome_in_move_direction": {
+                "point": -0.4438877755511022,
+                "lo": -1.4147219817205152,
+                "hi": 0.5341003761590138,
+                "lower_one_sided_5pct": -1.2740598042066493,
+                "B": 1000,
+                "seed": 20261115
+              }
+            }
+          }
+        }
+      },
+      "holdout": {
+        "total": {
+          "n": 1861,
+          "n_nonzero_move": 1532,
+          "mean_move": -0.3533046749059645,
+          "mean_abs_move": 1.8922622246104246,
+          "zero_move_share": 0.1767866738312735,
+          "corr_move_outcome": {
+            "point": 0.019999608893456623,
+            "lo": -0.0223938461956897,
+            "hi": 0.06152755866466974
+          },
+          "slope_outcome_per_point_move": {
+            "point": 0.12301310532266105,
+            "lo": -0.14297755508379578,
+            "hi": 0.36609873112990515
+          },
+          "mean_outcome_in_move_direction": {
+            "point": 0.21556788511749347,
+            "lo": -0.5312336467845076,
+            "hi": 0.960129733975162,
+            "lower_one_sided_5pct": -0.41697276544107564,
+            "B": 1000,
+            "seed": 20261115
+          },
+          "continuation_share": {
+            "point": 0.5156657963446475,
+            "lo": 0.4928904036887047,
+            "hi": 0.5381856658563792,
+            "lower_one_sided_5pct": 0.49650912374179307,
+            "B": 1000,
+            "seed": 20261115,
+            "n_decided": 1532
+          },
+          "size_buckets_abs_move": {
+            "(0,1]": {
+              "n": 618,
+              "mean_outcome_in_move_direction": {
+                "point": 0.32362459546925565,
+                "lo": -0.7269513890791528,
+                "hi": 1.418973970726079,
+                "lower_one_sided_5pct": -0.5683360022367951,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5080906148867314
+            },
+            "(1,3]": {
+              "n": 625,
+              "mean_outcome_in_move_direction": {
+                "point": 0.1396,
+                "lo": -1.0901736471368086,
+                "hi": 1.3334595019079007,
+                "lower_one_sided_5pct": -0.9333075883021609,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5216
+            },
+            ">3": {
+              "n": 289,
+              "mean_outcome_in_move_direction": {
+                "point": 0.14878892733564014,
+                "lo": -1.711708227221279,
+                "hi": 2.0869088669950733,
+                "lower_one_sided_5pct": -1.3743065767973854,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5190311418685121
+            }
+          },
+          "by_direction": {
+            "move_up": {
+              "n": 686,
+              "mean_outcome_in_move_direction": {
+                "point": 1.2733236151603498,
+                "lo": 0.2747331880361605,
+                "hi": 2.3042895228266747,
+                "lower_one_sided_5pct": 0.4398114881348415,
+                "B": 1000,
+                "seed": 20261115
+              }
+            },
+            "move_down": {
+              "n": 846,
+              "mean_outcome_in_move_direction": {
+                "point": -0.6421394799054374,
+                "lo": -1.7045100473500874,
+                "hi": 0.5373420142824753,
+                "lower_one_sided_5pct": -1.562500022760586,
+                "B": 1000,
+                "seed": 20261115
+              }
+            }
+          }
+        },
+        "spread_expected_home_margin_move": {
+          "n": 1853,
+          "n_nonzero_move": 1506,
+          "mean_move": 0.13869400971397733,
+          "mean_abs_move": 1.7479762547220723,
+          "zero_move_share": 0.18726389638424176,
+          "corr_move_outcome": {
+            "point": -0.002418809348560989,
+            "lo": -0.044082481813143094,
+            "hi": 0.04271648210228886
+          },
+          "slope_outcome_per_point_move": {
+            "point": -0.014535525993544825,
+            "lo": -0.2850057389921356,
+            "hi": 0.2597104523952457
+          },
+          "mean_outcome_in_move_direction": {
+            "point": -0.14442231075697212,
+            "lo": -0.8884007776497695,
+            "hi": 0.618362671235266,
+            "lower_one_sided_5pct": -0.7510083070350305,
+            "B": 1000,
+            "seed": 20261115
+          },
+          "continuation_share": {
+            "point": 0.5110073382254836,
+            "lo": 0.48812053592888316,
+            "hi": 0.5348897586339162,
+            "lower_one_sided_5pct": 0.4920379092366225,
+            "B": 1000,
+            "seed": 20261115,
+            "n_decided": 1499
+          },
+          "size_buckets_abs_move": {
+            "(0,1]": {
+              "n": 653,
+              "mean_outcome_in_move_direction": {
+                "point": 0.20520673813169985,
+                "lo": -0.6614085195934043,
+                "hi": 1.0643366206154885,
+                "lower_one_sided_5pct": -0.5184047129097716,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5092307692307693
+            },
+            "(1,3]": {
+              "n": 591,
+              "mean_outcome_in_move_direction": {
+                "point": -0.6171742808798646,
+                "lo": -1.910094324206551,
+                "hi": 0.676060848008023,
+                "lower_one_sided_5pct": -1.6704734753200292,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5102040816326531
+            },
+            ">3": {
+              "n": 262,
+              "mean_outcome_in_move_direction": {
+                "point": 0.05057251908396947,
+                "lo": -1.6435007480674924,
+                "hi": 1.7702972560975607,
+                "lower_one_sided_5pct": -1.372707991563159,
+                "B": 1000,
+                "seed": 20261115
+              },
+              "continuation_share": 0.5172413793103449
+            }
+          },
+          "by_direction": {
+            "move_up": {
+              "n": 783,
+              "mean_outcome_in_move_direction": {
+                "point": 0.7921455938697318,
+                "lo": -0.30288989499087526,
+                "hi": 1.7643390348598926,
+                "lower_one_sided_5pct": -0.0680611384668442,
+                "B": 1000,
+                "seed": 20261115
+              }
+            },
+            "move_down": {
+              "n": 723,
+              "mean_outcome_in_move_direction": {
+                "point": -1.1587136929460582,
+                "lo": -2.1650511837257307,
+                "hi": -0.0035403391748545367,
+                "lower_one_sided_5pct": -2.0496350258432887,
+                "B": 1000,
+                "seed": 20261115
+              }
+            }
+          }
+        }
+      }
+    },
+    "exploratory_refit": {
+      "label": "EXPLORATORY and NOT the pinned primary statistic: the pinned select window (<= 2022-11-11) has no open values, so the pinned test is untestable; coefficients here are fit on validation rows that carry open values. Never a verdict input.",
+      "total": {
+        "fit_validation_through_2023_eval_validation_2024": {
+          "n_fit": 418,
+          "n_eval": 646,
+          "baseline_coef": [
+            2.870765648467034,
+            0.9716413326663937
+          ],
+          "source_coef": [
+            6.092546432851345,
+            0.9172266091276201,
+            0.5865123602240921
+          ],
+          "dmse": -3.385300444385071,
+          "ci_lo": -6.12237210861727,
+          "ci_hi": -0.053987221522284363
+        },
+        "fit_all_validation_eval_holdout": {
+          "n_fit": 1064,
+          "n_eval": 1861,
+          "baseline_coef": [
+            10.594423492599084,
+            0.8246960419003283
+          ],
+          "source_coef": [
+            11.140026271203281,
+            0.8152766040234697,
+            0.0940239828297467
+          ],
+          "dmse": 0.14008687716600027,
+          "ci_lo": -0.14027087751989029,
+          "ci_hi": 0.43934931664550353
+        }
+      },
+      "spread": {
+        "fit_validation_through_2023_eval_validation_2024": {
+          "n_fit": 418,
+          "n_eval": 645,
+          "baseline_coef": [
+            0.05044262367714895,
+            1.0358771970491172
+          ],
+          "source_coef": [
+            0.13575412271955672,
+            1.018266069566181,
+            -0.37407448377146924
+          ],
+          "dmse": -0.09336739799212052,
+          "ci_lo": -1.7683374713405127,
+          "ci_hi": 1.4026720090768061
+        },
+        "fit_all_validation_eval_holdout": {
+          "n_fit": 1063,
+          "n_eval": 1853,
+          "baseline_coef": [
+            0.45485575899048686,
+            1.0365418086323732
+          ],
+          "source_coef": [
+            0.5460723949767797,
+            1.0269077991705466,
+            -0.2843200583365866
+          ],
+          "dmse": -0.6471964428544008,
+          "ci_lo": -1.4992973642832041,
+          "ci_hi": 0.31956517244131893
+        }
+      }
+    }
+  },
+  "intraday_2026": {
+    "tier": "descriptive",
+    "definition": "main-line rung = ladder rung whose over (totals) or home-side (spreads) midpoint is nearest 50 percent at each snapshot. These are Polymarket-lineage ladder quotes, NOT ESPN lines. Movement = last pre-kickoff main rung minus first observed main rung.",
+    "pinned_parameters": {
+      "snapshot_gap_seconds": 30.0,
+      "min_span_hours": 1.0,
+      "tight_width": 0.1,
+      "near_kickoff_hours": 6.0,
+      "agreement_gate": {
+        "corr_min": 0.95,
+        "median_abs_diff_max": 2.0
+      },
+      "market_state": "MARKET_STATE_OPEN",
+      "kickoff": "earlier of the ESPN base-row start and the Polymarket event start; observed_at < kickoff"
+    },
+    "load": {
+      "source": "runtime root odds/ncaaf/<date>/polymarket_snapshots.jsonl (Polymarket-lineage ladder quotes)",
+      "files": 42,
+      "rows_raw": 166477,
+      "rows_duplicate_dropped": 0,
+      "rows": 166477,
+      "market_quotes_db_reconciliation": {
+        "role": "reconciliation only: the DB carries no market slug and no team, so it cannot separate full-game from quarter/half ladders or orient spreads; it is not used for any number below",
+        "db_distinct_keys": 141448,
+        "db_keys_present_in_jsonl": 141435,
+        "db_keys_absent_from_jsonl": 13,
+        "db_absent_by_date_market": {
+          "2026-10-23 total": 5,
+          "2026-10-23 spread": 5,
+          "2026-10-23 moneyline": 3
+        }
+      }
+    },
+    "event_match": {
+      "polymarket_events_with_title": 1145,
+      "matched_1to1": 1111,
+      "unmatched_classification": {
+        "no_base_row": 8,
+        "name_mismatch_one_side_found": 1,
+        "after_last_base_row": 25
+      },
+      "alias_table_entries": 19,
+      "match_rule": "both team names must match (exact or word-boundary prefix of the ESPN name, or an explicit alias) and the kickoffs must be within 6 hours; exactly one base row must qualify"
+    },
+    "quote_filtering": {
+      "quotes_open_matched": 161063,
+      "quotes_pre_kickoff": 137772,
+      "quotes_full_game_spread": 48894,
+      "quotes_full_game_total": 24907,
+      "spread_rows_side_unresolved_dropped": 864,
+      "spread_rows_resolved_side": {
+        "away": 48012
+      },
+      "multi_rung_snapshots": 4371,
+      "single_rung_snapshots_excluded": 445
+    },
+    "coverage": {
+      "base_rows_2026": 1366,
+      "base_rows_2026_total_lined": 731,
+      "base_rows_2026_spread_lined": 731,
+      "base_rows_by_window": {
+        "holdout": 1270,
+        "post_holdout": 96
+      },
+      "matched_events": 1111,
+      "movement_defined_by_market_and_window": {
+        "total|select": 0,
+        "total|validation": 0,
+        "total|holdout": 564,
+        "total|post_holdout": 8,
+        "spread|select": 0,
+        "spread|validation": 0,
+        "spread|holdout": 662,
+        "spread|post_holdout": 8
+      },
+      "movement_defined_and_espn_lined_holdout": {
+        "total": 376,
+        "spread": 409
+      },
+      "post_holdout_games_excluded_from_outcome_comparison": 16
+    },
+    "movement_distribution": {
+      "total": {
+        "event_market_rows": 843,
+        "with_ge2_snapshots": 577,
+        "move_defined": 572,
+        "mean_move_points": 0.291958041958042,
+        "mean_abs_move_points": 2.3653846153846154,
+        "median_abs_move_points": 1.0,
+        "zero_move_share": 0.3583916083916084,
+        "abs_move_quantiles_p50_p90_p99": [
+          1.0,
+          6.0,
+          17.289999999999964
+        ],
+        "median_span_hours": 11.49773991164234,
+        "median_first_lead_hours": 14.919291987485355,
+        "last_lead_hours_p10_p50_p90": [
+          0.6606863236162398,
+          2.7570504093170167,
+          5.950085054112805
+        ],
+        "share_last_snapshot_within_6h": 0.9108391608391608,
+        "width_first_median": 0.010000000000000009,
+        "width_last_median": 0.010000000000000009,
+        "share_first_bracketed": 0.8601398601398601,
+        "share_last_bracketed": 0.8444055944055944,
+        "share_first_at_ladder_edge": 0.2465034965034965,
+        "share_last_at_ladder_edge": 0.24825174825174826
+      },
+      "spread": {
+        "event_market_rows": 866,
+        "with_ge2_snapshots": 675,
+        "move_defined": 670,
+        "mean_move_points": -0.13880597014925372,
+        "mean_abs_move_points": 5.956716417910448,
+        "median_abs_move_points": 2.0,
+        "zero_move_share": 0.32985074626865674,
+        "abs_move_quantiles_p50_p90_p99": [
+          2.0,
+          18.0,
+          42.309999999999945
+        ],
+        "median_span_hours": 11.49761675029993,
+        "median_first_lead_hours": 14.6570545336273,
+        "last_lead_hours_p10_p50_p90": [
+          0.6578160307407379,
+          2.418407361672984,
+          5.918969106389417
+        ],
+        "share_last_snapshot_within_6h": 0.9641791044776119,
+        "width_first_median": 0.010000000000000009,
+        "width_last_median": 0.010000000000000009,
+        "share_first_bracketed": 0.7805970149253731,
+        "share_last_bracketed": 0.7910447761194029,
+        "share_first_at_ladder_edge": 0.29402985074626864,
+        "share_last_at_ladder_edge": 0.291044776119403
+      }
+    },
+    "agreement_with_espn_close": {
+      "thresholds": {
+        "corr_min": 0.95,
+        "median_abs_diff_max": 2.0
+      },
+      "scope": "events with a defined movement; the last snapshot's main rung vs the ESPN selected close",
+      "total": {
+        "primary_all_defined": {
+          "n": 382,
+          "corr_last_rung_vs_espn_close": 0.8549855550768128,
+          "median_abs_diff_points": 1.0,
+          "mean_diff_points": -0.020942408376963352,
+          "share_within_1_point": 0.7146596858638743,
+          "passed": false
+        },
+        "both_ends_bracket_50pct": {
+          "n": 299,
+          "corr_last_rung_vs_espn_close": 0.9149761159661467,
+          "median_abs_diff_points": 1.0,
+          "mean_diff_points": -0.06354515050167224,
+          "share_within_1_point": 0.7892976588628763,
+          "passed": false
+        },
+        "both_ends_width_le_10pts": {
+          "n": 380,
+          "corr_last_rung_vs_espn_close": 0.8549658373639142,
+          "median_abs_diff_points": 1.0,
+          "mean_diff_points": -0.021052631578947368,
+          "share_within_1_point": 0.7131578947368421,
+          "passed": false
+        },
+        "last_snapshot_within_6h": {
+          "n": 352,
+          "corr_last_rung_vs_espn_close": 0.8621109070938577,
+          "median_abs_diff_points": 1.0,
+          "mean_diff_points": -0.13920454545454544,
+          "share_within_1_point": 0.7329545454545454,
+          "passed": false
+        }
+      },
+      "spread": {
+        "primary_all_defined": {
+          "n": 415,
+          "corr_last_rung_vs_espn_close": 0.9202705680038268,
+          "median_abs_diff_points": 1.0,
+          "mean_diff_points": 1.0433734939759036,
+          "share_within_1_point": 0.6216867469879518,
+          "passed": false
+        },
+        "both_ends_bracket_50pct": {
+          "n": 276,
+          "corr_last_rung_vs_espn_close": 0.9764133602295464,
+          "median_abs_diff_points": 0.5,
+          "mean_diff_points": -0.041666666666666664,
+          "share_within_1_point": 0.7608695652173914,
+          "passed": true
+        },
+        "both_ends_width_le_10pts": {
+          "n": 397,
+          "corr_last_rung_vs_espn_close": 0.9254151063095394,
+          "median_abs_diff_points": 1.0,
+          "mean_diff_points": 0.8866498740554156,
+          "share_within_1_point": 0.6171284634760705,
+          "passed": false
+        },
+        "last_snapshot_within_6h": {
+          "n": 401,
+          "corr_last_rung_vs_espn_close": 0.9194835835025267,
+          "median_abs_diff_points": 1.0,
+          "mean_diff_points": 1.1246882793017456,
+          "share_within_1_point": 0.6334164588528678,
+          "passed": false
+        }
+      }
+    },
+    "outcome_comparison": {
+      "label": "DESCRIPTIVE ONLY: Polymarket-lineage ladder quotes, not ESPN lines",
+      "total": {
+        "primary_all_defined": {
+          "label": "primary definition",
+          "gate": {
+            "n": 376,
+            "corr_last_rung_vs_espn_close": 0.8533844465591776,
+            "median_abs_diff_points": 1.0,
+            "mean_diff_points": -0.018617021276595744,
+            "share_within_1_point": 0.7101063829787234,
+            "passed": false
+          },
+          "gate_failed": true,
+          "gate_note": "GATE FAILED: the last main rung does not track the ESPN close here (the ladder often does not bracket 50%), so read this comparison as unreliable",
+          "pm_last_minus_first_vs_outcome_minus_espn_close": {
+            "n": 376,
+            "n_nonzero_move": 242,
+            "mean_move": 0.27393617021276595,
+            "mean_abs_move": 2.757978723404255,
+            "zero_move_share": 0.35638297872340424,
+            "corr_move_outcome": {
+              "point": 0.010459910417694418,
+              "lo": -0.08974276206678809,
+              "hi": 0.09923356673153691
+            },
+            "slope_outcome_per_point_move": {
+              "point": 0.031232179503665344,
+              "lo": -0.24114261466555664,
+              "hi": 0.3521628576504982
+            },
+            "mean_outcome_in_move_direction": {
+              "point": 2.0330578512396693,
+              "lo": 0.22051177466523011,
+              "hi": 4.0739069361921985,
+              "lower_one_sided_5pct": 0.4250301736826612,
+              "B": 1000,
+              "seed": 20261115
+            },
+            "continuation_share": {
+              "point": 0.5413223140495868,
+              "lo": 0.4853696741854636,
+              "hi": 0.600017361111111,
+              "lower_one_sided_5pct": 0.49418491539227216,
+              "B": 1000,
+              "seed": 20261115,
+              "n_decided": 242
+            },
+            "size_buckets_abs_move": {
+              "(0,1]": {
+                "n": 57,
+                "mean_outcome_in_move_direction": {
+                  "point": 5.06140350877193,
+                  "lo": 0.5186878952122858,
+                  "hi": 7.534189189189188,
+                  "lower_one_sided_5pct": 1.3050179211469535,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.6842105263157895
+              },
+              "(1,3]": {
+                "n": 97,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.097938144329897,
+                  "lo": -0.6922060815896433,
+                  "hi": 5.40331286360698,
+                  "lower_one_sided_5pct": -0.37638034112889046,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5154639175257731
+              },
+              ">3": {
+                "n": 88,
+                "mean_outcome_in_move_direction": {
+                  "point": 0.0,
+                  "lo": -3.7188368055555556,
+                  "hi": 4.296059523809522,
+                  "lower_one_sided_5pct": -3.0359119496855342,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.4772727272727273
+              }
+            },
+            "by_direction": {
+              "move_up": {
+                "n": 123,
+                "mean_outcome_in_move_direction": {
+                  "point": 3.1910569105691056,
+                  "lo": 0.28386850152905213,
+                  "hi": 5.2441901408450695,
+                  "lower_one_sided_5pct": 0.847431684538222,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              },
+              "move_down": {
+                "n": 119,
+                "mean_outcome_in_move_direction": {
+                  "point": 0.8361344537815126,
+                  "lo": -2.1552706237424544,
+                  "hi": 4.435184552289815,
+                  "lower_one_sided_5pct": -1.6490862398471093,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              }
+            }
+          }
+        },
+        "both_ends_bracket_50pct": {
+          "label": "SENSITIVITY (labelled)",
+          "gate": {
+            "n": 295,
+            "corr_last_rung_vs_espn_close": 0.9136529780100416,
+            "median_abs_diff_points": 1.0,
+            "mean_diff_points": -0.06440677966101695,
+            "share_within_1_point": 0.7864406779661017,
+            "passed": false
+          },
+          "gate_failed": true,
+          "gate_note": "GATE FAILED: the last main rung does not track the ESPN close here (the ladder often does not bracket 50%), so read this comparison as unreliable",
+          "pm_last_minus_first_vs_outcome_minus_espn_close": {
+            "n": 295,
+            "n_nonzero_move": 163,
+            "mean_move": -0.01694915254237288,
+            "mean_abs_move": 1.488135593220339,
+            "zero_move_share": 0.44745762711864406,
+            "corr_move_outcome": {
+              "point": 0.03398863436631325,
+              "lo": -0.03950939480083611,
+              "hi": 0.15343011833707176
+            },
+            "slope_outcome_per_point_move": {
+              "point": 0.19853441846892134,
+              "lo": -0.2019983689448174,
+              "hi": 1.3593097755201153
+            },
+            "mean_outcome_in_move_direction": {
+              "point": 2.6349693251533743,
+              "lo": 0.4569767606231094,
+              "hi": 5.095891714236291,
+              "lower_one_sided_5pct": 0.837589565606807,
+              "B": 1000,
+              "seed": 20261115
+            },
+            "continuation_share": {
+              "point": 0.558282208588957,
+              "lo": 0.47925080296048034,
+              "hi": 0.6285804132973944,
+              "lower_one_sided_5pct": 0.4949388623072834,
+              "B": 1000,
+              "seed": 20261115,
+              "n_decided": 163
+            },
+            "size_buckets_abs_move": {
+              "(0,1]": {
+                "n": 49,
+                "mean_outcome_in_move_direction": {
+                  "point": 5.948979591836735,
+                  "lo": 1.3061432637571158,
+                  "hi": 8.645863970588236,
+                  "lower_one_sided_5pct": 2.1656862745098038,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.673469387755102
+              },
+              "(1,3]": {
+                "n": 79,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.2974683544303796,
+                  "lo": -1.5006849315068493,
+                  "hi": 6.000347222222222,
+                  "lower_one_sided_5pct": -0.9171448087431694,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5189873417721519
+              },
+              ">3": {
+                "n": 35,
+                "mean_outcome_in_move_direction": {
+                  "point": -1.2428571428571429,
+                  "lo": -6.398333333333333,
+                  "hi": 4.9136363636363605,
+                  "lower_one_sided_5pct": -5.618014705882352,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.4857142857142857
+              }
+            },
+            "by_direction": {
+              "move_up": {
+                "n": 77,
+                "mean_outcome_in_move_direction": {
+                  "point": 4.422077922077922,
+                  "lo": 0.7205399061032864,
+                  "hi": 7.214406099518459,
+                  "lower_one_sided_5pct": 1.4813333333333334,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              },
+              "move_down": {
+                "n": 86,
+                "mean_outcome_in_move_direction": {
+                  "point": 1.0348837209302326,
+                  "lo": -3.300348837209302,
+                  "hi": 5.259132653061223,
+                  "lower_one_sided_5pct": -2.6164995990376907,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              }
+            }
+          }
+        },
+        "both_ends_width_le_10pts": {
+          "label": "SENSITIVITY (labelled)",
+          "gate": {
+            "n": 374,
+            "corr_last_rung_vs_espn_close": 0.8533659560738788,
+            "median_abs_diff_points": 1.0,
+            "mean_diff_points": -0.01871657754010695,
+            "share_within_1_point": 0.7085561497326203,
+            "passed": false
+          },
+          "gate_failed": true,
+          "gate_note": "GATE FAILED: the last main rung does not track the ESPN close here (the ladder often does not bracket 50%), so read this comparison as unreliable",
+          "pm_last_minus_first_vs_outcome_minus_espn_close": {
+            "n": 374,
+            "n_nonzero_move": 240,
+            "mean_move": 0.20855614973262032,
+            "mean_abs_move": 2.7058823529411766,
+            "zero_move_share": 0.3582887700534759,
+            "corr_move_outcome": {
+              "point": 0.0023224988658548055,
+              "lo": -0.09926572242364984,
+              "hi": 0.09249236890396006
+            },
+            "slope_outcome_per_point_move": {
+              "point": 0.0070552674222620375,
+              "lo": -0.27873356036584784,
+              "hi": 0.33329184338770346
+            },
+            "mean_outcome_in_move_direction": {
+              "point": 1.8833333333333333,
+              "lo": -0.016323350047431878,
+              "hi": 3.973923301304049,
+              "lower_one_sided_5pct": 0.2724320864242999,
+              "B": 1000,
+              "seed": 20261115
+            },
+            "continuation_share": {
+              "point": 0.5375,
+              "lo": 0.4793376204215365,
+              "hi": 0.5979029990627929,
+              "lower_one_sided_5pct": 0.4872873651771957,
+              "B": 1000,
+              "seed": 20261115,
+              "n_decided": 240
+            },
+            "size_buckets_abs_move": {
+              "(0,1]": {
+                "n": 57,
+                "mean_outcome_in_move_direction": {
+                  "point": 5.06140350877193,
+                  "lo": 0.5186878952122858,
+                  "hi": 7.534189189189188,
+                  "lower_one_sided_5pct": 1.3050179211469535,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.6842105263157895
+              },
+              "(1,3]": {
+                "n": 97,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.097938144329897,
+                  "lo": -0.6922060815896433,
+                  "hi": 5.40331286360698,
+                  "lower_one_sided_5pct": -0.37638034112889046,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5154639175257731
+              },
+              ">3": {
+                "n": 86,
+                "mean_outcome_in_move_direction": {
+                  "point": -0.46511627906976744,
+                  "lo": -3.948859797297297,
+                  "hi": 4.000192307692307,
+                  "lower_one_sided_5pct": -3.5,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.46511627906976744
+              }
+            },
+            "by_direction": {
+              "move_up": {
+                "n": 121,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.9132231404958677,
+                  "lo": -0.02950980392156862,
+                  "hi": 5.047122302158273,
+                  "lower_one_sided_5pct": 0.6010223706852921,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              },
+              "move_down": {
+                "n": 119,
+                "mean_outcome_in_move_direction": {
+                  "point": 0.8361344537815126,
+                  "lo": -2.1552706237424544,
+                  "hi": 4.435184552289815,
+                  "lower_one_sided_5pct": -1.6490862398471093,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              }
+            }
+          }
+        },
+        "last_snapshot_within_6h": {
+          "label": "SENSITIVITY (labelled)",
+          "gate": {
+            "n": 346,
+            "corr_last_rung_vs_espn_close": 0.8604488121232886,
+            "median_abs_diff_points": 1.0,
+            "mean_diff_points": -0.13872832369942195,
+            "share_within_1_point": 0.7283236994219653,
+            "passed": false
+          },
+          "gate_failed": true,
+          "gate_note": "GATE FAILED: the last main rung does not track the ESPN close here (the ladder often does not bracket 50%), so read this comparison as unreliable",
+          "pm_last_minus_first_vs_outcome_minus_espn_close": {
+            "n": 346,
+            "n_nonzero_move": 216,
+            "mean_move": 0.14739884393063585,
+            "mean_abs_move": 2.632947976878613,
+            "zero_move_share": 0.37572254335260113,
+            "corr_move_outcome": {
+              "point": 0.01355858592025069,
+              "lo": -0.12024449718545091,
+              "hi": 0.11985597949245931
+            },
+            "slope_outcome_per_point_move": {
+              "point": 0.04006204668605709,
+              "lo": -0.3525601714574604,
+              "hi": 0.4230523148126676
+            },
+            "mean_outcome_in_move_direction": {
+              "point": 1.8796296296296295,
+              "lo": -0.6845742072572736,
+              "hi": 4.160897248243559,
+              "lower_one_sided_5pct": -0.25134933192686354,
+              "B": 1000,
+              "seed": 20261115
+            },
+            "continuation_share": {
+              "point": 0.5509259259259259,
+              "lo": 0.4868139097744361,
+              "hi": 0.6102843601895734,
+              "lower_one_sided_5pct": 0.496,
+              "B": 1000,
+              "seed": 20261115,
+              "n_decided": 216
+            },
+            "size_buckets_abs_move": {
+              "(0,1]": {
+                "n": 55,
+                "mean_outcome_in_move_direction": {
+                  "point": 4.4818181818181815,
+                  "lo": -0.1369999999999998,
+                  "hi": 7.120689655172414,
+                  "lower_one_sided_5pct": 0.8586666666666667,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.6727272727272727
+              },
+              "(1,3]": {
+                "n": 86,
+                "mean_outcome_in_move_direction": {
+                  "point": 1.3255813953488371,
+                  "lo": -1.7027922077922075,
+                  "hi": 4.297041062801932,
+                  "lower_one_sided_5pct": -1.2381135531135532,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5232558139534884
+              },
+              ">3": {
+                "n": 75,
+                "mean_outcome_in_move_direction": {
+                  "point": 0.6066666666666667,
+                  "lo": -4.092995169082125,
+                  "hi": 5.80063953488372,
+                  "lower_one_sided_5pct": -3.475,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.49333333333333335
+              }
+            },
+            "by_direction": {
+              "move_up": {
+                "n": 107,
+                "mean_outcome_in_move_direction": {
+                  "point": 3.4065420560747666,
+                  "lo": 0.4723318042813456,
+                  "hi": 5.43570788530466,
+                  "lower_one_sided_5pct": 1.0137896825396826,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              },
+              "move_down": {
+                "n": 109,
+                "mean_outcome_in_move_direction": {
+                  "point": 0.38073394495412843,
+                  "lo": -3.250558943089431,
+                  "hi": 3.938891028109357,
+                  "lower_one_sided_5pct": -2.7637806637806634,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              }
+            }
+          }
+        }
+      },
+      "spread": {
+        "primary_all_defined": {
+          "label": "primary definition",
+          "gate": {
+            "n": 409,
+            "corr_last_rung_vs_espn_close": 0.9198319298321797,
+            "median_abs_diff_points": 1.0,
+            "mean_diff_points": 1.0574572127139363,
+            "share_within_1_point": 0.6161369193154034,
+            "passed": false
+          },
+          "gate_failed": true,
+          "gate_note": "GATE FAILED: the last main rung does not track the ESPN close here (the ladder often does not bracket 50%), so read this comparison as unreliable",
+          "pm_last_minus_first_vs_outcome_minus_espn_close": {
+            "n": 409,
+            "n_nonzero_move": 264,
+            "mean_move": 0.5452322738386308,
+            "mean_abs_move": 6.290953545232274,
+            "zero_move_share": 0.3545232273838631,
+            "corr_move_outcome": {
+              "point": 0.048249141167125476,
+              "lo": -0.07754418487638355,
+              "hi": 0.17791951132734918
+            },
+            "slope_outcome_per_point_move": {
+              "point": 0.05619712370473758,
+              "lo": -0.0886865107199396,
+              "hi": 0.2287726463613007
+            },
+            "mean_outcome_in_move_direction": {
+              "point": 1.878787878787879,
+              "lo": 0.06007411524921254,
+              "hi": 3.8457042792317426,
+              "lower_one_sided_5pct": 0.4044494357987059,
+              "B": 1000,
+              "seed": 20261115
+            },
+            "continuation_share": {
+              "point": 0.5576923076923077,
+              "lo": 0.5125239039343064,
+              "hi": 0.6169509556437072,
+              "lower_one_sided_5pct": 0.5180064451803582,
+              "B": 1000,
+              "seed": 20261115,
+              "n_decided": 260
+            },
+            "size_buckets_abs_move": {
+              "(0,1]": {
+                "n": 75,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.76,
+                  "lo": -0.5970246171738709,
+                  "hi": 7.187765330188679,
+                  "lower_one_sided_5pct": -0.12559931506849312,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.56
+              },
+              "(1,3]": {
+                "n": 43,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.0,
+                  "lo": -1.890503875968992,
+                  "hi": 5.126041666666666,
+                  "lower_one_sided_5pct": -1.0755357142857143,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.6046511627906976
+              },
+              ">3": {
+                "n": 146,
+                "mean_outcome_in_move_direction": {
+                  "point": 1.3904109589041096,
+                  "lo": -0.3563174763832658,
+                  "hi": 4.342098815843201,
+                  "lower_one_sided_5pct": -0.10601851851851847,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5422535211267606
+              }
+            },
+            "by_direction": {
+              "move_up": {
+                "n": 133,
+                "mean_outcome_in_move_direction": {
+                  "point": 3.9962406015037595,
+                  "lo": 1.9566252055921054,
+                  "hi": 6.34080161236702,
+                  "lower_one_sided_5pct": 2.2533460172501267,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              },
+              "move_down": {
+                "n": 131,
+                "mean_outcome_in_move_direction": {
+                  "point": -0.27099236641221375,
+                  "lo": -3.268276109449519,
+                  "hi": 2.1625068897637787,
+                  "lower_one_sided_5pct": -2.628526586491188,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              }
+            }
+          }
+        },
+        "both_ends_bracket_50pct": {
+          "label": "SENSITIVITY (labelled)",
+          "gate": {
+            "n": 273,
+            "corr_last_rung_vs_espn_close": 0.9763276765721027,
+            "median_abs_diff_points": 0.5,
+            "mean_diff_points": -0.04395604395604396,
+            "share_within_1_point": 0.7582417582417582,
+            "passed": true
+          },
+          "gate_failed": false,
+          "gate_note": null,
+          "pm_last_minus_first_vs_outcome_minus_espn_close": {
+            "n": 273,
+            "n_nonzero_move": 141,
+            "mean_move": 1.0769230769230769,
+            "mean_abs_move": 2.7472527472527473,
+            "zero_move_share": 0.4835164835164835,
+            "corr_move_outcome": {
+              "point": 0.17702822427886716,
+              "lo": 0.08013321718678046,
+              "hi": 0.2740559673626489
+            },
+            "slope_outcome_per_point_move": {
+              "point": 0.3517623681268197,
+              "lo": 0.17315428497827726,
+              "hi": 0.6208787721892819
+            },
+            "mean_outcome_in_move_direction": {
+              "point": 3.574468085106383,
+              "lo": 1.0,
+              "hi": 6.088473020787262,
+              "lower_one_sided_5pct": 1.4678599128930256,
+              "B": 1000,
+              "seed": 20261115
+            },
+            "continuation_share": {
+              "point": 0.5857142857142857,
+              "lo": 0.5151298701298701,
+              "hi": 0.6645698924731183,
+              "lower_one_sided_5pct": 0.5248110684804093,
+              "B": 1000,
+              "seed": 20261115,
+              "n_decided": 140
+            },
+            "size_buckets_abs_move": {
+              "(0,1]": {
+                "n": 64,
+                "mean_outcome_in_move_direction": {
+                  "point": 1.78125,
+                  "lo": -1.5377112598770852,
+                  "hi": 6.637042682926826,
+                  "lower_one_sided_5pct": -1.1073328488372092,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.53125
+              },
+              "(1,3]": {
+                "n": 29,
+                "note": "fewer than 30 rows"
+              },
+              ">3": {
+                "n": 48,
+                "mean_outcome_in_move_direction": {
+                  "point": 6.125,
+                  "lo": 2.2585505212510024,
+                  "hi": 9.05162037037037,
+                  "lower_one_sided_5pct": 2.9108258258258255,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5957446808510638
+              }
+            },
+            "by_direction": {
+              "move_up": {
+                "n": 78,
+                "mean_outcome_in_move_direction": {
+                  "point": 5.346153846153846,
+                  "lo": 2.1324456521739132,
+                  "hi": 8.089314516129031,
+                  "lower_one_sided_5pct": 2.716249028749029,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              },
+              "move_down": {
+                "n": 63,
+                "mean_outcome_in_move_direction": {
+                  "point": 1.380952380952381,
+                  "lo": -1.0677173913043478,
+                  "hi": 4.236554621848739,
+                  "lower_one_sided_5pct": -0.7377906976744185,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              }
+            }
+          }
+        },
+        "both_ends_width_le_10pts": {
+          "label": "SENSITIVITY (labelled)",
+          "gate": {
+            "n": 391,
+            "corr_last_rung_vs_espn_close": 0.9250055088611568,
+            "median_abs_diff_points": 1.0,
+            "mean_diff_points": 0.8989769820971867,
+            "share_within_1_point": 0.6112531969309463,
+            "passed": false
+          },
+          "gate_failed": true,
+          "gate_note": "GATE FAILED: the last main rung does not track the ESPN close here (the ladder often does not bracket 50%), so read this comparison as unreliable",
+          "pm_last_minus_first_vs_outcome_minus_espn_close": {
+            "n": 391,
+            "n_nonzero_move": 246,
+            "mean_move": -0.17902813299232737,
+            "mean_abs_move": 5.202046035805626,
+            "zero_move_share": 0.37084398976982097,
+            "corr_move_outcome": {
+              "point": -0.023967544731836172,
+              "lo": -0.11512419901894437,
+              "hi": 0.09016208910105453
+            },
+            "slope_outcome_per_point_move": {
+              "point": -0.03240578350998619,
+              "lo": -0.16222266962471288,
+              "hi": 0.15094081435164214
+            },
+            "mean_outcome_in_move_direction": {
+              "point": 1.3252032520325203,
+              "lo": -0.23662059545887423,
+              "hi": 3.0878284451586984,
+              "lower_one_sided_5pct": 0.006066973861921055,
+              "B": 1000,
+              "seed": 20261115
+            },
+            "continuation_share": {
+              "point": 0.5495867768595041,
+              "lo": 0.5046544999632054,
+              "hi": 0.6027686354741149,
+              "lower_one_sided_5pct": 0.5120784666067686,
+              "B": 1000,
+              "seed": 20261115,
+              "n_decided": 242
+            },
+            "size_buckets_abs_move": {
+              "(0,1]": {
+                "n": 74,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.5337837837837838,
+                  "lo": -0.7027485268441728,
+                  "hi": 6.842519852524106,
+                  "lower_one_sided_5pct": -0.32166666666666666,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5540540540540541
+              },
+              "(1,3]": {
+                "n": 43,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.0,
+                  "lo": -1.890503875968992,
+                  "hi": 5.126041666666666,
+                  "lower_one_sided_5pct": -1.0755357142857143,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.6046511627906976
+              },
+              ">3": {
+                "n": 129,
+                "mean_outcome_in_move_direction": {
+                  "point": 0.4069767441860465,
+                  "lo": -1.3098875661375662,
+                  "hi": 2.176274528067561,
+                  "lower_one_sided_5pct": -0.9836884854276158,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.528
+              }
+            },
+            "by_direction": {
+              "move_up": {
+                "n": 119,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.7983193277310923,
+                  "lo": 0.7184895833333333,
+                  "hi": 5.311225064350063,
+                  "lower_one_sided_5pct": 1.0683302808302808,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              },
+              "move_down": {
+                "n": 127,
+                "mean_outcome_in_move_direction": {
+                  "point": -0.05511811023622047,
+                  "lo": -3.212603169856459,
+                  "hi": 2.6304337387964147,
+                  "lower_one_sided_5pct": -2.582707800511509,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              }
+            }
+          }
+        },
+        "last_snapshot_within_6h": {
+          "label": "SENSITIVITY (labelled)",
+          "gate": {
+            "n": 395,
+            "corr_last_rung_vs_espn_close": 0.9190238906208081,
+            "median_abs_diff_points": 1.0,
+            "mean_diff_points": 1.1405063291139241,
+            "share_within_1_point": 0.6278481012658228,
+            "passed": false
+          },
+          "gate_failed": true,
+          "gate_note": "GATE FAILED: the last main rung does not track the ESPN close here (the ladder often does not bracket 50%), so read this comparison as unreliable",
+          "pm_last_minus_first_vs_outcome_minus_espn_close": {
+            "n": 395,
+            "n_nonzero_move": 252,
+            "mean_move": 0.5215189873417722,
+            "mean_abs_move": 6.379746835443038,
+            "zero_move_share": 0.3620253164556962,
+            "corr_move_outcome": {
+              "point": 0.05488284340950225,
+              "lo": -0.06837140646297923,
+              "hi": 0.1950732366154608
+            },
+            "slope_outcome_per_point_move": {
+              "point": 0.06329415353556833,
+              "lo": -0.07496164210317498,
+              "hi": 0.24863814823315838
+            },
+            "mean_outcome_in_move_direction": {
+              "point": 2.1031746031746033,
+              "lo": 0.30154673873729054,
+              "hi": 4.235276179915447,
+              "lower_one_sided_5pct": 0.5878983606557378,
+              "B": 1000,
+              "seed": 20261115
+            },
+            "continuation_share": {
+              "point": 0.5645161290322581,
+              "lo": 0.5162517477085599,
+              "hi": 0.6291676382800112,
+              "lower_one_sided_5pct": 0.5251708633093525,
+              "B": 1000,
+              "seed": 20261115,
+              "n_decided": 248
+            },
+            "size_buckets_abs_move": {
+              "(0,1]": {
+                "n": 71,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.4295774647887325,
+                  "lo": -0.8296928941311852,
+                  "hi": 6.644868421052631,
+                  "lower_one_sided_5pct": -0.4852935606060606,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5492957746478874
+              },
+              "(1,3]": {
+                "n": 41,
+                "mean_outcome_in_move_direction": {
+                  "point": 2.0365853658536586,
+                  "lo": -1.8128771551724139,
+                  "hi": 5.112885174418604,
+                  "lower_one_sided_5pct": -1.0830073995771667,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.6097560975609756
+              },
+              ">3": {
+                "n": 140,
+                "mean_outcome_in_move_direction": {
+                  "point": 1.957142857142857,
+                  "lo": 0.14897602036388882,
+                  "hi": 5.112850400457664,
+                  "lower_one_sided_5pct": 0.46098200336498024,
+                  "B": 1000,
+                  "seed": 20261115
+                },
+                "continuation_share": 0.5588235294117647
+              }
+            },
+            "by_direction": {
+              "move_up": {
+                "n": 126,
+                "mean_outcome_in_move_direction": {
+                  "point": 4.2976190476190474,
+                  "lo": 2.355186610393909,
+                  "hi": 6.634131305987741,
+                  "lower_one_sided_5pct": 2.612437513351848,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              },
+              "move_down": {
+                "n": 126,
+                "mean_outcome_in_move_direction": {
+                  "point": -0.09126984126984126,
+                  "lo": -2.9498480765165924,
+                  "hi": 2.4805871919342795,
+                  "lower_one_sided_5pct": -2.584234234234234,
+                  "B": 1000,
+                  "seed": 20261115
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "notes": [
+    "ESPN movement is a close-time, untimestamped value: at most UPPER_BOUND_PASS, never enters v6.1.",
+    "Intraday ladders are Polymarket-lineage quotes, not ESPN lines; DESCRIPTIVE_ONLY.",
+    "2026-11-14 games are post-holdout and are never scored in any outcome statistic here.",
+    "A non-final run reads no holdout row: verdicts that depend on the holdout are PROVISIONAL_PENDING_FINAL."
+  ]
+}

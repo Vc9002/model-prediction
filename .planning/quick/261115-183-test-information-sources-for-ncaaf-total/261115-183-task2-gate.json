@@ -1,0 +1,14 @@
+{
+ "status": "OPEN",
+ "checked_at_utc": "2026-11-15T07:59:08Z",
+ "daily_rows_started": 0,
+ "blocking_run_ids": [],
+ "rule": "count of daily rows with status 'started' must be 0 (status 'skipped' ignored); no src/tests batch within 15 minutes before 11:00, 14:00 or 17:00Z",
+ "latest_daily": "daily-20261115T065025Z-c6d50a completed 2026-11-15T07:09:46Z",
+ "next_scheduled_daily_utc": "2026-11-15T11:00:00Z",
+ "hard_stop_for_starting_a_batch_utc": "2026-11-15T10:45:00Z",
+ "next_attempt": null,
+ "checks": "gate re-queried before the artifact build, before each src and tests write batch, and immediately before the commit; every check found 0 daily rows in status 'started'",
+ "task2_commit": "f9ef35b3605a1a83bafeb36571e89483e2fdadd2",
+ "daily_py_call_site": "not added: the sibling 261115-0pq commits (403df5f3, fbe7cb6c, 3b9728fc) did not change espn.py or daily.py, so the call-site rule was unmet; documented as a follow-up in docs/ROADMAP.md"
+}

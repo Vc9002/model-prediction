@@ -703,9 +703,9 @@ models:
     family: tiered_elo_heavy_tail_distribution
     enabled: true
     origin: statistical_model
-    active_production_version: ncaab-spread-v6
+    active_production_version: ncaab-spread-v7
     active_total_production_version: ncaab-total-v6
-    rollback_production_version: ncaab-spread-v5
+    rollback_production_version: ncaab-spread-v6
     min_edge: 0.035
     spread_sd: 10.5
     total_sd: 13.5
@@ -717,6 +717,15 @@ models:
     max_margin_divergence: 12.0
     max_total_divergence: 14.0
     max_moneyline_margin: 10.0
+    # The daily run captures Polymarket BBOs ~15 min before the NCAAB step; 30 min matches NCAAF's
+    # capture window (quick 261121-uuv, operator-approved). Inert on its own: see the PLAN for the
+    # transact_time blocker in college_contract_evidence._valid_quote.
+    max_quote_age_seconds: 1800
+    # The margin engine follows the production.yaml champion: ncaab-spread-v7 = v6 artifact + frozen v7
+    # multi-season margin engine (served since 2026-11-16, promoted 2026-11-21, quick 261120-nip);
+    # rollback ncaab-spread-v6 = v6 engine via `model_promotion rollback`. A `margin_engine` key here
+    # is retired and fails the NCAAB slate closed. spread_sd/total_sd/home_court_points/logistic_scale/
+    # max_moneyline_margin above are not read by the v6/v7 models (their artifacts carry the served values).
     markets:
     - moneyline
     - spread

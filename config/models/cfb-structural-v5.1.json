@@ -1,0 +1,274 @@
+{
+  "method": "cfb_structural_v51_fixed_v5_integer_margin_pmf",
+  "model_version": "cfb-structural-v5.1",
+  "schema_version": "1",
+  "sport": "ncaaf",
+  "league": "NCAAF",
+  "positive_class": "home_win",
+  "base_model": "cfb-structural-v5",
+  "features": {
+    "extractor": "features/cfb_features_v51.CFBFeatureExtractorV51",
+    "epa_mode": "dropped",
+    "home_advantage_points": 2.5
+  },
+  "conference_source": {
+    "path": "config/ncaaf/cfb_conference_membership.json",
+    "sha256": "67cb89a626a11bc6278c0cd6fe4b2888f1338c9e5e951c1be2e58c043bac34d4",
+    "hash": "content sha256 of the parsed table (features/cfb_conference.table_content_sha256)"
+  },
+  "parameters": {
+    "margin_calibration": {
+      "intercept": -0.6864,
+      "slope": 1.447,
+      "neutral_intercept": 0.0
+    },
+    "total_calibration": {
+      "intercept": -6.9366,
+      "slope": 1.1242
+    },
+    "established_min_sample": 3,
+    "sd_widening": {
+      "blowout_spread_threshold": 21.5,
+      "blowout_margin_scale": 0.025,
+      "blowout_cap_points": 15.0,
+      "total_deviation_threshold": 8.0,
+      "total_deviation_scale": 0.025,
+      "total_deviation_cap_points": 20.0
+    },
+    "floors": {
+      "total_points": 24.0,
+      "team_points": 3.0
+    },
+    "margin_pmf": {
+      "max_margin": 120,
+      "key_multipliers": {
+        "0": 0.0
+      }
+    },
+    "margin_sd_table": {
+      "established": 17.266,
+      "thin_sample": 17.59,
+      "fbs_vs_fcs": 18.315
+    },
+    "conference_margin_scale": 0.9651,
+    "total_sd": 17.236
+  },
+  "serving": {
+    "tiers": [
+      "flat",
+      "research"
+    ],
+    "main": false,
+    "auto_buyer": false,
+    "quotes": "captured executable Polymarket book observed at or before the decision only",
+    "side_selection": "max_edge; emitted only when round(edge, 4) > 0",
+    "max_history_staleness_days": 14
+  },
+  "training": {
+    "harness": "scripts/cfb_v51_research.py",
+    "split": {
+      "method": "complete_date_60_20_20",
+      "train": {
+        "start": "2016-08-27",
+        "end": "2022-11-27",
+        "observations": 5891
+      },
+      "validation": {
+        "start": "2022-12-02",
+        "end": "2024-11-29",
+        "observations": 1801
+      },
+      "locked_holdout": {
+        "start": "2024-11-30",
+        "end": "2026-11-21",
+        "observations": 1819
+      }
+    },
+    "n_train": 5891,
+    "n_validation": 1801,
+    "n_holdout": 1819,
+    "fitted_on": "train only; variant and key set selected on validation; holdout scored once",
+    "selected_variant": "drop_k3_noneu_all",
+    "key_set": "none",
+    "train_slices": {
+      "established": 3952,
+      "thin_sample": 1140,
+      "fbs_vs_fcs": 799,
+      "established_conference": 3264
+    },
+    "history_snapshot": {
+      "processed/ncaaf/games.jsonl": {
+        "sha256": "d4fff8f9d8ae78ff4bb86120ae4dced3b0025e73510f7b4d818f1f0c432b9c75",
+        "rows": 16405
+      },
+      "historical/ncaaf_games_all.jsonl": {
+        "sha256": "a5d67bbda94fc72b4f5b8952f1960e3d7cb70a69fe061a2e849e4805253c7c4a",
+        "rows": 8033
+      }
+    },
+    "preregistration": "outputs/ncaaf/cfb_v51_prereg.json",
+    "generated_at_utc": "2026-11-22T03:18:31.919875+00:00"
+  },
+  "evaluation": {
+    "holdout_v5": {
+      "n": 1819,
+      "brier": 0.17143788606086707,
+      "log_loss": 0.5126981844967319,
+      "ece": 0.03812451017042331,
+      "calibration_slope": 1.14034839467854,
+      "accuracy": 0.7438152831225948,
+      "margin_mae": 13.208425761407366,
+      "total_mae": 12.907534321055524,
+      "margin_bias": 2.030501517317208,
+      "total_bias": -0.6889973886750898,
+      "margin_gauss_log_score": -4.237379063225977,
+      "total_gauss_log_score": -4.196406379600683,
+      "mean_margin_sd": 18.349097855964814,
+      "margin_resid_sd": 16.499860162621466
+    },
+    "holdout_v51": {
+      "n": 1819,
+      "brier": 0.1715520298966954,
+      "log_loss": 0.5130921948715719,
+      "ece": 0.029883091853867193,
+      "calibration_slope": 1.129421900256465,
+      "accuracy": 0.7399670148433205,
+      "margin_mae": 13.072220368334248,
+      "total_mae": 12.924419873556898,
+      "margin_bias": 1.6244486805937324,
+      "total_bias": -1.006450813633871,
+      "margin_gauss_log_score": -4.231084204579446,
+      "total_gauss_log_score": -4.196024358011001,
+      "mean_margin_sd": 17.993934489964264,
+      "margin_resid_sd": 16.403012361736902,
+      "margin_discrete_log_score": -4.21312699052791
+    },
+    "holdout_deltas_v51_minus_v5": {
+      "brier_v51_minus_v5": {
+        "metric": "candidate_brier_minus_incumbent",
+        "dates": 176,
+        "resamples": 2000,
+        "point_estimate": 0.00011414,
+        "ci_95_low": -0.00104744,
+        "ci_95_high": 0.0012071
+      },
+      "log_loss_v51_minus_v5": {
+        "point_estimate": 0.000394,
+        "ci_95_low": -0.002336,
+        "ci_95_high": 0.002962,
+        "dates": 176
+      },
+      "margin_mae_v51_minus_v5": {
+        "point_estimate": -0.136205,
+        "ci_95_low": -0.213178,
+        "ci_95_high": -0.052928,
+        "dates": 176
+      },
+      "total_mae_v51_minus_v5": {
+        "point_estimate": 0.016886,
+        "ci_95_low": -0.025951,
+        "ci_95_high": 0.061379,
+        "dates": 176
+      },
+      "margin_gauss_log_score_v51_minus_v5": {
+        "point_estimate": 0.006295,
+        "ci_95_low": 0.001456,
+        "ci_95_high": 0.010657,
+        "dates": 176
+      },
+      "accuracy_v51_minus_v5": {
+        "point_estimate": -0.003848,
+        "ci_95_low": -0.010468,
+        "ci_95_high": 0.002787,
+        "dates": 176
+      },
+      "spread_cover_brier_v51_minus_v5": {
+        "point_estimate": -0.003452,
+        "ci_95_low": -0.00546,
+        "ci_95_high": -0.001443,
+        "dates": 169
+      }
+    },
+    "market_relative": {
+      "v5": {
+        "n_spread_lines": 1785,
+        "n_total_lines": 1785,
+        "spread_cover_brier": 0.2708496885252007,
+        "spread_cover_log_loss": 0.7413116142138838,
+        "spread_cover_n": 1775,
+        "whole_line_push": {
+          "n": 178,
+          "predicted": 0.023305112359550562,
+          "actual": 0.056179775280898875
+        },
+        "total_over_brier": 0.25921584952953314,
+        "total_over_n": 1785,
+        "spread_corr_model_minus_line_vs_result_minus_line": -0.010136704066204254,
+        "spread_corr_ci95": [
+          -0.0533,
+          0.0354
+        ],
+        "spread_mae_model": 13.17332668347339,
+        "spread_mae_line": 11.834173669467788,
+        "total_corr_model_minus_line_vs_result_minus_line": -0.016684056864914396,
+        "total_corr_ci95": [
+          -0.0725,
+          0.0298
+        ],
+        "ats_disagree_ge_3": {
+          "wins": 540,
+          "losses": 546,
+          "win_pct": 49.72
+        },
+        "ats_disagree_ge_7": {
+          "wins": 226,
+          "losses": 235,
+          "win_pct": 49.02
+        }
+      },
+      "v5.1": {
+        "n_spread_lines": 1785,
+        "n_total_lines": 1785,
+        "spread_cover_brier": 0.26739744910435953,
+        "spread_cover_log_loss": 0.7327348943903382,
+        "spread_cover_n": 1775,
+        "whole_line_push": {
+          "n": 178,
+          "predicted": 0.02276037142535064,
+          "actual": 0.056179775280898875
+        },
+        "total_over_brier": 0.25948678527080854,
+        "total_over_n": 1785,
+        "spread_corr_model_minus_line_vs_result_minus_line": -0.008939814647655319,
+        "spread_corr_ci95": [
+          -0.0523,
+          0.0369
+        ],
+        "spread_mae_model": 13.03718411764706,
+        "spread_mae_line": 11.834173669467788,
+        "total_corr_model_minus_line_vs_result_minus_line": -0.011790504547488498,
+        "total_corr_ci95": [
+          -0.0664,
+          0.0328
+        ],
+        "ats_disagree_ge_3": {
+          "wins": 539,
+          "losses": 538,
+          "win_pct": 50.05
+        },
+        "ats_disagree_ge_7": {
+          "wins": 208,
+          "losses": 221,
+          "win_pct": 48.48
+        }
+      }
+    }
+  },
+  "qualification": {
+    "status": "paper_challenger",
+    "qualified": false,
+    "promotion_approved": false,
+    "note": "Flat/research rows only; never Main, never the auto-buyer. v5 stays champion."
+  },
+  "artifact_hash": "b211f5c02b8581262ad0db1de3fce2bd03d48b3690a9de7d62363e28cc7a9828"
+}

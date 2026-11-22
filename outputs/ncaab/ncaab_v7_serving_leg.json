@@ -1,0 +1,40 @@
+{
+  "games_joined": 219,
+  "by_day": {
+    "2026-11-08": {
+      "games": 23,
+      "mean_abs_live_minus_walkforward": 1.999,
+      "live_bias_actual_minus_live": 0.265
+    },
+    "2026-11-09": {
+      "games": 10,
+      "mean_abs_live_minus_walkforward": 1.221,
+      "live_bias_actual_minus_live": 5.375
+    },
+    "2026-11-10": {
+      "games": 25,
+      "mean_abs_live_minus_walkforward": 1.717,
+      "live_bias_actual_minus_live": -0.65
+    },
+    "2026-11-11": {
+      "games": 39,
+      "mean_abs_live_minus_walkforward": 3.505,
+      "live_bias_actual_minus_live": 5.054
+    },
+    "2026-11-12": {
+      "games": 23,
+      "mean_abs_live_minus_walkforward": 0.009,
+      "live_bias_actual_minus_live": 1.289
+    },
+    "2026-11-13": {
+      "games": 46,
+      "mean_abs_live_minus_walkforward": 0.0,
+      "live_bias_actual_minus_live": 1.404
+    },
+    "2026-11-14": {
+      "games": 53,
+      "mean_abs_live_minus_walkforward": 0.0,
+      "live_bias_actual_minus_live": -0.993
+    }
+  }
+}

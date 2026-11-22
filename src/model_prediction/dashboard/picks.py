@@ -412,11 +412,25 @@ def _performance_breakdown(
     )
 
 
+# The forecast path writes this sportsbook when no executable quote matched and the
+# row was priced at the standard 52.38% lay instead. Its pnl pays favourites as coin
+# flips (210 settled Main rows, +47u, as of 2026-11-15), so it is not performance.
+PLACEHOLDER_PRICED_SPORTSBOOK = "model_opinion_no_executable_quote"
+
+
+def _is_placeholder_priced(row: dict) -> bool:
+    return str(row.get("sportsbook") or "").strip().casefold() == PLACEHOLDER_PRICED_SPORTSBOOK
+
+
 def performance(picks: list[dict]) -> dict:
     unique_picks = _dedupe_contract_observations(picks)
-    settled = _dedupe_contract_observations(
+    all_settled = _dedupe_contract_observations(
         [row for row in picks if row.get("status") == "settled" and row.get("result") in ("win", "loss")]
     )
+    # Counted and reported, never scored: the rows stay in the ledger and in
+    # total_picks, they just cannot contribute a record or pnl.
+    placeholder_rows = [row for row in all_settled if _is_placeholder_priced(row)]
+    settled = [row for row in all_settled if not _is_placeholder_priced(row)]
     settled.sort(key=lambda row: str(row.get("settled_at_utc") or ""))
     wins = sum(1 for row in settled if row["result"] == "win")
     cumulative, curve = 0.0, []
@@ -583,6 +597,11 @@ def performance(picks: list[dict]) -> dict:
     return {
         "total_picks": len(unique_picks),
         "duplicate_observations_excluded": len(picks) - len(unique_picks),
+        "placeholder_priced_excluded": {
+            "calls": len(placeholder_rows),
+            "wins": sum(1 for row in placeholder_rows if row["result"] == "win"),
+            "pnl": round(sum(_pick_pnl(row) for row in placeholder_rows if _pick_is_scored(row)), 4),
+        },
         "settled": len(settled),
         "open": sum(1 for row in unique_picks if row.get("status") == "open"),
         "wins": wins,

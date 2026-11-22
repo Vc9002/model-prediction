@@ -16,6 +16,7 @@ import json
 import logging
 import math
 import os
+import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -37,25 +38,14 @@ from model_prediction.data_sources.polymarket_execute import (
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
 from model_prediction.portfolio.auto_buyer_ledger import event_key_from_slug
-from model_prediction.runtime_paths import RuntimePaths
+from model_prediction.runtime_paths import RuntimePaths, load_dotenv_into_environ
 
 _paths = RuntimePaths.resolve()
 DATA = _paths.runtime_root
 EASTERN = ZoneInfo("America/New_York")
 
 # Auto-load .env credentials if present
-_env_file = _paths.repo_root / ".env"
-if _env_file.exists():
-    try:
-        with _env_file.open(encoding="utf-8") as _f:
-            for _line in _f:
-                _line = _line.strip()
-                if _line and not _line.startswith("#") and "=" in _line:
-                    _key, _val = _line.split("=", 1)
-                    if _key.strip() and _key.strip() not in os.environ:
-                        os.environ[_key.strip()] = _val.strip()
-    except OSError:
-        pass
+load_dotenv_into_environ(_paths.repo_root / ".env")
 
 DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     # NBA: spread + moneyline. nba-moneyline-v9 was removed 2026-11-12 (placeholder
@@ -159,6 +149,8 @@ EXPLICIT_BLACKLIST_MODELS: tuple[str, ...] = (
     "rainbow_six-tiered-elo-v6",  # 2W-8L (-68.1% ROI) in production ledgers
     # NCAAB decommissioned per operator directive 2026-11-09:
     "ncaab-spread-v6",
+    "ncaab-spread-v7",
+    "ncaab-moneyline-v7m",
     "ncaab-spread-v5",
     "ncaab-total-v6",
     "ncaab-total-v5",
@@ -208,6 +200,12 @@ DISABLED_AUTO_BUYER_SPORT_MARKETS = frozenset(
         # The serving champion (nba-total-margin-v9) keeps forecasting for the
         # Main ledger; only execution is blocked.
         ("nba", "total"),
+        # NFL spreads and totals were pulled and then restored the same day
+        # (operator directive 2026-11-15: nothing comes off production, the paper
+        # ledger needs picks to judge the model). Open evidence against both is in
+        # docs/DEBUG.md (2026-11-15): spread edge >= 5% is 6-14 on settled quotes,
+        # total edge >= 5% is 13-17 on the replay holdout. The input gate below
+        # still blocks rows priced without verified weather or qualified inputs.
         ("soccer", "moneyline"),
         ("soccer", "total"),
         ("soccer", "spread"),
@@ -301,6 +299,7 @@ class AutoExecutionResult:
     rejected_unmapped_market: int = 0
     rejected_unsupported_market: int = 0
     rejected_disabled_sport_market: int = 0
+    rejected_input_unqualified: int = 0
     rejected_closed_market: int = 0
     rejected_below_win_probability: int = 0
     rejected_low_edge: int = 0
@@ -315,6 +314,94 @@ class AutoExecutionResult:
     dry_run_orders: list[dict[str, Any]] = field(default_factory=list)
     total_spend_usd: float = 0.0
     snapshot_captures: list[dict[str, Any]] = field(default_factory=list)
+
+
+INPUT_FLAG_FIELDS = ("input_qualified", "weather_inputs_verified")
+
+
+def _parse_input_flag(value: Any) -> bool | None:
+    """Tri-state parse: the ledger stores these flags as the strings "True"/"False"."""
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower() if value is not None else ""
+    if text in ("true", "1"):
+        return True
+    if text in ("false", "0"):
+        return False
+    return None
+
+
+def _load_pick_input_flags(
+    pick_ids: list[str], ledgers_db: Path | None = None
+) -> dict[str, dict[str, bool]] | None:
+    """Read each pick's model-input flags from the canonical ledger.
+
+    The dashboard pick readers the buyer consumes do not project
+    ``feature_payload_json``, so a row the forecast kept out of Main for
+    unqualified inputs (stale efficiency data, no pregame weather) reaches the
+    buyer looking identical to a clean one. Returns None when the ledger cannot
+    be read, so the caller can fail closed.
+    """
+    db_path = Path(ledgers_db) if ledgers_db is not None else _paths.ledgers_db
+    wanted = sorted({pid for pid in pick_ids if pid})
+    flags: dict[str, dict[str, bool]] = {}
+    if not wanted or not db_path.exists():
+        return flags
+    try:
+        conn = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
+        try:
+            for start in range(0, len(wanted), 500):
+                chunk = wanted[start : start + 500]
+                marks = ",".join("?" for _ in chunk)
+                query = f"SELECT pick_id, feature_payload_json FROM ledger_records WHERE pick_id IN ({marks})"
+                for pick_id, payload_json in conn.execute(query, chunk):
+                    try:
+                        features = (json.loads(payload_json or "{}") or {}).get("features") or {}
+                    except (TypeError, ValueError):
+                        continue
+                    if not isinstance(features, dict):
+                        continue
+                    entry = flags.setdefault(str(pick_id), {})
+                    for name in INPUT_FLAG_FIELDS:
+                        parsed = _parse_input_flag(features.get(name))
+                        if parsed is not None:
+                            # Main and Flat copies share a pick_id; any copy
+                            # saying False wins.
+                            entry[name] = entry.get(name, True) and parsed
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        logger.warning("auto-buyer could not read pick input flags from %s", db_path, exc_info=True)
+        return None
+    return flags
+
+
+def _has_unqualified_inputs(row: dict[str, Any], ledger_flags: dict[str, dict[str, bool]] | None) -> bool:
+    """True when the forecast itself flagged this pick's inputs as not qualified.
+
+    Explicit flags only: a pick whose model publishes no such flag is not
+    blocked. Totals additionally need verified pregame weather, matching the
+    Main ledger's ``pregame_weather_unverified`` rejection. When the ledger is
+    unreadable, NFL spread/total picks fail closed because every one of them
+    carries the flag.
+    """
+    sport, market = _auto_buyer_sport_market(row)
+    stored = (ledger_flags or {}).get(str(row.get("pick_id") or ""), {})
+
+    def flag(name: str) -> bool | None:
+        own = _parse_input_flag(row.get(name))
+        return own if own is not None else stored.get(name)
+
+    if flag("input_qualified") is False:
+        return True
+    if market == "total" and flag("weather_inputs_verified") is False:
+        return True
+    return (
+        ledger_flags is None
+        and sport == "nfl"
+        and market in ("spread", "total")
+        and flag("input_qualified") is None
+    )
 
 
 def _auto_buyer_sport_market(row: dict[str, Any]) -> tuple[str, str]:
@@ -334,6 +421,12 @@ def _auto_buyer_sport_market(row: dict[str, Any]) -> tuple[str, str]:
     return sport, market_type
 
 
+# Ids the isolated NCAAB spread paper trial may name. ncaab-spread-v7 (2026-11-21) is the v6 artifact
+# with the v7 margin engine; the trial's config file picks exactly one, and the buyer's whitelist
+# (set to that one id by run_ncaab_spread_paper_trial) keeps the other out.
+NCAAB_SPREAD_TRIAL_MODEL_IDS: tuple[str, ...] = ("ncaab-spread-v6", "ncaab-spread-v7")
+
+
 def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
     """Allow one quarantined model through only in the isolated paper run."""
     model_id = str(row.get("model_id") or row.get("model_version") or "")
@@ -341,7 +434,7 @@ def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionCo
         config.paper_ncaab_spread_v6_trial
         and config.mode == "paper"
         and not config.execute_live
-        and model_id == "ncaab-spread-v6"
+        and model_id in NCAAB_SPREAD_TRIAL_MODEL_IDS
         and _auto_buyer_sport_market(row) == ("ncaab", "spread")
     )
 
@@ -1087,6 +1180,7 @@ def run_auto_buyer_cycle(
         "rejected_unmapped_market": res.rejected_unmapped_market,
         "rejected_unsupported_market": res.rejected_unsupported_market,
         "rejected_disabled_sport_market": res.rejected_disabled_sport_market,
+        "rejected_input_unqualified": res.rejected_input_unqualified,
         "rejected_closed_market": res.rejected_closed_market,
         "rejected_below_win_probability": res.rejected_below_win_probability,
         "rejected_low_edge": res.rejected_low_edge,
@@ -1757,6 +1851,9 @@ class AutoPolymarketBuyer:
         # real per-calendar-day ceiling across every cycle, not just this one.
         current_spend = today_spend_usd
         bought_index = self._build_bought_index()
+        input_flags = _load_pick_input_flags(
+            [str(row.get("pick_id") or "") for row in picks if row.get("status") == "open"]
+        )
 
         for row in sorted(picks, key=_auto_buyer_start_order):
             result.total_evaluated += 1
@@ -1828,6 +1925,13 @@ class AutoPolymarketBuyer:
                 and _is_disabled_auto_buyer_sport_market(row, self.config.disabled_sport_markets)
             ):
                 result.rejected_disabled_sport_market += 1
+                continue
+
+            # The forecast's own input verdict (operator directive 2026-11-15): a
+            # pick Main declined for unqualified inputs or unverified weather is
+            # not bought from its Flat copy either.
+            if _has_unqualified_inputs(row, input_flags):
+                result.rejected_input_unqualified += 1
                 continue
 
             # whitelisted_count counts only picks that cleared every categorical

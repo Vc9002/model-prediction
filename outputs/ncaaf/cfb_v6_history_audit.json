@@ -1,0 +1,4001 @@
+{
+  "as_of_utc": "2026-11-15T02:10:00Z",
+  "audit": {
+    "division_reading_check": {
+      "feed_label_mismatch_examples": [
+        {
+          "division_class": "FCS-FCS",
+          "event_id": "401551470",
+          "feed_class": "FBS-FCS",
+          "feeds": [
+            80,
+            81
+          ],
+          "start": "2023-12-16T17:00Z",
+          "teams": [
+            "Howard Bison",
+            "Florida A&M Rattlers"
+          ]
+        }
+      ],
+      "feed_label_vs_team_division_label_mismatches": 1,
+      "singleton_lower_division_teams_per_season": {
+        "2016": 46,
+        "2017": 41,
+        "2018": 48,
+        "2019": 47,
+        "2020": 11,
+        "2021": 35,
+        "2022": 41,
+        "2023": 34,
+        "2024": 42,
+        "2025": 43,
+        "2026": 43
+      },
+      "team_table_conflict_examples": [
+        [
+          2016,
+          "Idaho Vandals"
+        ],
+        [
+          2017,
+          "Idaho Vandals"
+        ],
+        [
+          2026,
+          "North Dakota State Bison"
+        ]
+      ],
+      "team_table_fcs_but_espn_fbs_conflicts": 3
+    },
+    "history_class_source": {
+      "espn_feed": 7965
+    },
+    "id_cross_check": {
+      "espn_events_missing_by_id": 8413,
+      "examples": [],
+      "of_which_present_under_another_id": 0
+    },
+    "overlap": {
+      "events_in_both": 7965,
+      "history_rows_without_neutral_flag": 241,
+      "neutral_flag_compared": 7724,
+      "neutral_flag_disagreements": 0,
+      "orientation_swaps": 0,
+      "score_disagreement_count": 0,
+      "score_disagreements": [],
+      "score_disagreements_truncated": 0,
+      "start_timestamp_disagreements": 0,
+      "team_name_mismatch_examples": [
+        {
+          "espn": [
+            "Connecticut Huskies",
+            "Navy Midshipmen"
+          ],
+          "event_id": "400869512",
+          "history": [
+            "UConn Huskies",
+            "Navy Midshipmen"
+          ]
+        },
+        {
+          "espn": [
+            "Virginia Cavaliers",
+            "Connecticut Huskies"
+          ],
+          "event_id": "400869444",
+          "history": [
+            "Virginia Cavaliers",
+            "UConn Huskies"
+          ]
+        },
+        {
+          "espn": [
+            "Syracuse Orange",
+            "Connecticut Huskies"
+          ],
+          "event_id": "400869450",
+          "history": [
+            "Syracuse Orange",
+            "UConn Huskies"
+          ]
+        },
+        {
+          "espn": [
+            "Connecticut Huskies",
+            "Houston Cougars"
+          ],
+          "event_id": "400869527",
+          "history": [
+            "UConn Huskies",
+            "Houston Cougars"
+          ]
+        },
+        {
+          "espn": [
+            "Cincinnati Bearcats",
+            "Connecticut Huskies"
+          ],
+          "event_id": "400869534",
+          "history": [
+            "Cincinnati Bearcats",
+            "UConn Huskies"
+          ]
+        },
+        {
+          "espn": [
+            "Connecticut Huskies",
+            "South Florida Bulls"
+          ],
+          "event_id": "400869540",
+          "history": [
+            "UConn Huskies",
+            "South Florida Bulls"
+          ]
+        },
+        {
+          "espn": [
+            "UCF Knights",
+            "Connecticut Huskies"
+          ],
+          "event_id": "400869543",
+          "history": [
+            "UCF Knights",
+            "UConn Huskies"
+          ]
+        },
+        {
+          "espn": [
+            "Connecticut Huskies",
+            "East Carolina Pirates"
+          ],
+          "event_id": "400869551",
+          "history": [
+            "UConn Huskies",
+            "East Carolina Pirates"
+          ]
+        },
+        {
+          "espn": [
+            "Temple Owls",
+            "Connecticut Huskies"
+          ],
+          "event_id": "400869554",
+          "history": [
+            "Temple Owls",
+            "UConn Huskies"
+          ]
+        },
+        {
+          "espn": [
+            "Connecticut Huskies",
+            "Boston College Eagles"
+          ],
+          "event_id": "400869490",
+          "history": [
+            "UConn Huskies",
+            "Boston College Eagles"
+          ]
+        }
+      ],
+      "team_name_mismatch_same_id": 106
+    },
+    "per_season": {
+      "2016": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 873,
+            "81": 790
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 760,
+          "FBS-FCS": 113,
+          "FCS-FCS": 677,
+          "total": 1550,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 51,
+          "FBS-FCS": 103,
+          "FCS-FCS": 662,
+          "total": 816,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 709,
+          "FBS-FCS": 10,
+          "FCS-FCS": 15,
+          "total": 734,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2017": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 874,
+            "81": 776
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 776,
+          "FBS-FCS": 98,
+          "FCS-FCS": 678,
+          "total": 1552,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 48,
+          "FBS-FCS": 89,
+          "FCS-FCS": 664,
+          "total": 801,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 728,
+          "FBS-FCS": 9,
+          "FCS-FCS": 14,
+          "total": 751,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2018": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 884,
+            "81": 787
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 772,
+          "FBS-FCS": 112,
+          "FCS-FCS": 675,
+          "total": 1559,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 29,
+          "FBS-FCS": 105,
+          "FCS-FCS": 661,
+          "total": 795,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 743,
+          "FBS-FCS": 7,
+          "FCS-FCS": 14,
+          "total": 764,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2019": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 888,
+            "81": 848
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st2-wk16",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 774,
+          "FBS-FCS": 114,
+          "FCS-FCS": 734,
+          "total": 1622,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 43,
+          "FBS-FCS": 103,
+          "FCS-FCS": 723,
+          "total": 869,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 731,
+          "FBS-FCS": 11,
+          "FCS-FCS": 11,
+          "total": 753,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2020": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 568,
+            "81": 58
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st2-wk16",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 534,
+          "FBS-FCS": 34,
+          "FCS-FCS": 24,
+          "total": 592,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 18,
+          "FBS-FCS": 32,
+          "FCS-FCS": 24,
+          "total": 74,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 516,
+          "FBS-FCS": 2,
+          "FCS-FCS": 0,
+          "total": 518,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2021": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 887,
+            "81": 799
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 770,
+          "FBS-FCS": 117,
+          "FCS-FCS": 682,
+          "total": 1569,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 22,
+          "FBS-FCS": 105,
+          "FCS-FCS": 666,
+          "total": 793,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 748,
+          "FBS-FCS": 12,
+          "FCS-FCS": 16,
+          "total": 776,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2022": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 896,
+            "81": 821
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 776,
+          "FBS-FCS": 120,
+          "FCS-FCS": 701,
+          "total": 1597,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 20,
+          "FBS-FCS": 108,
+          "FCS-FCS": 691,
+          "total": 819,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 756,
+          "FBS-FCS": 12,
+          "FCS-FCS": 10,
+          "total": 778,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2023": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 911,
+            "81": 810
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 792,
+          "FBS-FCS": 118,
+          "FCS-FCS": 692,
+          "total": 1602,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 23,
+          "FBS-FCS": 111,
+          "FCS-FCS": 676,
+          "total": 810,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 769,
+          "FBS-FCS": 7,
+          "FCS-FCS": 16,
+          "total": 792,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2024": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 919,
+            "81": 867
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st2-wk16",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 798,
+          "FBS-FCS": 121,
+          "FCS-FCS": 746,
+          "total": 1665,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 16,
+          "FBS-FCS": 112,
+          "FCS-FCS": 737,
+          "total": 865,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 782,
+          "FBS-FCS": 9,
+          "FCS-FCS": 9,
+          "total": 800,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2025": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 934,
+            "81": 878
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st2-wk16",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 808,
+          "FBS-FCS": 126,
+          "FCS-FCS": 752,
+          "total": 1686,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 28,
+          "FBS-FCS": 120,
+          "FCS-FCS": 745,
+          "total": 893,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 780,
+          "FBS-FCS": 6,
+          "FCS-FCS": 7,
+          "total": 793,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      },
+      "2026": {
+        "coverage": {
+          "failed_requests": 0,
+          "feed_event_counts": {
+            "80": 731,
+            "81": 776
+          },
+          "requests": 40,
+          "weeks_with_events": [
+            "st2-wk1",
+            "st2-wk2",
+            "st2-wk3",
+            "st2-wk4",
+            "st2-wk5",
+            "st2-wk6",
+            "st2-wk7",
+            "st2-wk8",
+            "st2-wk9",
+            "st2-wk10",
+            "st2-wk11",
+            "st2-wk12",
+            "st2-wk13",
+            "st2-wk14",
+            "st2-wk15",
+            "st3-wk1"
+          ]
+        },
+        "espn": {
+          "FBS-FBS": 608,
+          "FBS-FCS": 123,
+          "FCS-FCS": 653,
+          "total": 1384,
+          "unclassified": 0
+        },
+        "espn_not_in_history": {
+          "FBS-FBS": 113,
+          "FBS-FCS": 113,
+          "FCS-FCS": 652,
+          "total": 878,
+          "unclassified": 0
+        },
+        "history": {
+          "FBS-FBS": 495,
+          "FBS-FCS": 10,
+          "FCS-FCS": 1,
+          "total": 506,
+          "unclassified": 0
+        },
+        "history_not_in_espn": {
+          "FBS-FBS": 0,
+          "FBS-FCS": 0,
+          "FCS-FCS": 0,
+          "total": 0,
+          "unclassified": 0
+        }
+      }
+    },
+    "season_2026": {
+      "by_us_eastern_day": {
+        "2026-08-27": {
+          "espn_games": 21,
+          "fbs_involved": 0,
+          "fbs_involved_missing": 0,
+          "missing": 21
+        },
+        "2026-08-28": {
+          "espn_games": 7,
+          "fbs_involved": 0,
+          "fbs_involved_missing": 0,
+          "missing": 7
+        },
+        "2026-08-29": {
+          "espn_games": 48,
+          "fbs_involved": 8,
+          "fbs_involved_missing": 1,
+          "missing": 41
+        },
+        "2026-09-03": {
+          "espn_games": 14,
+          "fbs_involved": 11,
+          "fbs_involved_missing": 6,
+          "missing": 9
+        },
+        "2026-09-04": {
+          "espn_games": 9,
+          "fbs_involved": 8,
+          "fbs_involved_missing": 3,
+          "missing": 4
+        },
+        "2026-09-05": {
+          "espn_games": 102,
+          "fbs_involved": 68,
+          "fbs_involved_missing": 39,
+          "missing": 73
+        },
+        "2026-09-06": {
+          "espn_games": 6,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 3
+        },
+        "2026-09-07": {
+          "espn_games": 1,
+          "fbs_involved": 1,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-09-10": {
+          "espn_games": 1,
+          "fbs_involved": 1,
+          "fbs_involved_missing": 1,
+          "missing": 1
+        },
+        "2026-09-11": {
+          "espn_games": 5,
+          "fbs_involved": 5,
+          "fbs_involved_missing": 2,
+          "missing": 2
+        },
+        "2026-09-12": {
+          "espn_games": 125,
+          "fbs_involved": 80,
+          "fbs_involved_missing": 34,
+          "missing": 79
+        },
+        "2026-09-17": {
+          "espn_games": 1,
+          "fbs_involved": 1,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-09-18": {
+          "espn_games": 3,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 1,
+          "missing": 1
+        },
+        "2026-09-19": {
+          "espn_games": 124,
+          "fbs_involved": 71,
+          "fbs_involved_missing": 19,
+          "missing": 72
+        },
+        "2026-09-24": {
+          "espn_games": 1,
+          "fbs_involved": 1,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-09-25": {
+          "espn_games": 6,
+          "fbs_involved": 5,
+          "fbs_involved_missing": 1,
+          "missing": 2
+        },
+        "2026-09-26": {
+          "espn_games": 116,
+          "fbs_involved": 65,
+          "fbs_involved_missing": 16,
+          "missing": 67
+        },
+        "2026-10-01": {
+          "espn_games": 2,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-10-02": {
+          "espn_games": 4,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-10-03": {
+          "espn_games": 108,
+          "fbs_involved": 54,
+          "fbs_involved_missing": 3,
+          "missing": 57
+        },
+        "2026-10-06": {
+          "espn_games": 1,
+          "fbs_involved": 1,
+          "fbs_involved_missing": 1,
+          "missing": 1
+        },
+        "2026-10-07": {
+          "espn_games": 2,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 2,
+          "missing": 2
+        },
+        "2026-10-08": {
+          "espn_games": 4,
+          "fbs_involved": 4,
+          "fbs_involved_missing": 4,
+          "missing": 4
+        },
+        "2026-10-09": {
+          "espn_games": 7,
+          "fbs_involved": 5,
+          "fbs_involved_missing": 5,
+          "missing": 7
+        },
+        "2026-10-10": {
+          "espn_games": 94,
+          "fbs_involved": 46,
+          "fbs_involved_missing": 46,
+          "missing": 94
+        },
+        "2026-10-13": {
+          "espn_games": 2,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 2,
+          "missing": 2
+        },
+        "2026-10-14": {
+          "espn_games": 2,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 2,
+          "missing": 2
+        },
+        "2026-10-15": {
+          "espn_games": 3,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 3,
+          "missing": 3
+        },
+        "2026-10-16": {
+          "espn_games": 4,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 1
+        },
+        "2026-10-17": {
+          "espn_games": 107,
+          "fbs_involved": 52,
+          "fbs_involved_missing": 0,
+          "missing": 55
+        },
+        "2026-10-20": {
+          "espn_games": 3,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-10-21": {
+          "espn_games": 1,
+          "fbs_involved": 1,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-10-22": {
+          "espn_games": 3,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-10-23": {
+          "espn_games": 7,
+          "fbs_involved": 5,
+          "fbs_involved_missing": 0,
+          "missing": 2
+        },
+        "2026-10-24": {
+          "espn_games": 97,
+          "fbs_involved": 44,
+          "fbs_involved_missing": 0,
+          "missing": 53
+        },
+        "2026-10-27": {
+          "espn_games": 2,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-10-28": {
+          "espn_games": 2,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-10-29": {
+          "espn_games": 3,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 0,
+          "missing": 1
+        },
+        "2026-10-30": {
+          "espn_games": 4,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 1
+        },
+        "2026-10-31": {
+          "espn_games": 104,
+          "fbs_involved": 47,
+          "fbs_involved_missing": 0,
+          "missing": 57
+        },
+        "2026-11-03": {
+          "espn_games": 2,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-11-04": {
+          "espn_games": 3,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-11-05": {
+          "espn_games": 3,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 0,
+          "missing": 1
+        },
+        "2026-11-06": {
+          "espn_games": 5,
+          "fbs_involved": 5,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-11-07": {
+          "espn_games": 111,
+          "fbs_involved": 51,
+          "fbs_involved_missing": 0,
+          "missing": 60
+        },
+        "2026-11-10": {
+          "espn_games": 3,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-11-11": {
+          "espn_games": 3,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-11-12": {
+          "espn_games": 2,
+          "fbs_involved": 2,
+          "fbs_involved_missing": 0,
+          "missing": 0
+        },
+        "2026-11-13": {
+          "espn_games": 4,
+          "fbs_involved": 3,
+          "fbs_involved_missing": 0,
+          "missing": 1
+        },
+        "2026-11-14": {
+          "espn_games": 92,
+          "fbs_involved": 35,
+          "fbs_involved_missing": 35,
+          "missing": 92
+        }
+      },
+      "by_week": {
+        "st2-wk1": {
+          "espn_games": 208,
+          "fbs_involved": 99,
+          "fbs_involved_missing": 49,
+          "missing": 158
+        },
+        "st2-wk10": {
+          "espn_games": 124,
+          "fbs_involved": 63,
+          "fbs_involved_missing": 0,
+          "missing": 61
+        },
+        "st2-wk11": {
+          "espn_games": 104,
+          "fbs_involved": 46,
+          "fbs_involved_missing": 35,
+          "missing": 93
+        },
+        "st2-wk2": {
+          "espn_games": 131,
+          "fbs_involved": 86,
+          "fbs_involved_missing": 37,
+          "missing": 82
+        },
+        "st2-wk3": {
+          "espn_games": 128,
+          "fbs_involved": 75,
+          "fbs_involved_missing": 20,
+          "missing": 73
+        },
+        "st2-wk4": {
+          "espn_games": 123,
+          "fbs_involved": 71,
+          "fbs_involved_missing": 17,
+          "missing": 69
+        },
+        "st2-wk5": {
+          "espn_games": 114,
+          "fbs_involved": 59,
+          "fbs_involved_missing": 3,
+          "missing": 57
+        },
+        "st2-wk6": {
+          "espn_games": 108,
+          "fbs_involved": 58,
+          "fbs_involved_missing": 58,
+          "missing": 108
+        },
+        "st2-wk7": {
+          "espn_games": 118,
+          "fbs_involved": 62,
+          "fbs_involved_missing": 7,
+          "missing": 63
+        },
+        "st2-wk8": {
+          "espn_games": 111,
+          "fbs_involved": 56,
+          "fbs_involved_missing": 0,
+          "missing": 55
+        },
+        "st2-wk9": {
+          "espn_games": 115,
+          "fbs_involved": 56,
+          "fbs_involved_missing": 0,
+          "missing": 59
+        }
+      },
+      "day_2026_09_26": {
+        "by_us_eastern_date": {
+          "espn_games": 116,
+          "fbs_involved": 65,
+          "fbs_involved_missing": 16,
+          "missing": 67
+        },
+        "by_utc_start_date": {
+          "espn_games": 103,
+          "fbs_involved": 58,
+          "fbs_involved_missing": 14,
+          "missing": 59
+        }
+      },
+      "espn_completed_games": 1384,
+      "fbs_involved_games_espn": 731,
+      "fbs_involved_games_missing": 226,
+      "fbs_team_count": 138,
+      "fbs_teams_missing_distribution": {
+        "max_missing_per_team": 7,
+        "mean_espn_games_per_team": 9.703,
+        "mean_history_games_per_team": 7.246,
+        "mean_missing_per_team": 2.457,
+        "median_missing_per_team": 2.0,
+        "missing_histogram": {
+          "1": 19,
+          "2": 61,
+          "3": 44,
+          "4": 10,
+          "6": 2,
+          "7": 2
+        },
+        "teams": 138,
+        "teams_with_zero_missing": 0
+      },
+      "fbs_teams_with_most_missing": [
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 3,
+          "missing_games": 7,
+          "team": "Florida International Panthers",
+          "team_id": "2229"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 3,
+          "missing_games": 7,
+          "team": "Missouri State Bears",
+          "team_id": "2623"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 11,
+          "history_games": 5,
+          "missing_games": 6,
+          "team": "Sacramento State Hornets",
+          "team_id": "16"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 4,
+          "missing_games": 6,
+          "team": "Sam Houston Bearkats",
+          "team_id": "2534"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Buffalo Bulls",
+          "team_id": "2084"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "East Carolina Pirates",
+          "team_id": "151"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Georgia Southern Eagles",
+          "team_id": "290"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Jacksonville State Gamecocks",
+          "team_id": "55"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Kennesaw State Owls",
+          "team_id": "338"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Marshall Thundering Herd",
+          "team_id": "276"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Massachusetts Minutemen",
+          "team_id": "113"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Southern Miss Golden Eagles",
+          "team_id": "2572"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "UAB Blazers",
+          "team_id": "5"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Western Kentucky Hilltoppers",
+          "team_id": "98"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "App State Mountaineers",
+          "team_id": "2026"
+        }
+      ],
+      "history_games": 506,
+      "lower_division_team_count": 182,
+      "lower_division_teams_missing_distribution": {
+        "max_missing_per_team": 11,
+        "mean_espn_games_per_team": 7.852,
+        "mean_history_games_per_team": 0.066,
+        "mean_missing_per_team": 7.786,
+        "median_missing_per_team": 10.0,
+        "missing_histogram": {
+          "1": 43,
+          "2": 10,
+          "5": 1,
+          "8": 2,
+          "9": 11,
+          "10": 31,
+          "11": 84
+        },
+        "teams": 182,
+        "teams_with_zero_missing": 0
+      },
+      "missing_by_class": {
+        "FBS-FBS": {
+          "espn": 608,
+          "missing": 113
+        },
+        "FBS-FCS": {
+          "espn": 123,
+          "missing": 113
+        },
+        "FCS-FCS": {
+          "espn": 653,
+          "missing": 652
+        }
+      },
+      "missing_from_history": 878,
+      "teams": [
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Air Force Falcons",
+          "team_id": "2005"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Akron Zips",
+          "team_id": "2006"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Alabama Crimson Tide",
+          "team_id": "333"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "App State Mountaineers",
+          "team_id": "2026"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Arizona State Sun Devils",
+          "team_id": "9"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Arizona Wildcats",
+          "team_id": "12"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Arkansas Razorbacks",
+          "team_id": "8"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Arkansas State Red Wolves",
+          "team_id": "2032"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Army Black Knights",
+          "team_id": "349"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 9,
+          "missing_games": 1,
+          "team": "Auburn Tigers",
+          "team_id": "2"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "BYU Cougars",
+          "team_id": "252"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Ball State Cardinals",
+          "team_id": "2050"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Baylor Bears",
+          "team_id": "239"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Boise State Broncos",
+          "team_id": "68"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Boston College Eagles",
+          "team_id": "103"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Bowling Green Falcons",
+          "team_id": "189"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Buffalo Bulls",
+          "team_id": "2084"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "California Golden Bears",
+          "team_id": "25"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Central Michigan Chippewas",
+          "team_id": "2117"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Charlotte 49ers",
+          "team_id": "2429"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Cincinnati Bearcats",
+          "team_id": "2132"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 9,
+          "missing_games": 1,
+          "team": "Clemson Tigers",
+          "team_id": "228"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Coastal Carolina Chanticleers",
+          "team_id": "324"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 9,
+          "missing_games": 1,
+          "team": "Colorado Buffaloes",
+          "team_id": "38"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Colorado State Rams",
+          "team_id": "36"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Delaware Blue Hens",
+          "team_id": "48"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Duke Blue Devils",
+          "team_id": "150"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "East Carolina Pirates",
+          "team_id": "151"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Eastern Michigan Eagles",
+          "team_id": "2199"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Florida Atlantic Owls",
+          "team_id": "2226"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Florida Gators",
+          "team_id": "57"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 3,
+          "missing_games": 7,
+          "team": "Florida International Panthers",
+          "team_id": "2229"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Florida State Seminoles",
+          "team_id": "52"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Fresno State Bulldogs",
+          "team_id": "278"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Georgia Bulldogs",
+          "team_id": "61"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Georgia Southern Eagles",
+          "team_id": "290"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Georgia State Panthers",
+          "team_id": "2247"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Georgia Tech Yellow Jackets",
+          "team_id": "59"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Hawai'i Rainbow Warriors",
+          "team_id": "62"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Houston Cougars",
+          "team_id": "248"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Illinois Fighting Illini",
+          "team_id": "356"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Indiana Hoosiers",
+          "team_id": "84"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Iowa Hawkeyes",
+          "team_id": "2294"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Iowa State Cyclones",
+          "team_id": "66"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Jacksonville State Gamecocks",
+          "team_id": "55"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 11,
+          "history_games": 8,
+          "missing_games": 3,
+          "team": "James Madison Dukes",
+          "team_id": "256"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Kansas Jayhawks",
+          "team_id": "2305"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Kansas State Wildcats",
+          "team_id": "2306"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Kennesaw State Owls",
+          "team_id": "338"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Kent State Golden Flashes",
+          "team_id": "2309"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Kentucky Wildcats",
+          "team_id": "96"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "LSU Tigers",
+          "team_id": "99"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Liberty Flames",
+          "team_id": "2335"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Louisiana Ragin' Cajuns",
+          "team_id": "309"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Louisiana Tech Bulldogs",
+          "team_id": "2348"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Louisville Cardinals",
+          "team_id": "97"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Marshall Thundering Herd",
+          "team_id": "276"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Maryland Terrapins",
+          "team_id": "120"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Massachusetts Minutemen",
+          "team_id": "113"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Memphis Tigers",
+          "team_id": "235"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Miami (OH) RedHawks",
+          "team_id": "193"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Miami Hurricanes",
+          "team_id": "2390"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Michigan State Spartans",
+          "team_id": "127"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 9,
+          "missing_games": 1,
+          "team": "Michigan Wolverines",
+          "team_id": "130"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Middle Tennessee Blue Raiders",
+          "team_id": "2393"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Minnesota Golden Gophers",
+          "team_id": "135"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 9,
+          "missing_games": 1,
+          "team": "Mississippi State Bulldogs",
+          "team_id": "344"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 3,
+          "missing_games": 7,
+          "team": "Missouri State Bears",
+          "team_id": "2623"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Missouri Tigers",
+          "team_id": "142"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "NC State Wolfpack",
+          "team_id": "152"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Navy Midshipmen",
+          "team_id": "2426"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Nebraska Cornhuskers",
+          "team_id": "158"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Nevada Wolf Pack",
+          "team_id": "2440"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "New Mexico Lobos",
+          "team_id": "167"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "New Mexico State Aggies",
+          "team_id": "166"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "North Carolina Tar Heels",
+          "team_id": "153"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 6,
+          "missing_games": 3,
+          "team": "North Dakota State Bison",
+          "team_id": "2449"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "North Texas Mean Green",
+          "team_id": "249"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Northern Illinois Huskies",
+          "team_id": "2459"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Northwestern Wildcats",
+          "team_id": "77"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Notre Dame Fighting Irish",
+          "team_id": "87"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Ohio Bobcats",
+          "team_id": "195"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Ohio State Buckeyes",
+          "team_id": "194"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Oklahoma Sooners",
+          "team_id": "201"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Oklahoma State Cowboys",
+          "team_id": "197"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Old Dominion Monarchs",
+          "team_id": "295"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Ole Miss Rebels",
+          "team_id": "145"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Oregon Ducks",
+          "team_id": "2483"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Oregon State Beavers",
+          "team_id": "204"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Penn State Nittany Lions",
+          "team_id": "213"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Pittsburgh Panthers",
+          "team_id": "221"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Purdue Boilermakers",
+          "team_id": "2509"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Rice Owls",
+          "team_id": "242"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Rutgers Scarlet Knights",
+          "team_id": "164"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "SMU Mustangs",
+          "team_id": "2567"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 11,
+          "history_games": 5,
+          "missing_games": 6,
+          "team": "Sacramento State Hornets",
+          "team_id": "16"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 4,
+          "missing_games": 6,
+          "team": "Sam Houston Bearkats",
+          "team_id": "2534"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "San Diego State Aztecs",
+          "team_id": "21"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "San Jos\u00e9 State Spartans",
+          "team_id": "23"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "South Alabama Jaguars",
+          "team_id": "6"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "South Carolina Gamecocks",
+          "team_id": "2579"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "South Florida Bulls",
+          "team_id": "58"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Southern Miss Golden Eagles",
+          "team_id": "2572"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Stanford Cardinal",
+          "team_id": "24"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Syracuse Orange",
+          "team_id": "183"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "TCU Horned Frogs",
+          "team_id": "2628"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Temple Owls",
+          "team_id": "218"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Tennessee Volunteers",
+          "team_id": "2633"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Texas A&M Aggies",
+          "team_id": "245"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Texas Longhorns",
+          "team_id": "251"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Texas State Bobcats",
+          "team_id": "326"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Texas Tech Red Raiders",
+          "team_id": "2641"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Toledo Rockets",
+          "team_id": "2649"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 6,
+          "missing_games": 3,
+          "team": "Troy Trojans",
+          "team_id": "2653"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Tulane Green Wave",
+          "team_id": "2655"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Tulsa Golden Hurricane",
+          "team_id": "202"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "UAB Blazers",
+          "team_id": "5"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "UCF Knights",
+          "team_id": "2116"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 9,
+          "missing_games": 1,
+          "team": "UCLA Bruins",
+          "team_id": "26"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "UConn Huskies",
+          "team_id": "41"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 9,
+          "missing_games": 1,
+          "team": "UL Monroe Warhawks",
+          "team_id": "2433"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "UNLV Rebels",
+          "team_id": "2439"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "USC Trojans",
+          "team_id": "30"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "UTEP Miners",
+          "team_id": "2638"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "UTSA Roadrunners",
+          "team_id": "2636"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Utah State Aggies",
+          "team_id": "328"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 8,
+          "missing_games": 1,
+          "team": "Utah Utes",
+          "team_id": "254"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Vanderbilt Commodores",
+          "team_id": "238"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Virginia Cavaliers",
+          "team_id": "258"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Virginia Tech Hokies",
+          "team_id": "259"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Wake Forest Demon Deacons",
+          "team_id": "154"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "Washington Huskies",
+          "team_id": "264"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Washington State Cougars",
+          "team_id": "265"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 7,
+          "missing_games": 3,
+          "team": "West Virginia Mountaineers",
+          "team_id": "277"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 6,
+          "missing_games": 4,
+          "team": "Western Kentucky Hilltoppers",
+          "team_id": "98"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Western Michigan Broncos",
+          "team_id": "2711"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 10,
+          "history_games": 8,
+          "missing_games": 2,
+          "team": "Wisconsin Badgers",
+          "team_id": "275"
+        },
+        {
+          "division": "FBS",
+          "espn_games": 9,
+          "history_games": 7,
+          "missing_games": 2,
+          "team": "Wyoming Cowboys",
+          "team_id": "2751"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Abilene Christian Wildcats",
+          "team_id": "2000"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Alabama A&M Bulldogs",
+          "team_id": "2010"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Alabama State Hornets",
+          "team_id": "2011"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Albany State Golden Rams",
+          "team_id": "2013"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Alcorn State Braves",
+          "team_id": "2016"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "American International Yellow Jackets",
+          "team_id": "2022"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Anderson (SC) Trojans",
+          "team_id": "129469"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Arkansas Baptist Buffaloes",
+          "team_id": "124386"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Arkansas-Pine Bluff Golden Lions",
+          "team_id": "2029"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Austin Peay Governors",
+          "team_id": "2046"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Bethune-Cookman Wildcats",
+          "team_id": "2065"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Bowie State Bulldogs",
+          "team_id": "2075"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Brown Bears",
+          "team_id": "225"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Bryant Bulldogs",
+          "team_id": "2803"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Bucknell Bison",
+          "team_id": "2083"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Butler Bulldogs",
+          "team_id": "2086"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Cal Poly Mustangs",
+          "team_id": "13"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Campbell Fighting Camels",
+          "team_id": "2097"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Central Arkansas Bears",
+          "team_id": "2110"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Central Connecticut Blue Devils",
+          "team_id": "2115"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Central Oklahoma Bronchos",
+          "team_id": "2122"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Central State Marauders",
+          "team_id": "2119"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Central Washington Wildcats",
+          "team_id": "2120"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 1,
+          "missing_games": 10,
+          "team": "Charleston Southern Buccaneers",
+          "team_id": "2127"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Chattanooga Mocs",
+          "team_id": "236"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Chicago State Cougars",
+          "team_id": "2130"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Clark Atlanta Panthers",
+          "team_id": "2805"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Colgate Raiders",
+          "team_id": "2142"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Columbia Lions",
+          "team_id": "171"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Concord Mountain Lions",
+          "team_id": "2148"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Cornell Big Red",
+          "team_id": "172"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Dartmouth Big Green",
+          "team_id": "159"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Davidson Wildcats",
+          "team_id": "2166"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Dayton Flyers",
+          "team_id": "2168"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Delaware State Hornets",
+          "team_id": "2169"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Delta State Statesmen",
+          "team_id": "2170"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Dickinson Red Devils",
+          "team_id": "2175"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Drake Bulldogs",
+          "team_id": "2181"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Duquesne Dukes",
+          "team_id": "2184"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "East Tennessee State Buccaneers",
+          "team_id": "2193"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "East Texas A&M Lions",
+          "team_id": "2837"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Eastern Illinois Panthers",
+          "team_id": "2197"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Eastern Kentucky Colonels",
+          "team_id": "2198"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Eastern Washington Eagles",
+          "team_id": "331"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Edward Waters Tigers",
+          "team_id": "2206"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Elizabeth City State Vikings",
+          "team_id": "2207"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 1,
+          "missing_games": 10,
+          "team": "Elon Phoenix",
+          "team_id": "2210"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Fairmont State Falcons",
+          "team_id": "2986"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Florida A&M Rattlers",
+          "team_id": "50"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Fordham Rams",
+          "team_id": "2230"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Fort Valley State Wildcats",
+          "team_id": "2232"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Franklin Grizzlies",
+          "team_id": "2233"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Franklin Pierce Ravens",
+          "team_id": "112334"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 1,
+          "missing_games": 10,
+          "team": "Furman Paladins",
+          "team_id": "231"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Gardner-Webb Runnin' Bulldogs",
+          "team_id": "2241"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Georgetown (KY) Tigers",
+          "team_id": "2245"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Georgetown Hoyas",
+          "team_id": "46"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Glenville State Pioneers",
+          "team_id": "2249"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Grambling Tigers",
+          "team_id": "2755"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Hampton Pirates",
+          "team_id": "2261"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Harvard Crimson",
+          "team_id": "108"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Holy Cross Crusaders",
+          "team_id": "107"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Houston Christian Huskies",
+          "team_id": "2277"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Howard Bison",
+          "team_id": "47"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Idaho State Bengals",
+          "team_id": "304"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 2,
+          "missing_games": 8,
+          "team": "Idaho Vandals",
+          "team_id": "70"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Illinois State Redbirds",
+          "team_id": "2287"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Incarnate Word Cardinals",
+          "team_id": "2916"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Indiana State Sycamores",
+          "team_id": "282"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Jackson State Tigers",
+          "team_id": "2296"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Kentucky Christian Knights",
+          "team_id": "3077"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Kentucky State Thorobreds",
+          "team_id": "2310"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Lafayette Leopards",
+          "team_id": "322"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Lamar Cardinals",
+          "team_id": "2320"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Lane College Dragons",
+          "team_id": "2323"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Lawrence Tech Blue Devils",
+          "team_id": "102071"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Lehigh Mountain Hawks",
+          "team_id": "2329"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Lincoln (PA) Lions",
+          "team_id": "2339"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Lindenwood Lions",
+          "team_id": "2815"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Long Island University Sharks",
+          "team_id": "2341"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Louisiana Christian Wildcats",
+          "team_id": "2347"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Maine Black Bears",
+          "team_id": "311"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Marist Red Foxes",
+          "team_id": "2368"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "McNeese Cowboys",
+          "team_id": "2377"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Mercer Bears",
+          "team_id": "2382"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Mercyhurst Lakers",
+          "team_id": "2385"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 1,
+          "missing_games": 10,
+          "team": "Merrimack Warriors",
+          "team_id": "2771"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Miles Golden Bears",
+          "team_id": "2396"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Mississippi Valley State Delta Devils",
+          "team_id": "2400"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Monmouth Hawks",
+          "team_id": "2405"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 1,
+          "missing_games": 9,
+          "team": "Montana Grizzlies",
+          "team_id": "149"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 2,
+          "missing_games": 8,
+          "team": "Montana State Bobcats",
+          "team_id": "147"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Morehead State Eagles",
+          "team_id": "2413"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Morehouse Maroon Tigers",
+          "team_id": "60"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Morgan State Bears",
+          "team_id": "2415"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Murray State Racers",
+          "team_id": "93"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "New Hampshire Wildcats",
+          "team_id": "160"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "New Haven Chargers",
+          "team_id": "2441"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Nicholls Colonels",
+          "team_id": "2447"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Norfolk State Spartans",
+          "team_id": "2450"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "North Alabama Lions",
+          "team_id": "2453"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "North Carolina A&T Aggies",
+          "team_id": "2448"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "North Carolina Central Eagles",
+          "team_id": "2428"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "North Dakota Fighting Hawks",
+          "team_id": "155"
+        },
+        {
+          "division": "lower",
+          "espn_games": 2,
+          "history_games": 0,
+          "missing_games": 2,
+          "team": "Northeastern State RiverHawks",
+          "team_id": "196"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Northern Arizona Lumberjacks",
+          "team_id": "2464"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Northern Colorado Bears",
+          "team_id": "2458"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Northern Iowa Panthers",
+          "team_id": "2460"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Northern Michigan Wildcats",
+          "team_id": "128"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Northwestern (IA) Red Raiders",
+          "team_id": "2471"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Northwestern State Demons",
+          "team_id": "2466"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Ohio Dominican Panthers",
+          "team_id": "2477"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Oklahoma Panhandle Aggies",
+          "team_id": "2824"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Pennsylvania Quakers",
+          "team_id": "219"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Point University Skyhawks",
+          "team_id": "3179"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Portland State Vikings",
+          "team_id": "2502"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Prairie View A&M Panthers",
+          "team_id": "2504"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Presbyterian Blue Hose",
+          "team_id": "2506"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Princeton Tigers",
+          "team_id": "163"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Rhode Island Rams",
+          "team_id": "227"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Richmond Spiders",
+          "team_id": "257"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Rio Grande Red Storm",
+          "team_id": "131239"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Robert Morris Colonials",
+          "team_id": "2523"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Roosevelt Lakers",
+          "team_id": "127991"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "SE Louisiana Lions",
+          "team_id": "2545"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Sacred Heart Pioneers",
+          "team_id": "2529"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Samford Bulldogs",
+          "team_id": "2535"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "San Diego Toreros",
+          "team_id": "301"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Savannah State Tigers",
+          "team_id": "2542"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "South Carolina State Bulldogs",
+          "team_id": "2569"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "South Dakota Coyotes",
+          "team_id": "233"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "South Dakota Mines Hardrockers",
+          "team_id": "613"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 1,
+          "missing_games": 10,
+          "team": "South Dakota State Jackrabbits",
+          "team_id": "2571"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Southeast Missouri State Redhawks",
+          "team_id": "2546"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Southern Connecticut State Owls",
+          "team_id": "2583"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Southern Illinois Salukis",
+          "team_id": "79"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Southern Jaguars",
+          "team_id": "2582"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Southern Utah Thunderbirds",
+          "team_id": "253"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "St. Francis (IL) Fighting Saints",
+          "team_id": "2595"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "St. Thomas Tommies",
+          "team_id": "2900"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Stephen F. Austin Lumberjacks",
+          "team_id": "2617"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Stetson Hatters",
+          "team_id": "56"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Stonehill Skyhawks",
+          "team_id": "284"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Stony Brook Seawolves",
+          "team_id": "2619"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Tarleton State Texans",
+          "team_id": "2627"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Tennessee State Tigers",
+          "team_id": "2634"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Tennessee Tech Golden Eagles",
+          "team_id": "2635"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Texas Southern Tigers",
+          "team_id": "2640"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Texas Wesleyan Rams",
+          "team_id": "102626"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 1,
+          "missing_games": 10,
+          "team": "The Citadel Bulldogs",
+          "team_id": "2643"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Thomas More Saints",
+          "team_id": "2646"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Towson Tigers",
+          "team_id": "119"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Tusculum Pioneers",
+          "team_id": "2839"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Tuskegee Golden Tigers",
+          "team_id": "2657"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "UAlbany Great Danes",
+          "team_id": "399"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "UC Davis Aggies",
+          "team_id": "302"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "UFTL Eagles",
+          "team_id": "124110"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "UT Martin Skyhawks",
+          "team_id": "2630"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "UT Permian Basin Falcons",
+          "team_id": "110243"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "UT Rio Grande Valley Vaqueros",
+          "team_id": "292"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "UVA Wise Cavaliers",
+          "team_id": "2842"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Utah Tech Trailblazers",
+          "team_id": "3101"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "VMI Keydets",
+          "team_id": "2678"
+        },
+        {
+          "division": "lower",
+          "espn_games": 10,
+          "history_games": 0,
+          "missing_games": 10,
+          "team": "Valparaiso Beacons",
+          "team_id": "2674"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 1,
+          "missing_games": 10,
+          "team": "Villanova Wildcats",
+          "team_id": "222"
+        },
+        {
+          "division": "lower",
+          "espn_games": 5,
+          "history_games": 0,
+          "missing_games": 5,
+          "team": "Virginia Lynchburg Dragons",
+          "team_id": "2355"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Virginia State Trojans",
+          "team_id": "330"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Wagner Seahawks",
+          "team_id": "2681"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Webber International Warriors",
+          "team_id": "2691"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Weber State Wildcats",
+          "team_id": "2692"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "West Alabama Tigers",
+          "team_id": "2695"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "West Florida Argonauts",
+          "team_id": "110242"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "West Georgia Wolves",
+          "team_id": "2698"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "West Virginia State Yellow Jackets",
+          "team_id": "2707"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Western Carolina Catamounts",
+          "team_id": "2717"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Western Illinois Leathernecks",
+          "team_id": "2710"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "William & Mary Tribe",
+          "team_id": "2729"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Winona State Warriors",
+          "team_id": "2851"
+        },
+        {
+          "division": "lower",
+          "espn_games": 1,
+          "history_games": 0,
+          "missing_games": 1,
+          "team": "Winston-Salem State Rams",
+          "team_id": "2736"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Wofford Terriers",
+          "team_id": "2747"
+        },
+        {
+          "division": "lower",
+          "espn_games": 9,
+          "history_games": 0,
+          "missing_games": 9,
+          "team": "Yale Bulldogs",
+          "team_id": "43"
+        },
+        {
+          "division": "lower",
+          "espn_games": 11,
+          "history_games": 0,
+          "missing_games": 11,
+          "team": "Youngstown State Penguins",
+          "team_id": "2754"
+        }
+      ],
+      "week4_completed_games_in_feed": {
+        "80": 71,
+        "81": 65
+      }
+    }
+  },
+  "backfill": {
+    "bytes": 11785384,
+    "first_event_start_utc": "2016-08-27T02:00Z",
+    "last_event_start_utc": "2026-11-14T23:00Z",
+    "path": "data/research/ncaaf_v6/ncaaf_games_backfill.jsonl",
+    "rows": 16378,
+    "sha256": "cc704059e4684edb9e580dff5033433424ee34e6a5fe96995c7c272ae82d8bf4"
+  },
+  "espn_completed_events": 16378,
+  "fetch": {
+    "duplicates_across_weeks": 0,
+    "events_started_after_as_of": 0,
+    "failures": [],
+    "limit_saturated": [],
+    "reject": {
+      "not_completed": 691
+    },
+    "requests": 440,
+    "retries": 0,
+    "status_names": {
+      "STATUS_FINAL": 16372,
+      "STATUS_FORFEIT": 6
+    }
+  },
+  "fetch_finished_utc": "2026-11-15T02:26:23Z",
+  "fetch_started_utc": "2026-11-15T02:21:59Z",
+  "history_files": [
+    {
+      "exists": true,
+      "new_events": 7965,
+      "path": "data/processed/ncaaf/games.jsonl",
+      "rows": 7965,
+      "sha256": "659e33b21de95e02633251c5614df3b63f9fea62898a140bd7efaa83e525ecb7"
+    },
+    {
+      "exists": true,
+      "new_events": 0,
+      "path": "data/historical/ncaaf_games_all.jsonl",
+      "rows": 7965,
+      "sha256": "659e33b21de95e02633251c5614df3b63f9fea62898a140bd7efaa83e525ecb7"
+    }
+  ],
+  "history_loaded_events": 7965,
+  "history_rejected": {},
+  "max_events_in_one_response": 159,
+  "parser_version": "cfb-v6-backfill-1",
+  "regime_note": "All seasons 2016-2026 were fetched without a failed request. FBS-FBS: share of ESPN games absent from the history is 2.0% to 6.7% over 2016-2025 and 18.6% in 2026. FBS-FCS: share of ESPN games absent from the history is 89.7% to 95.2% over 2016-2025 and 91.9% in 2026. FCS-FCS: share of ESPN games absent from the history is 97.7% to 100.0% over 2016-2025 and 99.8% in 2026. The history is missing FCS-involved games in every fit season as well as 2026, so the backfill changes the rating inputs in the fit years and in the market-check season alike; the regime is consistent across them. Seasons with under 100 ESPN FCS-FCS games in the requested season types: {2020: 24}. The 2020 FCS season was played in spring 2021 and ESPN files it under season type 5, which this script does not request (probed once by hand: 238 completed games, 236 groups=81-only and 2 in both feeds, none of them in the backfill file), so 2020 FCS coverage is understated, not thin on ESPN.",
+  "script": "scripts/cfb_v6_history_backfill.py",
+  "seasons_covered": {
+    "complete": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "empty": [],
+    "partial": []
+  }
+}

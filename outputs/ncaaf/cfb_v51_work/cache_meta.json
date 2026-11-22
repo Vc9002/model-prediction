@@ -1,0 +1,16 @@
+{
+  "history_root": "C:\\Users\\Vince\\AppData\\Local\\Temp\\claude\\3c4e37e4a6ec2934\\5102c22c-32d0-4368-88d7-6dd00c770661\\scratchpad\\hist",
+  "files": {
+    "processed/ncaaf/games.jsonl": {
+      "sha256": "d4fff8f9d8ae78ff4bb86120ae4dced3b0025e73510f7b4d818f1f0c432b9c75",
+      "rows": 16405
+    },
+    "historical/ncaaf_games_all.jsonl": {
+      "sha256": "a5d67bbda94fc72b4f5b8952f1960e3d7cb70a69fe061a2e849e4805253c7c4a",
+      "rows": 8033
+    }
+  },
+  "conference_table_sha256": "6d9b660fb6d625bf6536f69c27dfe129ad60fe8ced38c0b1c6e08c61996fe0bc",
+  "started_utc": "2026-11-22T02:57:59.235223+00:00",
+  "workers": 10
+}

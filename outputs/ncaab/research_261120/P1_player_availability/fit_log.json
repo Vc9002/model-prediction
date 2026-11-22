@@ -1,0 +1,87 @@
+{
+  "grid": "P1_player_availability",
+  "fitted_by_fold": {
+    "2023": {
+      "coef": [
+        5.44263265577285,
+        -3.7675742216164405
+      ],
+      "n_train": 15408,
+      "n_train_rows_total": 17242,
+      "train_target_rmse_before": 11.39089,
+      "train_target_rmse_after": 11.36851,
+      "regressor_sd": [
+        0.10384,
+        0.05978
+      ],
+      "fit_seasons": [
+        2024,
+        2025,
+        2026
+      ]
+    },
+    "2024": {
+      "coef": [
+        6.458048382607443,
+        -0.9252161689527177
+      ],
+      "n_train": 14951,
+      "n_train_rows_total": 17237,
+      "train_target_rmse_before": 11.33928,
+      "train_target_rmse_after": 11.31748,
+      "regressor_sd": [
+        0.10396,
+        0.05935
+      ],
+      "fit_seasons": [
+        2023,
+        2025,
+        2026
+      ]
+    },
+    "2025": {
+      "coef": [
+        6.072785408163263,
+        -1.887716118273623
+      ],
+      "n_train": 14576,
+      "n_train_rows_total": 17199,
+      "train_target_rmse_before": 11.32389,
+      "train_target_rmse_after": 11.30327,
+      "regressor_sd": [
+        0.10178,
+        0.0581
+      ],
+      "fit_seasons": [
+        2023,
+        2024,
+        2026
+      ]
+    },
+    "2026": {
+      "coef": [
+        5.246158013451801,
+        -4.120632041011528
+      ],
+      "n_train": 14594,
+      "n_train_rows_total": 17211,
+      "train_target_rmse_before": 11.28886,
+      "train_target_rmse_after": 11.26713,
+      "regressor_sd": [
+        0.10282,
+        0.0588
+      ],
+      "fit_seasons": [
+        2023,
+        2024,
+        2025
+      ]
+    }
+  },
+  "adj_valid_share": {
+    "2023": 0.77521,
+    "2024": 0.85452,
+    "2025": 0.91395,
+    "2026": 0.91342
+  }
+}

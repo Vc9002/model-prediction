@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import os
 import tempfile
+import threading
 import time
 import uuid
+from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
 from datetime import datetime
@@ -424,6 +426,17 @@ def settle_from_pick_row(model_ledgers_dir: str | Path, row: dict[str, Any]) -> 
     )
 
 
+# Parsed workbook rows by resolved path, valid while the file's (mtime, size,
+# inode) is unchanged. The live hook reads a model's whole workbook twice per
+# appended pick (dedupe, then append) and once more for the same pick arriving
+# from a second tier: 0.4 s per read at 1,000 rows on 2026-11-14, hundreds of
+# picks per slate. Every write goes through an atomic replace, which changes
+# the signature, so another process's write is always seen.
+_ROWS_CACHE: OrderedDict[str, tuple[tuple[int, int, int], list[dict[str, str]]]] = OrderedDict()
+_ROWS_CACHE_LOCK = threading.Lock()
+_ROWS_CACHE_MAX_LEDGERS = 32
+
+
 class ModelLedger:
     """One file per model identity (e.g. mlb-moneyline-elo-trend-lr.xlsx).
 
@@ -451,11 +464,31 @@ class ModelLedger:
                 unlock(lock.fileno())
 
     def _read_unlocked(self) -> list[dict[str, str]]:
-        if not self.path.exists():
+        try:
+            stat = self.path.stat()
+        except FileNotFoundError:
             return []
-        return _read_predictions(self.path)
+        key = str(self.path.resolve())
+        signature = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
+        with _ROWS_CACHE_LOCK:
+            cached = _ROWS_CACHE.get(key)
+            if cached is not None and cached[0] == signature:
+                _ROWS_CACHE.move_to_end(key)
+                return [dict(row) for row in cached[1]]
+        rows = _read_predictions(self.path)
+        with _ROWS_CACHE_LOCK:
+            _ROWS_CACHE[key] = (signature, [dict(row) for row in rows])
+            _ROWS_CACHE.move_to_end(key)
+            while len(_ROWS_CACHE) > _ROWS_CACHE_MAX_LEDGERS:
+                _ROWS_CACHE.popitem(last=False)
+        return rows
 
     def _write_unlocked(self, rows: list[dict[str, str]]) -> None:
+        # Dropped rather than refilled from ``rows``: the workbook round trip is
+        # not an identity (blank rows are skipped on read), so only what a real
+        # read returned is ever served.
+        with _ROWS_CACHE_LOCK:
+            _ROWS_CACHE.pop(str(self.path.resolve()), None)
         _write_predictions_atomic(self.path, rows)
 
     def rows(self) -> list[dict[str, str]]:

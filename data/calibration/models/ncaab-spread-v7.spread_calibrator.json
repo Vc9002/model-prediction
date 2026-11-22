@@ -1,0 +1,17 @@
+{
+  "baseline_brier": 0.263751,
+  "calibrated_at_utc": "2026-11-22T01:38:05.596680+00:00",
+  "calibrated_oof_brier": 0.2637511831480942,
+  "champion_method": "identity",
+  "fit_model_versions": [
+    "ncaab-spread-v7",
+    "ncaab-spread-v6"
+  ],
+  "fit_pool": "engine-pure: ncaab-spread-v7 rows plus ncaab-spread-v6 rows whose decision snapshot features.margin_engine == 'v7'",
+  "fit_source": "settled_live_rows",
+  "market": "spread",
+  "model_version": "ncaab-spread-v7",
+  "parameters": {},
+  "sample_size": 223,
+  "sport": "ncaab"
+}

@@ -133,6 +133,10 @@ def validate_decision_snapshot(payload: dict[str, Any], row: dict[str, Any]) -> 
         from .esports_replay import validate_decision_snapshot as validate_esports
 
         return validate_esports(payload, row)
+    if payload.get("schema") == "nba-anchor-v10-replay-v1":
+        from .nba_anchor_v10_replay import validate_decision_snapshot as validate_nba_anchor
+
+        return validate_nba_anchor(payload, row)
     if payload.get("schema") == "cfb-joint-replay-v1":
         from .cfb_replay import validate_decision_snapshot as validate_cfb
 

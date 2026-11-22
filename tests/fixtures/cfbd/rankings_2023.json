@@ -1,0 +1,292 @@
+[
+ {
+  "season": 2023,
+  "seasonType": "regular",
+  "week": 2,
+  "polls": [
+   {
+    "poll": "FCS Coaches Poll",
+    "isFinal": null,
+    "ranks": [
+     {
+      "rank": 1,
+      "teamId": 2571,
+      "school": "South Dakota State",
+      "conference": "MVFC",
+      "firstPlaceVotes": 25,
+      "points": 625
+     },
+     {
+      "rank": 2,
+      "teamId": 2449,
+      "school": "North Dakota State",
+      "conference": "MVFC",
+      "firstPlaceVotes": 0,
+      "points": 599
+     },
+     {
+      "rank": 3,
+      "teamId": 147,
+      "school": "Montana State",
+      "conference": "Big Sky",
+      "firstPlaceVotes": 0,
+      "points": 573
+     },
+     {
+      "rank": 4,
+      "teamId": 2729,
+      "school": "William & Mary",
+      "conference": "Coastal Athletic",
+      "firstPlaceVotes": 0,
+      "points": 524
+     },
+     {
+      "rank": 5,
+      "teamId": 107,
+      "school": "Holy Cross",
+      "conference": "Patriot",
+      "firstPlaceVotes": 0,
+      "points": 503
+     }
+    ]
+   },
+   {
+    "poll": "AP Top 25",
+    "isFinal": null,
+    "ranks": [
+     {
+      "rank": 1,
+      "teamId": 61,
+      "school": "Georgia",
+      "conference": "SEC",
+      "firstPlaceVotes": 58,
+      "points": 1569
+     },
+     {
+      "rank": 2,
+      "teamId": 130,
+      "school": "Michigan",
+      "conference": "Big Ten",
+      "firstPlaceVotes": 2,
+      "points": 1485
+     },
+     {
+      "rank": 3,
+      "teamId": 333,
+      "school": "Alabama",
+      "conference": "SEC",
+      "firstPlaceVotes": 0,
+      "points": 1424
+     },
+     {
+      "rank": 4,
+      "teamId": 52,
+      "school": "Florida State",
+      "conference": "ACC",
+      "firstPlaceVotes": 3,
+      "points": 1384
+     },
+     {
+      "rank": 5,
+      "teamId": 194,
+      "school": "Ohio State",
+      "conference": "Big Ten",
+      "firstPlaceVotes": 0,
+      "points": 1308
+     }
+    ]
+   },
+   {
+    "poll": "Coaches Poll",
+    "isFinal": null,
+    "ranks": [
+     {
+      "rank": 1,
+      "teamId": 61,
+      "school": "Georgia",
+      "conference": "SEC",
+      "firstPlaceVotes": 63,
+      "points": 1647
+     },
+     {
+      "rank": 2,
+      "teamId": 130,
+      "school": "Michigan",
+      "conference": "Big Ten",
+      "firstPlaceVotes": 1,
+      "points": 1534
+     },
+     {
+      "rank": 3,
+      "teamId": 333,
+      "school": "Alabama",
+      "conference": "SEC",
+      "firstPlaceVotes": 2,
+      "points": 1515
+     },
+     {
+      "rank": 4,
+      "teamId": 194,
+      "school": "Ohio State",
+      "conference": "Big Ten",
+      "firstPlaceVotes": 0,
+      "points": 1422
+     },
+     {
+      "rank": 5,
+      "teamId": 52,
+      "school": "Florida State",
+      "conference": "ACC",
+      "firstPlaceVotes": 0,
+      "points": 1388
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "season": 2023,
+  "seasonType": "regular",
+  "week": 1,
+  "polls": [
+   {
+    "poll": "FCS Coaches Poll",
+    "isFinal": null,
+    "ranks": [
+     {
+      "rank": 1,
+      "teamId": 2571,
+      "school": "South Dakota State",
+      "conference": "MVFC",
+      "firstPlaceVotes": 24,
+      "points": 624
+     },
+     {
+      "rank": 2,
+      "teamId": 2449,
+      "school": "North Dakota State",
+      "conference": "MVFC",
+      "firstPlaceVotes": 1,
+      "points": 596
+     },
+     {
+      "rank": 3,
+      "teamId": 147,
+      "school": "Montana State",
+      "conference": "Big Sky",
+      "firstPlaceVotes": 0,
+      "points": 567
+     },
+     {
+      "rank": 4,
+      "teamId": 2729,
+      "school": "William & Mary",
+      "conference": "Coastal Athletic",
+      "firstPlaceVotes": 0,
+      "points": 510
+     },
+     {
+      "rank": 5,
+      "teamId": 107,
+      "school": "Holy Cross",
+      "conference": "Patriot",
+      "firstPlaceVotes": 0,
+      "points": 459
+     }
+    ]
+   },
+   {
+    "poll": "Coaches Poll",
+    "isFinal": null,
+    "ranks": [
+     {
+      "rank": 1,
+      "teamId": 61,
+      "school": "Georgia",
+      "conference": "SEC",
+      "firstPlaceVotes": 61,
+      "points": 1643
+     },
+     {
+      "rank": 2,
+      "teamId": 130,
+      "school": "Michigan",
+      "conference": "Big Ten",
+      "firstPlaceVotes": 0,
+      "points": 1510
+     },
+     {
+      "rank": 3,
+      "teamId": 333,
+      "school": "Alabama",
+      "conference": "SEC",
+      "firstPlaceVotes": 4,
+      "points": 1489
+     },
+     {
+      "rank": 4,
+      "teamId": 194,
+      "school": "Ohio State",
+      "conference": "Big Ten",
+      "firstPlaceVotes": 1,
+      "points": 1485
+     },
+     {
+      "rank": 5,
+      "teamId": 99,
+      "school": "LSU",
+      "conference": "SEC",
+      "firstPlaceVotes": 0,
+      "points": 1294
+     }
+    ]
+   },
+   {
+    "poll": "AP Top 25",
+    "isFinal": null,
+    "ranks": [
+     {
+      "rank": 1,
+      "teamId": 61,
+      "school": "Georgia",
+      "conference": "SEC",
+      "firstPlaceVotes": 60,
+      "points": 1572
+     },
+     {
+      "rank": 2,
+      "teamId": 130,
+      "school": "Michigan",
+      "conference": "Big Ten",
+      "firstPlaceVotes": 2,
+      "points": 1490
+     },
+     {
+      "rank": 3,
+      "teamId": 194,
+      "school": "Ohio State",
+      "conference": "Big Ten",
+      "firstPlaceVotes": 1,
+      "points": 1400
+     },
+     {
+      "rank": 4,
+      "teamId": 333,
+      "school": "Alabama",
+      "conference": "SEC",
+      "firstPlaceVotes": 0,
+      "points": 1398
+     },
+     {
+      "rank": 5,
+      "teamId": 99,
+      "school": "LSU",
+      "conference": "SEC",
+      "firstPlaceVotes": 0,
+      "points": 1276
+     }
+    ]
+   }
+  ]
+ }
+]

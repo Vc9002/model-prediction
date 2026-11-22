@@ -199,6 +199,7 @@ class NCAABTotalModelV6:
         self.conference_baselines = conference_baselines or DEFAULT_CONFERENCE_SCORING_BASELINES
         self.team_conferences = _load_team_conference_map(conference_file)
         self.version = version
+        self.model_artifact_hash = ""  # set by the production factory; stamped on ledger rows
         self.league = "NCAAB"
         self.sport = "ncaab"
 
@@ -569,4 +570,7 @@ class NCAABTotalModelV6:
 
 def ncaab_total_v6_model() -> NCAABTotalModelV6:
     """Production factory: the served parameters are the hash-verified artifact's, nothing else."""
-    return NCAABTotalModelV6.from_artifact(load_verified_artifact(ARTIFACT_PATH))
+    artifact = load_verified_artifact(ARTIFACT_PATH)
+    model = NCAABTotalModelV6.from_artifact(artifact)
+    model.model_artifact_hash = str(artifact["artifact_hash"])
+    return model

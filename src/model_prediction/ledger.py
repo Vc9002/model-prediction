@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 import threading
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
@@ -130,6 +130,12 @@ def defer_sqlite_xlsx_exports() -> Iterator[None]:
                 )
                 if ledger.mirror is not None:
                     _parity_alarm(ledger.mirror, f"deferred export write {ledger.path}")
+
+
+def _sqlite_xlsx_export_deferred() -> bool:
+    """Whether a deferral context is active, without registering a ledger as dirty."""
+    with _DEFERRED_XLSX_EXPORTS_LOCK:
+        return _DEFERRED_XLSX_EXPORTS_DEPTH > 0
 
 
 def _defer_sqlite_xlsx_export(ledger: PickLedger) -> bool:
@@ -782,6 +788,8 @@ class PickLedger:
                 )
                 if dyn_units <= 1.0 and calc_edge > 0.01:
                     dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
+            if eligibility.units_cap is not None:
+                dyn_units = min(dyn_units, max(0.0, float(eligibility.units_cap)))
             eligibility = replace(
                 eligibility,
                 qualified=True,
@@ -825,6 +833,8 @@ class PickLedger:
                 )
                 if dyn_units <= 1.0 and calc_edge > 0.01:
                     dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
+            if eligibility.units_cap is not None:
+                dyn_units = min(dyn_units, max(0.0, float(eligibility.units_cap)))
             eligibility = replace(
                 eligibility,
                 qualified=True,
@@ -896,7 +906,14 @@ class PickLedger:
         )
         with self._lock():
             self._migrate_if_needed()
-            existing = self._read_unlocked()
+            # The duplicate check only needs this event's rows. Reading the whole
+            # tier/sport slice here cost 1.9 s (flat/ncaaf, 4,216 rows) to 2.5 s
+            # (flat/ncaab, 8,442 rows) per append on 2026-11-14 and grew daily;
+            # the indexed event lookup is under a millisecond. The full list is
+            # only ever needed to rebuild the XLSX export, so it is read only
+            # when that export is not deferred.
+            event_scoped = self.authority == "sqlite" and _sqlite_xlsx_export_deferred()
+            existing = self._read_unlocked(event_id=request.event_id if event_scoped else None)
             for item in existing:
                 item_key = _market_duplicate_key(
                     item["event_id"],
@@ -999,7 +1016,13 @@ class PickLedger:
                 # Canonical store commits first — its failure aborts the
                 # mutation (the export write below becomes best-effort).
                 self._mirror_row(row, "append", operation_id)
-            self._write_rows(existing)
+            if event_scoped and not _defer_sqlite_xlsx_export(self):
+                # The deferral ended between the check and here (another
+                # thread's context exited): the export needs every row, and
+                # the canonical store already holds the new one.
+                self._write_rows(self._read_unlocked())
+            elif not event_scoped:
+                self._write_rows(existing)
         # Operator directive, 2026-08-02: every model also writes to its own
         # per-model ledger going forward (data/model_ledgers/<model-id>.xlsx,
         # see model_ledger.py) -- additive, alongside this real, working
@@ -1178,7 +1201,12 @@ class PickLedger:
             from .learned_replay import validate_decision_snapshot
 
             snapshot = json.loads(row["model_input_snapshot_json"])
-            if event_type in ("settle", "void", "update"):
+            # "archive" moves an already-settled row out with its full content
+            # in the audit event; like settle/void it asserts no new fact, so a
+            # later engine-code change must degrade to a warning, not block the
+            # operator-directed archive (2026-11-21: 29 NCAAF v1-v4 rows refused
+            # with cfb_replay_engine_identity_mismatch, after a stray audit event).
+            if event_type in ("settle", "void", "update", "archive"):
                 try:
                     validate_decision_snapshot(snapshot, row)
                 except ValueError as exc:
@@ -1553,8 +1581,19 @@ class PickLedger:
         """
         return self._retire_open_rows(pick_ids, reason, allow_staked_removal, superseded=True)
 
-    def restore_unreplaced_picks(self, prior_rows: list[dict[str, str]]) -> list[str]:
-        """Reopen pre-refresh calls only where no new event/market call landed."""
+    def restore_unreplaced_picks(
+        self,
+        prior_rows: list[dict[str, str]],
+        exclude_slots: Iterable[tuple[str, str, str]] = (),
+    ) -> list[str]:
+        """Reopen pre-refresh calls only where no new event/market call landed.
+
+        ``exclude_slots`` are (league, event_id, market_type) slots the refresh
+        deliberately declined (a serving gate said no). Those must stay retired:
+        reopening the previous run's version would resurrect exactly the pick the
+        gate exists to stop.
+        """
+        declined = {(str(a).casefold(), str(b), str(c)) for a, b, c in exclude_slots}
         restored: list[str] = []
         with self._lock():
             current = self._read_unlocked()
@@ -1574,7 +1613,7 @@ class PickLedger:
             }
             for row in prior_rows:
                 slot = (row["league"].casefold(), row["event_id"], row["market_type"])
-                if slot in active_slots:
+                if slot in active_slots or slot in declined:
                     continue
                 # Only the rows this refresh actually retired are eligible.
                 if retired_ids is not None and row["pick_id"] not in retired_ids:
@@ -2199,12 +2238,17 @@ class PickLedger:
             raise ValueError(f"cannot write picks.xlsx with unknown fields: {unknown}")
         write_xlsx_rows_atomic(self.path, FIELDNAMES, rows)
 
-    def _read_unlocked(self) -> list[dict[str, str]]:
+    def _read_unlocked(self, *, event_id: str | None = None) -> list[dict[str, str]]:
+        """Every live row of this ledger, or only one event's when ``event_id`` is given.
+
+        ``event_id`` narrows the read under sqlite authority only; the XLSX
+        path has no index to use and always returns every row.
+        """
         if self.authority == "sqlite":
             if self.mirror is None or not self.tier:
                 raise RuntimeError("sqlite ledger authority requires a RuntimeLedgerStore and ledger tier")
             canonical_rows: list[dict[str, str]] = []
-            for projected in self.mirror.pick_rows(tier=self.tier, sport=self.sport):
+            for projected in self.mirror.pick_rows(tier=self.tier, sport=self.sport, event_id=event_id):
                 if projected.get("status") in RETIRED_STATUSES:
                     continue
                 row = dict.fromkeys(FIELDNAMES, "")

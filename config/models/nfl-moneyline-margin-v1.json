@@ -1,0 +1,36 @@
+{
+  "artifact_hash": "0c7b08686e266502429a4891ccb6378afc7576e887259c7df136d20bdb59fd86",
+  "evidence": {
+    "accuracy": 0.673,
+    "accuracy_nfl_elo_trend_lr_v4": 0.66,
+    "brier": 0.2071,
+    "brier_nfl_elo_trend_lr_v4": 0.2198,
+    "caveats": [
+      "The replay fed the engine the closing line; serving uses the line at decision time.",
+      "The gain comes from the line inside the margin (market weight 0.8): the pure structural margin scores 0.2277, worse than nfl-elo-trend-lr-v4.",
+      "The line alone scores 0.2068; this is an accuracy gain, not an edge over the market."
+    ],
+    "out_of_sample_games": 594,
+    "out_of_sample_window": "2024-09-22..2026-10-08",
+    "paired_brier_gain": 0.0127,
+    "paired_brier_gain_ci95": [
+      0.0038,
+      0.0213
+    ],
+    "source": "1,485-game point-in-time replay joined to walk-forward Elo/trend rows, 2021-09-09..2026-10-08"
+  },
+  "league": "NFL",
+  "method": "nfl_spread_v7_margin_win_probability",
+  "model_version": "nfl-moneyline-margin-v1",
+  "note": "Moneyline challenger: the home-win probability nfl-spread-structural-v7 already derives from its projected margin (logistic, scale 13.5, clamp 0.05-0.95). No fitted constants of its own. Logged to Flat beside nfl-elo-trend-lr-v4; never Main.",
+  "parent_artifact_hash": "856efa81fbe3cfafd7ffbc8bab2f0c76ec0982ca2c019e838af76dae9156c2c5",
+  "parent_model_version": "nfl-spread-structural-v7",
+  "positive_class": "home",
+  "qualification": {
+    "note": "Flat-only challenger; promotion needs model_promotion promote with operator approval.",
+    "qualified": false,
+    "status": "candidate_unqualified"
+  },
+  "schema_version": "1",
+  "sport": "nfl"
+}

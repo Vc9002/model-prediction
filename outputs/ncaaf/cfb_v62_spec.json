@@ -1,0 +1,208 @@
+{
+  "blend": {
+    "margin": {
+      "w": 1.0,
+      "w_raw": 1.0334792807219708
+    },
+    "total": {
+      "w": 1.0,
+      "w_raw": 1.0126588880071232
+    }
+  },
+  "cohort_check": {
+    "spread": {
+      "train_n_own_lined_set": 4696,
+      "train_slope_actual_minus_line_on_v6_minus_line": -0.00887515702103006
+    },
+    "total": {
+      "train_n_own_lined_set": 4590,
+      "train_slope_actual_minus_line_on_v6_minus_line": -0.011593573341520785
+    }
+  },
+  "counts": {
+    "both_lined_all_windows": 8268,
+    "holdout_rows_not_read": 1889,
+    "spread_lined_all_windows": 8376,
+    "total_lined_all_windows": 8279,
+    "windows": {
+      "train": 4590,
+      "validation": 1789
+    }
+  },
+  "generated_at_utc": "2026-11-21T09:23:17.283565+00:00",
+  "holdout_reads": 1,
+  "holdout_reads_note": "Holdout reads by this task, all rules: 1 (rule-1, mean-centred, after hashing; outputs/ncaaf/cfb_v62_report_rule1.md). The rule-2 fit and its ridge choice used train and validation only; the holdout was not re-read for selection. Before this task the holdout window's v6-vs-line numbers were read by the v6-espn check and the v6.1 comparison, so it is not clean.",
+  "inputs": {
+    "base_rows": {
+      "path": "E:\\MP\\outputs\\ncaaf\\cfb_v6_base_rows.jsonl",
+      "sha256": "30c3383c4de3824e5a3ee7cb76053facd18b0fe105097fec066bb9fc2980f4be"
+    },
+    "espn_lines": {
+      "path": "E:\\MP\\data\\research\\ncaaf_v6\\espn_lines.jsonl",
+      "sha256": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54"
+    },
+    "frozen_v6_fit": {
+      "path": "outputs/ncaaf/cfb_v6_frozen_fit.json",
+      "sha256": "2df0e1f7ca99cc0a952098319b078c475add2e05f2036f3568143ba46c7db28d"
+    },
+    "v6_artifact": {
+      "artifact_hash": "db869a4d96642983697571a828301585cc08a834f4d28b738622a7f57b38e5d2",
+      "path": "config/models/cfb-structural-v6.json"
+    }
+  },
+  "key_multipliers": {
+    "1": 0.9716609815908381,
+    "10": 1.424490068118888,
+    "11": 0.8211792717558708,
+    "12": 0.43189874685144086,
+    "13": 0.5454690056362403,
+    "14": 1.5043221659904047,
+    "15": 0.5346810813384769,
+    "16": 0.5812481465746022,
+    "17": 1.313816048084709,
+    "18": 1.0157096752020116,
+    "19": 0.5916090637855388,
+    "2": 0.7326913748155346,
+    "20": 0.6329704954647687,
+    "21": 1.6809316881885374,
+    "22": 0.6166253120225653,
+    "23": 0.7556523188919024,
+    "24": 1.3047159752855453,
+    "25": 0.8446790148062547,
+    "26": 0.4903235055288158,
+    "27": 0.9203190363706705,
+    "28": 1.7671290027820197,
+    "3": 2.761479015166232,
+    "4": 1.0032092312647942,
+    "5": 0.7382896848996574,
+    "6": 0.9869889033204862,
+    "7": 2.487080130470755,
+    "8": 0.8235510142142052,
+    "9": 0.39533241074522446
+  },
+  "margin": {
+    "converged": true,
+    "lambda": 1.0,
+    "neg_ll": 18511.571448183415,
+    "sd_params": [
+      2.7930991063119843,
+      -0.03444203778848589,
+      0.0270563907722516
+    ],
+    "theta": [
+      -0.028748319732679595,
+      -0.3110307096672256,
+      1.0157664112595213,
+      0.0032040926731562685,
+      -0.30341900443591413,
+      -0.01309648244824345,
+      0.9111093840331258,
+      -0.19412978323917787,
+      -0.9280283217920331,
+      0.3538139027440072,
+      -0.19701383556378166,
+      -0.8395641004981793,
+      -0.606109293588601,
+      0.40834240869943633,
+      -0.6260848194778335,
+      -0.5425775107745113,
+      0.27293591641511206,
+      0.015587555567266993,
+      -0.5249092274624172,
+      -0.45733146856444634,
+      0.5193482159972612,
+      -0.48349371341163405,
+      -0.2801739042326726,
+      0.2659853736275298,
+      -0.1687985879262296,
+      -0.7126898903588202,
+      -0.08303489038910261,
+      0.5693561973405119
+    ]
+  },
+  "margin_smooth_baseline": {
+    "neg_ll": 19035.982870172207,
+    "sd_params": [
+      2.760052454894751,
+      -0.0164381612728175,
+      0.026333973296440532
+    ]
+  },
+  "model_version": "cfb-structural-v6.2",
+  "ridge_selection": [
+    {
+      "converged": true,
+      "lambda": 1.0,
+      "neg_ll": 18511.571448183415,
+      "validation_margin_log_score": -4.008994525415933
+    },
+    {
+      "converged": true,
+      "lambda": 10.0,
+      "neg_ll": 18565.254186347855,
+      "validation_margin_log_score": -4.009745250273164
+    },
+    {
+      "converged": true,
+      "lambda": 100.0,
+      "neg_ll": 18791.10486105903,
+      "validation_margin_log_score": -4.042158173203821
+    }
+  ],
+  "rule": {
+    "anchor_historical": "ESPN pinned median of non-live providers (espn-lines-rule-1), closing, untimestamped",
+    "anchor_serving": "DraftKings line from the forward ESPN pregame capture, observed_at <= decision and < kickoff",
+    "base": "frozen cfb-structural-v6 (params sha256 6e38b14c...), calibrated margin and total; no refit",
+    "blend": "w = argmin sum (y - w*a - (1-w)*v)^2 on train, per market (margin, total); clipped to [0, 1]",
+    "cohort": "v6-covered lined events (cfb_v6_base_rows rows with a grid), season > 2016, both lines present",
+    "id": "cfb-v62-fit-rule-2",
+    "margin_pmf": "p(m) proportional to [Phi((m+.5-loc)/sd) - Phi((m-.5-loc)/sd)] * g(|m|), g(0)=0 (no ties in the data), g(k)=exp(theta_k) for 1<=k<=28 else 1; loc solved by 4 Newton steps: anchored rows cover-balanced at the anchor line (P(m > a) = P(m < a)); model-only rows mean-centred (E[m] = v6 mean)",
+    "margin_sd": "sd = exp(s0 + s1*|mu|/10 + s2*(anchor total - 55)/10), MLE jointly with theta on train",
+    "metrics": "validation: Brier/log (moneyline, cover, over), integer log score, key mass, cover near 3/7, MAE",
+    "model_only_fallback": "v6 means, v6 slice SD tables, same theta (no anchor at decision time)",
+    "ridge": "penalty lambda * sum(theta^2), lambda in [1.0, 10.0, 100.0] chosen by validation margin log score",
+    "supersedes": "cfb-v62-fit-rule-1 (mean-centred margin pmf). Changed AFTER rule-1's single holdout read: on train the mean-centred keyed pmf under-predicted favourite cover at half-point lines near key numbers (7.5: 45.0% predicted vs 57.6% actual, n 144), so the anchored pmf is now centred cover-balanced at the anchor line. The holdout is NOT re-read under rule-2.",
+    "total_pmf": "discretised normal at the blended total mean, sd per anchor-total bucket [[0.0, 45.0], [45.0, 52.0], [52.0, 60.0], [60.0, 999.0]], MLE on train",
+    "windows": {
+      "holdout": "date > 2024-11-14, scored at most once after the artifact is hashed",
+      "train": "date <= 2022-11-11",
+      "validation": "2022-11-11 < date <= 2024-11-14"
+    }
+  },
+  "rule_sha256": "9cd74d77099d2da05b0d579dbe24e2ebefd4e1278a0596cd0b493d5d2b765127",
+  "script_sha256": "737e5b0369f29d0368a91dd42f00bc5e5663cea3840170c3a3e1eac5057c4f0e",
+  "structure": {
+    "key_max": 28,
+    "margin_support": 130,
+    "recentre_iterations": 4,
+    "sd_scale": 10.0,
+    "sd_total_centre": 55.0,
+    "total_buckets": [
+      [
+        0.0,
+        45.0
+      ],
+      [
+        45.0,
+        52.0
+      ],
+      [
+        52.0,
+        60.0
+      ],
+      [
+        60.0,
+        999.0
+      ]
+    ],
+    "total_support": 180
+  },
+  "total": {
+    "bucket_sds": [
+      14.890175806505054,
+      15.543953808595933,
+      16.05683190654119,
+      17.787658957760158
+    ]
+  }
+}

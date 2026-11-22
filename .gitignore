@@ -141,3 +141,13 @@ dashboard/cache_snapshot.pkl
 
 # task-observer log; belongs to the agent workspace, not the project
 skill-observations/
+
+# codewhale session scratch (pasted transcripts, temp scripts, run log)
+.codewhale/pastes/
+.codewhale/tmp_*
+.codewhale/workflow-runs.jsonl
+.codewhale/state/
+
+# large regenerable research caches (GitHub rejects >100 MB, warns >50 MB)
+outputs/**/*.pkl
+outputs/ncaaf/cfb_v6_base_rows.jsonl

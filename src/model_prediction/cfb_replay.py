@@ -5,8 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import threading
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from .domain import parse_utc
 from .learned_replay import snapshot_hash
@@ -36,6 +40,53 @@ VERSIONS = {
         "cfb-total-v1",
     ),
 }
+
+
+# Simulated (home, away) score arrays by engine parameters, RNG state and score
+# means. A replay restores the recorded RNG state, so the draws are a pure
+# function of that key; the spread and total lines only threshold them. One
+# game's contracts share one key and each was replayed at slate build, snapshot
+# build, snapshot validation and every ledger write: 93% of the 128 s NCAAF
+# slate build on 2026-11-14. Two 200,000-draw arrays are 3.2 MB, hence the
+# small bound. The memo lives here, not in models/cfb_distribution.py, because
+# that file's hash is stamped into every stored snapshot (engine_hash).
+_SCORES_CACHE: OrderedDict[str, tuple[np.ndarray, np.ndarray]] = OrderedDict()
+_SCORES_CACHE_LOCK = threading.Lock()
+_SCORES_CACHE_MAX_ENTRIES = 16
+
+
+class _MemoizedReplayEngine(CFBJointDistributionEngine):
+    """A replay engine whose score simulation is served from ``_SCORES_CACHE``."""
+
+    def simulate_joint_scores(self, mu_home: float, mu_away: float) -> tuple[np.ndarray, np.ndarray]:
+        key = json.dumps(
+            [
+                self.distribution_type.value,
+                self.margin_sd,
+                self.total_sd,
+                self.score_correlation,
+                self.nb_dispersion,
+                self.n_simulations,
+                self.rng.bit_generator.state,
+                mu_home,
+                mu_away,
+            ],
+            sort_keys=True,
+        )
+        with _SCORES_CACHE_LOCK:
+            cached = _SCORES_CACHE.get(key)
+            if cached is not None:
+                _SCORES_CACHE.move_to_end(key)
+                return cached
+        home_scores, away_scores = super().simulate_joint_scores(mu_home, mu_away)
+        # Shared between callers from here on; a write would corrupt later replays.
+        home_scores.setflags(write=False)
+        away_scores.setflags(write=False)
+        with _SCORES_CACHE_LOCK:
+            _SCORES_CACHE[key] = (home_scores, away_scores)
+            while len(_SCORES_CACHE) > _SCORES_CACHE_MAX_ENTRIES:
+                _SCORES_CACHE.popitem(last=False)
+        return home_scores, away_scores
 
 
 def engine_hash() -> str:
@@ -87,7 +138,7 @@ def replay_inputs(inputs: dict[str, Any], market: str) -> dict[str, float]:
             raise ValueError("cfb_replay_invalid_input")
     if min(inputs["mu_home"], inputs["mu_away"]) <= 0:
         raise ValueError("cfb_replay_invalid_score_mean")
-    engine = CFBJointDistributionEngine(**parameters)
+    engine = _MemoizedReplayEngine(**parameters)
     engine.rng.bit_generator.state = inputs["rng_state_before"]
     result = engine.compute_market_probabilities(
         mu_home=inputs["mu_home"],

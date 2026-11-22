@@ -1,0 +1,72 @@
+{
+  "prereg_version": "cfb-lopsided-prereg-1",
+  "quick_task": "261115-183",
+  "registered_at_utc": "2026-11-15T06:28:59Z",
+  "totals_rule_sha256": "1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f",
+  "hypothesis": "On NCAAF games that are lopsided (|closing home spread| >= 28) or FBS-vs-FCS, the final total exceeds the ESPN closing total on average: mean(actual total - closing total) > 0.",
+  "origin_note": "The tilt was found retrospectively (55.2% over on 972 games before registration). That history is cited only as the origin of the hypothesis and is never part of a test; it includes 2026-11-14.",
+  "evaluation_window": {
+    "rule": "games with kickoff strictly after registered_at_utc",
+    "kickoff_strictly_after_utc": "2026-11-15T06:28:59Z",
+    "pre_registration_games": "never tested; every game with kickoff at or before registered_at_utc is dropped before any score or odds field is parsed. Season scoreboards are read in full only for team ids and feed membership (to learn each season's FBS set); no pre-registration score, line or result enters the metric."
+  },
+  "population": "FBS-involved games (ESPN college-football scoreboard feed groups=80); completed, not STATUS_FORFEIT; at least 10 hours past kickoff (an operational proxy for 'the game ended at least 6 hours ago'; no ESPN end-time field is used).",
+  "classification": {
+    "fbs_set": "a team is FBS in a season if it plays in at least one groups=80-only event (not also in groups=81) that season, from the season's scoreboards (regular weeks 1-17 and postseason weeks 1-3, both feeds) fetched at evaluation time; the division reading verified in scripts/cfb_v6_history_backfill.py",
+    "fbs_vs_fcs": "exactly one of the two teams is in that season's FBS set",
+    "season": "calendar year, January and February games belong to the previous season"
+  },
+  "tilt_rule": {
+    "members": "lopsided OR FBS-vs-FCS",
+    "lopsided": "the closing home spread line (ESPN espn-lines-rule-1 selected home_spread_line) has absolute value >= 28",
+    "abs_closing_home_spread_at_least": 28,
+    "fbs_vs_fcs": "per classification; needs no spread",
+    "requires": "a selected closing total line"
+  },
+  "closing_line": {
+    "source": "ESPN core odds endpoint, fetched at least 10 hours after kickoff",
+    "selection": "espn-lines-rule-1 via trim_item / select_lines imported read-only from scripts/cfb_v6_espn_lines.py (median across non-live providers of the per-provider close value)",
+    "missing": "a game with no selected closing total is skipped, counted and retried on later runs"
+  },
+  "predicted_direction": "actual total - closing total > 0",
+  "expected_size_points": 1.5,
+  "primary_metric": "mean(actual total - closing total) over the qualifying games",
+  "primary_decision": "one-sided date-clustered bootstrap lower bound (5th percentile) of the mean > 0",
+  "secondary_metric": "over share = overs / (overs + unders), pushes (actual == closing total) excluded",
+  "bootstrap": {
+    "kind": "date-clustered (UTC kickoff date), nonparametric",
+    "B": 5000,
+    "seed": 20261115,
+    "one_sided_percentile": 5,
+    "generator": "fresh numpy default_rng(seed) per call"
+  },
+  "power": {
+    "alpha_one_sided": 0.05,
+    "power": 0.8,
+    "z_alpha": 1.645,
+    "z_beta": 0.8416,
+    "expected_size_points": 1.5,
+    "residual_sd_points": 16.0,
+    "residual_sd_source": "the totals diagnosis (sd of actual - closing total about 16); used only for sizing",
+    "formula": "n = ceil(((z_alpha + z_beta) * residual_sd / expected_size)^2)",
+    "computed": 703.5084299377779
+  },
+  "minimum_n": 704,
+  "sample": "the first minimum_n qualifying games in (kickoff, event_id) order; one test at that n, so a later run cannot change the sample",
+  "below_minimum_n": "the evaluator prints INSUFFICIENT N and reports no test",
+  "decision_at_minimum_n": "tilt SUPPORTED if the one-sided lower bound > 0, else NOT SUPPORTED; both outcomes are reported plainly",
+  "expected_duration": "about 100-180 qualifying lined games a season, so this is a multi-season test",
+  "data_sources": [
+    "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard (groups 80 and 81)",
+    "https://sports.core.api.espn.com/v2/sports/football/leagues/college-football/events/{id}/competitions/{id}/odds"
+  ],
+  "safety": "read-only GET with a generic User-Agent; no order, execute or account endpoint; points and percentages only",
+  "evaluator": {
+    "script": "scripts/cfb_lopsided_prereg.py",
+    "sha256_lf_at_registration": "4d688153913f44799738dec876be0d725c51c5aa0871f38fc7031ab730ddd57f",
+    "note": "informational; a later bug fix to the evaluator must not change the rule above, which is what the hash pins",
+    "verify_command": "python scripts/cfb_lopsided_prereg.py verify",
+    "evaluate_command": "python scripts/cfb_lopsided_prereg.py evaluate"
+  },
+  "sha256": "45dbd546543e345559d39422ef77d17b7d8721302c5bc314882f89f2deff4d22"
+}

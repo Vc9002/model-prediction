@@ -25,9 +25,15 @@ def entry(model_id="candidate", **kwargs):
 @pytest.mark.parametrize("model_id", ["mlb-moneyline-v9-frozen", "wnba-moneyline-v5"])
 def test_names_cannot_claim_prospective_capture(monkeypatch, model_id):
     root = Path(__file__).resolve().parents[1]
-    monkeypatch.setattr(
-        qualification, "load_challenger_evidence", lambda *a, **k: pytest.fail("unbound evidence read")
-    )
+
+    # Only the NAME under test must never reach an evidence read. A genuinely bound challenger elsewhere in the
+    # registry (the hash-frozen cfb-structural-v6.2, quick-261121-v62) legitimately reads its own evidence.
+    def _evidence(*_a, challenger_model_id=None, **_k):
+        if challenger_model_id == model_id:
+            pytest.fail("unbound evidence read")
+        return []
+
+    monkeypatch.setattr(qualification, "load_challenger_evidence", _evidence)
     summary = next(
         s for s in qualification.generate_qualification_registry(root) if s.challenger_model_id == model_id
     )

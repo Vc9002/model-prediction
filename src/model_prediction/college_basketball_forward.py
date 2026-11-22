@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import unicodedata
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .calibration import IdentityCalibrator, load_calibrator_artifact
+from .calibration import IdentityCalibrator
 from .college_contract_evidence import build_candidate_evidence, save_candidate_evidence
 from .config import PROJECT_ROOT
 from .data_sources.espn import ESPNClient
@@ -23,7 +24,13 @@ from .features.base import FeatureStore
 from .ledger import DuplicatePickError, defer_sqlite_xlsx_exports
 from .models.basketball import UpcomingGame
 from .models.ncaab_spread_v5 import ncaab_spread_v5_model
-from .models.ncaab_spread_v6 import ncaab_spread_v6_model
+from .models.ncaab_spread_v6 import (
+    NCAAB_MONEYLINE_V7M_VERSION,
+    NCAAB_SPREAD_V7_VERSION,
+    ncaab_moneyline_v7m_model,
+    ncaab_spread_v6_model,
+    ncaab_spread_v7_model,
+)
 from .models.ncaab_total_v6 import ncaab_total_v6_model
 from .production_registry import ProductionModelRegistry
 
@@ -41,6 +48,88 @@ def _main_sample_eligible(current_season_sample: object, required_games: int) ->
         and not isinstance(current_season_sample, bool)
         and current_season_sample >= required_games
     )
+
+
+def _ncaab_champion_ids(registry: ProductionModelRegistry) -> tuple[str | None, str | None]:
+    """(moneyline, spread) champion ids; one spread-model instance prices both markets.
+
+    The spread champion selects the engine (ncaab-spread-v7 = v7 factory). The moneyline champion is
+    either the same id or ncaab-moneyline-v7m, which is the ncaab-spread-v7 instance with a margin-only
+    moneyline and so exists only over a v7 spread champion; any other pairing fails closed. Serving
+    follows the champion map, so model_promotion promote/rollback alone switches it; see cfb_model()
+    for the NCAAF precedent.
+    """
+    ids = {m: getattr(registry.champion("NCAAB", m), "model_id", None) for m in ("moneyline", "spread")}
+    same = ids["moneyline"] == ids["spread"] and ids["spread"] != NCAAB_MONEYLINE_V7M_VERSION
+    margin_only_over_v7 = (
+        ids["moneyline"] == NCAAB_MONEYLINE_V7M_VERSION and ids["spread"] == NCAAB_SPREAD_V7_VERSION
+    )
+    if not (same or margin_only_over_v7):
+        raise ValueError(
+            "NCAAB moneyline and spread champions must name one spread model, or "
+            f"{NCAAB_MONEYLINE_V7M_VERSION} over {NCAAB_SPREAD_V7_VERSION}, got {ids}"
+        )
+    return ids["moneyline"], ids["spread"]
+
+
+def _ncaab_serving_spread_model(registry: ProductionModelRegistry) -> Any:
+    """The one instance that prices NCAAB moneyline and spread, chosen by the champion map."""
+    moneyline_champion_id, spread_champion_id = _ncaab_champion_ids(registry)
+    if moneyline_champion_id == NCAAB_MONEYLINE_V7M_VERSION:
+        return ncaab_moneyline_v7m_model()
+    if spread_champion_id == NCAAB_SPREAD_V7_VERSION:
+        return ncaab_spread_v7_model()
+    if ncaab_model in (ncaab_spread_v5_model, ncaab_spread_v6_model):
+        return ncaab_spread_model()
+    return ncaab_model()
+
+
+def _market_identity(model: Any, kind: str) -> tuple[str, str]:
+    """(model_version, model_artifact_hash) that rows of market ``kind`` carry.
+
+    ncaab-moneyline-v7m serves the moneyline off the ncaab-spread-v7 instance under its own id and
+    hash; every other row is labelled with the instance's own version and hash.
+    """
+    if kind == "moneyline" and getattr(model, "moneyline_version", None):
+        return str(model.moneyline_version), str(getattr(model, "moneyline_artifact_hash", "") or "")
+    return str(model.version), str(getattr(model, "model_artifact_hash", "") or "")
+
+
+def _load_ncaab_calibrators(
+    data_root: Path | str, versions: dict[str, str]
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    """Guarded serving calibrators per market kind, plus the per-kind guard decision.
+
+    Goes through calibration_pipeline.load_serving_calibrator, the guard every other serving path
+    uses (own-model fit provenance, MIN_SERVING_SAMPLE, out-of-fold Brier gain). The NCAAB forward
+    used the bare loader until 2026-11-21, so the served transform flipped between beta, temperature,
+    platt and identity from one Daily refit to the next. A refused or unreadable calibrator serves
+    identity (the raw probability); nothing here may kill the slate.
+    """
+    from .calibration_pipeline import load_serving_calibrator
+
+    calibrators: dict[str, Any] = {}
+    decisions: dict[str, dict[str, Any]] = {}
+    for kind_key, mv in versions.items():
+        try:
+            calibrator, decision = load_serving_calibrator(
+                mv, kind_key, roots=(Path(data_root) / "calibration",)
+            )
+        except Exception as exc:  # noqa: BLE001 - a calibrator problem must degrade to raw, never raise
+            calibrator, decision = None, {"model_version": mv, "market": kind_key, "applied": False}
+            decision["reason"] = f"guard_error:{type(exc).__name__}"
+        calibrators[kind_key] = calibrator if calibrator is not None else IdentityCalibrator(mv)
+        decisions[kind_key] = decision
+    return calibrators, decisions
+
+
+def _served_probability(calibrator: Any, raw_probability: float) -> float:
+    """The calibrated probability, or the raw one when the transform fails or leaves (0, 1)."""
+    try:
+        mapped = float(calibrator.transform(raw_probability))
+    except (ArithmeticError, TypeError, ValueError):
+        return raw_probability
+    return mapped if math.isfinite(mapped) and 0.0 < mapped < 1.0 else raw_probability
 
 
 def _normalize_name(s: str) -> str:
@@ -74,7 +163,11 @@ _NCAAB_ALIASES: dict[str, str] = {
     "st thomas (mn)": "st thomas tommies",
     "st thomas mn": "st thomas tommies",
     "saint thomas": "st thomas tommies",
-    "uconn": "connecticut",
+    # History and ESPN call UConn "UConn Huskies"; the old target "connecticut" matched nothing
+    # by name and fell onto "Central Connecticut Blue Devils" (2026-11-18, five ledger games).
+    "uconn": "uconn huskies",
+    "connecticut": "uconn huskies",
+    "connecticut huskies": "uconn huskies",
     "nc state": "nc state wolfpack",
     "penn": "pennsylvania quakers",
     "ole miss": "ole miss rebels",
@@ -91,9 +184,81 @@ _NCAAB_ALIASES: dict[str, str] = {
     "unlv": "unlv rebels",
     "utep": "utep miners",
     "utsa": "utsa roadrunners",
-    "umass": "umass minutemen",
+    # History calls the flagship "Massachusetts Minutemen"; the old target "umass minutemen" matched
+    # nothing, so school-only "UMass" fell to token-subset ranking and landed on "UMass Boston Beacons"
+    # (a non-D1 school, 2026-11-03/06). "Rutgers" alone lost the same ranking to Rutgers-Camden
+    # because that history name repeats its own token.
+    "umass": "massachusetts minutemen",
+    "umass minutemen": "massachusetts minutemen",
+    "rutgers": "rutgers scarlet knights",
     "liu": "long island university sharks",
+    # Polymarket abbreviations whose school+mascot lands on an old-name history record ("UCA Bears")
+    # that is not in the D1 map; current-season history and the map use the full names (2026-11-21).
+    "uca": "central arkansas bears",
+    "uncw": "unc wilmington seahawks",
+    "nau": "northern arizona lumberjacks",
 }
+
+
+def _is_line_text(text: str) -> bool:
+    return any(c in text for c in "+-0123456789")
+
+
+def _away_home_sides(market: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    sides = market.get("sides", [])
+    away = next((s for s in sides if s.get("selection") == "away"), None)
+    home = next((s for s in sides if s.get("selection") == "home"), None)
+    return away, home
+
+
+def _event_team_names(event: dict[str, Any]) -> tuple[str | None, str | None, str, str]:
+    """(away school, home school, away mascot, home mascot) from a Polymarket event.
+
+    The school comes from the first market naming both teams, as before. The mascot is searched in
+    every market for that same school: spread sides describe a line ("+15.50"), and 49 of 57 events on
+    the 2026-11-21 slate listed a spread first, so taking only the first market dropped the mascot and
+    an ambiguous school ("Cornell": Big Red vs the non-D1 Cornell (IA) Rams) fell out as non-D1.
+    """
+    away_school: str | None = None
+    home_school: str | None = None
+    from_team_fields = False
+    for market in event.get("markets", []):
+        a_side, h_side = _away_home_sides(market)
+        if not (a_side and h_side):
+            continue
+        if a_side.get("team") and h_side.get("team"):
+            away_school, home_school = str(a_side["team"]), str(h_side["team"])
+            from_team_fields = True
+            break
+        desc_a, desc_h = str(a_side.get("description") or ""), str(h_side.get("description") or "")
+        if desc_a and desc_h and not _is_line_text(desc_a) and not _is_line_text(desc_h):
+            away_school, home_school = desc_a, desc_h
+            break
+
+    away_mascot = ""
+    home_mascot = ""
+    if from_team_fields:
+        for market in event.get("markets", []):
+            a_side, h_side = _away_home_sides(market)
+            if not (a_side and h_side):
+                continue
+            desc_a, desc_h = str(a_side.get("description") or ""), str(h_side.get("description") or "")
+            if not away_mascot and a_side.get("team") == away_school and desc_a and not _is_line_text(desc_a):
+                away_mascot = desc_a
+            if not home_mascot and h_side.get("team") == home_school and desc_h and not _is_line_text(desc_h):
+                home_mascot = desc_h
+            if away_mascot and home_mascot:
+                break
+
+    if not away_school:
+        title = event.get("title", "")
+        for sep in (" vs. ", " vs ", " at ", " @ "):
+            if sep in title:
+                parts = title.split(sep)
+                if len(parts) == 2:
+                    away_school, home_school = parts[0].strip(), parts[1].strip()
+                    break
+    return away_school, home_school, away_mascot, home_mascot
 
 
 def _resolve_ncaab_team(
@@ -107,8 +272,14 @@ def _resolve_ncaab_team(
 
     if norm_school in _NCAAB_ALIASES:
         target = _NCAAB_ALIASES[norm_school]
+        # Exact name, then whole-word prefix. Never `target in k`: a short alias target is a
+        # substring of other schools ("connecticut" in "central connecticut blue devils"), and the
+        # first such name in dict order won. A miss falls through to the general matching below.
         for k, v in normalized_names.items():
-            if k == target or k.startswith(target + " ") or target in k:
+            if k == target:
+                return v
+        for k, v in normalized_names.items():
+            if k.startswith(target + " "):
                 return v
 
     if norm_mascot:
@@ -184,6 +355,141 @@ def _main_line_markets(markets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return kept
 
 
+# --- Tier-1 NCAAB guardrails (2026-11-15) -------------------------------------------
+# Every threshold below was chosen AFTER looking at the 11-08..11-15 flat v6 ledger, so
+# none of them is validated: judge them forward only, never on the dates that suggested them.
+# Overrides live in config/model.yaml models.NCAAB (keys named in each comment).
+
+# models.NCAAB.max_same_direction_totals. The 11-14 slate was 57 overs to 19 unders (one
+# correlated bet on scoring pace); the highest-edge quoted picks per direction are kept.
+MAX_SAME_DIRECTION_TOTALS_PER_SLATE = 8
+# Settled v6 picks with serving probability >= 80% went 40-for-59 against a recorded mean
+# above 80% (spread: 7 of 21, -14.9u), so their stake is held to 1.0U.
+HIGH_PROBABILITY_STAKE_FLOOR = 0.80
+HIGH_PROBABILITY_UNIT_CAP = 1.0
+# A slate price of exactly 50% with no executable quote is where an untraded alternate
+# line sits; the edge measured against it is manufactured, so the row stakes nothing.
+PLACEHOLDER_INDICATIVE_PRICE = 0.5
+# A quoted line only replaces the slate's choice when its BBO mid is within this distance
+# of 50%; otherwise the genuinely balanced line was not among the freshly quoted ones.
+QUOTE_BALANCE_MAX_DEVIATION = 0.10
+# models.NCAAB.decline_non_d1. v6 on games with a team outside the D1 conference map had RMSE
+# 20-24 and +8..+14 bias (non-D1 v7 research, quick 261115-1m7); the rule was written after
+# seeing those cohorts (post-hoc), so judge it forward only. Reason code matches the v7 shadow.
+DECLINE_NON_D1 = True
+NON_D1_REASON = "NO_CALL_NON_D1"
+
+
+def _model_line_divergence(
+    kind: str, prediction: Any, selection: str, decision_line: float | None
+) -> float | None:
+    """|model expectation - line| in the model's own frame, or None when not computable.
+
+    The spread model's ``mean`` is the expected HOME margin and the away side covers when
+    home margin < away line. The selected side's line flips sign with the side (home line
+    = -away line), so it is mapped back to the away frame before comparing; comparing the
+    raw home line made the gate fire on small divergences and pass large ones for home picks.
+    """
+    mean = (getattr(prediction, "inference_inputs", None) or {}).get("mean")
+    if mean is None or decision_line is None:
+        return None
+    if kind == "spread":
+        away_line = float(decision_line) if selection == "away" else -float(decision_line)
+        return abs(float(mean) - away_line)
+    if kind == "total":
+        return abs(float(mean) - float(decision_line))
+    return None
+
+
+def _apply_same_direction_total_cap(decisions: list[dict[str, Any]], cap: int) -> None:
+    """Decline totals beyond ``cap`` per direction, keeping quoted then highest-edge picks."""
+    if cap <= 0:
+        return
+    by_direction: dict[str, list[dict[str, Any]]] = {}
+    for decision in decisions:
+        if decision["kind"] == "total" and not decision["decline_reason"]:
+            by_direction.setdefault(decision["selection"], []).append(decision)
+    for group in by_direction.values():
+        group.sort(key=lambda d: (not d["has_executable_quote"], -d["edge"]))
+        for decision in group[cap:]:
+            decision["decline_reason"] = "same_slate_same_direction_total_cap"
+
+
+def _quote_balance(
+    candidate_row: dict[str, Any] | None, observed: datetime, max_age_seconds: float
+) -> float | None:
+    """How far a freshly quoted line's two-sided BBO mid sits from 50%, or None if unquoted."""
+    if not candidate_row or candidate_row.get("quote_reason") != "matched" or max_age_seconds <= 0:
+        return None
+    try:
+        age = observed - parse_utc(str(candidate_row["quote_observed_at_utc"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    if age > timedelta(seconds=max_age_seconds):
+        return None
+    deviations = []
+    for side in candidate_row.get("sides", []):
+        ask, bid = side.get("executable_ask"), side.get("executable_bid")
+        if ask is None or bid is None:
+            return None
+        deviations.append(abs((float(ask) + float(bid)) / 2 - 0.5))
+    return max(deviations) if len(deviations) == 2 else None
+
+
+def _reselect_total_main_lines(
+    planned: list[tuple[Any, ...]],
+    alternate_totals: dict[str, list[tuple[dict[str, Any], Any, list[dict[str, Any]], str]]],
+    candidate_by_slug: dict[str, dict[str, Any]],
+    pred_lookup: dict[Any, Any],
+    *,
+    observed: datetime,
+    max_quote_age_seconds: float,
+    source_by_game_key: dict[str, str],
+) -> list[tuple[Any, ...]]:
+    """Re-choose each event's main totals line from fresh two-sided BBO mids.
+
+    The slate's ``price_probability`` is a per-side ask or last trade (0.99/0.26 pairs on
+    one line) and untraded alternate lines sit at 0.50, so "closest to 50%" on slate
+    prices picked lines 3+ points off the balanced one for 14% of flat totals. Quoted
+    mids are two-sided; they decide when available and the slate rule is the fallback.
+    The pick is then priced from the chosen line's own quote and prediction. ``source_by_game_key``
+    records which rule decided, for audit.
+    """
+    out: list[tuple[Any, ...]] = []
+    for entry in planned:
+        event, _market_def, kind, _line, _sides, away, home, start, identity, game_key = entry
+        if kind != "total":
+            out.append(entry)
+            continue
+        scored = []
+        for alt_def, alt_line, alt_sides, alt_key in alternate_totals.get(str(identity), []):
+            if pred_lookup.get((alt_key, "total")) is None:
+                continue
+            score = _quote_balance(
+                candidate_by_slug.get(str(alt_def.get("market_slug") or "")), observed, max_quote_age_seconds
+            )
+            if score is not None:
+                scored.append(
+                    (
+                        score,
+                        float(alt_line) if alt_line is not None else 0.0,
+                        alt_def,
+                        alt_line,
+                        alt_sides,
+                        alt_key,
+                    )
+                )
+        best = min(scored, key=lambda item: (item[0], item[1])) if scored else None
+        if best is not None and best[0] <= QUOTE_BALANCE_MAX_DEVIATION:
+            _, _, alt_def, alt_line, alt_sides, alt_key = best
+            source_by_game_key[alt_key] = "bbo_mid"
+            out.append((event, alt_def, kind, alt_line, alt_sides, away, home, start, identity, alt_key))
+        else:
+            source_by_game_key[game_key] = "slate_price"
+            out.append(entry)
+    return out
+
+
 def forecast_ncaab_sport(
     *,
     data_root,
@@ -195,15 +501,20 @@ def forecast_ncaab_sport(
     main_ledger=None,
 ):
     board = ESPNClient().scoreboard("NCAAB", args_date)
-    spread_model = (
-        ncaab_spread_model()
-        if ncaab_model in (ncaab_spread_v5_model, ncaab_spread_v6_model)
-        else ncaab_model()
-    )
+    registry = ProductionModelRegistry.load(PROJECT_ROOT)
+    spread_model = _ncaab_serving_spread_model(registry)
     total_model = ncaab_total_model()
     result: dict[str, Any] = {
         "sport": "ncaab",
-        "model_version": f"{spread_model.version}+{total_model.version}",
+        "model_version": "+".join(
+            dict.fromkeys(
+                (
+                    _market_identity(spread_model, "moneyline")[0],
+                    _market_identity(spread_model, "spread")[0],
+                    total_model.version,
+                )
+            )
+        ),
         "scheduled_games": len(board.get("events", [])),
         "logged": 0,
         "flat_logged": 0,
@@ -211,6 +522,7 @@ def forecast_ncaab_sport(
         "research_ledger_logged": 0,
         "gated_ledger_logged": 0,
         "skipped": [],
+        "declined_slots": [],
         "errors": [],
     }
     if not result["scheduled_games"]:
@@ -230,18 +542,26 @@ def forecast_ncaab_sport(
     ).hexdigest()
     events = PolymarketUSClient().slate("NCAAB", date.fromisoformat(args_date))
     observed = utc_now()
-    registry = ProductionModelRegistry.load(PROJECT_ROOT)
     for market, expected_model in (
         ("moneyline", spread_model),
         ("spread", spread_model),
         ("total", total_model),
     ):
         champion = registry.champion("NCAAB", market)
-        if champion is None or not champion.available or champion.model_id != expected_model.version:
+        expected_version = _market_identity(expected_model, market)[0]
+        if champion is None or not champion.available or champion.model_id != expected_version:
             raise ValueError(
-                f"NCAAB {market} champion {champion.model_id if champion else None} does not match executable model {expected_model.version}"
+                f"NCAAB {market} champion {champion.model_id if champion else None} does not match executable model {expected_version}"
             )
     policy = config.get("models", {}).get("NCAAB", {})
+    # The champion id selects the margin engine (ncaab-spread-v7 = v7, ncaab-spread-v6 = v6) since the
+    # 2026-11-21 promotion; the old yaml switch would let someone believe `margin_engine: v6` reverts
+    # anything, so its presence fails the slate closed. Rollback is `model_promotion rollback`.
+    if "margin_engine" in policy:
+        raise ValueError(
+            "models.NCAAB.margin_engine is retired: the NCAAB spread champion in config/production.yaml "
+            "selects the engine (ncaab-spread-v7 = v7, ncaab-spread-v6 = v6)"
+        )
     min_edge = float(policy.get("min_edge", 0.035))
     min_team_games = int(policy.get("min_team_games", 0))
     min_moneyline_ask = float(policy.get("min_moneyline_ask", 0.20))
@@ -249,6 +569,13 @@ def forecast_ncaab_sport(
     max_margin_divergence = float(policy.get("max_margin_divergence", 12.0))
     max_total_divergence = float(policy.get("max_total_divergence", 14.0))
     max_quote_age_seconds = float(policy.get("max_quote_age_seconds", 300.0))
+    max_same_direction_totals = int(
+        policy.get("max_same_direction_totals", MAX_SAME_DIRECTION_TOTALS_PER_SLATE)
+    )
+    decline_non_d1 = bool(policy.get("decline_non_d1", DECLINE_NON_D1))
+    # The served v6 definition of "D1" is membership in its conference map (team_priors). A
+    # missing or empty map means no team can be shown to be D1, so everything declines (fail closed).
+    d1_teams = getattr(spread_model, "team_priors", None) or {}
     # Main totals were paused by code in 93aa093c (2026-11-10) after the v6 totals lost 25.8u in
     # Main on season-opener samples. Restored 2026-11-13 behind the same current-season sample
     # gate as spread/moneyline; this switch (config/model.yaml models.NCAAB.main_totals_enabled)
@@ -295,6 +622,9 @@ def forecast_ncaab_sport(
     ] = []
     upcoming_batch: list[UpcomingGame] = []
     market_game_keys: dict[str, tuple[str, str]] = {}
+    # Every listed totals line per event, so the balanced line can be re-chosen from quotes
+    # once candidate evidence exists (predictions are already produced for every line).
+    alternate_totals: dict[str, list[tuple[dict[str, Any], Any, list[dict[str, Any]], str]]] = {}
 
     for event in events:
         identity = event.get("event_id") or event.get("id")
@@ -303,45 +633,7 @@ def forecast_ncaab_sport(
             result["skipped"].append({"event_id": identity, "reason": "missing_identity_or_event_started"})
             continue
 
-        away_school = None
-        home_school = None
-        away_mascot = ""
-        home_mascot = ""
-
-        for m in event.get("markets", []):
-            sides = m.get("sides", [])
-            a_side = next((s for s in sides if s.get("selection") == "away"), None)
-            h_side = next((s for s in sides if s.get("selection") == "home"), None)
-            if a_side and h_side:
-                if a_side.get("team") and h_side.get("team"):
-                    away_school = str(a_side["team"])
-                    home_school = str(h_side["team"])
-                    desc_a = str(a_side.get("description", ""))
-                    desc_h = str(h_side.get("description", ""))
-                    if desc_a and not any(c in desc_a for c in "+-0123456789"):
-                        away_mascot = desc_a
-                    if desc_h and not any(c in desc_h for c in "+-0123456789"):
-                        home_mascot = desc_h
-                    break
-                if a_side.get("description") and h_side.get("description"):
-                    desc_a = str(a_side["description"])
-                    desc_h = str(h_side["description"])
-                    if not any(c in desc_a for c in "+-0123456789") and not any(
-                        c in desc_h for c in "+-0123456789"
-                    ):
-                        away_school = desc_a
-                        home_school = desc_h
-                        break
-
-        if not away_school:
-            title = event.get("title", "")
-            for sep in (" vs. ", " vs ", " at ", " @ "):
-                if sep in title:
-                    parts = title.split(sep)
-                    if len(parts) == 2:
-                        away_school = parts[0].strip()
-                        home_school = parts[1].strip()
-                        break
+        away_school, home_school, away_mascot, home_mascot = _event_team_names(event)
 
         if not away_school or not home_school:
             result["skipped"].append({"event_id": identity, "reason": "team_identity_unavailable"})
@@ -356,8 +648,24 @@ def forecast_ncaab_sport(
             or frozenset({away, home}) in espn_neutral_pairs
         )
 
-        if min_team_games > 0 and (
-            games_by_team.get(away, 0) < min_team_games or games_by_team.get(home, 0) < min_team_games
+        non_d1 = decline_non_d1 and (away not in d1_teams or home not in d1_teams)
+        if non_d1:
+            # Recorded here, before any later per-market `continue`, so every slot of the event
+            # lands in declined_slots and a restore cannot reopen an earlier run's row for it.
+            # The markets still go through prediction so candidate evidence keeps their
+            # probabilities for judging this rule forward; they are just never planned.
+            for kind in dict.fromkeys(
+                m.get("market_type")
+                for m in event.get("markets", [])
+                if m.get("market_type") in {"moneyline", "spread", "total"}
+            ):
+                result["skipped"].append({"event_id": identity, "market_type": kind, "reason": NON_D1_REASON})
+                result["declined_slots"].append(["NCAAB", str(identity), kind])
+
+        if (
+            not non_d1
+            and min_team_games > 0
+            and (games_by_team.get(away, 0) < min_team_games or games_by_team.get(home, 0) < min_team_games)
         ):
             result["skipped"].append({"event_id": identity, "reason": "insufficient_history_non_d1"})
             continue
@@ -389,7 +697,9 @@ def forecast_ncaab_sport(
             upcoming_batch.append(upcoming)
             if slug:
                 market_game_keys[slug] = (game_key, kind)
-            if id(market_def) in main_market_ids:
+                if kind == "total" and len(sides) == 2:
+                    alternate_totals.setdefault(str(identity), []).append((market_def, line, sides, game_key))
+            if id(market_def) in main_market_ids and not non_d1:
                 planned.append(
                     (event, market_def, kind, line, sides, away, home, str(start), str(identity), game_key)
                 )
@@ -427,7 +737,7 @@ def forecast_ncaab_sport(
         prediction = pred_lookup.get((game_key, kind))
         if prediction is None:
             continue
-        model_version = total_model.version if kind == "total" else spread_model.version
+        model_version = _market_identity(total_model if kind == "total" else spread_model, kind)[0]
         basis = getattr(prediction, "feature_basis", None) or {}
         candidate_probabilities[slug] = {
             "model_version": model_version,
@@ -446,17 +756,14 @@ def forecast_ncaab_sport(
             },
         }
     archive_root = Path(data_root)
-    calibrators: dict[str, Any] = {}
-    for kind_key in ("moneyline", "spread", "total"):
-        mv = total_model.version if kind_key == "total" else spread_model.version
-        cal_path = archive_root / "calibration" / "models" / f"{mv}.{kind_key}_calibrator.json"
-        if cal_path.exists():
-            try:
-                calibrators[kind_key] = load_calibrator_artifact(cal_path)
-            except (OSError, json.JSONDecodeError, ValueError):
-                calibrators[kind_key] = IdentityCalibrator(mv)
-        else:
-            calibrators[kind_key] = IdentityCalibrator(mv)
+    calibrators, calibration_decisions = _load_ncaab_calibrators(
+        archive_root,
+        {
+            kind_key: _market_identity(total_model if kind_key == "total" else spread_model, kind_key)[0]
+            for kind_key in ("moneyline", "spread", "total")
+        },
+    )
+    result["calibration"] = calibration_decisions
 
     candidate_rows, candidate_summary = build_candidate_evidence(
         sport="ncaab",
@@ -469,291 +776,386 @@ def forecast_ncaab_sport(
     candidate_by_slug = {row["market_slug"]: row for row in candidate_rows}
     candidate_summary["serving_decision_joins"] = []
 
-    with defer_sqlite_xlsx_exports():
-        for event, market_def, kind, line, sides, away, home, start, identity, game_key in planned:
-            prediction = pred_lookup.get((game_key, kind))
-            if prediction is None:
-                continue
+    # Tier-1 guardrail (2026-11-15): pick the balanced totals line from pre-decision BBO
+    # mids where fresh two-sided quotes exist; slate prices stay the fallback.
+    main_line_source: dict[str, str] = {}
+    planned = _reselect_total_main_lines(
+        planned,
+        alternate_totals,
+        candidate_by_slug,
+        pred_lookup,
+        observed=observed,
+        max_quote_age_seconds=max_quote_age_seconds,
+        source_by_game_key=main_line_source,
+    )
 
-            candidate_row = candidate_by_slug.get(str(market_def.get("market_slug") or ""))
-            quote_matched = bool(candidate_row and candidate_row.get("quote_reason") == "matched")
-            if quote_matched:
-                quote_time = parse_utc(str(candidate_row["quote_observed_at_utc"]))
-                quote_matched = max_quote_age_seconds > 0 and observed - quote_time <= timedelta(
-                    seconds=max_quote_age_seconds
-                )
-            quoted_sides = (
-                {side["selection"]: side for side in candidate_row["sides"]} if quote_matched else {}
+    decisions: list[dict[str, Any]] = []
+    for event, market_def, kind, line, sides, away, home, start, identity, game_key in planned:
+        prediction = pred_lookup.get((game_key, kind))
+        if prediction is None:
+            continue
+
+        candidate_row = candidate_by_slug.get(str(market_def.get("market_slug") or ""))
+        quote_matched = bool(candidate_row and candidate_row.get("quote_reason") == "matched")
+        if quote_matched:
+            quote_time = parse_utc(str(candidate_row["quote_observed_at_utc"]))
+            quote_matched = max_quote_age_seconds > 0 and observed - quote_time <= timedelta(
+                seconds=max_quote_age_seconds
             )
-            selections = {"over", "under"} if kind == "total" else {"home", "away"}
-            valid_sides = [
-                side
-                for side in sides
-                if side.get("selection") in selections
-                and isinstance(side.get("is_long"), bool)
-                and (
-                    (
-                        (quoted := quoted_sides.get(side["selection"])) is not None
-                        and quoted.get("is_long") == side["is_long"]
-                        and quoted.get("line") == side.get("line")
-                        and quoted.get("executable_ask") is not None
-                        and 0 < float(quoted["executable_ask"]) < 1
-                    )
-                    or (
-                        side.get("price_probability") is not None and 0 < float(side["price_probability"]) < 1
-                    )
+        quoted_sides = {side["selection"]: side for side in candidate_row["sides"]} if quote_matched else {}
+        selections = {"over", "under"} if kind == "total" else {"home", "away"}
+        valid_sides = [
+            side
+            for side in sides
+            if side.get("selection") in selections
+            and isinstance(side.get("is_long"), bool)
+            and (
+                (
+                    (quoted := quoted_sides.get(side["selection"])) is not None
+                    and quoted.get("is_long") == side["is_long"]
+                    and quoted.get("line") == side.get("line")
+                    and quoted.get("executable_ask") is not None
+                    and 0 < float(quoted["executable_ask"]) < 1
                 )
-            ]
-            if not valid_sides:
-                result["skipped"].append(
-                    {"event_id": identity, "market_type": kind, "reason": "priced_side_unavailable"}
-                )
+                or (side.get("price_probability") is not None and 0 < float(side["price_probability"]) < 1)
+            )
+        ]
+        if not valid_sides:
+            result["skipped"].append(
+                {"event_id": identity, "market_type": kind, "reason": "priced_side_unavailable"}
+            )
+            continue
+        if kind == "moneyline":
+            # Pure Probability Winner Selection: pick the projected winner (model_prob >= 0.50).
+            # Do NOT pick underdogs to win straight-up when the model projects them to lose.
+            winner_side = max(valid_sides, key=lambda s: prediction.probabilities.get(s["selection"], 0.0))
+            if prediction.probabilities.get(winner_side["selection"], 0.0) < 0.50:
                 continue
-            if kind == "moneyline":
-                # Pure Probability Winner Selection: pick the projected winner (model_prob >= 0.50).
-                # Do NOT pick underdogs to win straight-up when the model projects them to lose.
-                winner_side = max(
-                    valid_sides, key=lambda s: prediction.probabilities.get(s["selection"], 0.0)
-                )
-                if prediction.probabilities.get(winner_side["selection"], 0.0) < 0.50:
-                    continue
-                best_side = winner_side
-            else:
-                # Spread / total: only consider sides the model projects to cover/hit (prob >= 0.50)
-                cover_sides = [
-                    s for s in valid_sides if prediction.probabilities.get(s["selection"], 0.0) >= 0.50
-                ]
-                if not cover_sides:
-                    continue
-                best_side = max(
-                    cover_sides,
-                    key=lambda side: (
-                        prediction.probabilities[side["selection"]]
-                        - float(
-                            quoted_sides.get(side["selection"], {}).get("executable_ask")
-                            or side["price_probability"]
-                        )
-                    ),
-                )
-            model_inst = total_model if kind == "total" else spread_model
-            model_version = model_inst.version
-            calibrator = calibrators.get(kind, IdentityCalibrator(model_version))
+            best_side = winner_side
+        else:
+            # Spread / total: only consider sides the model projects to cover/hit (prob >= 0.50)
+            cover_sides = [
+                s for s in valid_sides if prediction.probabilities.get(s["selection"], 0.0) >= 0.50
+            ]
+            if not cover_sides:
+                continue
+            best_side = max(
+                cover_sides,
+                key=lambda side: (
+                    prediction.probabilities[side["selection"]]
+                    - float(
+                        quoted_sides.get(side["selection"], {}).get("executable_ask")
+                        or side["price_probability"]
+                    )
+                ),
+            )
+        model_inst = total_model if kind == "total" else spread_model
+        model_version, model_artifact_hash = _market_identity(model_inst, kind)
+        calibrator = calibrators.get(kind, IdentityCalibrator(model_version))
 
-            for side in (best_side,):
-                selection = side["selection"]
-                candidate_side = quoted_sides.get(selection, {})
-                has_executable_quote = bool(
-                    candidate_side.get("executable_ask") is not None
-                    and candidate_side.get("is_long") == side.get("is_long")
-                    and candidate_side.get("line") == side.get("line")
-                )
-                ask = float(
-                    candidate_side["executable_ask"] if has_executable_quote else side["price_probability"]
-                )
-                indicative_ask = side.get("price_probability")
-                raw_probability = prediction.probabilities[selection]
-                probability = calibrator.transform(raw_probability)
-                edge = probability - float(ask)
-                candidate_summary["serving_decision_joins"].append(
-                    {
-                        "event_id": str(identity),
-                        "market_slug": market_def.get("market_slug"),
-                        "selection": selection,
-                        "indicative_ask": indicative_ask,
-                        "executable_ask": ask,
-                        "quote_hash": candidate_row.get("quote_hash") if has_executable_quote else None,
-                        "quote_reason": "matched" if has_executable_quote else "indicative_only",
-                    }
-                )
-                decision_line = (
-                    (side.get("line") if side.get("line") is not None else line)
-                    if kind != "moneyline"
-                    else None
-                )
+        selection = best_side["selection"]
+        candidate_side = quoted_sides.get(selection, {})
+        has_executable_quote = bool(
+            candidate_side.get("executable_ask") is not None
+            and candidate_side.get("is_long") == best_side.get("is_long")
+            and candidate_side.get("line") == best_side.get("line")
+        )
+        ask = float(
+            candidate_side["executable_ask"] if has_executable_quote else best_side["price_probability"]
+        )
+        indicative_ask = best_side.get("price_probability")
+        raw_probability = prediction.probabilities[selection]
+        probability = _served_probability(calibrator, raw_probability)
+        edge = probability - float(ask)
+        candidate_summary["serving_decision_joins"].append(
+            {
+                "event_id": str(identity),
+                "market_slug": market_def.get("market_slug"),
+                "selection": selection,
+                "indicative_ask": indicative_ask,
+                "executable_ask": ask,
+                "quote_hash": candidate_row.get("quote_hash") if has_executable_quote else None,
+                "quote_reason": "matched" if has_executable_quote else "indicative_only",
+            }
+        )
+        decision_line = (
+            (best_side.get("line") if best_side.get("line") is not None else line)
+            if kind != "moneyline"
+            else None
+        )
 
-                snapshot = contract_snapshot_json(
-                    {
-                        "market_type": kind,
-                        "model_version": model_version,
-                        "event_id": str(identity),
-                        "event_start_utc": str(start),
-                        "home_team": home,
-                        "away_team": away,
-                        "feature_basis": {
-                            **(getattr(prediction, "feature_basis", None) or {}),
-                            "model_probability_raw": round(raw_probability, 6),
-                            "history_games": len(history),
-                            "history_scores_sha256": history_digest,
-                            "history_cutoff_date": args_date,
-                            "research_quote_join": {
-                                "status": "matched" if has_executable_quote else "indicative_only",
-                                "market_slug": market_def.get("market_slug"),
-                                "quote_hash": candidate_row.get("quote_hash")
-                                if has_executable_quote
-                                else None,
-                                "quote_archive_path": candidate_row.get("quote_archive_path")
-                                if has_executable_quote
-                                else None,
-                                "quote_observed_at_utc": candidate_row.get("quote_observed_at_utc")
-                                if has_executable_quote
-                                else None,
-                                "executable_ask": ask if has_executable_quote else None,
-                                "indicative_ask": indicative_ask,
-                            },
+        decline_reason: str | None = None
+        if kind == "moneyline" and edge <= 0:
+            # 110 of 166 settled flat v6 moneyline picks had negative edge (-8.6u).
+            decline_reason = "moneyline_nonpositive_edge"
+        elif kind != "moneyline":
+            divergence = _model_line_divergence(kind, prediction, selection, decision_line)
+            divergence_cap = max_margin_divergence if kind == "spread" else max_total_divergence
+            if divergence is not None and divergence > divergence_cap:
+                decline_reason = "flat_divergence_gate"
+        decisions.append(
+            {
+                "market_def": market_def,
+                "kind": kind,
+                "away": away,
+                "home": home,
+                "start": start,
+                "identity": identity,
+                "game_key": game_key,
+                "prediction": prediction,
+                "candidate_row": candidate_row,
+                "selection": selection,
+                "has_executable_quote": has_executable_quote,
+                "ask": ask,
+                "indicative_ask": indicative_ask,
+                "raw_probability": raw_probability,
+                "probability": probability,
+                "edge": edge,
+                "decision_line": decision_line,
+                "model_inst": model_inst,
+                "model_version": model_version,
+                "model_artifact_hash": model_artifact_hash,
+                "calibrator": calibrator,
+                "decline_reason": decline_reason,
+            }
+        )
+
+    _apply_same_direction_total_cap(decisions, max_same_direction_totals)
+    for decision in decisions:
+        if decision["decline_reason"]:
+            result["skipped"].append(
+                {
+                    "event_id": decision["identity"],
+                    "market_type": decision["kind"],
+                    "reason": decision["decline_reason"],
+                }
+            )
+            # Daily/forecast restore must not reopen the previous run's version of a slot a
+            # gate just declined.
+            result["declined_slots"].append(["NCAAB", str(decision["identity"]), decision["kind"]])
+
+    with defer_sqlite_xlsx_exports():
+        for decision in decisions:
+            if decision["decline_reason"]:
+                continue
+            market_def = decision["market_def"]
+            kind = decision["kind"]
+            prediction = decision["prediction"]
+            candidate_row = decision["candidate_row"]
+            selection = decision["selection"]
+            has_executable_quote = decision["has_executable_quote"]
+            ask = decision["ask"]
+            indicative_ask = decision["indicative_ask"]
+            raw_probability = decision["raw_probability"]
+            probability = decision["probability"]
+            edge = decision["edge"]
+            decision_line = decision["decision_line"]
+            model_inst = decision["model_inst"]
+            model_version = decision["model_version"]
+            model_artifact_hash = decision["model_artifact_hash"]
+            calibrator = decision["calibrator"]
+            identity = decision["identity"]
+            away = decision["away"]
+            home = decision["home"]
+            start = decision["start"]
+            game_key = decision["game_key"]
+
+            # Placeholder pricing: no executable quote AND the slate shows exactly 50%, the
+            # price an untraded alternate line sits at. The edge against it is manufactured,
+            # so the row stays visible but stakes nothing (units 0).
+            placeholder_price = (
+                not has_executable_quote
+                and indicative_ask is not None
+                and abs(float(indicative_ask) - PLACEHOLDER_INDICATIVE_PRICE) < 1e-9
+            )
+            caps: list[float] = []
+            if probability >= HIGH_PROBABILITY_STAKE_FLOOR:
+                caps.append(HIGH_PROBABILITY_UNIT_CAP)
+            if placeholder_price:
+                caps.append(0.0)
+            units_cap = min(caps) if caps else None
+
+            snapshot = contract_snapshot_json(
+                {
+                    "market_type": kind,
+                    "model_version": model_version,
+                    "event_id": str(identity),
+                    "event_start_utc": str(start),
+                    "home_team": home,
+                    "away_team": away,
+                    "feature_basis": {
+                        **(getattr(prediction, "feature_basis", None) or {}),
+                        "model_probability_raw": round(raw_probability, 6),
+                        "history_games": len(history),
+                        "history_scores_sha256": history_digest,
+                        "history_cutoff_date": args_date,
+                        **(
+                            {"main_line_source": main_line_source.get(game_key, "slate_price")}
+                            if kind == "total"
+                            else {}
+                        ),
+                        "research_quote_join": {
+                            "status": "matched" if has_executable_quote else "indicative_only",
+                            "market_slug": market_def.get("market_slug"),
+                            "quote_hash": candidate_row.get("quote_hash") if has_executable_quote else None,
+                            "quote_archive_path": candidate_row.get("quote_archive_path")
+                            if has_executable_quote
+                            else None,
+                            "quote_observed_at_utc": candidate_row.get("quote_observed_at_utc")
+                            if has_executable_quote
+                            else None,
+                            "executable_ask": ask if has_executable_quote else None,
+                            "indicative_ask": indicative_ask,
                         },
                     },
-                    sport="NCAAB",
-                    selection=selection,
-                    line=decision_line,
-                    probability=float(probability),
-                    observed_at_utc=observed.isoformat(),
-                )
-                cal_meta = getattr(calibrator, "metadata", None)
-                cal_method = cal_meta.calibration_method if cal_meta else "identity"
-                cal_version = cal_meta.calibration_version if cal_meta else "identity-v1"
-                cal_hash = cal_meta.artifact_hash if cal_meta else ""
+                },
+                sport="NCAAB",
+                selection=selection,
+                line=decision_line,
+                probability=float(probability),
+                observed_at_utc=observed.isoformat(),
+                artifact_hash=model_artifact_hash,
+            )
+            cal_meta = getattr(calibrator, "metadata", None)
+            cal_method = cal_meta.calibration_method if cal_meta else "identity"
+            cal_version = cal_meta.calibration_version if cal_meta else "identity-v1"
+            cal_hash = cal_meta.artifact_hash if cal_meta else ""
 
-                request = PickRequest(
-                    event_start_utc=str(start),
-                    event_id=str(identity),
-                    league=League.NCAAB,
-                    away_team=away,
-                    home_team=home,
-                    market_type=MarketType(kind),
-                    selection=selection,
-                    line=decision_line,
-                    sportsbook="polymarket_us_executable_ask"
-                    if has_executable_quote
-                    else "polymarket_us_indicative",
-                    american_odds=probability_to_american(float(ask)),
-                    model_probability=probability,
-                    model_uncertainty=prediction.uncertainty,
-                    model_version=model_version,
-                    rationale=prediction.rationale,
-                    risks=(
-                        "Paper model; executable quote is a predecision snapshot, not a guaranteed fill."
-                        if has_executable_quote
-                        else "Paper model; indicative market price, no executable quote."
-                    ),
-                    model_origin=ModelOrigin.STATISTICAL_MODEL,
-                    model_enabled=True,
-                    calibration_method=cal_method,
-                    calibration_version=cal_version,
-                    calibration_artifact_hash=cal_hash,
-                    observed_at_utc=observed.isoformat(),
-                    market_quote_observed_at_utc=candidate_row.get("quote_observed_at_utc")
-                    if has_executable_quote
-                    else None,
-                    market_quote_timestamp_valid=has_executable_quote,
-                    market_quote_source="polymarket_us",
-                    market_quote_provenance="archived_two_sided_bbo"
-                    if has_executable_quote
-                    else "indicative_slate",
-                    market_quote_reconstructed=False,
-                    market_snapshot_hash=candidate_row.get("quote_hash") if has_executable_quote else None,
-                    market_snapshot_archive_path=candidate_row.get("quote_archive_path")
-                    if has_executable_quote
-                    else None,
-                    model_probability_raw=raw_probability,
-                    market_probability_at_decision=ask,
-                    serving_probability=probability,
-                    model_input_snapshot_json=snapshot,
+            rationale = prediction.rationale
+            if placeholder_price:
+                rationale = (
+                    f"{rationale} [UNQUOTED_SHADOW: no executable quote and the indicative price is "
+                    "the 50% placeholder; zero stake]"
                 )
-                teams = [
-                    CanonicalTeam(name, League.NCAAB, name, name[:3], True, None, None, ())
-                    for name in (away, home)
-                ]
-                dynamic_units = (
-                    getattr(model_inst, "compute_dynamic_units", None)
-                    and model_inst.compute_dynamic_units(edge, min_edge=min_edge)
-                ) or 1.00
-                eligibility = EligibilityResult(
-                    False,
-                    "CALL",
-                    "PAPER_CALL_MODEL_UNVALIDATED",
-                    dynamic_units,
-                    round(probability * 100),
-                    edge,
-                    edge,
-                    *teams,
-                )
-                if flat_ledger is not None:
-                    try:
-                        flat_ledger.append_evaluated(request, eligibility, now=observed)
-                        result["flat_logged"] += 1
-                    except DuplicatePickError:
-                        pass
-                    except (ValueError, OSError) as exc:
-                        result["errors"].append(
-                            {"event_id": identity, "ledger": "flat_logged", "reason": str(exc)}
-                        )
+            request = PickRequest(
+                event_start_utc=str(start),
+                event_id=str(identity),
+                league=League.NCAAB,
+                away_team=away,
+                home_team=home,
+                market_type=MarketType(kind),
+                selection=selection,
+                line=decision_line,
+                sportsbook="polymarket_us_executable_ask"
+                if has_executable_quote
+                else "polymarket_us_indicative",
+                american_odds=probability_to_american(float(ask)),
+                model_probability=probability,
+                model_uncertainty=prediction.uncertainty,
+                model_version=model_version,
+                model_artifact_hash=model_artifact_hash,
+                rationale=rationale,
+                risks=(
+                    "Paper model; executable quote is a predecision snapshot, not a guaranteed fill."
+                    if has_executable_quote
+                    else "Paper model; indicative market price, no executable quote."
+                ),
+                model_origin=ModelOrigin.STATISTICAL_MODEL,
+                model_enabled=True,
+                calibration_method=cal_method,
+                calibration_version=cal_version,
+                calibration_artifact_hash=cal_hash,
+                observed_at_utc=observed.isoformat(),
+                market_quote_observed_at_utc=candidate_row.get("quote_observed_at_utc")
+                if has_executable_quote
+                else None,
+                market_quote_timestamp_valid=has_executable_quote,
+                market_quote_source="polymarket_us",
+                market_quote_provenance="archived_two_sided_bbo"
+                if has_executable_quote
+                else "indicative_slate",
+                market_quote_reconstructed=False,
+                market_snapshot_hash=candidate_row.get("quote_hash") if has_executable_quote else None,
+                market_snapshot_archive_path=candidate_row.get("quote_archive_path")
+                if has_executable_quote
+                else None,
+                model_probability_raw=raw_probability,
+                market_probability_at_decision=ask,
+                serving_probability=probability,
+                model_input_snapshot_json=snapshot,
+            )
+            teams = [
+                CanonicalTeam(name, League.NCAAB, name, name[:3], True, None, None, ())
+                for name in (away, home)
+            ]
+            dynamic_units = (
+                getattr(model_inst, "compute_dynamic_units", None)
+                and model_inst.compute_dynamic_units(edge, min_edge=min_edge)
+            ) or 1.00
+            if units_cap is not None:
+                dynamic_units = min(dynamic_units, units_cap)
+            eligibility = EligibilityResult(
+                False,
+                "CALL",
+                "PAPER_CALL_MODEL_UNVALIDATED",
+                dynamic_units,
+                round(probability * 100),
+                edge,
+                edge,
+                *teams,
+                units_cap=units_cap,
+            )
+            if flat_ledger is not None:
+                try:
+                    flat_ledger.append_evaluated(request, eligibility, now=observed)
+                    result["flat_logged"] += 1
+                except DuplicatePickError:
+                    pass
+                except (ValueError, OSError) as exc:
+                    result["errors"].append(
+                        {"event_id": identity, "ledger": "flat_logged", "reason": str(exc)}
+                    )
 
-                qualified = has_executable_quote and edge >= min_edge
-                if kind == "moneyline" and ask < min_moneyline_ask:
-                    qualified = False
-                if kind == "spread":
-                    exp_margin = (getattr(prediction, "inference_inputs", {}) or {}).get("mean")
-                    if decision_line is not None and abs(float(decision_line)) > max_spread_line:
-                        qualified = False
-                    if (
-                        exp_margin is not None
-                        and decision_line is not None
-                        and abs(float(exp_margin) - float(decision_line)) > max_margin_divergence
-                    ):
-                        qualified = False
-                if kind == "total":
-                    exp_tot = (getattr(prediction, "inference_inputs", {}) or {}).get("mean")
-                    if (
-                        exp_tot is not None
-                        and decision_line is not None
-                        and abs(float(exp_tot) - float(decision_line)) > max_total_divergence
-                    ):
-                        qualified = False
-                # The configured history floor also applies to the current season
-                # before a probability can enter Main. Lifetime games only establish
-                # team identity; they do not validate a season-opening estimate.
-                current_season_sample = (getattr(prediction, "feature_basis", None) or {}).get(
-                    "current_season_sample"
+            qualified = has_executable_quote and edge >= min_edge
+            if kind == "moneyline" and ask < min_moneyline_ask:
+                qualified = False
+            if kind == "spread" and decision_line is not None and abs(float(decision_line)) > max_spread_line:
+                qualified = False
+            # The configured history floor also applies to the current season
+            # before a probability can enter Main. Lifetime games only establish
+            # team identity; they do not validate a season-opening estimate.
+            current_season_sample = (getattr(prediction, "feature_basis", None) or {}).get(
+                "current_season_sample"
+            )
+            main_sample_eligible = _main_sample_eligible(current_season_sample, min_team_games)
+            if qualified and not main_sample_eligible:
+                result["skipped"].append(
+                    {
+                        "event_id": identity,
+                        "market_type": kind,
+                        "reason": "insufficient_current_season_sample_for_main",
+                        "current_season_sample": current_season_sample,
+                        "required_games": min_team_games,
+                    }
                 )
-                main_sample_eligible = _main_sample_eligible(current_season_sample, min_team_games)
-                if qualified and not main_sample_eligible:
-                    result["skipped"].append(
-                        {
-                            "event_id": identity,
-                            "market_type": kind,
-                            "reason": "insufficient_current_season_sample_for_main",
-                            "current_season_sample": current_season_sample,
-                            "required_games": min_team_games,
-                        }
-                    )
-                market_main_enabled = main_totals_enabled or kind != "total"
-                if qualified and main_sample_eligible and not market_main_enabled:
-                    result["skipped"].append(
-                        {
-                            "event_id": identity,
-                            "market_type": kind,
-                            "reason": "main_totals_disabled_by_policy",
-                        }
-                    )
-                destinations = (
-                    ("research_ledger_logged", research_ledger, qualified),
-                    ("gated_ledger_logged", gated_ledger, qualified),
-                    (
-                        "main_logged",
-                        main_ledger,
-                        qualified and main_sample_eligible and market_main_enabled,
-                    ),
+            market_main_enabled = main_totals_enabled or kind != "total"
+            if qualified and main_sample_eligible and not market_main_enabled:
+                result["skipped"].append(
+                    {
+                        "event_id": identity,
+                        "market_type": kind,
+                        "reason": "main_totals_disabled_by_policy",
+                    }
                 )
-                for counter, destination, eligible in destinations:
-                    if destination is None or not eligible:
-                        continue
-                    try:
-                        destination.append_evaluated(request, eligibility, now=observed)
-                        result[counter] += 1
-                    except DuplicatePickError:
-                        pass
-                    except (ValueError, OSError) as exc:
-                        result["errors"].append({"event_id": identity, "ledger": counter, "reason": str(exc)})
+            destinations = (
+                ("research_ledger_logged", research_ledger, qualified),
+                ("gated_ledger_logged", gated_ledger, qualified),
+                (
+                    "main_logged",
+                    main_ledger,
+                    qualified and main_sample_eligible and market_main_enabled,
+                ),
+            )
+            for counter, destination, eligible in destinations:
+                if destination is None or not eligible:
+                    continue
+                try:
+                    destination.append_evaluated(request, eligibility, now=observed)
+                    result[counter] += 1
+                except DuplicatePickError:
+                    pass
+                except (ValueError, OSError) as exc:
+                    result["errors"].append({"event_id": identity, "ledger": counter, "reason": str(exc)})
 
     result["logged"] = result["flat_logged"] or result["main_logged"]
     packet = save_candidate_evidence(candidate_rows, candidate_summary, archive_root)

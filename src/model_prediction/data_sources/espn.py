@@ -212,6 +212,11 @@ SPORT_LEAGUES: dict[str, tuple[str, ...]] = {
 }
 
 
+# Bumped when the NCAAF scoreboard query changes, so a past-date raw cache captured from the old
+# featured-games feed is refetched instead of trusted forever.
+NCAAF_SCOREBOARD_QUERY_VERSION = "ncaaf_groups_80_81_v1"
+
+
 class ESPNClient:
     """Generic ESPN site-API client covering every configured league."""
 
@@ -259,6 +264,63 @@ class ESPNClient:
             f"{SITE_API}/{self._league_path(league)}/scoreboard",
             params,
         )
+
+    def scoreboard_ncaaf_divisions(self, game_date: str) -> dict[str, Any]:
+        """FBS-involved (groups=80) and FCS-involved (groups=81) events merged by id.
+
+        The default NCAAF feed is a featured-games subset that misses most FCS-involved games, which
+        left the rating history short. ``_event_feed_groups`` records which feed(s) listed each event
+        (80 only = FBS-FBS, 80+81 = FBS-FCS, 81 only = lower division) so ingest can keep the scope pinned.
+        """
+        merged: dict[str, dict[str, Any]] = {}
+        groups_by_id: dict[str, list[int]] = {}
+        for group in (80, 81):
+            payload = self._get(
+                f"{SITE_API}/{self._league_path('NCAAF')}/scoreboard",
+                {"dates": game_date.replace("-", ""), "groups": group, "limit": 500},
+            )
+            for event in payload.get("events") or []:
+                event_id = str(event.get("id"))
+                merged.setdefault(event_id, event)
+                groups_by_id.setdefault(event_id, []).append(group)
+        return {
+            "events": list(merged.values()),
+            "_event_feed_groups": {k: sorted(v) for k, v in groups_by_id.items()},
+            "_scoreboard_query_version": NCAAF_SCOREBOARD_QUERY_VERSION,
+        }
+
+    @staticmethod
+    def completed_ncaaf_games(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        """``completed_games`` plus the fields the NCAAF history needs; FBS-involved, non-forfeit only.
+
+        A malformed optional field becomes None, never a guess. Events without feed membership (a cache
+        written by the old single-feed query) are treated as FBS-involved only when the payload carries
+        no membership map at all, which keeps legacy raw caches parseable.
+        """
+        membership = payload.get("_event_feed_groups")
+        games = ESPNClient.completed_games(payload)
+        by_id = {str(e.get("id")): e for e in payload.get("events", [])}
+        out: list[dict[str, Any]] = []
+        for game in games:
+            event = by_id.get(game["event_id"], {})
+            competition = (event.get("competitions") or [{}])[0]
+            status_name = (competition.get("status", {}).get("type") or {}).get("name")
+            if status_name == "STATUS_FORFEIT":
+                continue
+            groups = sorted(membership.get(game["event_id"], [])) if isinstance(membership, dict) else None
+            if groups is not None and 80 not in groups:
+                continue
+            neutral = competition.get("neutralSite")
+            week = (event.get("week") or {}).get("number")
+            season_type_id = (event.get("season") or {}).get("type")
+            game["is_neutral_site"] = neutral if isinstance(neutral, bool) else None
+            game["week"] = week if isinstance(week, int) and not isinstance(week, bool) else None
+            game["espn_season_type_id"] = (
+                season_type_id if isinstance(season_type_id, int) and not isinstance(season_type_id, bool) else None
+            )
+            game["feed_groups"] = groups
+            out.append(game)
+        return out
 
     def summary(self, league: str, event_id: str) -> dict[str, Any]:
         return self._get(f"{SITE_API}/{self._league_path(league)}/summary", {"event": event_id})

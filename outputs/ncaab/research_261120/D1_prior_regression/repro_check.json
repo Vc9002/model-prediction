@@ -1,0 +1,26 @@
+{
+  "ridge_vs_archive_rg_c010_l02_k14": {
+    "n": 22963,
+    "max_abs_diff": 7.105427357601002e-15,
+    "n_abs_diff_gt_1e-4": 0
+  },
+  "served_scheme_vs_v7_export": {
+    "n_mine": 22963,
+    "n_export": 22963,
+    "n_only_mine": 0,
+    "n_only_export": 0,
+    "mu_max_abs_diff": 5.0032866738547455e-11,
+    "scale_max_abs_diff": 4.938653841435325e-07,
+    "p_home_ml_max_abs_diff": 4.932097397158941e-09,
+    "by_season_n": {
+      "2023": 5721,
+      "2024": 5726,
+      "2025": 5764,
+      "2026": 5752
+    },
+    "mu_max_abs_diff_2023": 5.0032866738547455e-11,
+    "mu_max_abs_diff_2024": 5.000799774279585e-11,
+    "mu_max_abs_diff_2025": 4.998845781756245e-11,
+    "mu_max_abs_diff_2026": 4.9956483394453244e-11
+  }
+}

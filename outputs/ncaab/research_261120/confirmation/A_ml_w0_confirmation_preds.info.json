@@ -1,0 +1,38 @@
+{
+  "predictions_file": "outputs/ncaab/research_261120/confirmation/A_ml_w0_confirmation_preds.jsonl",
+  "predictions_sha256": "d1c0f45a15ad6249300e0d28871a54d3c4814f5aaeb10433a385479e76c2d930",
+  "n_rows": 38471,
+  "n_by_season": {
+    "2015": 5494,
+    "2016": 5514,
+    "2017": 5520,
+    "2018": 5533,
+    "2019": 5597,
+    "2020": 5328,
+    "2022": 5485
+  },
+  "d1_vs_d1_events_by_season": {
+    "2015": 5494,
+    "2016": 5514,
+    "2017": 5520,
+    "2018": 5533,
+    "2019": 5597,
+    "2020": 5328,
+    "2022": 5485
+  },
+  "coverage_by_season": {
+    "2015": 1.0,
+    "2016": 1.0,
+    "2017": 1.0,
+    "2018": 1.0,
+    "2019": 1.0,
+    "2020": 1.0,
+    "2022": 1.0
+  },
+  "coverage_ok": true,
+  "elo_reconstruction_frac_abs_diff_lt_0.002": 0.9781,
+  "abs_p_change_vs_served": {
+    "mean": 0.032346211603540766,
+    "max": 0.18819478951224666
+  }
+}

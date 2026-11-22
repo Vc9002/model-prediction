@@ -1,0 +1,104 @@
+{
+  "cfbd_lines_sha256": "ff95a377064ac67dfa2741c6f0bc52db7f10d55ae4533e251299ed8319d2daa6",
+  "cfbd_present_at_pin": true,
+  "cfbd_priors_sha256": "e4c203249daadf8d32ab68f7c051e9ad8e806c515f7a54866177702dfa9711aa",
+  "holdout_walk_files_sha256": {
+    "walk_cfbd_m0.25_hl45.holdout.jsonl": "c358052d8ad13bd4a087c4a98f2119282d9c5ba716e54b3dfa31ee878c5c1f46",
+    "walk_cfbd_m0.25_hlnone.holdout.jsonl": "ad69be41fdb2d7687b764ce332c848dc2a49932f2e3511ebba00e385aaae68b9",
+    "walk_cfbd_m0.5_hl45.holdout.jsonl": "e93cdb53428a7340656efc169eeddab75096d476389866c8282b2d3e266483b9",
+    "walk_cfbd_m0.5_hlnone.holdout.jsonl": "c4dda294df916ea22233eb6bad7392fac47d47fdace93612e12ec489076dae86",
+    "walk_cfbd_m1_hl45.holdout.jsonl": "3973a3c580da0b379f8e0e50d9da3a3eaa76e6d7fe3466465a6b2414a6fcacc4",
+    "walk_cfbd_m1_hlnone.holdout.jsonl": "25c8779697407429daf4891f299991fa2a2c58069d8280d1b4d0a94dc82a3e9a",
+    "walk_cfbd_m2_hl45.holdout.jsonl": "d3eb6d23198e87f585bb85830e432152b6d970939110a227fb6bfa222a82e708",
+    "walk_cfbd_m2_hlnone.holdout.jsonl": "b6e0eaf8104ab1ec7188a1498243618442ff281fca6528bb5c9b4b18c25cc883",
+    "walk_cfbd_portal_m0.25_hl45.holdout.jsonl": "32ad9336f8d192107703aa8f3e02043280e6587307e5c2157f84f94dcc5fb517",
+    "walk_cfbd_portal_m0.25_hlnone.holdout.jsonl": "9926dbe3effb3434fbecc801dfed6935c342dcb60385a0689018999647aa5fa3",
+    "walk_cfbd_portal_m0.5_hl45.holdout.jsonl": "f644110f595716e2e62e7f361252dfdeb63b661bf2f08050bfd59bf037ec4034",
+    "walk_cfbd_portal_m0.5_hlnone.holdout.jsonl": "af78f2e4a2a3bcf9a2c0a63be0098568b83e152e9465efd958f2a13d1f5a9b41",
+    "walk_cfbd_portal_m1_hl45.holdout.jsonl": "7dacd21daa5bb0c61925a0bb6b1c8c19526e59883429117d209f032782db01bc",
+    "walk_cfbd_portal_m1_hlnone.holdout.jsonl": "18563b1f777872c09be113ddf130890cc961bd59e539eaed34f5500494c671f6",
+    "walk_cfbd_portal_m2_hl45.holdout.jsonl": "094f096aaa0e29cfa0860625ffe11eb68fbf325603ff4606c52f3244d22e9b0b",
+    "walk_cfbd_portal_m2_hlnone.holdout.jsonl": "0b87c3e77493a3f15f5a703d45554ae29111f172cc9fab3a8e3f0134c4d1eeba",
+    "walk_m0.25_hl45.holdout.jsonl": "0f444022b21c65d6b9d8397cd3988b813bfbfa7b3779e9849b2403b9851fbf12",
+    "walk_m0.25_hlnone.holdout.jsonl": "28d98ca53109be8a0ac2158076c9f93f127fbe605a659cd6509034cb0f62d188",
+    "walk_m0.5_hl45.holdout.jsonl": "1155cc4610852a6fca6835ebaaaba615e58e2d78bfd201b912c38bddc9eb76af",
+    "walk_m0.5_hlnone.holdout.jsonl": "525359e498f92bd297ad777f34829d4fd2c7fb7f25657eacc9e18242293f37de",
+    "walk_m1_hl45.holdout.jsonl": "2de799661cc9ab62e4502fe576937575098cf7b26d3df6108b5de5c7b5c8ac61",
+    "walk_m1_hlnone.holdout.jsonl": "b9f87703125d3462840c34da496eb31a32f5172166c3f92840caf74a43a81a73",
+    "walk_m2_hl45.holdout.jsonl": "21a8c07b4e6a81760ead003c0fcf147f2415f61cb616c1472c5f702dfc89fba2",
+    "walk_m2_hlnone.holdout.jsonl": "603309ed68ed082001b66ac2e3a94c8525cf662189564822c59ebe7132bad644"
+  },
+  "pinned_at_utc": "2026-11-21T21:12:19Z",
+  "prior_arms_sha256": "983569ee193bf4a59e62143edff74cd8b5c478fd28b32318f1fde33bc8a1cdc8",
+  "prior_sha256": "bc7c9b8a40d0a82d07109a37429e2b8e3f1c3fabaec56e4f2297d2d1438f07cb",
+  "rule": {
+    "arms": {
+      "cfbd_close": "CFBD multi-book close: median over providers of spread_espn_home_close / total_close, rows flagged ml_spread_sign_conflict or open_close_sign_conflict excluded; moneyline from the consensus pmf",
+      "consensus": "ESPN pinned median closing line (espn-lines-rule-1) as the margin / total mean; moneyline from a cover-balanced keyed pmf whose SD model is fit on TRAIN lined games (a baseline fit, not a v7 fit)",
+      "opener": "CFBD multi-book opener (median spread_espn_home_open / total_open, 2021+), same exclusions",
+      "v5": "artifact as served: intercept + slope * raw replay margin, slice SD table x conference scale x blowout widening, negative-binomial engine 200k sims, common random numbers per event (the recheck's arithmetic)",
+      "v7": "selected candidate, mean-centred keyed margin pmf; moneyline = P(margin > 0). The gate uses this arm.",
+      "v7_alt": "best validation candidate of the other prior family (with vs without CFBD), reported, never gating"
+    },
+    "bootstrap": "paired v7 - v5 deltas, resampling game dates (2000 resamples, seed 11), 95% percentile CI",
+    "cfbd_arm": "The CFBD preseason prior landed before this pin, so core and CFBD arms compete on validation and the holdout is read once for both (selected arm gates; the other family is reported as v7_alt). CFBD values are current-revised (as_published_verified false; 2026 fetched mid-season): any CFBD-arm gain is an UPPER BOUND. Used: returning_off_ppa_pct, talent_prev_season, recruiting_points_4yr_weighted, portal_out_stars_sum (portal arm only). Never used: portal IN (as-of-fetch destination), current-season talent, SP+.",
+    "gate_beats_v5_on_outcomes": {
+      "applies_to": "each scored v7 arm (selected and alt) separately, v7 minus v5 on the same games",
+      "coverage": "v7 calls >= 97% of the holdout v5 rows",
+      "no_point_regression": {
+        "margin_mae_at_most": 0.0,
+        "ml_brier_at_most": 0.0005,
+        "ml_log_loss_at_most": 0.0015
+      },
+      "significant_improvement": "margin MAE delta CI high < 0, or moneyline log loss delta CI high < 0",
+      "verdict": {
+        "FAILED": "core arm: margin MAE delta CI low > 0, or moneyline Brier delta CI low > 0 (significantly worse)",
+        "PASS -> WIRE AS CHALLENGER": "the CORE arm (no CFBD) passes coverage, significant_improvement and no_point_regression; the CFBD arm is packaged only if it passes as well, otherwise the core arm is packaged",
+        "RESEARCH ONLY": "otherwise; if only the CFBD arm passes, RESEARCH ONLY (its gain cannot be separated from current-revised CFBD values, which are also current-revised in the validation seasons)"
+      }
+    },
+    "grid_history": "lambda multipliers started at (0.5, 1, 2); 0.5 won on validation at the grid edge, so 0.25 was added before this pin (0.5 still won). The half-life grid (none, 45 days) was NOT extended although 45 won: the validation difference between them is about 0.015 points of margin MAE. Every grid change happened on train/validation numbers only; the holdout was unread.",
+    "id": "cfb-v7-holdout-rule-1",
+    "market_relative_cfbd": "the same market block against the CFBD multi-book close; MAE vs the CFBD opener (2021+) for v7, v5, v7_alt (paired, date-clustered CI). Reported, not gating.",
+    "market_relative_reported_not_gating": {
+      "MARKET_SKILL_if": "orthogonalised slope CI low > 0 AND corr CI low > 0 (per market); else NO_MARKET_SKILL",
+      "ats": "disagreement >= 3 and >= 7 points: wins / losses / pushes, Wilson CI, ROI at a 52.4% break-even",
+      "corr": "corr(model - line, result - line), date-clustered bootstrap CI",
+      "lines": "ESPN pinned median closing spread and total (espn-lines-rule-1); DESIGN-INFORMED (read before)",
+      "slope_orthogonalised": "coefficient on (model - line) in OLS of (result - line) on [1, line, model - line]",
+      "slope_plain": "OLS slope of (result - line) on (model - line)",
+      "totals": "same four on totals"
+    },
+    "pinned_before": "the first and only v7 holdout read; validation numbers were known, holdout numbers were not",
+    "point_in_time": "decision = min(kickoff, 08:00 America/New_York on the kickoff's ET date); a game feeds ratings only if kickoff + 5 h <= decision. v5's replay admits games with start < kickoff (no buffer, same-day results): a small information advantage to v5 that is left in place.",
+    "pre_read_steps": "v5 reproduction (`v5repro`, no v7 file opened) must pass; the consensus pmf is fit on train and stored in the spec before the pin; the identical scoring path runs once on validation (`dryrun`); script, spec, prior files, the v5 reproduction and this rule are committed and unmodified; the read marker is written immediately before the first holdout file is opened.",
+    "scored_set": "v5 replay rows (every completed FBS-involved game) in the holdout window on which v7 makes a call; v5 and the consensus baseline are scored on exactly those games (consensus on the lined subset); no-calls and rows without facts are counted and reported, never scored.",
+    "secondary_reported_not_gating": [
+      "weeks 0-4 (v5 replay week <= 4) vs 5-14 vs postseason: margin MAE, Brier, log loss deltas with CIs",
+      "FBS-FBS vs FBS-FCS",
+      "calibration by favourite size (0-3/3-7/7-14/14-21/21+ projected margin)",
+      "total MAE (v7 vs v5 vs consensus)",
+      "v7 and v5 vs the consensus baseline on outcomes"
+    ],
+    "selection": "prior arm ['core', 'cfbd', 'cfbd_portal'] x lambda multiplier [0.25, 0.5, 1.0, 2.0] x recency half-life [None, 45.0] x stage-2 feature set ['full', 'eff', 'pts']: lowest validation margin MAE (0.005-point ties -> lower validation total MAE). Prior rho / lambda / CFBD gammas from 2016-2021 finals (and those seasons' CFBD values) only. Margin pmf (SD model + key multipliers, ridge 10.0) and total bucket SDs fit on train for the selected candidate and for the best candidate of the other family (core vs CFBD), the 'alt' arm.",
+    "v5_reproduction_required": {
+      "margin_mae": [
+        13.167,
+        0.002
+      ],
+      "ml_brier": [
+        0.17197,
+        5e-05
+      ],
+      "n": 1949,
+      "note": "published in outputs/ncaaf/cfb_v5_margin_slope_recheck.md; checked on all v5 holdout rows first"
+    },
+    "windows": {
+      "holdout": "date > 2024-11-14 (2024-11-15 onwards, through the 2026-11-19 end of the v5 replay rows)",
+      "train": "date <= 2022-11-11",
+      "validation": "2022-11-11 < date <= 2024-11-14"
+    }
+  },
+  "rule_sha256": "fd7e9d0f2a8f5bbc22e8a7b3eadb101f3577488de1cc5854c985becd81ff00d3",
+  "spec_sha256": "90fd539af9f0ab2a98f574f463a017607a2c14f08524a492a3eac228aeaea1c4"
+}

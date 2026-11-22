@@ -1,0 +1,56 @@
+season 2022: {'fit_games': 5474, 'league_eff': 103.01, 'league_poss40_intercept': 67.36, 'mean_game_poss40': 67.51, 'seconds': 0.2}
+season 2023: {'fit_games': 5714, 'league_eff': 104.39, 'league_poss40_intercept': 67.2, 'mean_game_poss40': 67.31, 'seconds': 26.4}
+season 2024: {'fit_games': 5724, 'league_eff': 106.27, 'league_poss40_intercept': 67.64, 'mean_game_poss40': 67.81, 'seconds': 27.4}
+season 2025: {'fit_games': 5759, 'league_eff': 107.38, 'league_poss40_intercept': 67.16, 'mean_game_poss40': 67.32, 'seconds': 27.7}
+season 2026: {'fit_games': 5752, 'league_eff': 109.66, 'league_poss40_intercept': 67.39, 'mean_game_poss40': 67.61, 'seconds': 27.4}
+{
+ "drops": {
+  "no_box": 25,
+  "poss_out_of_range": 1,
+  "fit_rows_periods_unknown_ot_0": 0,
+  "fit_rows_overtime": 1671
+ },
+ "n_fit_rows": 28423,
+ "n_teams": 368,
+ "seasons": {
+  "2022": {
+   "fit_games": 5474,
+   "league_eff": 103.01,
+   "league_poss40_intercept": 67.36,
+   "mean_game_poss40": 67.51,
+   "seconds": 0.2
+  },
+  "2023": {
+   "fit_games": 5714,
+   "league_eff": 104.39,
+   "league_poss40_intercept": 67.2,
+   "mean_game_poss40": 67.31,
+   "seconds": 26.4
+  },
+  "2024": {
+   "fit_games": 5724,
+   "league_eff": 106.27,
+   "league_poss40_intercept": 67.64,
+   "mean_game_poss40": 67.81,
+   "seconds": 27.4
+  },
+  "2025": {
+   "fit_games": 5759,
+   "league_eff": 107.38,
+   "league_poss40_intercept": 67.16,
+   "mean_game_poss40": 67.32,
+   "seconds": 27.7
+  },
+  "2026": {
+   "fit_games": 5752,
+   "league_eff": 109.66,
+   "league_poss40_intercept": 67.39,
+   "mean_game_poss40": 67.61,
+   "seconds": 27.4
+  }
+ },
+ "n_rows": 22963,
+ "history_events_with_periods": 31023,
+ "components_sha256": "6382d613ba45bdc8c117b23ce78c62706cd7dd87fae52ad1a01536f8f41f3307"
+}
+exit 0

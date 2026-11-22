@@ -1,0 +1,288 @@
+{
+ "rule_sha256": "1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f",
+ "rule_version": "totals-sources-rule-1",
+ "script": "cfb_qb_bound.py",
+ "script_sha256": "a1a911446f6f895917afe22b1f2508e3da661dd22861c5c2462e92d8b7945c94",
+ "generated_at_utc": "2026-11-15T07:13:25Z",
+ "final": true,
+ "frozen_inputs_sha256": {
+  "cfb_v6_base_rows.jsonl": "30c3383c4de3824e5a3ee7cb76053facd18b0fe105097fec066bb9fc2980f4be",
+  "cfb_v5_base_rows.jsonl": "39c1cbd61e63b7dc1c029ad39b7c5b759aa1921296957d9070cb977bab2d187e",
+  "history_snapshot.jsonl": "1fe90e1a11b8e5248003bff92ae62eec5bb17c4bd421a275b2f64ed36f1ced0c",
+  "espn_lines.jsonl": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54"
+ },
+ "v6_frozen_params_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70",
+ "holdout_reads": 1,
+ "holdout_note": null,
+ "workstream": "W4",
+ "source": "W4 quarterback starter bound",
+ "tier": "leaky",
+ "caveat": "LEAKY UPPER BOUND. Starters are derived post hoc from box-score pass attempts. The closing line knows the announced starter and there are no historical timestamped injury or depth-chart reports locally, so nothing here can be shown to be observable before kickoff. The best possible verdict is UPPER_BOUND_PASS, and nothing here enters cfb-structural-v6.1.",
+ "definitions": "starter = the team's passer with the most pass attempts in that game; qb_changed = starter differs from the team's previous game starter; backup_start = starter differs from the team's season-to-date attempts leader over prior games (the first game of a season is 0, counted)",
+ "interpretation_notes": [
+  "qb_changed and backup_start are season-local: the first game of a season is 0 for both (counted in coverage), so an offseason starter change is not flagged.",
+  "A game whose starter did not resolve (no pass attempts or no box score) leaves the feature missing and is dropped from the cohort; it does not update the team's state.",
+  "Seasons 2022-2026 only; 2022 select rows end 2022-11-11 and so are few."
+ ],
+ "cache_file": "data\\research\\ncaaf_v6\\qb_starters.jsonl",
+ "cache_events": 4390,
+ "coverage_by_season": {
+  "2022": {
+   "events_expected": 896,
+   "events_fetched": 896,
+   "events_with_box_score": 896,
+   "team_sides_expected": 1792,
+   "team_sides_resolved": 1792,
+   "sides_with_both_flags_zero": 1407,
+   "fbs_fbs_total_lined_scored": 776,
+   "fbs_fbs_spread_lined_scored": 776,
+   "backup_start_sum_gt0": 266,
+   "qb_changed_sum_gt0": 200,
+   "backup_start_diff_ne0": 227,
+   "qb_changed_diff_ne0": 181
+  },
+  "2023": {
+   "events_expected": 910,
+   "events_fetched": 910,
+   "events_with_box_score": 910,
+   "team_sides_expected": 1820,
+   "team_sides_resolved": 1820,
+   "sides_with_both_flags_zero": 1415,
+   "fbs_fbs_total_lined_scored": 792,
+   "fbs_fbs_spread_lined_scored": 792,
+   "backup_start_sum_gt0": 296,
+   "qb_changed_sum_gt0": 221,
+   "backup_start_diff_ne0": 268,
+   "qb_changed_diff_ne0": 205
+  },
+  "2024": {
+   "events_expected": 919,
+   "events_fetched": 919,
+   "events_with_box_score": 919,
+   "team_sides_expected": 1838,
+   "team_sides_resolved": 1838,
+   "sides_with_both_flags_zero": 1491,
+   "fbs_fbs_total_lined_scored": 772,
+   "fbs_fbs_spread_lined_scored": 770,
+   "backup_start_sum_gt0": 251,
+   "qb_changed_sum_gt0": 183,
+   "backup_start_diff_ne0": 222,
+   "qb_changed_diff_ne0": 172
+  },
+  "2025": {
+   "events_expected": 934,
+   "events_fetched": 934,
+   "events_with_box_score": 933,
+   "team_sides_expected": 1868,
+   "team_sides_resolved": 1866,
+   "sides_with_both_flags_zero": 1516,
+   "fbs_fbs_total_lined_scored": 805,
+   "fbs_fbs_spread_lined_scored": 807,
+   "backup_start_sum_gt0": 259,
+   "qb_changed_sum_gt0": 188,
+   "backup_start_diff_ne0": 230,
+   "qb_changed_diff_ne0": 178
+  },
+  "2026": {
+   "events_expected": 731,
+   "events_fetched": 731,
+   "events_with_box_score": 731,
+   "team_sides_expected": 1462,
+   "team_sides_resolved": 1462,
+   "sides_with_both_flags_zero": 1196,
+   "fbs_fbs_total_lined_scored": 570,
+   "fbs_fbs_spread_lined_scored": 570,
+   "backup_start_sum_gt0": 177,
+   "qb_changed_sum_gt0": 129,
+   "backup_start_diff_ne0": 152,
+   "qb_changed_diff_ne0": 122
+  }
+ },
+ "results": {
+  "total": {
+   "source": "W4",
+   "market": "total",
+   "stage": "observed",
+   "tier": "leaky",
+   "result": {
+    "market": "total",
+    "features": [
+     "backup_start_sum",
+     "qb_changed_sum"
+    ],
+    "eval_features": null,
+    "close_col": "line",
+    "y_col": "actual",
+    "n_select": 542,
+    "n_validation": 1566,
+    "n_holdout": 1607,
+    "flag_counts": {
+     "backup_start_sum": {
+      "select_flagged": 155,
+      "validation_flagged": 571
+     },
+     "qb_changed_sum": {
+      "select_flagged": 134,
+      "validation_flagged": 415
+     }
+    },
+    "final": true,
+    "validation": {
+     "mse_baseline": 260.96756491101127,
+     "mse_with_source": 260.2644966969663,
+     "dmse": 0.7030682140449409,
+     "ci_lo": -0.4485701977164642,
+     "ci_hi": 1.9003814593750263,
+     "B": 1000,
+     "seed": 20261115
+    },
+    "holdout": {
+     "mse_baseline": 245.4113091996701,
+     "mse_with_source": 246.2004242062255,
+     "dmse": -0.7891150065554231,
+     "point_estimate_only": true
+    },
+    "baseline_coef": [
+     -3.385844441563508,
+     1.056438541099994
+    ],
+    "source_coef": [
+     -2.383693150704265,
+     1.0445468303659182,
+     0.3708589591660157,
+     -1.7233993262506213
+    ],
+    "select_feature_means": {
+     "backup_start_sum": 0.3247232472324723,
+     "qb_changed_sum": 0.2730627306273063
+    },
+    "exploratory": {
+     "label": "exploratory, not a verdict input",
+     "select_in_sample_dmse": 0.5511113928018644,
+     "validation_dmae": 0.0020720574880715224
+    }
+   },
+   "verdict": {
+    "verdict": "NOT_WORTH_BUILDING",
+    "validation_pass": false,
+    "holdout_pass": false,
+    "reason": "fails the pass rule (validation CI lower bound > 0 AND holdout point estimate > 0)"
+   }
+  },
+  "spread": {
+   "source": "W4",
+   "market": "spread",
+   "stage": "observed",
+   "tier": "leaky",
+   "result": {
+    "market": "spread",
+    "features": [
+     "backup_start_diff",
+     "qb_changed_diff"
+    ],
+    "eval_features": null,
+    "close_col": "close_margin",
+    "y_col": "margin",
+    "n_select": 542,
+    "n_validation": 1565,
+    "n_holdout": 1608,
+    "flag_counts": {
+     "backup_start_diff": {
+      "select_flagged": 134,
+      "validation_flagged": 507
+     },
+     "qb_changed_diff": {
+      "select_flagged": 120,
+      "validation_flagged": 386
+     }
+    },
+    "final": true,
+    "validation": {
+     "mse_baseline": 235.91619483149958,
+     "mse_with_source": 233.9297357564206,
+     "dmse": 1.9864590750789595,
+     "ci_lo": -0.22933690625200948,
+     "ci_hi": 4.081938259740851,
+     "B": 1000,
+     "seed": 20261115
+    },
+    "holdout": {
+     "mse_baseline": 224.4573532640278,
+     "mse_with_source": 221.88825600109396,
+     "dmse": 2.5690972629338273,
+     "point_estimate_only": true
+    },
+    "baseline_coef": [
+     -0.0012985555125643853,
+     0.9319552525500129
+    ],
+    "source_coef": [
+     0.06689681685726091,
+     0.9199419297470499,
+     -0.9328075766514712,
+     -2.4390898427159904
+    ],
+    "select_feature_means": {
+     "backup_start_diff": -0.01107011070110701,
+     "qb_changed_diff": 0.007380073800738007
+    },
+    "exploratory": {
+     "label": "exploratory, not a verdict input",
+     "select_in_sample_dmse": 2.1166484518074205,
+     "validation_dmae": 0.059506717180496486
+    }
+   },
+   "verdict": {
+    "verdict": "NOT_WORTH_BUILDING",
+    "validation_pass": false,
+    "holdout_pass": true,
+    "reason": "fails the pass rule (validation CI lower bound > 0 AND holdout point estimate > 0)"
+   }
+  }
+ },
+ "verdicts": {
+  "total": {
+   "verdict": "NOT_WORTH_BUILDING",
+   "validation_pass": false,
+   "holdout_pass": false,
+   "reason": "fails the pass rule (validation CI lower bound > 0 AND holdout point estimate > 0)"
+  },
+  "spread": {
+   "verdict": "NOT_WORTH_BUILDING",
+   "validation_pass": false,
+   "holdout_pass": true,
+   "reason": "fails the pass rule (validation CI lower bound > 0 AND holdout point estimate > 0)"
+  }
+ },
+ "exploratory": {
+  "label": "exploratory, validation window only, not a verdict input",
+  "backup_start_sum": {
+   "0": {
+    "n": 995,
+    "mean_actual_minus_close": 0.9711055276381909
+   },
+   "1": {
+    "n": 507,
+    "mean_actual_minus_close": 1.9985207100591715
+   },
+   "2": {
+    "n": 64,
+    "mean_actual_minus_close": -0.6875
+   }
+  },
+  "qb_changed_sum": {
+   "0": {
+    "n": 1151,
+    "mean_actual_minus_close": 1.5071676802780192
+   },
+   "1": {
+    "n": 386,
+    "mean_actual_minus_close": 0.5148963730569949
+   },
+   "2": {
+    "n": 29,
+    "mean_actual_minus_close": 0.06896551724137931
+   }
+  }
+ }
+}

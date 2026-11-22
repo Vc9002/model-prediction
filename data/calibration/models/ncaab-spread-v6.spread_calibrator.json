@@ -1,17 +1,16 @@
 {
-  "baseline_brier": 0.269799,
-  "calibrated_at_utc": "2026-11-14T19:00:47.253431+00:00",
-  "calibrated_oof_brier": 0.2613822755924291,
-  "champion_method": "temperature",
+  "baseline_brier": 0.270066,
+  "calibrated_at_utc": "2026-11-22T01:38:05.596680+00:00",
+  "calibrated_oof_brier": 0.2700663579873776,
+  "champion_method": "identity",
   "fit_model_versions": [
     "ncaab-spread-v6"
   ],
+  "fit_pool": "engine-pure: ncaab-spread-v6 rows whose decision snapshot features.margin_engine is 'v6' or missing",
   "fit_source": "settled_live_rows",
   "market": "spread",
   "model_version": "ncaab-spread-v6",
-  "parameters": {
-    "temperature": 3.0
-  },
-  "sample_size": 158,
+  "parameters": {},
+  "sample_size": 241,
   "sport": "ncaab"
 }

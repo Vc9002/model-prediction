@@ -1,0 +1,81 @@
+{
+  "written_before_fit": true,
+  "split": "validation.chronological_split, 60/20/20 on complete kickoff dates, FBS-involved completed games",
+  "feature_candidates": {
+    "live": "v5.1 conference table + lagged scoring proxy computed in the feature path",
+    "drop": "v5.1 conference table + EPA channel off (PPP fallback)",
+    "ablation_only_not_selectable": [
+      "v5 (served features, refit)",
+      "conf (conference fix, stored EPA)"
+    ]
+  },
+  "layer_candidates": {
+    "established_min_sample": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "neutral_intercept": [
+      false,
+      true
+    ],
+    "margin_mean_fit_cohort": [
+      "all",
+      "fbs_vs_fbs"
+    ],
+    "conference_scale": "always fitted (established matchups)"
+  },
+  "stage_1_selection": "lowest validation moneyline Brier under the served v5.1 arithmetic with no key multipliers (tie-free Normal point masses); tiebreak higher validation discrete margin log score",
+  "stage_2_key_numbers": {
+    "candidates": {
+      "none": [],
+      "k3_7": [
+        3,
+        7
+      ],
+      "k3_7_10_14": [
+        3,
+        7,
+        10,
+        14
+      ],
+      "all_1_28": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ]
+    },
+    "fit": "fixed-point multipliers on TRAIN so expected |margin| counts match observed",
+    "validated_if": "validation discrete margin log score improves over 'none' with a date-clustered 95% CI above 0 AND validation spread-cover log loss at archived closing lines is not worse than 'none' (point estimate); among validated sets the highest validation discrete log score wins; otherwise 'none'"
+  },
+  "holdout": "read once by the holdout stage (marker file); served v5 vs selected v5.1; never used to choose",
+  "baseline": "served cfb-structural-v5: v5 features, v5 artifact parameters, 200k NB engine",
+  "note": "The 2024-11..2026-11 window was already scored by v5's 2026-11-12 fit and the 2026-11-21 slope recheck; it is not a pristine holdout for NCAAF research in general, only untouched by this fit's choices.",
+  "written_utc": "2026-11-22T02:44:59.391426+00:00"
+}

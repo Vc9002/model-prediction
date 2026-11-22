@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Sequence
 from math import erf, isnan, sqrt
 from pathlib import Path
@@ -52,6 +53,12 @@ from .base import GamePrediction, GamePredictionBase
 from .basketball import UpcomingGame
 
 NCAAB_SPREAD_V6_VERSION = "ncaab-spread-v6"
+NCAAB_SPREAD_V7_VERSION = "ncaab-spread-v7"  # the v6 artifact served with the v7 margin engine
+# ncaab-spread-v7 with the moneyline from P_t8(margin >= 1) alone (Elo weight 0); spread unchanged.
+NCAAB_MONEYLINE_V7M_VERSION = "ncaab-moneyline-v7m"
+NCAAB_MONEYLINE_V7M_RULE = "p_home = P_t8(margin >= 1) under the served margin distribution; elo weight 0"
+_logger = logging.getLogger(__name__)
+
 ARTIFACT_PATH = Path(__file__).resolve().parents[3] / "config" / "models" / "ncaab-spread-v6.json"
 ELO_POINTS_PER_MARGIN_POINT = 28.0  # Elo rating gap that corresponds to one point of margin
 
@@ -223,6 +230,7 @@ class NCAABSpreadModelV6:
         high_altitude_hca: dict[str, float] | None = None,
         stats_root: Path | str | None = None,
         version: str = NCAAB_SPREAD_V6_VERSION,
+        margin_engine: str = "v6",
     ) -> None:
         self.margin_sd = margin_sd
         self.elo_weight = elo_weight
@@ -257,6 +265,18 @@ class NCAABSpreadModelV6:
         self.dynamic_sizing_enabled = dynamic_sizing_enabled
         self.high_altitude_hca = high_altitude_hca or DEFAULT_HIGH_ALTITUDE_HCA
         self.version = version
+        # "v6" (default, bit-for-bit the served model) or "v7": D1-vs-D1 margin mean/scale come from the
+        # multi-season v7 engine. Set by college_basketball_forward from models.NCAAB.margin_engine; it is
+        # a runtime switch, not an artifact parameter, so the artifact hash and from_artifact are untouched.
+        self.margin_engine = margin_engine
+        self.model_artifact_hash = ""  # set by the production factories; stamped on ledger rows
+        self.v7_serving: Any = None  # injectable for tests; None builds the process-wide default lazily
+        # Runtime switches set only by ncaab_moneyline_v7m_model (like margin_engine, not artifact
+        # parameters): serve the moneyline from P(margin >= 1) alone, under its own id and hash. The
+        # spread outputs, version and model_artifact_hash are untouched by them.
+        self.moneyline_margin_only = False
+        self.moneyline_version: str | None = None
+        self.moneyline_artifact_hash = ""
         self.league = "NCAAB"
         self.sport = "ncaab"
 
@@ -403,6 +423,29 @@ class NCAABSpreadModelV6:
             defense[team] = league_mean - strength
         return offense, defense
 
+    def _v7_margins(self, history: Sequence[GameRecord], upcoming: Sequence[UpcomingGame]) -> dict[str, Any]:
+        """v7 overrides for D1-vs-D1 games, or {} (v6 serves everything) when off or v7 cannot run.
+
+        Never raises and never guesses: a missing archive or any v7 failure logs a warning and the slate
+        is served by v6 exactly as if the switch were off.
+        """
+        engine = str(self.margin_engine or "v6").lower()
+        if engine == "v6":
+            return {}
+        if engine != "v7":
+            _logger.warning("NCAAB margin_engine %r is not recognised; serving v6", self.margin_engine)
+            return {}
+        try:
+            serving = self.v7_serving
+            if serving is None:
+                from .ncaab_v7_serving import default_serving
+
+                serving = default_serving()
+            return dict(serving.margins(history, upcoming))
+        except Exception:
+            _logger.warning("NCAAB v7 margin engine failed; serving v6 for this slate", exc_info=True)
+            return {}
+
     def predict_spreads(
         self,
         history: Sequence[GameRecord],
@@ -429,6 +472,7 @@ class NCAABSpreadModelV6:
             defense_baselines=baselines[1] if baselines else None,
         )
         baseline = trend.league_baseline or 71.4
+        v7_margins = self._v7_margins(history, upcoming)
 
         predictions: list[GamePrediction] = []
 
@@ -530,6 +574,16 @@ class NCAABSpreadModelV6:
                 )
             scale = self._margin_scale(effective_margin_sd)
 
+            v7 = v7_margins.get(game.event_id)
+            if v7 is not None:
+                # v7 was fitted without the rest/density terms and without availability points, so they are
+                # replaced along with the blend rather than stacked on top of it. v7's scale is already a
+                # Student-t scale (df 8), so it bypasses _margin_scale; sd mirrors it as v6 does by default.
+                rest_diff = 0.0
+                expected_margin = v7.mean
+                effective_margin_sd = v7.scale
+                scale = v7.scale
+
             uncertainty = max(0.03, min(0.20, 0.20 - 0.025 * sample))
             base: GamePredictionBase = {
                 "event_id": game.event_id,
@@ -560,6 +614,7 @@ class NCAABSpreadModelV6:
                     "altitude_bonus": alt_bonus,
                     "current_season_sample": sample,
                     "history_games": len(history),
+                    "margin_engine": "v7" if v7 is not None else "v6",
                 },
             }
 
@@ -577,10 +632,23 @@ class NCAABSpreadModelV6:
                 home_win_elo = elo.expected_neutral_win(game.home_team, game.away_team)
             else:
                 home_win_elo = elo.expected_home_win(game.home_team, game.away_team)
-            p_home = elo_w * home_win_elo + (1.0 - elo_w) * p_margin_home
+            if self.moneyline_margin_only:
+                # ncaab-moneyline-v7m (A_ml_w0, confirmed 2026-11-21): Elo weight 0 at every sample size.
+                # elo_w is left alone because it still shapes expected_margin on the v6 path.
+                p_home = p_margin_home
+            else:
+                p_home = elo_w * home_win_elo + (1.0 - elo_w) * p_margin_home
             p_h_clamped = max(0.0001, min(0.9999, p_home))
             p_a_clamped = max(0.0001, min(0.9999, 1.0 - p_home))
 
+            moneyline_base = base
+            if self.moneyline_version:
+                # Moneyline rows carry their own id; base (and so every spread row) stays v7's.
+                moneyline_base = {
+                    **base,
+                    "model_version": self.moneyline_version,
+                    "feature_basis": {**base["feature_basis"], "moneyline_rule": "margin_only"},
+                }
             predictions.append(
                 GamePrediction(
                     market_type="moneyline",
@@ -596,7 +664,7 @@ class NCAABSpreadModelV6:
                         f"{elo.rating(game.away_team):.0f}, proj margin {expected_margin:+.1f} "
                         f"(HCA {effective_hca:.1f})"
                     ),
-                    **base,
+                    **moneyline_base,
                 )
             )
 
@@ -656,4 +724,62 @@ class NCAABSpreadModelV6:
 
 def ncaab_spread_v6_model() -> NCAABSpreadModelV6:
     """Production factory: the served parameters are the hash-verified artifact's, nothing else."""
-    return NCAABSpreadModelV6.from_artifact(load_verified_artifact(ARTIFACT_PATH))
+    artifact = load_verified_artifact(ARTIFACT_PATH)
+    model = NCAABSpreadModelV6.from_artifact(artifact)
+    model.model_artifact_hash = str(artifact["artifact_hash"])
+    return model
+
+
+def ncaab_spread_v7_artifact_hash(base_artifact_hash: str) -> str:
+    """Identity of ncaab-spread-v7: the v6 artifact it reuses plus the frozen v7 engine (pin 2)."""
+    from .ncaab_v7_serving import v7_config_hash
+
+    payload = {
+        "model_id": NCAAB_SPREAD_V7_VERSION,
+        "base_artifact_hash": base_artifact_hash,
+        "v7_config_hash": v7_config_hash(),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def ncaab_spread_v7_model() -> NCAABSpreadModelV6:
+    """ncaab-spread-v7: the unchanged, hash-verified v6 artifact with the v7 margin engine on.
+
+    Same parameters as v6 by construction (nothing is re-read or re-fit); only the id, the engine
+    and the recorded model hash differ. It gives the engine that served under the v6 id since
+    2026-11-16 its own identity; rollback is ncaab-spread-v6 (engine v6).
+    """
+    artifact = load_verified_artifact(ARTIFACT_PATH)
+    model = NCAABSpreadModelV6.from_artifact(artifact, version=NCAAB_SPREAD_V7_VERSION, margin_engine="v7")
+    model.model_artifact_hash = ncaab_spread_v7_artifact_hash(str(artifact["artifact_hash"]))
+    return model
+
+
+def ncaab_moneyline_v7m_artifact_hash(v7_artifact_hash: str) -> str:
+    """Identity of ncaab-moneyline-v7m: the ncaab-spread-v7 identity plus the margin-only moneyline rule."""
+    payload = {
+        "model_id": NCAAB_MONEYLINE_V7M_VERSION,
+        "base_artifact_hash": v7_artifact_hash,
+        "moneyline_rule": NCAAB_MONEYLINE_V7M_RULE,
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def ncaab_moneyline_v7m_model() -> NCAABSpreadModelV6:
+    """ncaab-moneyline-v7m: the ncaab-spread-v7 instance with the moneyline read off the margin alone.
+
+    One instance serves both markets: ``version`` / ``model_artifact_hash`` stay ncaab-spread-v7's (spread
+    rows are bit-identical to v7), and moneyline rows carry ``moneyline_version`` / ``moneyline_artifact_hash``.
+    Confirmed as A_ml_w0 (outputs/ncaab/research_261120/confirmation/A_ml_w0_confirmation.md) only for
+    the coherent Student-t(8) P(margin >= 1) rule, so any other moneyline configuration fails closed.
+    """
+    model = ncaab_spread_v7_model()
+    if not (model.coherent_moneyline and model.use_student_t_spreads and model.student_t_df == 8.0):
+        raise ValueError(
+            "ncaab-moneyline-v7m needs the coherent Student-t(8) moneyline it was confirmed on; the v6 "
+            "artifact no longer provides it"
+        )
+    model.moneyline_margin_only = True
+    model.moneyline_version = NCAAB_MONEYLINE_V7M_VERSION
+    model.moneyline_artifact_hash = ncaab_moneyline_v7m_artifact_hash(model.model_artifact_hash)
+    return model

@@ -1,0 +1,7 @@
+{
+  "games_jsonl": "E:\\MP\\data\\processed\\nba\\games.jsonl",
+  "games_sha256": "4dd2cf82c365226e253dc2cd56cecf77e447412347fc2292594aa0df2e002ca8",
+  "lines_jsonl": "E:\\MP\\data\\odds\\nba\\historical_closing_lines\\nba_closing_lines_2024_2026.jsonl",
+  "lines_sha256": "4b72ce5b3f7f42fcebfed04b720219a54d71ddd37dde6dab33912a5fc5a833f1",
+  "rows": 2811
+}

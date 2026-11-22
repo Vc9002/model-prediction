@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -321,3 +322,140 @@ def test_unmapped_cohort_pick_captures_only_its_own_contract(tmp_path):
     assert [(m["market_type"], m["sides"][0]["team"], m["sides"][0]["line"]) for m in kept] == [
         ("spread", "North Carolina Central", 8.5)
     ]
+
+
+def _write_trial_settings(tmp_path, model_id):
+    (tmp_path / "auto_buyer_ncaab_spread_paper_trial.json").write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "model_id": model_id,
+                "market_type": "spread",
+                "min_saved_edge": 0.05,
+                "max_saved_edge_exclusive": 0.08,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_v7_trial_config_trades_v7_rows_only(tmp_path, monkeypatch):
+    _write_trial_settings(tmp_path, "ncaab-spread-v7")
+    monkeypatch.setattr(trial.RuntimePaths, "resolve", lambda: SimpleNamespace(runtime_root=tmp_path))
+    base = {"sport": "ncaab", "market_type": "spread", "status": "open", "edge": "0.06"}
+    monkeypatch.setattr(
+        trial,
+        "read_picks",
+        lambda: [
+            {**base, "pick_id": "v7", "model_version": "ncaab-spread-v7"},
+            {**base, "pick_id": "v6", "model_version": "ncaab-spread-v6"},
+        ],
+    )
+    monkeypatch.setattr(trial, "read_flat_picks", list)
+    monkeypatch.setattr(trial, "settle_auto_buyer_ledger", lambda **_: None)
+    monkeypatch.setattr(trial, "load_auto_buyer_state", lambda: {"max_event_lookahead_hours": 1.0})
+    monkeypatch.setattr(trial, "PAPER_AUTO_BUYER_DATA_ROOT", tmp_path / "paper_auto_buyer")
+    monkeypatch.setattr(trial, "capture_unmapped_cohort_markets", lambda picks, root: 0)
+    captured = {}
+
+    class PaperBuyer:
+        def __init__(self, *, config, data_root):
+            captured["config"] = config
+
+        def evaluate_and_execute(self, picks):
+            captured["picks"] = picks
+            return SimpleNamespace(dry_run_orders=[])
+
+    monkeypatch.setattr(trial, "AutoPolymarketBuyer", PaperBuyer)
+    assert trial.run_ncaab_spread_paper_trial()["candidates"] == 1
+    assert [p["pick_id"] for p in captured["picks"]] == ["v7"]
+    assert captured["config"].whitelisted_models == ("ncaab-spread-v7",)
+
+
+def test_trial_config_naming_another_model_raises(tmp_path, monkeypatch):
+    _write_trial_settings(tmp_path, "ncaab-spread-v5")
+    monkeypatch.setattr(trial.RuntimePaths, "resolve", lambda: SimpleNamespace(runtime_root=tmp_path))
+    # Fence off every side effect so a regression (no raise) cannot reach the real paper ledger.
+    monkeypatch.setattr(trial, "PAPER_AUTO_BUYER_DATA_ROOT", tmp_path / "paper_auto_buyer")
+    monkeypatch.setattr(trial, "settle_auto_buyer_ledger", lambda **_: None)
+    monkeypatch.setattr(trial, "read_picks", list)
+    monkeypatch.setattr(trial, "read_flat_picks", list)
+    monkeypatch.setattr(trial, "load_auto_buyer_state", lambda: {"max_event_lookahead_hours": 1.0})
+    monkeypatch.setattr(trial, "capture_unmapped_cohort_markets", lambda picks, root: 0)
+    monkeypatch.setattr(
+        trial,
+        "AutoPolymarketBuyer",
+        lambda **_: SimpleNamespace(evaluate_and_execute=lambda picks: SimpleNamespace(dry_run_orders=[])),
+    )
+    with pytest.raises(ValueError, match="ncaab-spread-v6 or ncaab-spread-v7"):
+        trial.run_ncaab_spread_paper_trial()
+    with pytest.raises(ValueError, match="ncaab-spread-v6 or ncaab-spread-v7"):
+        trial.paper_trial_status()
+
+
+def test_real_buyer_treats_v6_and_v7_trial_rows_identically(tmp_path):
+    """The bypass and whitelist are the only id-dependent steps: same row, same outcome under either id."""
+    from model_prediction.domain import iso_utc, utc_now
+    from model_prediction.portfolio.auto_executor import AutoPolymarketBuyer
+
+    now = utc_now()
+    row = {
+        "pick_id": "p1",
+        "event_id": "game-1",
+        "sport": "ncaab",
+        "market_type": "spread",
+        "selection": "away",
+        "status": "open",
+        "decision": "CALL",
+        "reason_code": "FLAT_CALL",
+        "edge": "0.06",
+        "line": 10.5,
+        "model_probability": 0.56,
+        "units": 1.0,
+        "away_team": "Away",
+        "home_team": "Home",
+        "created_at_utc": iso_utc(now),
+        "event_start_utc": iso_utc(now + timedelta(hours=6)),
+        "market_quote_provenance": "indicative_slate",
+        "market_quote_timestamp_valid": "False",
+    }
+
+    def run(config_model, row_model):
+        buyer = AutoPolymarketBuyer(
+            config=AutoExecutionConfig(
+                mode="paper",
+                execute_live=False,
+                paper_ncaab_spread_v6_trial=True,
+                whitelisted_models=(config_model,),
+                blacklisted_models=(),
+                edge_scaled_sizing_enabled=False,
+                require_model_timestamp=True,
+                capture_missing_slates=False,
+                unit_value_usd=15.0,
+                max_game_stake_usd=75.0,
+                max_daily_spend_usd=750.0,
+                min_edge=0.0,
+                max_edge=0.25,
+            ),
+            live_quote_fn=lambda slug: {"market_slug": slug, "ask": 0.50, "side": "long"},
+            data_root=tmp_path / f"{config_model}-{row_model}",
+        )
+        result = buyer.evaluate_and_execute([{**row, "model_id": row_model}])
+        counters = {k: v for k, v in vars(result).items() if k.startswith("rejected_")}
+        return counters, len(result.dry_run_orders)
+
+    v6 = run("ncaab-spread-v6", "ncaab-spread-v6")
+    v7 = run("ncaab-spread-v7", "ncaab-spread-v7")
+    assert v7 == v6 and v6[1] == 1
+    crossed_counters, crossed_orders = run("ncaab-spread-v7", "ncaab-spread-v6")
+    assert crossed_orders == 0 and crossed_counters["rejected_not_whitelisted"] == 1
+
+
+def test_trial_bypass_accepts_v7_and_still_refuses_live():
+    row = {"model_version": "ncaab-spread-v7", "sport": "ncaab", "market_type": "spread"}
+    assert _is_paper_ncaab_spread_v6_trial(
+        row, AutoExecutionConfig(mode="paper", paper_ncaab_spread_v6_trial=True)
+    )
+    assert not _is_paper_ncaab_spread_v6_trial(
+        row, AutoExecutionConfig(mode="live", paper_ncaab_spread_v6_trial=True)
+    )

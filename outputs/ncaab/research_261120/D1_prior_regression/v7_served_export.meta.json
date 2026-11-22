@@ -1,0 +1,26 @@
+{
+  "candidate": "baseline v7_served",
+  "grid_name": "BASELINE_v7_served",
+  "protocol_sha256": "72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813",
+  "code_sha256": "ca74356b8b7f6b26bcbf3f3d66cac5899cf339dab93649e8713f91ef7d9e93ba",
+  "fit_seasons_by_predicted_season": {
+    "2023": [
+      2024
+    ],
+    "2024": [
+      2023
+    ],
+    "2025": [
+      2023,
+      2024
+    ],
+    "2026": [
+      2023,
+      2024
+    ]
+  },
+  "history_cutoff": "strictly before Eastern midnight of the game day",
+  "data_sources": {
+    "data\\research\\ncaab_market\\v7ms_components.jsonl": "cf1b90760618bd90869a121c5fca12ef24a0327670c0016200dce3b13175fe94"
+  }
+}

@@ -33,12 +33,12 @@ Every candidate pick must pass all five evaluation pillars before earning the `C
 ```mermaid
 flowchart TD
     A["Raw Candidate Pick (Nominal Edge >= 5%)"] --> B{"Pillar 1: Vig & Hurdle Filter"}
-    B -- "< 60% WR or < 15% ROI on verified-quote rows (n >= 4)" --> X["DOWNGRADE (Vig Churn / Marginal)"]
+    B -- "fewer than 30 verified, 95% Wilson bound not above bucket mean price, ROI under 15%, or negative closing-line value" --> X["DOWNGRADE (Vig Churn / Marginal)"]
     B -- "Passes Hurdle" --> C{"Pillar 2: Directional Asymmetry"}
     C -- "Direction bucket (over/under) fails its own hurdle" --> Y["FADE / REJECT (Structural Bleed)"]
     C -- "Favorable Direction" --> D{"Pillar 3: Regime & Sample"}
     D -- "Early-Season Unstabilized (e.g. NCAAB 12%+ Spreads)" --> Z["DOWNGRADE (Sample Noise)"]
-    D -- "Established Baseline (n >= 4)" --> E{"Pillar 4: Market Disagreement"}
+    D -- "Established Baseline (n >= 30 verified)" --> E{"Pillar 4: Market Disagreement"}
     E -- "> 10% Disagreement on Totals/NFL" --> W["DOWNGRADE (Market Info Trap)"]
     E -- "<= 10% Disagreement" --> F["CONFIRMED BEST PICK (Tier 1 Gold Standard)"]
 ```
@@ -49,14 +49,45 @@ checks described below; `scripts/audit_best_picks.py` does not enforce them. Onl
 
 ### Pillar 1: Hurdle Rates & Vig Buffer
 A "Best Pick" cannot be a coin-flip that barely escapes standard market vig (52.38% breakeven). As implemented in `scripts/audit_best_picks.py` (Tasks 1-2 of plan `261111-w1m`):
-- **Only verified-quote rows count.** A settled row counts toward any verdict only when its own `decision_payload_json.market_quote_provenance` equals exactly `decision_time_executable_quote` -- the value `forecast.py` stamps after a timestamp-valid, non-reconstructed Polymarket US snapshot taken at decision time. Empty, missing, `indicative_slate`, `archived_two_sided_bbo`, and `decision_time_sportsbook_quote` rows are **context only**; they are never counted toward a verdict.
-- **Minimum Verified Sample Size (`MIN_GRADED`)**: $n \ge 4$ **verified** decisions in the exact sport/market/bucket (or sport/direction/bucket for totals). Below that, the verdict does not change, and a flag states the verified-of-graded count.
+- **Only verified-quote rows count.** A decision counts toward any verdict only when its FIRST eligible row (not a settled row) carries a verified quote, i.e. that row's own `decision_payload_json.market_quote_provenance` equals exactly `decision_time_executable_quote` -- the value `forecast.py` stamps after a timestamp-valid, non-reconstructed Polymarket US snapshot taken at decision time. Empty, missing, `indicative_slate`, `archived_two_sided_bbo`, and `decision_time_sportsbook_quote` rows are **context only**; they are never counted toward a verdict.
+- **Minimum Verified Sample Size (`MIN_GRADED`)**: $n \ge 4$ **verified** decisions in the exact sport/market/bucket (or sport/direction/bucket for totals). It now only selects the evidence basis (own model vs pooled) and detects traps; it no longer confirms anything. Below it the verdict does not change, and a flag states the verified-of-graded count.
 - **Model-or-pooled basis**: the candidate's own model's verified record is used when it has at least `MIN_GRADED` verified decisions; otherwise the pooled (all-models) record is used, with a flag naming the basis.
-- **Minimum Win Rate for CONFIRMED_BEST (`BEST_MIN_WIN_RATE`)**: $\ge 60.0\%$ verified win rate.
-- **Minimum ROI for CONFIRMED_BEST (`BEST_MIN_ROI`)**: $\ge +15.0\%$ verified ROI.
-- **DOWNGRADE_TRAP thresholds**: verified win rate $< 55.0\%$ (`TRAP_WIN_RATE`) or verified ROI $< +5.0\%$ (`TRAP_ROI`).
+- **Confirmation sample and price bar (`CONFIRM_MIN_GRADED`, `CONFIRM_Z`)**: $n \ge 30$ verified decisions, and the one-sided 95% Wilson lower bound ($z = 1.645$) of verified wins / (wins + losses) must sit strictly above the bucket's stake-weighted mean first-sight price. The bucket's own mean price is the comparator, not the candidate's price, because a moneyline bucket mixes underdogs and favourites: a 70% win rate is a strong result at a 35 cent price and a poor one at 75 cents.
+- **The flat 60% win-rate gate (`BEST_MIN_WIN_RATE`) was removed.** It is the even-price vig heuristic, so it blocked profitable underdog buckets and was looser than the price comparator for favourite buckets. The Wilson bound above the mean price is the price-aware form of the same hurdle.
+- **Minimum ROI for CONFIRMED_BEST (`BEST_MIN_ROI`)**: $\ge +15.0\%$ verified ROI (unchanged).
+- **Closing-line value (CLV) gate (`CLV_MIN_MOVED`)**: per decision, CLV is the last verified pre-start same-line price minus the first-sight price, averaged over keys whose close moved (unmoved keys add nothing). With at least 8 moved keys and a negative mean the bucket carries an `UNPROVEN ... closed at worse prices` flag and cannot confirm.
+- **Model-family review (`CLV_FAMILY_MIN_MOVED`)**: the candidate model's family is (sport, market, over/under direction for totals, model) across all edge buckets. With at least 20 moved keys and mean CLV $\le 0$ the family is flagged `under review` and none of its buckets confirm. No sport is hard-labelled in code; the family is recomputed live.
+- **DOWNGRADE_TRAP thresholds**: verified win rate $< 55.0\%$ (`TRAP_WIN_RATE`) or verified ROI $< +5.0\%$ (`TRAP_ROI`). A statistically confirmed bucket is never a trap (the 55% hurdle is a vig heuristic that mislabels profitable underdog buckets); if the CLV or family gate then blocks it, the verdict is `QUALIFIED_MODERATE`.
 - **Candidate quote gate**: even when the bucket's verified evidence mechanically qualifies as `CONFIRMED_BEST`, the label is withheld to `QUALIFIED_MODERATE` unless the candidate's own current quote is itself `decision_time_executable_quote`. The mechanical bucket verdict is still shown separately.
 - **Negative edge is always `DOWNGRADE_TRAP`**, regardless of the bucket's win rate.
+
+#### Bucket population: first sighting, not the last rerun (2026-11-20, quick 261120-gaq)
+
+Buckets are keyed on each decision's earliest eligible `open`, `superseded` or `settled` row (verified evidence: the same decision, counted only when that first row itself carries `decision_time_executable_quote`), and graded at that row's own line and price: its own settled result, else the final scores from the event's settled rows, else a same-key settled result at the same line, else the decision is skipped as ungraded (counted in `ungraded_first_sight_keys`). A later row is never substituted. `archived` and `removed` rows are never counted. The old record, the settled row that is the last pre-game run, appears only as a "Context, last pre-game run (old basis)" flag and never moves a verdict.
+
+Why: the daily job reruns up to four times a day and supersedes earlier rows, so the settled row is the LAST rerun. Bucketing on its edge conditions on line movement after the pick was offered: winners whose edge grew and losers whose edge shrank leave the band. NBA total v9 under, 5.0-7.9%: the old basis read 8W-1L, +77.4% ROI; first sighting reads 1W-5L, -67.3% ROI (all NBA unders pooled: 13W-3L, +61.1% on the old basis, 4W-11L, -47.1% on first sighting). A manual tracker had logged 8 first-sight unders in that band and they went 3-5; all 5 losers had left the band by the final run.
+
+Follow-up fixes (2026-11-20, quick 261120-w6i):
+- **Verified evidence is a subset of all-rows (D2).** A key counts as verified only when its FIRST row is verified. Letting the earliest verified row stand in for the key moved decisions into a later rerun's bucket: 202 of 2,388 verified keys took their verified row from a later rerun, and 104 of those landed in a different bucket. A bucket line can no longer read more verified than graded decisions.
+- **Post-start rows never become first sight (D4).** A row created at or after its own `event_start_utc` is an in-game decision, and a row whose start or created stamp does not parse fails closed. Comparison uses parsed aware datetimes because `event_start_utc` is stored in mixed shapes (`...Z`, `...T21:00Z`, `-0400`). One NBA first row was created after its start.
+- **Archived/removed keys are excluded whole (D5).** An operator removing part of a decision removes the decision: 16 of 22 archived/removed keys still had live superseded rows that were counting as evidence.
+- **Open candidates are bucketed on first-sight edge (D1).** `audit_candidate(..., bucket_edge=)` looks the candidate up on the edge its decision was first offered at; `HistoricalAuditEngine.first_sight_edge(...)` supplies it and `collect_open_pick_audits` passes it. Only 4 of 122 open rows were their own first sighting. The negative-edge trap still reads the current edge, and a caller that omits `bucket_edge` (the external widget) keeps bucketing on current edge.
+- **`nrfi` rows are never an event score source (D3).** They store first-inning runs in the score fields, which graded a total as a loss from a 1-0 first inning.
+
+#### Confirmation bar: 30 verified decisions, Wilson bound above price, closing-line value (2026-11-20, quick 261120-w6i)
+
+Why: in forward use the `CONFIRMED_BEST` label was anti-predictive. Tracker picks labelled confirmed went 19W-27L, -14.07U. Picks confirmed from buckets with fewer than 10 graded decisions claimed a 76% win rate and hit 34% (12-23, -18.18U); buckets with 10-29 graded went 7-4. Closing prices on confirmed picks moved against the logged price 27 times and for it 12 times. The cause is a winner's curse: a 4-decision minimum plus a 60% / +15% hurdle selects the luckiest of hundreds of small buckets. 1,747 of 2,143 keys never move price between the first row and the last pre-game same-line row, so CLV is averaged over moved keys only.
+
+Live effect, `--all-open` over 122 open rows, HEAD script and new script run back to back (read-only):
+
+| | HEAD | New |
+| :--- | :---: | :---: |
+| CONFIRMED_BEST | 13 | 0 |
+| QUALIFIED_MODERATE | 64 | 88 |
+| DOWNGRADE_TRAP | 45 | 34 |
+| Engine build time | 1.46 s | 1.42 s |
+
+65 of the 122 open picks sit in a different bucket on first-sight edge than on current edge. 6 open picks carry an UNPROVEN flag and 30 an under-review flag. No bucket anywhere on the ledger is statistically confirmed today (n >= 30 verified, Wilson bound above mean price, ROI >= 15%). The nearest is MLB totals over 2.0-4.9% (59W-45L, n=104, ROI +15.6%, bound 48.7% against a 49.0 cent mean price, only 6 moved keys), which misses by 0.3 points and is out of season. Model families under review (>= 20 moved keys, mean CLV <= 0): NBA moneyline `nba-elo-trend-lr-v4` (-0.5 cents, +16/-17) and `nba-elo-trend-lr-v5` (-1.7 cents, +14/-27), NBA spread `nba-spread-margin-v9` (-0.6 cents, +18/-28), NBA total under `nba-total-margin-v9` (-1.2 cents, +8/-18), NFL moneyline `nfl-elo-trend-lr-v4` (-0.6 cents, +7/-14). Recompute before quoting any of this.
 
 ### Pillar 2: Directional Asymmetry Audit
 Totals markets exhibit real structural directionality between Over and Under. The script
@@ -96,7 +127,7 @@ edge for the 2.0-4.9% / 5.0-7.9% / 8.0-11.9% / 12%-or-more buckets respectively)
 the candidate-quote gate -- it is the evidence-only verdict, not a guarantee that any live
 candidate in this bucket will show as `CONFIRMED_BEST` (that also requires the candidate's
 own quote to be verified). **Recompute this table before quoting any figure from it** --
-settled decisions change daily.
+settled decisions change daily. The Mechanical verdict column predates the 2026-11-20 confirmation bar, and no listed bucket has 30 verified decisions, so none of those CONFIRMED_BEST labels would survive it. The 2026-11-11 table below and the NCAAB 5.0%-7.9% snapshot in this section were computed on the OLD last-pre-game-run basis (the settled row's edge) and must be recomputed on the first-sight basis before any figure is cited.
 
 | Sport | Market | Direction / Bucket | All graded W-L | Verified W-L | Verified WR | Verified ROI | Mechanical verdict |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
@@ -170,7 +201,7 @@ Options:
 ### Sample Terminal Output:
 
 Real excerpt from `python scripts/audit_best_picks.py --all-open` (2026-11-11, abridged to
-the header and the first two picks -- figures are live and will differ on a later run):
+the header and the first two picks -- figures are live and will differ on a later run). This sample predates both 2026-11-20 changes (first-sight bucketing and the confirmation bar), so its header wording and evidence lines are out of date:
 
 ```text
 ================================================================================
@@ -204,7 +235,7 @@ Whenever the user asks:
 
 The agent **MUST**:
 1. Execute `python scripts/audit_best_picks.py`.
-2. Present a pick as best only when the script's final `verdict` is `CONFIRMED_BEST` -- which already requires both verified bucket evidence and a verified candidate quote (Pillar 1) -- **and** the current-season sample check above also passes.
+2. Present a pick as best only when the script's final `verdict` is `CONFIRMED_BEST` -- which already requires the confirmation bar (at least 30 verified decisions, a Wilson bound above the bucket's mean price, ROI >= 15%, non-negative bucket and model-family closing-line value) and a verified candidate quote (Pillar 1) -- **and** the current-season sample check above also passes. A pick carrying an `UNPROVEN` or `under review` flag is not a best pick.
 3. Provide the exact verified win rate, verified ROI, verified sample size, all-graded sample size, executable-quote coverage, and current-season sample range for each pick's empirical bucket.
 4. Explicitly list any popular nominal plays that were **DOWNGRADED** (e.g. 2–5% NFL spreads, NBA Overs, sub-5% NBA Unders, early 12%+ college spreads) and explain why they fail the empirical audit.
 5. Adhere strictly to **percentages exclusively** (zero American odds).

@@ -352,7 +352,7 @@ prediction_service:
     artifact: config/models/nfl-elo-trend-lr-v4.json
     enabled: true
     serving_status: production
-    evidence_status: predictively_qualified
+    evidence_status: historical_only
     replacement_priority: medium
     rollback_model: nfl-elo-trend-lr-v3
   - model_id: nfl-spread-structural-v7
@@ -362,7 +362,7 @@ prediction_service:
     artifact: config/models/nfl-spread-structural-v7.json
     enabled: true
     serving_status: production
-    evidence_status: predictively_qualified
+    evidence_status: historical_only
     replacement_priority: low
     rollback_model: nfl-spread-structural-v6
   - model_id: nfl-spread-structural-v6
@@ -392,7 +392,7 @@ prediction_service:
     artifact: config/models/nfl-total-structural-v7.json
     enabled: true
     serving_status: production
-    evidence_status: predictively_qualified
+    evidence_status: historical_only
     replacement_priority: low
     rollback_model: nfl-total-structural-v6
   - model_id: nfl-total-structural-v6
@@ -594,6 +594,55 @@ prediction_service:
     evidence_status: degraded
     replacement_priority: low
     rollback_model: null
+  - model_id: cfb-structural-v6.2
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v6.2.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: unverified
+    replacement_priority: low
+    rollback_model: null
+  # quick-261121-v7: research challenger. quick-261121-v7r routes it as the second challenger beside v6.2
+  # (Flat/research rows only). Never champion, never Main, never the auto-buyer; the 2027 forward gate
+  # decides (docs/CFB_V7_2027_GATE.md).
+  - model_id: cfb-structural-v7
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v7.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: unverified
+    replacement_priority: low
+    rollback_model: null
+  # quick-261122-v71: v7 refit with the 2026-11-22 bug-hunt fixes (neutral-site intercept, FBS-only CFBD
+  # covariates, validated fit time, 404 retry, feature snapshot). Paper challenger: Flat/research rows only,
+  # never champion, never Main, never the auto-buyer. It replaces v7 in challengers.NCAAF; v7 stays registered.
+  - model_id: cfb-structural-v7.1
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v7.1.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: unverified
+    replacement_priority: low
+    rollback_model: null
+  # quick-261122-v51: v5 with the 2026-11-21 bug-hunt fixes (season-keyed conference flag, in-path scoring proxy,
+  # refit, integer margin pmf, max-edge sides). Paper challenger routed after v6.2 and v7.1: Flat/research rows only,
+  # never champion, never Main, never the auto-buyer. Promotion not approved.
+  - model_id: cfb-structural-v5.1
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v5.1.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: unverified
+    replacement_priority: low
+    rollback_model: null
   - model_id: cs2-tiered-elo-v6
     sport: CS2
     market: moneyline
@@ -760,10 +809,30 @@ prediction_service:
     implementation: code_backed_model
     entry: model_prediction.models.ncaab_spread_v6:ncaab_spread_v6_model
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: ncaab-spread-v5
+  - model_id: ncaab-spread-v7
+    sport: NCAAB
+    market: multi
+    implementation: code_backed_model
+    entry: model_prediction.models.ncaab_spread_v6:ncaab_spread_v7_model
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: ncaab-spread-v6
+  - model_id: ncaab-moneyline-v7m
+    sport: NCAAB
+    market: moneyline
+    implementation: code_backed_model
+    entry: model_prediction.models.ncaab_spread_v6:ncaab_moneyline_v7m_model
+    enabled: true
+    serving_status: candidate
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: ncaab-spread-v7
   - model_id: ncaab-total-v6
     sport: NCAAB
     market: total
@@ -946,8 +1015,8 @@ prediction_service:
     rollback_model: null
   champions:
     NCAAB:
-      moneyline: ncaab-spread-v6
-      spread: ncaab-spread-v6
+      moneyline: ncaab-moneyline-v7m
+      spread: ncaab-spread-v7
       total: ncaab-total-v6
     WNBA:
       moneyline: wnba-elo-trend-lr-v4
@@ -983,10 +1052,23 @@ prediction_service:
       moneyline: wnba-moneyline-v5
       spread: wnba-spread-structural-v3
       total: wnba-total-possession-v3
+    # quick-261121-v7r: a route may list several challengers; the first is the primary (lifecycle
+    # contract, qualification). Each prices its own Flat/research rows; none reaches Main or the buyer.
+    # quick-261122-v71: the v7.1 refit replaces v7 (registered, unrouted); v6.2 stays first.
+    # quick-261122-v51: v5.1 is the third challenger.
     NCAAF:
-      moneyline: null
-      spread: null
-      total: null
+      moneyline:
+      - cfb-structural-v6.2
+      - cfb-structural-v7.1
+      - cfb-structural-v5.1
+      spread:
+      - cfb-structural-v6.2
+      - cfb-structural-v7.1
+      - cfb-structural-v5.1
+      total:
+      - cfb-structural-v6.2
+      - cfb-structural-v7.1
+      - cfb-structural-v5.1
     NBA: {}
     NFL:
       moneyline: null
@@ -997,19 +1079,19 @@ prediction_service:
     market: moneyline
     incumbent: cfb-structural-v5
     replacement_priority: low
-    challenger: null
+    challenger: cfb-structural-v6.2
     evidence_status: predictively_qualified
   - sport: NCAAF
     market: spread
     incumbent: cfb-structural-v5
     replacement_priority: low
-    challenger: null
+    challenger: cfb-structural-v6.2
     evidence_status: predictively_qualified
   - sport: NCAAF
     market: total
     incumbent: cfb-structural-v5
     replacement_priority: low
-    challenger: null
+    challenger: cfb-structural-v6.2
     evidence_status: predictively_qualified
   - sport: MLB
     market: total
@@ -1162,6 +1244,10 @@ prediction_service:
   - cfb-structural-v2
   - cfb-spread-v1
   - cfb-total-v1
+  - cfb-structural-v6.2
+  - cfb-structural-v7
+  - cfb-structural-v7.1
+  - cfb-structural-v5.1
   - cs2-tiered-elo-v6
   - dota2-tiered-elo-v6
   - lol-tiered-elo-v6
@@ -1179,6 +1265,8 @@ prediction_service:
   - ncaab-tempo-v2
   - ncaab-tempo-v3
   - ncaab-spread-v6
+  - ncaab-spread-v7
+  - ncaab-moneyline-v7m
   - ncaab-total-v6
   - ncaab-spread-v5
   - ncaab-total-v5
@@ -1238,6 +1326,10 @@ prediction_service:
     cfb-structural-v2: config/models/cfb-structural-v2.json
     cfb-spread-v1: config/models/cfb-spread-v1.json
     cfb-total-v1: config/models/cfb-total-v1.json
+    cfb-structural-v6.2: config/models/cfb-structural-v6.2.json
+    cfb-structural-v7: config/models/cfb-structural-v7.json
+    cfb-structural-v7.1: config/models/cfb-structural-v7.1.json
+    cfb-structural-v5.1: config/models/cfb-structural-v5.1.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
     dota2-tiered-elo-v6: config/models/dota2-tiered-elo-v6.json
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json

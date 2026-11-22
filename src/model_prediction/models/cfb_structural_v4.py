@@ -370,6 +370,10 @@ class CFBStructuralV4Model:
             inference_inputs=inference_inputs,
         )
 
+    def _rationale_label(self) -> str:
+        """Rationale prefix from the served id: every v5 rationale said "v4" until 2026-11-22 (models.md #8)."""
+        return "CFB Structural " + str(self.version).removeprefix("cfb-structural-")
+
     def predict_matchup(
         self,
         history: list[Any],
@@ -408,6 +412,8 @@ class CFBStructuralV4Model:
             is_neutral_site=getattr(game, "is_neutral_site", False),
             qb_starter_prob_away=getattr(game, "qb_starter_prob_away", 1.0),
             qb_starter_prob_home=getattr(game, "qb_starter_prob_home", 1.0),
+            away_team_id=getattr(game, "away_team_id", None),
+            home_team_id=getattr(game, "home_team_id", None),
         )
         supplied_spread = getattr(game, "spread_home_line", None)
         if supplied_spread is None and getattr(game, "spread_away_line", None) is not None:
@@ -447,7 +453,7 @@ class CFBStructuralV4Model:
                 feature_basis=feat.to_dict(),
                 inference_inputs=fc.inference_inputs,
                 rationale=(
-                    f"CFB Structural v4: proj {game.away_team} {fc.away_expected_points:.1f} @ "
+                    f"{self._rationale_label()}: proj {game.away_team} {fc.away_expected_points:.1f} @ "
                     f"{game.home_team} {fc.home_expected_points:.1f} (Margin {fc.projected_margin_home:+.1f}). "
                     f"Total {fc.projected_total:.1f}. Weather adj: {fc.weather_points_adj:+.1f} pts. "
                     f"Eff margin SD: {fc.effective_margin_sd:.1f}."
@@ -475,7 +481,7 @@ class CFBStructuralV4Model:
                 feature_basis=feat.to_dict(),
                 inference_inputs=fc.inference_inputs,
                 rationale=(
-                    f"CFB Structural v4 Spread: Home {spread_home_line:+.1f} / Away {sp_away_line:+.1f} "
+                    f"{self._rationale_label()} Spread: Home {spread_home_line:+.1f} / Away {sp_away_line:+.1f} "
                     f"(P(Home cover)={fc.prob_home_cover:.4f}, P(Away cover)={fc.prob_away_cover:.4f}, "
                     f"P(Push)={fc.prob_push_spread:.4f}). Calibrated margin SD: {fc.effective_margin_sd:.1f}."
                 ),
@@ -503,7 +509,7 @@ class CFBStructuralV4Model:
                 feature_basis=feat.to_dict(),
                 inference_inputs=fc.inference_inputs,
                 rationale=(
-                    f"CFB Structural v4 Total: line {tot_line:.1f} "
+                    f"{self._rationale_label()} Total: line {tot_line:.1f} "
                     f"(P(Over)={fc.prob_over:.4f}, P(Under)={fc.prob_under:.4f}, "
                     f"P(Push)={fc.prob_push_total:.4f}). Eff total SD: {fc.effective_total_sd:.1f}."
                 ),

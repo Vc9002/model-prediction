@@ -1,0 +1,82 @@
+{
+  "id": "ncaab-research-protocol-261120-addendum-v4",
+  "amends": "ncaab-research-protocol-261120 (sha256 72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813), addendum v2 (sha256 75241bc7885378f266ba66ce383f3b50fe58869e9b699ae90f0ddd9c8ead6317) and addendum v3 (sha256 d098238e340f192eb61339a9f936a96e84f49fc00b5e944b9c312dc323b1b337). All three stay unedited and binding for their own grids; grader.py and grader_v3.py stay byte-identical. This addendum registers a SPREAD grid built on point-in-time player features, graded by scripts/ncaab_research/grader_v4.py, which imports grader.py and hard-codes this file's canonical sha256.",
+  "program": "quick 261121-hmc, lane P (spread, player features)",
+  "written": "2026-11-22 ~00:10Z (2026-11-21 19:10 ET). Before writing, only OUTCOME-FREE work was done on the player data: the box backfill, the box-quality audit (points sum, minutes sum, ids, copied rosters), per-season null rates of the feature table, and one hand recomputation of avail_top7_prev1 / top7_n_out_prev1 for one 2026 team-date from the raw boxes (matched to 4 decimals). No player feature has been joined to a margin, a line or a game outcome by anyone before this hash was fixed.",
+  "hash_rule": "sha256 of json.dumps(<this object>, sort_keys=True, separators=(',', ':')), as grader.canonical_sha256. grader_v4.py hard-codes it and refuses to run on mismatch.",
+  "registration_basis": "Protocol v1's D1_prior_regression entry says returning minutes is NOT in its grid for lack of player data and must be re-registered by amendment if a lane supplies it. Lane P supplied it (commits 8a7b8953, 00cf1b52, a3c8c3ca); this addendum is that re-registration, plus an availability candidate.",
+  "pinned_inputs_sha256": {
+    "data/research/ncaab_external/player_features/pit_player_features.jsonl": "a9a406d87af14fc6ac9a6023dda79ad8ce8b02c0459825bebdc605f69f93062a",
+    "scripts/ncaab_research/player_features_261121.py": "a6efbde1b9e380b4f764f083707ff56c3e35153a2577f55ebc69f41183539665",
+    "scripts/backfill_ncaab_player_boxes.py": "f195cc5e889c4a54c3c0b2c4e114ddfd80146784ce2867a348f81425b1cc7ed3",
+    "rule": "grader_v4 re-hashes the feature table and the feature builder on every call and refuses on mismatch. A rebuilt table is a new addendum."
+  },
+  "feature_table": {
+    "schema": "ncaab-pit-player-features-v1, one row per (event_id, team side); definitions in scripts/ncaab_research/player_features_261121.md",
+    "pit_rule": "a row uses only the team's player boxes from games on an EARLIER Eastern date, plus the complete previous season; the game's own box is never an input",
+    "box_gate": "a team-game box is usable only if player points sum to the team score, minutes are within 5 of 200 + 25 per OT period, every player with minutes has an athlete id, and no athlete id appears on both teams; otherwise the team-game counts as having no box (fail closed, the feature goes null rather than reading DNP lines as absences)",
+    "transfers": "joined on ESPN athlete id only. About 7% of season-to-season transfers carry a new ESPN id and therefore count as newcomers (lane P audit: 359 two-id names vs 4803 id-stable team changes). Disclosed, not corrected; a name crosswalk would be a new addendum.",
+    "season_2022_rows": "2021-22 (season year 2022) is a sealed confirmation season. Its feature rows are never fit on and never scored in development. Its boxes enter development only as the prior-season input to 2023 continuity / returning-production features."
+  },
+  "multiplicity": {
+    "counting_rule": "As v3: one K per statistic family; K = the previous K of the family + every v4 grid entry that produces a statistic of that family. Both v4 entries are mean-family spread candidates and also produce cover and moneyline statistics, so those families are charged too. K never decreases; a withdrawn or unread entry keeps its charge.",
+    "K": {
+      "spread_market_relative": 25,
+      "total": 26,
+      "cover_calibration": 16,
+      "moneyline": 16
+    },
+    "derivation": {
+      "spread_market_relative": "v3 23 + P1 + P2 = 25",
+      "total": "unchanged 26 (v4 candidates carry served v6 totals or none)",
+      "cover_calibration": "v1 14 + P1 + P2 = 16",
+      "moneyline": "v1 14 + P1 + P2 = 16 (the A_ml_w0 confirmation read was its own registered window and is not re-charged here)"
+    },
+    "adjusted_interval": "unchanged: percentile day-cluster bootstrap (4000 resamples, seed 17, Eastern game-day clusters, grader._boot) at alpha = 0.025 / K per tail; the plain 95% interval is reported alongside",
+    "rereads": "One logged read per grid name per window. A second, different predictions file under the same grid name and window gets REREAD_NO_VERDICT (grader_v4 checks read_log.jsonl before scoring)."
+  },
+  "windows": {
+    "development": "unchanged: season years 2023-2026, leave-one-season-out, espn_archive closing lines (ncaab-espn-lines-rule-1), the v1 cohort (D1-vs-D1 with a closing spread line). Season year >= 2027 or Eastern date >= 2026-07-01 is refused before any score or line is read. Every free parameter of a fold is fit on that fold's three training seasons among 2023-2026 only.",
+    "confirmation": {
+      "season_years": [2015, 2016, 2017, 2018, 2019, 2020, 2022],
+      "lines": "addendum v2's confirmation line source (espn_backfill_261120), unchanged",
+      "player_data": "player boxes for season years 2014-2021 do not exist yet. They are fetched ONLY if a v4 candidate is DEV_ELIGIBLE, with scripts/backfill_ncaab_player_boxes.py at the pinned hash (season list extended, nothing else), and the feature table for 2015-2022 is built with player_features_261121.py at the pinned hash (season list extended, nothing else). 2014 and 2021 are prior-season inputs only.",
+      "season_usability": "decided OUTCOME-FREE before the read: a confirmation season counts only if at least 85% of its D1 team-games pass the box gate. Seasons below 85% are dropped and listed on the card.",
+      "coefficients": "one fit on all four development seasons 2023-2026, frozen, then applied to the confirmation seasons. No refit on confirmation data.",
+      "pass_rule": "the primary statistic (spread_corr_delta_vs_v7) with a plain one-sided 95% bound above 0, pooled over the usable confirmation seasons, one read per candidate (v1 beats_v7 rule).",
+      "unavailable": "if fewer than 3 confirmation seasons are usable, or the confirmation boxes cannot be fetched, the verdict is CONFIRMATION_UNAVAILABLE and the candidate is judged only on the locked 2026-27 forward window as a shadow challenger under a new pin."
+    }
+  },
+  "candidate_grid": {
+    "P1_player_availability": {
+      "family": "mean",
+      "spec": "mu = v7_mu + b1 * dA + b2 * dL, where dA = avail_top7_prev1(home) - avail_top7_prev1(away) and dL = top7_minutes_share_out_3plus(home) - top7_minutes_share_out_3plus(away). b1, b2 by OLS with no intercept on the training seasons' cohort rows where all four inputs are non-null, target = actual margin - v7_mu. scale_margin and dist = v7's (unchanged). If any of the four inputs is null for a game, the adjustment is 0 (the game is predicted by v7).",
+      "changes": ["mu_margin"],
+      "free_parameters": "b1, b2",
+      "variant_selection": "none: one form, no grid",
+      "primary": "spread_corr_delta_vs_v7"
+    },
+    "P2_returning_production_early": {
+      "family": "mean",
+      "spec": "mu = v7_mu + w(s) * (c1 * dR + c2 * dG), where dR = (ret_gmsc_share_same + ret_gmsc_share_transfer_in)(home) - (same)(away), dG = prior_gmsc40_cur_weighted(home) - prior_gmsc40_cur_weighted(away), s = the archive's games_played_min (point in time) and w(s) = max(0, 1 - s / 10), fixed. c1, c2 by OLS with no intercept on the training seasons' cohort rows with w(s) > 0 and all inputs non-null, regressor columns w*dR and w*dG, target = actual margin - v7_mu. scale_margin and dist = v7's. Null inputs or w(s) = 0 give adjustment 0 (v7).",
+      "changes": ["mu_margin"],
+      "free_parameters": "c1, c2",
+      "variant_selection": "none: the decay (10 games, linear) is fixed here, not tuned",
+      "primary": "spread_corr_delta_vs_v7"
+    }
+  },
+  "baseline_v7_mu": "v7_mu is the development baseline's v7_served mean exactly as grader.baseline_predictions gives it (m5r leave-one-season-out predictions for 2023 and 2024, served constants for 2025 and 2026); only its prediction columns are read, outcomes only as the training-fold target.",
+  "null_rule": "Null feature rows fall back to v7 (adjustment 0), so every cohort game is predicted and the 99% coverage rule is met. The verdict is on the FULL cohort. Reported alongside, with no verdict: the same paired statistics restricted to games whose adjustment is non-zero, and the share of such games per season.",
+  "acceptance": {
+    "dev": "v1 mean_family rule with K = 25: DEV_ELIGIBLE iff (i) spread_corr_delta_vs_v7 K-adjusted lower bound > 0, (ii) margin_rmse_delta_vs_v7 point <= 0, (iii) the pooled 2025+2026 folds' corr delta point > 0, (iv) no leak flag (v1 leak_flags unchanged, plus refusal if a feature row's source hash mismatches or a predicted season appears among its fit seasons), (v) coverage >= 99% in every held-out season.",
+    "beats_v7": "v1 rule unchanged: only a DEV_ELIGIBLE candidate that then passes the confirmation read beats v7; it may then be registered as a shadow challenger under a new pin. Promotion stays a separate operator decision through model_promotion."
+  },
+  "moneyline_disclosure": "Live NCAAB moneyline has served ncaab-moneyline-v7m (pure margin probability) since 2026-11-21 (commit e865f518). The pinned development baseline is still the v7 0.5 Elo blend. v4 candidates submit p_home_ml = grader.served_ml_blend(event_ids, mu, scale, dist) so the moneyline secondaries compare like with like against that baseline. Moneyline is not a v4 primary.",
+  "reproduction_gate": "Before any v4 candidate is scored, grader_v4 must reproduce the baseline scorecard's v7_served spread block from outputs/ncaab/research_261120/baseline_scorecard.json at v1's K (21): n, RMSE, bias, slope and CI, corr, rule-1 MSE delta and K-adjusted CI, cover log loss, to the scorecard's printed precision. A miss aborts. Logged in read_log.jsonl as BASELINE_SPREAD_REPRO_V4; adds no K.",
+  "plumbing": "Each candidate is first scored with --shuffle-seed (outcomes shuffled within season, not logged, no number means anything). Then exactly one logged read per grid name.",
+  "submission": {
+    "schema": "grader.py submission schema (event_id, season, game_date, home_team, away_team, neutral, mu_margin, scale_margin, dist, games_played_min, p_home_ml). No totals fields.",
+    "sidecar": "candidate, grid_name (P1_player_availability or P2_returning_production_early), protocol_sha256 (v1), addendum_v4_sha256, code_sha256, fit_seasons_by_predicted_season (the predicted season may never appear; 2022 may never appear), history_cutoff 'strictly before Eastern midnight of the game day', data_sources with sha256 (must include the pinned feature table)"
+  },
+  "unchanged": "protocol v1, addenda v2 and v3 (grids, K, verdicts, reads already done), the lock, the line rule, the bootstrap constants, the rule-1 machinery, no shrink-toward-the-market candidate (the market line never enters a candidate's inputs or targets)"
+}

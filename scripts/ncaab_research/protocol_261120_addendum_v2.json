@@ -1,0 +1,36 @@
+{
+  "id": "ncaab-research-protocol-261120-addendum-v2",
+  "amends": "ncaab-research-protocol-261120 (sha256 72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813), which stays unedited and binding except where this addendum says otherwise",
+  "written": "2026-11-21 ~04:30Z (2026-11-20 ~23:30 ET), after the baseline scorecard (served v7, v6 as-of, closing line on the development window) was read and BEFORE any candidate outcome, any confirmation-window outcome or any CollegeBasketballData (CBBD) line was joined. Nothing in the development window changes.",
+  "trigger": "Operator supplied a CollegeBasketballData.com key; the data lane fetches historical spread/total lines for 2013-14..2020-21 into data/research/ncaab_external/cbbd/. Kaggle Massey ordinals are dropped from the program.",
+  "changes": {
+    "confirmation_window": {
+      "season_years": [2015, 2016, 2017, 2018, 2019, 2020, 2022],
+      "history_only_season_years": [2014, 2021],
+      "replaces": "v1 confirmation_backcast.season_years [2018, 2019, 2020, 2022] and history_only [2016, 2017, 2021]",
+      "why": "None of 2013-14..2021-22 has ever been scored by an NCAAB model in this repo. Selection already happens on 2022-23..2025-26 (v1, unchanged), so the cleanest use of the never-read block is ONE final touch on as many of its seasons as have lines, rather than spending part of it on a walk-forward selection. 2013-14 is burn-in for ratings; 2020-21 (COVID: empty arenas, reduced home edge, irregular schedules, many cancellations) is history only, never scored; 2021-22 is lined only by the ESPN backfill.",
+      "read_policy": "unchanged from v1: only DEV_ELIGIBLE candidates, once each, logged; pass = the candidate's primary statistic with the plain one-sided 95% bound on the favourable side of zero, pooled over the window. Per-season results are reported, never used to choose a subset after the read."
+    },
+    "line_source": {
+      "pluggable": "The grader takes a named line source and records its name, rule id and file sha256 on every scorecard. Development window: 'espn_archive' only (v1, unchanged).",
+      "sources": {
+        "espn_archive": "data/research/ncaab_market/espn_lines.jsonl, ncaab-espn-lines-rule-1 (2022-23 on)",
+        "espn_backfill_261120": "data/research/ncaab_market/backfill_261120/espn_lines.jsonl, the same rule (2017-18..2019-20, 2021-22)",
+        "cbbd": "data/research/ncaab_external/cbbd/ (2013-14..2020-21). Before the confirmation read the data lane pins, in a hashed rule file, how one closing spread and total per game are chosen (provider set, median vs a named provider, sign convention of home spread, treatment of missing/pushed lines) and how CBBD game ids map to ESPN event ids. Until that rule exists the grader refuses the cbbd source."
+      },
+      "confirmation_priority": "per game: CBBD under its pinned rule where it has a spread line, else the ESPN backfill. Seasons/games where both exist also report the CBBD-vs-ESPN line difference (outcome-free) before the read; the source of every scored game is recorded.",
+      "never_mix_within_development": "the development window is graded on espn_archive only"
+    },
+    "candidate_grid": {
+      "D2_massey_pit": "WITHDRAWN before any read (Kaggle Massey dropped by the operator). K is left at the v1 values (conservative; no candidate's interval narrows from this withdrawal)."
+    },
+    "unchanged": "windows.development, lock, multiplicity.K, statistics, beats_v7_rule, leak_flags, submission schema, baselines"
+  },
+  "disclosures_from_baseline_implementation": [
+    "Games-played buckets use the archive's point-in-time v6 sample for every model, not the submitted games_played_min (so all scorecards bucket identically).",
+    "Optional submission field dist_total (defaults to dist) was added so the served v6 total can be scored as a normal distribution, as the v1 baselines text requires.",
+    "The baseline read is the first line-joined read of 2025-26 (season year 2026).",
+    "The served v6 total's pooled plain slope on (actual - total line) is +0.068 [+0.017, +0.118] while the rule-1 K-adjusted MSE delta interval includes 0; pooled statistics are not demeaned by season.",
+    "pinned_inputs_sha256 is enforced for the data files; for models/ncaab_v7_serving.py the grader checks the served constants against the pinned frozen config instead of the file hash, because serving lane A may legitimately edit that file without changing the formula."
+  ]
+}

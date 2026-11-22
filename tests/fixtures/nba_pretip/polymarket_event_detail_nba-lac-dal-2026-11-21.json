@@ -1,0 +1,920 @@
+{
+ "event": {
+  "active": true,
+  "archived": false,
+  "category": "sports",
+  "closed": false,
+  "createdAt": "2026-11-07T05:00:29Z",
+  "eventState": {
+   "createdAt": "2026-11-20T20:32:43.004201Z",
+   "eventId": 240450,
+   "gameId": 20024153,
+   "id": 145173290,
+   "mainSpreadLine": 5.5,
+   "mainTotalLine": 229.5,
+   "marketGroupStats": [
+    {
+     "line": 5.5,
+     "marketGroupId": "game-lines/spread/full-game"
+    },
+    {
+     "line": 229.5,
+     "marketGroupId": "game-lines/totals/full-game"
+    }
+   ],
+   "periodScores": [],
+   "sportradarGameId": "363a3d10-4410-426d-9992-77d3abcddfbc",
+   "type": "basketball",
+   "updatedAt": "2026-11-21T00:30:43.406135Z"
+  },
+  "fixtureId": "Q9KVtp0eK9xn0LZWL4Lh",
+  "gameId": 20024153,
+  "hidden": false,
+  "id": "240450",
+  "markets": [
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.9900"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.7000"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-21T01:30:39Z",
+    "darkColor": "#EA2E4D",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-21T01:30:39Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2758673",
+    "image": "https://static.polymarket.us/images/teams/basketball/nba/lac/headshots/max-strus-caae49a369cb61ec-1024x845.png",
+    "line": 2,
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-21T01:30:39Z",
+      "description": "Yes",
+      "id": "5516728",
+      "identifier": "astatc-nba-lac-dal-2026-11-21-ast-maxstr-gte2",
+      "long": true,
+      "marketId": 2758673,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.7000",
+      "quote": {
+       "currency": "USD",
+       "value": "0.9900"
+      },
+      "team": {
+       "abbreviation": "lac",
+       "alias": "Los Angeles Clippers",
+       "displayAbbreviation": "LAC",
+       "id": 20,
+       "league": "nba",
+       "name": "Los Angeles Clippers",
+       "ordering": "away",
+       "providerId": 28,
+       "record": "4-10",
+       "safeName": "Clippers"
+      },
+      "teamId": 20,
+      "tradable": true,
+      "updatedAt": "2026-11-21T01:30:39Z"
+     },
+     {
+      "createdAt": "2026-11-21T01:30:39Z",
+      "description": "No",
+      "id": "5516729",
+      "identifier": "astatc-nba-lac-dal-2026-11-21-ast-maxstr-gte2",
+      "long": false,
+      "marketId": 2758673,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.9900",
+      "quote": {
+       "currency": "USD",
+       "value": "0.3"
+      },
+      "team": {
+       "abbreviation": "lac",
+       "alias": "Los Angeles Clippers",
+       "displayAbbreviation": "LAC",
+       "id": 20,
+       "league": "nba",
+       "name": "Los Angeles Clippers",
+       "ordering": "home",
+       "providerId": 28,
+       "record": "4-10",
+       "safeName": "Clippers"
+      },
+      "teamId": 20,
+      "tradable": false,
+      "updatedAt": "2026-11-21T01:30:39Z"
+     }
+    ],
+    "marketType": "props",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.7000\",\"0.9900\"]",
+    "outcomes": "[\"Yes\",\"No\"]",
+    "politics": null,
+    "slug": "astatc-nba-lac-dal-2026-11-21-ast-maxstr-gte2",
+    "sportsMarketType": "basketball_player_assists",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_PROP",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Max Strus 2+ assists",
+    "titleShort": "Max Strus 2+ Ast",
+    "updatedAt": "2026-11-21T01:55:54Z"
+   },
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.5800"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.5700"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-20T20:45:46Z",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-20T20:45:46Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2749132",
+    "line": 7.5,
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-20T20:45:46Z",
+      "description": "+7.50",
+      "id": "5497646",
+      "identifier": "asc-nba-lac-dal-2026-11-21-pos-7pt5",
+      "long": true,
+      "marketId": 2749132,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.5700",
+      "quote": {
+       "currency": "USD",
+       "value": "0.5800"
+      },
+      "team": {
+       "abbreviation": "lac",
+       "alias": "Los Angeles Clippers",
+       "displayAbbreviation": "LAC",
+       "id": 20,
+       "league": "nba",
+       "name": "Los Angeles Clippers",
+       "ordering": "away",
+       "providerId": 28,
+       "record": "4-10",
+       "safeName": "Clippers"
+      },
+      "teamId": 20,
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:46Z"
+     },
+     {
+      "createdAt": "2026-11-20T20:45:46Z",
+      "description": "-7.50",
+      "id": "5497647",
+      "identifier": "asc-nba-lac-dal-2026-11-21-pos-7pt5",
+      "long": false,
+      "marketId": 2749132,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.5800",
+      "quote": {
+       "currency": "USD",
+       "value": "0.43"
+      },
+      "team": {
+       "abbreviation": "dal",
+       "alias": "Dallas Mavericks",
+       "displayAbbreviation": "DAL",
+       "id": 39,
+       "league": "nba",
+       "name": "Dallas Mavericks",
+       "ordering": "home",
+       "providerId": 25,
+       "record": "8-7",
+       "safeName": "Mavericks"
+      },
+      "teamId": 39,
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:46Z"
+     }
+    ],
+    "marketType": "spreads",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.5700\",\"0.5800\"]",
+    "outcomes": "[\"+7.50\",\"-7.50\"]",
+    "politics": null,
+    "slug": "asc-nba-lac-dal-2026-11-21-pos-7pt5",
+    "sportsMarketType": "basketball_team_full_game_spread",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD",
+    "spreadTotalSuffix": "points",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Dallas Mavericks wins by over 7.5 points",
+    "titleShort": "DAL -7.5",
+    "updatedAt": "2026-11-20T21:10:07Z"
+   },
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.5500"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.5400"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-20T20:45:34Z",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-20T20:45:34Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2749115",
+    "line": 6.5,
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-20T20:45:34Z",
+      "description": "+6.50",
+      "id": "5497612",
+      "identifier": "asc-nba-lac-dal-2026-11-21-pos-6pt5",
+      "long": true,
+      "marketId": 2749115,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.5400",
+      "quote": {
+       "currency": "USD",
+       "value": "0.5500"
+      },
+      "team": {
+       "abbreviation": "lac",
+       "alias": "Los Angeles Clippers",
+       "displayAbbreviation": "LAC",
+       "id": 20,
+       "league": "nba",
+       "name": "Los Angeles Clippers",
+       "ordering": "away",
+       "providerId": 28,
+       "record": "4-10",
+       "safeName": "Clippers"
+      },
+      "teamId": 20,
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:34Z"
+     },
+     {
+      "createdAt": "2026-11-20T20:45:34Z",
+      "description": "-6.50",
+      "id": "5497613",
+      "identifier": "asc-nba-lac-dal-2026-11-21-pos-6pt5",
+      "long": false,
+      "marketId": 2749115,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.5500",
+      "quote": {
+       "currency": "USD",
+       "value": "0.46"
+      },
+      "team": {
+       "abbreviation": "dal",
+       "alias": "Dallas Mavericks",
+       "displayAbbreviation": "DAL",
+       "id": 39,
+       "league": "nba",
+       "name": "Dallas Mavericks",
+       "ordering": "home",
+       "providerId": 25,
+       "record": "8-7",
+       "safeName": "Mavericks"
+      },
+      "teamId": 39,
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:34Z"
+     }
+    ],
+    "marketType": "spreads",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.5400\",\"0.5500\"]",
+    "outcomes": "[\"+6.50\",\"-6.50\"]",
+    "politics": null,
+    "slug": "asc-nba-lac-dal-2026-11-21-pos-6pt5",
+    "sportsMarketType": "basketball_team_full_game_spread",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD",
+    "spreadTotalSuffix": "points",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Dallas Mavericks wins by over 6.5 points",
+    "titleShort": "DAL -6.5",
+    "updatedAt": "2026-11-21T03:10:04Z"
+   },
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.5400"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.5300"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-20T20:46:06Z",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-20T20:46:06Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2749163",
+    "line": 227.5,
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-20T20:46:06Z",
+      "description": "Over",
+      "id": "5497708",
+      "identifier": "tsc-nba-lac-dal-2026-11-21-227pt5",
+      "long": true,
+      "marketId": 2749163,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.5300",
+      "quote": {
+       "currency": "USD",
+       "value": "0.5400"
+      },
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:46:06Z"
+     },
+     {
+      "createdAt": "2026-11-20T20:46:06Z",
+      "description": "Under",
+      "id": "5497709",
+      "identifier": "tsc-nba-lac-dal-2026-11-21-227pt5",
+      "long": false,
+      "marketId": 2749163,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.5400",
+      "quote": {
+       "currency": "USD",
+       "value": "0.47"
+      },
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:46:06Z"
+     }
+    ],
+    "marketType": "totals",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.5300\",\"0.5400\"]",
+    "outcomes": "[\"Over\",\"Under\"]",
+    "politics": null,
+    "slug": "tsc-nba-lac-dal-2026-11-21-227pt5",
+    "sportsMarketType": "basketball_team_full_game_total",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+    "spreadTotalSuffix": "points",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Over 227.5 total points",
+    "titleShort": "Over 227.5 points",
+    "updatedAt": "2026-11-20T21:12:04Z"
+   },
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.5100"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.4900"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-20T20:45:46Z",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-20T20:45:46Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2749131",
+    "line": 5.5,
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-20T20:45:46Z",
+      "description": "+5.50",
+      "id": "5497644",
+      "identifier": "asc-nba-lac-dal-2026-11-21-pos-5pt5",
+      "long": true,
+      "marketId": 2749131,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.4900",
+      "quote": {
+       "currency": "USD",
+       "value": "0.5100"
+      },
+      "team": {
+       "abbreviation": "lac",
+       "alias": "Los Angeles Clippers",
+       "displayAbbreviation": "LAC",
+       "id": 20,
+       "league": "nba",
+       "name": "Los Angeles Clippers",
+       "ordering": "away",
+       "providerId": 28,
+       "record": "4-10",
+       "safeName": "Clippers"
+      },
+      "teamId": 20,
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:46Z"
+     },
+     {
+      "createdAt": "2026-11-20T20:45:46Z",
+      "description": "-5.50",
+      "id": "5497645",
+      "identifier": "asc-nba-lac-dal-2026-11-21-pos-5pt5",
+      "long": false,
+      "marketId": 2749131,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.5100",
+      "quote": {
+       "currency": "USD",
+       "value": "0.51"
+      },
+      "team": {
+       "abbreviation": "dal",
+       "alias": "Dallas Mavericks",
+       "displayAbbreviation": "DAL",
+       "id": 39,
+       "league": "nba",
+       "name": "Dallas Mavericks",
+       "ordering": "home",
+       "providerId": 25,
+       "record": "8-7",
+       "safeName": "Mavericks"
+      },
+      "teamId": 39,
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:46Z"
+     }
+    ],
+    "marketType": "spreads",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.4900\",\"0.5100\"]",
+    "outcomes": "[\"+5.50\",\"-5.50\"]",
+    "politics": null,
+    "slug": "asc-nba-lac-dal-2026-11-21-pos-5pt5",
+    "sportsMarketType": "basketball_team_full_game_spread",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD",
+    "spreadTotalSuffix": "points",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Dallas Mavericks wins by over 5.5 points",
+    "titleShort": "DAL -5.5",
+    "updatedAt": "2026-11-20T21:10:07Z"
+   },
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.4900"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.4800"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-20T20:45:57Z",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-20T20:45:57Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2749149",
+    "line": 229.5,
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-20T20:45:57Z",
+      "description": "Over",
+      "id": "5497680",
+      "identifier": "tsc-nba-lac-dal-2026-11-21-229pt5",
+      "long": true,
+      "marketId": 2749149,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.4800",
+      "quote": {
+       "currency": "USD",
+       "value": "0.4900"
+      },
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:57Z"
+     },
+     {
+      "createdAt": "2026-11-20T20:45:57Z",
+      "description": "Under",
+      "id": "5497681",
+      "identifier": "tsc-nba-lac-dal-2026-11-21-229pt5",
+      "long": false,
+      "marketId": 2749149,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.4900",
+      "quote": {
+       "currency": "USD",
+       "value": "0.52"
+      },
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:57Z"
+     }
+    ],
+    "marketType": "totals",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.4800\",\"0.4900\"]",
+    "outcomes": "[\"Over\",\"Under\"]",
+    "politics": null,
+    "slug": "tsc-nba-lac-dal-2026-11-21-229pt5",
+    "sportsMarketType": "basketball_team_full_game_total",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+    "spreadTotalSuffix": "points",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Over 229.5 total points",
+    "titleShort": "Over 229.5 points",
+    "updatedAt": "2026-11-21T03:12:13Z"
+   },
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.4700"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.4600"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-20T21:30:36Z",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-20T21:30:36Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2750539",
+    "line": 230.5,
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-20T21:30:36Z",
+      "description": "Over",
+      "id": "5500460",
+      "identifier": "tsc-nba-lac-dal-2026-11-21-230pt5",
+      "long": true,
+      "marketId": 2750539,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.4600",
+      "quote": {
+       "currency": "USD",
+       "value": "0.4700"
+      },
+      "tradable": true,
+      "updatedAt": "2026-11-20T21:30:36Z"
+     },
+     {
+      "createdAt": "2026-11-20T21:30:36Z",
+      "description": "Under",
+      "id": "5500461",
+      "identifier": "tsc-nba-lac-dal-2026-11-21-230pt5",
+      "long": false,
+      "marketId": 2750539,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.4700",
+      "quote": {
+       "currency": "USD",
+       "value": "0.54"
+      },
+      "tradable": true,
+      "updatedAt": "2026-11-20T21:30:36Z"
+     }
+    ],
+    "marketType": "totals",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.4600\",\"0.4700\"]",
+    "outcomes": "[\"Over\",\"Under\"]",
+    "politics": null,
+    "slug": "tsc-nba-lac-dal-2026-11-21-230pt5",
+    "sportsMarketType": "basketball_team_full_game_total",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_TOTAL",
+    "spreadTotalSuffix": "points",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Over 230.5 total points",
+    "titleShort": "Over 230.5 points",
+    "updatedAt": "2026-11-21T01:28:17Z"
+   },
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.3500"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.3400"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-07T05:00:29Z",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-07T05:00:29Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2261150",
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-07T05:00:29Z",
+      "description": "Clippers",
+      "id": "4521736",
+      "identifier": "aec-nba-lac-dal-2026-11-21",
+      "long": true,
+      "marketId": 2261150,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.3400",
+      "quote": {
+       "currency": "USD",
+       "value": "0.3500"
+      },
+      "team": {
+       "abbreviation": "lac",
+       "alias": "Los Angeles Clippers",
+       "displayAbbreviation": "LAC",
+       "id": 20,
+       "league": "nba",
+       "name": "Los Angeles Clippers",
+       "ordering": "away",
+       "providerId": 28,
+       "record": "4-10",
+       "safeName": "Clippers"
+      },
+      "teamId": 20,
+      "tradable": true,
+      "updatedAt": "2026-11-07T05:00:29Z"
+     },
+     {
+      "createdAt": "2026-11-07T05:00:29Z",
+      "description": "Mavericks",
+      "id": "4521737",
+      "identifier": "aec-nba-lac-dal-2026-11-21",
+      "long": false,
+      "marketId": 2261150,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.3500",
+      "quote": {
+       "currency": "USD",
+       "value": "0.66"
+      },
+      "team": {
+       "abbreviation": "dal",
+       "alias": "Dallas Mavericks",
+       "displayAbbreviation": "DAL",
+       "id": 39,
+       "league": "nba",
+       "name": "Dallas Mavericks",
+       "ordering": "home",
+       "providerId": 25,
+       "record": "8-7",
+       "safeName": "Mavericks"
+      },
+      "teamId": 39,
+      "tradable": true,
+      "updatedAt": "2026-11-07T05:00:29Z"
+     }
+    ],
+    "marketType": "moneyline",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.3400\",\"0.3500\"]",
+    "outcomes": "[\"Clippers\",\"Mavericks\"]",
+    "politics": null,
+    "slug": "aec-nba-lac-dal-2026-11-21",
+    "sportsMarketType": "basketball_team_full_game_winner",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_MONEYLINE",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Los Angeles Clippers vs Dallas Mavericks",
+    "titleShort": "LAC vs DAL",
+    "updatedAt": "2026-11-21T04:24:26Z"
+   },
+   {
+    "active": true,
+    "archived": false,
+    "assetPriceTerms": null,
+    "bestAskQuote": {
+     "currency": "USD",
+     "value": "0.3200"
+    },
+    "bestBidQuote": {
+     "currency": "USD",
+     "value": "0.3000"
+    },
+    "category": "sports",
+    "closed": false,
+    "comboEnabled": true,
+    "createdAt": "2026-11-20T20:45:41Z",
+    "ep3Status": "OPEN",
+    "ep3SyncedAt": "2026-11-20T20:45:41Z",
+    "eventSubcategory": "BASKETBALL",
+    "feeCoefficient": 0.095,
+    "gameStartTime": "2026-11-22T01:00:00Z",
+    "hidden": false,
+    "id": "2749126",
+    "line": -1.5,
+    "manualActivation": false,
+    "marketSides": [
+     {
+      "createdAt": "2026-11-20T20:45:41Z",
+      "description": "-1.50",
+      "id": "5497634",
+      "identifier": "asc-nba-lac-dal-2026-11-21-neg-1pt5",
+      "long": true,
+      "marketId": 2749126,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.3000",
+      "quote": {
+       "currency": "USD",
+       "value": "0.3200"
+      },
+      "team": {
+       "abbreviation": "lac",
+       "alias": "Los Angeles Clippers",
+       "displayAbbreviation": "LAC",
+       "id": 20,
+       "league": "nba",
+       "name": "Los Angeles Clippers",
+       "ordering": "away",
+       "providerId": 28,
+       "record": "4-10",
+       "safeName": "Clippers"
+      },
+      "teamId": 20,
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:41Z"
+     },
+     {
+      "createdAt": "2026-11-20T20:45:41Z",
+      "description": "+1.50",
+      "id": "5497635",
+      "identifier": "asc-nba-lac-dal-2026-11-21-neg-1pt5",
+      "long": false,
+      "marketId": 2749126,
+      "marketSideType": "MARKET_SIDE_TYPE_INSTRUMENT",
+      "price": "0.3200",
+      "quote": {
+       "currency": "USD",
+       "value": "0.7"
+      },
+      "team": {
+       "abbreviation": "dal",
+       "alias": "Dallas Mavericks",
+       "displayAbbreviation": "DAL",
+       "id": 39,
+       "league": "nba",
+       "name": "Dallas Mavericks",
+       "ordering": "home",
+       "providerId": 25,
+       "record": "8-7",
+       "safeName": "Mavericks"
+      },
+      "teamId": 39,
+      "tradable": true,
+      "updatedAt": "2026-11-20T20:45:41Z"
+     }
+    ],
+    "marketType": "spreads",
+    "minimumTradeQty": 0.01,
+    "orderPriceMinTickSize": 0.01,
+    "outcomePrices": "[\"0.3000\",\"0.3200\"]",
+    "outcomes": "[\"-1.50\",\"+1.50\"]",
+    "politics": null,
+    "slug": "asc-nba-lac-dal-2026-11-21-neg-1pt5",
+    "sportsMarketType": "basketball_team_full_game_spread",
+    "sportsMarketTypeV2": "SPORTS_MARKET_TYPE_SPREAD",
+    "spreadTotalSuffix": "points",
+    "status": "MARKET_STATUS_OPEN",
+    "title": "Los Angeles Clippers wins by over 1.5 points",
+    "titleShort": "LAC -1.5",
+    "updatedAt": "2026-11-20T21:10:06Z"
+   }
+  ],
+  "period": "NS",
+  "primaryTag": {
+   "createdAt": "2025-10-21T18:23:05Z",
+   "featuredEventIds": [],
+   "hub": null,
+   "id": "5",
+   "image": "https://static-preprod.polymarket.us/images/leagues/nba/NBA_dark.png",
+   "label": "NBA",
+   "league": {
+    "abbreviation": "NBA",
+    "activeSeriesId": 4,
+    "automaticResolution": false,
+    "createdAt": "2026-03-05T18:30:42Z",
+    "id": 2,
+    "image": "https://static-preprod.polymarket.us/images/leagues/nba/NBA_dark.png",
+    "isOperational": true,
+    "name": "NBA",
+    "ordering": "away",
+    "resolution": "https://www.nba.com/",
+    "slug": "nba",
+    "sportId": 1,
+    "tagId": 5
+   },
+   "parentId": 11,
+   "slug": "nba",
+   "subtags": [],
+   "tradable": false,
+   "updatedAt": "2026-11-21T04:26:12Z"
+  },
+  "seriesSlug": "nba-2025",
+  "slug": "nba-lac-dal-2026-11-21",
+  "sortType": "price",
+  "sportradarGameId": "363a3d10-4410-426d-9992-77d3abcddfbc",
+  "startTime": "2026-11-22T01:00:00Z",
+  "streamRequiresAuth": false,
+  "teams": [
+   {
+    "abbreviation": "lac",
+    "alias": "Los Angeles Clippers",
+    "displayAbbreviation": "LAC",
+    "id": 20,
+    "league": "nba",
+    "name": "Los Angeles Clippers",
+    "providerId": 28,
+    "record": "4-10",
+    "safeName": "Clippers"
+   },
+   {
+    "abbreviation": "dal",
+    "alias": "Dallas Mavericks",
+    "displayAbbreviation": "DAL",
+    "id": 39,
+    "league": "nba",
+    "name": "Dallas Mavericks",
+    "providerId": 25,
+    "record": "8-7",
+    "safeName": "Mavericks"
+   }
+  ],
+  "ticker": "nba-lac-dal-2026-11-21",
+  "title": "LA Clippers vs. DAL Mavericks",
+  "updatedAt": "2026-11-21T04:24:26Z"
+ }
+}

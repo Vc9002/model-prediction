@@ -12,7 +12,8 @@ import argparse
 import json
 import logging
 import os
-from collections.abc import Sequence
+import time
+from collections.abc import Collection, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -111,12 +112,7 @@ def capture_nfl_polymarket_week_ahead(
 
     poly = client or PolymarketUSClient(max_attempts=2)
     capture = capture_fn or capture_slate_snapshots
-    root = snapshot_root
-    if root is None:
-        root = Path(ledger_path(config)).parent
-        runtime = RuntimePaths.resolve()
-        if root.resolve() == (runtime.repo_root / "data").resolve():
-            root = runtime.runtime_root
+    root = snapshot_root if snapshot_root is not None else _capture_snapshot_root(config)
     first = date.fromisoformat(start_date)
     per_date: dict[str, Any] = {}
     errors: dict[str, str] = {}
@@ -156,6 +152,107 @@ def capture_nfl_polymarket_week_ahead(
     }
 
 
+# Wall-clock cap for the NCAAF day-ahead capture, slate fetches included. It runs
+# inside the daily job's serialized Polymarket chain, which forecasting waits on, so
+# it adds up to this much to the pre-forecast time of a run with day-ahead games.
+NCAAF_DAY_AHEAD_MAX_SECONDS = 180.0
+# Main rung only: a Saturday is ~115 events, and ML + 2 rungs per type is ~575 /book
+# calls (~290 s at the 0.5 s pacer), past the budget. ML + 1 + 1 is ~345.
+NCAAF_DAY_AHEAD_LADDER_KEEP = 1
+
+
+def capture_ncaaf_polymarket_day_ahead(
+    config: dict,
+    start_date: str,
+    *,
+    days: int = 2,
+    max_seconds: float = NCAAF_DAY_AHEAD_MAX_SECONDS,
+    client: Any | None = None,
+    capture_fn: Any | None = None,
+    snapshot_root: Path | None = None,
+    clock: Any = time.monotonic,
+) -> dict[str, Any]:
+    """Snapshot Polymarket NCAAF books for the next ``days`` Eastern dates (D+1, D+2).
+
+    Until this, every NCAAF quote was taken on game day (the slate capture prices only
+    today), so there was no opener and no line-movement series before kickoff day. Rows
+    come from the same writer as the slate capture and are filed under each game's own
+    Eastern date. ``build_cfb_slate`` never prices a decision off a row observed before
+    00:00 ET of the decision's day, so for the scheduled game-day forecast these rows feed
+    line movement and CLV only.
+
+    One deadline covers every date, slate fetches included (a fetch already in flight
+    can overrun it); a date reached after it is spent is skipped, not captured.
+    """
+    from datetime import timedelta
+
+    deadline = clock() + max_seconds
+    poly = client or PolymarketUSClient(max_attempts=2)
+    capture = capture_fn or capture_slate_snapshots
+    root = snapshot_root if snapshot_root is not None else _capture_snapshot_root(config)
+    first = date.fromisoformat(start_date)
+    per_date: dict[str, Any] = {}
+    errors: dict[str, str] = {}
+    skipped_after_budget: list[str] = []
+    # Offset 0 is the main slate capture's job; start at tomorrow.
+    for offset in range(1, max(2, days + 1)):
+        game_date = (first + timedelta(days=offset)).isoformat()
+        if deadline - clock() <= 0:
+            skipped_after_budget.append(game_date)
+            continue
+        try:
+            events = poly.slate("NCAAF", date.fromisoformat(game_date), "America/New_York")
+        except httpx.HTTPError as exc:
+            errors[game_date] = str(exc)[:200]
+            continue
+        if not events:
+            continue
+        remaining = deadline - clock()
+        if remaining <= 0:
+            skipped_after_budget.append(game_date)
+            continue
+        try:
+            result = capture(
+                poly,
+                {"NCAAF": events},
+                root,
+                game_date,
+                horizon_hours=None,
+                ladder_keep={"NCAAF": NCAAF_DAY_AHEAD_LADDER_KEEP},
+                ladder_leagues=frozenset({"NCAAF"}),
+                priority_leagues=frozenset({"NCAAF"}),
+                max_capture_seconds=remaining,
+            )
+        except Exception as exc:  # noqa: BLE001 -- one date must not stop the next
+            errors[game_date] = f"{type(exc).__name__}: {exc}"[:200]
+            continue
+        summary = result if isinstance(result, dict) else {}
+        per_date[game_date] = {
+            "events": len(events),
+            "captured": summary.get("captured"),
+            "skipped_after_time_budget": summary.get("skipped_after_time_budget"),
+            "source_rate_limited": summary.get("source_rate_limited"),
+        }
+    return {
+        "status": "ok" if not errors else ("partial" if per_date else "error"),
+        "start_date": start_date,
+        "days": days,
+        "max_seconds": max_seconds,
+        "dates": per_date,
+        "errors": errors,
+        "skipped_after_budget": skipped_after_budget,
+    }
+
+
+def _capture_snapshot_root(config: dict) -> Path:
+    """Where capture writes quote archives: the runtime root the forecast readers use, not the checkout."""
+    root = Path(ledger_path(config)).parent
+    runtime = RuntimePaths.resolve()
+    if root.resolve() == (runtime.repo_root / "data").resolve():
+        root = runtime.runtime_root
+    return root
+
+
 def _capture_horizon_hours() -> float | None:
     """Hours ahead to price books for (env POLYMARKET_CAPTURE_HORIZON_HOURS, default 24).
 
@@ -187,7 +284,9 @@ def _capture_ladder_keep() -> int | None:
 # made one capture take 2.8 hours at the gateway's rate limit. Until 2026-11-14
 # one integer was chosen first-match (NBA on the slate => 3 for every league),
 # so NCAAB and NCAAF each priced 3 rungs and the queue outgrew the limit.
-CAPTURE_LADDER_KEEP: dict[str, int] = {"NBA": 3, "NCAAF": 2, "NCAAB": 1, "NFL": 2}
+# NCAAF is 12, not 2: a one-game Sunday slate lists 41 spread and 25 total
+# alternates, and keeping 2 per type left 5 contracts, so 62 went unpriced.
+CAPTURE_LADDER_KEEP: dict[str, int] = {"NBA": 3, "NCAAF": 12, "NCAAB": 1, "NFL": 2}
 
 
 def _capture_ladder_keep_by_league() -> dict[str, int]:
@@ -443,6 +542,93 @@ def _clear_today_open(
     return ledger.supersede_open_rows(
         to_remove, reason=f"re-forecast replacement for {date_str}", allow_staked_removal=True
     )
+
+
+def _open_rows(ledger: Any, leagues: Collection[str] | None = None) -> list[dict[str, str]]:
+    """Open rows (optionally one league set), captured BEFORE a refresh retires them."""
+    wanted = {str(name).casefold() for name in leagues} if leagues is not None else None
+    return [
+        row
+        for row in ledger.rows()
+        if row.get("status") == "open" and (wanted is None or str(row.get("league", "")).casefold() in wanted)
+    ]
+
+
+def _open_ncaab_rows(ledger: Any) -> list[dict[str, str]]:
+    """Open NCAAB rows, captured BEFORE a refresh retires them (see restore below)."""
+    return _open_rows(ledger, {"ncaab"})
+
+
+def _restorable_open_rows(ledger: Any, config: dict[str, Any]) -> list[dict[str, str]]:
+    """Open rows of every league the daily job still forecasts, plus NCAAB (always).
+
+    "Enabled" means the league's own ``models.<LEAGUE>`` entry exists and
+    ``is_sport_daily_enabled`` accepts it. A league with no entry of its own (sub-leagues such as
+    NHL or DARTS_PDC) is not treated as enabled, and a switched-off sport's rows are left to the
+    daily clear exactly as before. NCAAB stays unconditional: it was restored before this widened.
+    """
+    models = config.get("models") or {}
+    enabled = {
+        str(key).casefold()
+        for key, value in models.items()
+        if isinstance(value, dict) and is_sport_daily_enabled(config, str(key))
+    }
+    return _open_rows(ledger, enabled | {"ncaab"})
+
+
+def _declined_slots(result: dict[str, Any] | None) -> list[tuple[str, str, str]]:
+    """(league, event_id, market_type) slots a forecast result says a gate declined."""
+    return [tuple(item) for item in (result or {}).get("declined_slots", ())]  # type: ignore[misc]
+
+
+def _evaluated_slots(
+    results: dict[str, Any], prior: dict[str, list[dict[str, str]]]
+) -> list[tuple[str, str, str]]:
+    """Prior-row slots this run's forecast results show it evaluated, whatever it decided.
+
+    Learned moneyline results carry ``candidates`` and the spread/total tasks carry
+    ``priced_contracts``; each entry names an (event_id, market_type) the run looked at. A pick
+    that was evaluated and not re-emitted was dropped by a gate, ban or no-call, and restoring
+    the previous run's version would resurrect exactly what that decision removed. Only slots
+    the run never evaluated (an errored task, a failed slate fetch, a vanished market) are left
+    for restore. The league comes from the prior row, so no result-key-to-league table is needed.
+    """
+    evaluated: set[tuple[str, str]] = set()
+    for result in results.values():
+        if not isinstance(result, dict):
+            continue
+        for key in ("candidates", "priced_contracts"):
+            for item in result.get(key) or ():
+                if isinstance(item, dict) and item.get("event_id") and item.get("market_type"):
+                    evaluated.add((str(item["event_id"]), str(item["market_type"])))
+    return [
+        (row["league"], row["event_id"], row["market_type"])
+        for rows in prior.values()
+        for row in rows
+        if (str(row["event_id"]), str(row["market_type"])) in evaluated
+    ]
+
+
+def _restore_unreplaced(
+    ledgers: dict[str, Any],
+    prior: dict[str, list[dict[str, str]]],
+    declined: list[tuple[str, str, str]],
+) -> dict[str, int]:
+    """Reopen picks the refresh retired and did not replace, except declined/evaluated slots.
+
+    Both the daily job and ``run_forecast`` clear every not-yet-started open row
+    before re-forecasting. A pick whose market produced no new call (the model no
+    longer favours it, the slate fetch failed, the sport task errored) would
+    otherwise vanish: 24 flat NCAAB event-markets were lost this way because only
+    ``run_forecast`` called restore and the scheduled daily path never did.
+    """
+    return {
+        tier: len(ledger.restore_unreplaced_picks(prior.get(tier, []), exclude_slots=declined))
+        for tier, ledger in ledgers.items()
+    }
+
+
+_restore_unreplaced_ncaab = _restore_unreplaced  # name kept for run_forecast and its tests
 
 
 def _rollback_pre_clear(ledger: Any) -> bool:

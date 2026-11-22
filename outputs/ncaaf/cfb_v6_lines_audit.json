@@ -1,0 +1,1781 @@
+{
+  "as_of_utc": "2026-11-15T02:10:00Z",
+  "generated_by": "scripts/cfb_v6_lines_audit.py",
+  "reference": {
+    "path": "C:/Users/Vince/AppData/Local/Temp/claude/3c4e37e4a6ec2934/f86acfae-6a7a-455a-99d3-5fcdba232520/scratchpad/v5_games.json",
+    "sha256": "31f2a9b83bec29d85db42f06164db26dbb2b796f08f97588ca0d2bb5ac247fcc",
+    "entries": 577,
+    "with_total_line": 575,
+    "with_spread_line": 576,
+    "earliest_start_utc": "2026-08-29T16:00:00Z",
+    "latest_start_utc": "2026-11-14T21:30:00Z",
+    "match_rule": "start within 3h and home+away names agree (U+FFFD in the dump matches one or no character)"
+  },
+  "verdict": {
+    "item_7": "BLOCKED",
+    "rule": "proceeds only if a separable set of pregame-lined (spread or total, with a pregame observed_at) events exists outside the reference events and predates the earliest reference event",
+    "predating_pregame_lined_events_by_source": {
+      "polymarket:repo data/odds/ncaaf": 0,
+      "polymarket:runtime odds/ncaaf": 0,
+      "runtime market_quotes.db": 0,
+      "ledger: live ledgers.db": 0,
+      "espn scoreboard consensus (DraftKings via ESPN)": 0,
+      "runtime research/college_contract_candidates": 0,
+      "xlsx:E:/model-prediction-runtime/backups/restore_unreplaced_2026-11-10_20261111T021040Z/E_MP_data_main_ncaaf.xlsx": 0,
+      "xlsx:data/archive/2026-08-30-ncaaf-synthetic-main-quarantine/flat_ncaaf.xlsx": 0,
+      "xlsx:data/archive/2026-08-30-ncaaf-synthetic-main-quarantine/ncaaf.xlsx": 0,
+      "xlsx:data/flat/ncaaf.xlsx": 0,
+      "xlsx:data/flat/ncaaf.xlsx.pre_clear.bak": 0,
+      "xlsx:data/main/ncaaf.xlsx": 0,
+      "xlsx:data/main/ncaaf.xlsx.pre_clear.bak": 0,
+      "xlsx:data/model_ledgers/ncaaf-moneyline-baseline.xlsx": 0,
+      "xlsx:data/model_ledgers/ncaaf-spread-baseline.xlsx": 0,
+      "xlsx:data/model_ledgers/ncaaf-total-baseline.xlsx": 0,
+      "xlsx:data/sports/ncaaf/flat.xlsx": 0,
+      "xlsx:data/sports/ncaaf/main.xlsx": 0,
+      "auto-buyer ledgers": 0
+    },
+    "predating_pregame_lined_events_max_over_sources": 0,
+    "earliest_line_bearing_event_start_utc_any_source": "2026-08-29T16:00:00Z",
+    "earliest_reference_event_start_utc": "2026-08-29T16:00:00Z",
+    "latest_reference_event_start_utc": "2026-11-14T21:30:00Z",
+    "pregame_lined_events_after_latest_reference_by_source": {
+      "polymarket:runtime odds/ncaaf": 31,
+      "ledger: live ledgers.db": 24,
+      "espn scoreboard consensus (DraftKings via ESPN)": 24,
+      "runtime research/college_contract_candidates": 31,
+      "xlsx:data/model_ledgers/ncaaf-spread-baseline.xlsx": 24,
+      "xlsx:data/model_ledgers/ncaaf-total-baseline.xlsx": 24,
+      "xlsx:data/sports/ncaaf/flat.xlsx": 24,
+      "xlsx:data/sports/ncaaf/main.xlsx": 9,
+      "auto-buyer ledgers": 17
+    },
+    "calendar_years_with_any_pregame_line": [
+      "2026"
+    ],
+    "same_season_pool_outside_reference_not_predating": {
+      "polymarket:repo data/odds/ncaaf": {
+        "pregame_lined_outside_reference": 460,
+        "of_which_with_result_in_history": 40,
+        "after_latest_reference": 0
+      },
+      "polymarket:runtime odds/ncaaf": {
+        "pregame_lined_outside_reference": 524,
+        "of_which_with_result_in_history": 40,
+        "after_latest_reference": 31
+      },
+      "runtime market_quotes.db": {
+        "pregame_lined_outside_reference": 419,
+        "of_which_with_result_in_history": 40,
+        "after_latest_reference": 0
+      },
+      "ledger: live ledgers.db": {
+        "pregame_lined_outside_reference": 30,
+        "of_which_with_result_in_history": 5,
+        "after_latest_reference": 24
+      },
+      "espn scoreboard consensus (DraftKings via ESPN)": {
+        "pregame_lined_outside_reference": 25,
+        "of_which_with_result_in_history": 0,
+        "after_latest_reference": 24
+      },
+      "runtime research/college_contract_candidates": {
+        "pregame_lined_outside_reference": 64,
+        "of_which_with_result_in_history": 0,
+        "after_latest_reference": 31
+      },
+      "xlsx:data/model_ledgers/ncaaf-spread-baseline.xlsx": {
+        "pregame_lined_outside_reference": 106,
+        "of_which_with_result_in_history": 42,
+        "after_latest_reference": 24
+      },
+      "xlsx:data/model_ledgers/ncaaf-total-baseline.xlsx": {
+        "pregame_lined_outside_reference": 109,
+        "of_which_with_result_in_history": 42,
+        "after_latest_reference": 24
+      },
+      "xlsx:data/sports/ncaaf/flat.xlsx": {
+        "pregame_lined_outside_reference": 24,
+        "of_which_with_result_in_history": 0,
+        "after_latest_reference": 24
+      },
+      "xlsx:data/sports/ncaaf/main.xlsx": {
+        "pregame_lined_outside_reference": 9,
+        "of_which_with_result_in_history": 0,
+        "after_latest_reference": 9
+      },
+      "auto-buyer ledgers": {
+        "pregame_lined_outside_reference": 17,
+        "of_which_with_result_in_history": 0,
+        "after_latest_reference": 17
+      }
+    },
+    "same_season_pool_note": "Outside-reference pregame-lined events all start on or after the reference's earliest event, so they are same-season, interleaved with the reference (no walk-forward separation). Polymarket ones are ladders (many alternate rungs, no single line) from 2026-09-04; many are FBS-vs-FCS games with no result in the history files (the known FCS gap), so only the 'with_result_in_history' subset is scorable without a backfill (name-matched, so approximate). Postgame/reconstructed prices are excluded from every count.",
+    "unblock": "Pregame spread and total quotes WITH a per-quote observed_at (or an archived pre-kickoff snapshot with fetch time) for NCAAF games of the 2016-2025 seasons, keyed by (start, home, away) or ESPN event_id so they join data/historical/ncaaf_games_all.jsonl (7,965 results, 2016-2026, no lines). Needed volume: enough events before 2026-08-29 to fit and validate the residual on data that is not the reference set. A single consensus line per event (opening and closing, with times) is sufficient; Polymarket ladders only exist from 2026-09-04. Postgame or reconstructed prices stay diagnostic only (docs/AGENTS.md); data/experiments/cfb_research_experiment_spec.json's 'market_seasons 2020-2024' is an aggregate claim with no rows behind it."
+  },
+  "sources": [
+    {
+      "source_id": "history:data/historical/ncaaf_games_all.jsonl",
+      "path": "data/historical/ncaaf_games_all.jsonl",
+      "file_count": 1,
+      "row_count_total": 7965,
+      "row_count_ncaaf": 7965,
+      "earliest_event_start_utc": "2016-08-27T02:00:00Z",
+      "latest_event_start_utc": "2026-11-14T03:15:00Z",
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "line_like_field_names_found": [],
+      "timestamp_basis": "not applicable: game results only, no quotes",
+      "games_per_season": {
+        "2016": 734,
+        "2017": 751,
+        "2018": 764,
+        "2019": 753,
+        "2020": 518,
+        "2021": 776,
+        "2022": 778,
+        "2023": 792,
+        "2024": 800,
+        "2025": 793,
+        "2026": 506
+      },
+      "distinct_events": 7965,
+      "events_with_spread_or_total_pregame": 0,
+      "notes": "Scores/context only. No line, odds or consensus field exists (key scan above)."
+    },
+    {
+      "source_id": "history:data/processed/ncaaf/games.jsonl",
+      "path": "data/processed/ncaaf/games.jsonl",
+      "file_count": 1,
+      "row_count_total": 7965,
+      "row_count_ncaaf": 7965,
+      "earliest_event_start_utc": "2016-08-27T02:00:00Z",
+      "latest_event_start_utc": "2026-11-14T03:15:00Z",
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "line_like_field_names_found": [],
+      "timestamp_basis": "not applicable: game results only, no quotes",
+      "games_per_season": {
+        "2016": 734,
+        "2017": 751,
+        "2018": 764,
+        "2019": 753,
+        "2020": 518,
+        "2021": 776,
+        "2022": 778,
+        "2023": 792,
+        "2024": 800,
+        "2025": 793,
+        "2026": 506
+      },
+      "distinct_events": 7965,
+      "events_with_spread_or_total_pregame": 0,
+      "notes": "Scores/context only. No line, odds or consensus field exists (key scan above)."
+    },
+    {
+      "source_id": "history:data/historical other files",
+      "path": "data/historical/*",
+      "file_count": 9,
+      "row_count_total": 77600,
+      "row_count_ncaaf": 0,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "not applicable",
+      "per_file": [
+        {
+          "file": "hockey_games_all.jsonl",
+          "rows": 7508,
+          "rows_mentioning_ncaaf": 0
+        },
+        {
+          "file": "mlb_games_all.jsonl",
+          "rows": 8772,
+          "rows_mentioning_ncaaf": 0
+        },
+        {
+          "file": "mlb_market_lines_reconstructed.jsonl",
+          "rows": 340,
+          "rows_mentioning_ncaaf": 0
+        },
+        {
+          "file": "nba_games_all.jsonl",
+          "rows": 3872,
+          "rows_mentioning_ncaaf": 0
+        },
+        {
+          "file": "ncaab_games_all.jsonl",
+          "rows": 7048,
+          "rows_mentioning_ncaaf": 0
+        },
+        {
+          "file": "nfl_games_all.jsonl",
+          "rows": 3080,
+          "rows_mentioning_ncaaf": 0
+        },
+        {
+          "file": "soccer_games_all.jsonl",
+          "rows": 16453,
+          "rows_mentioning_ncaaf": 0
+        },
+        {
+          "file": "tennis_games_all.jsonl",
+          "rows": 29168,
+          "rows_mentioning_ncaaf": 0
+        },
+        {
+          "file": "wnba_games_all.jsonl",
+          "rows": 1359,
+          "rows_mentioning_ncaaf": 0
+        }
+      ],
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "notes": "Other sports only (mlb_market_lines_reconstructed is MLB); no NCAAF rows."
+    },
+    {
+      "source_id": "history:data/odds/historical",
+      "path": "data/odds/historical/*",
+      "file_count": 1,
+      "row_count_total": null,
+      "row_count_ncaaf": 0,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "not applicable",
+      "files": [
+        "mlb_sbr_odds.json"
+      ],
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "notes": "mlb_sbr_odds.json only (sportsbook-review MLB); zero NCAAF/college-football mentions."
+    },
+    {
+      "source_id": "polymarket:repo data/odds/ncaaf",
+      "path": "data/odds/ncaaf/<date>/polymarket_snapshots.jsonl",
+      "file_count": 34,
+      "row_count_total": 161126,
+      "row_count_ncaaf": 161126,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true,
+        "american_odds_field_present": false,
+        "shape": "market ladder: many alternate spread/total rungs per event (line + long/short bid/ask); not a single consensus line"
+      },
+      "timestamp_basis": "per-row observed_at_utc (live gateway BBO capture); pregame iff observed_at <= event start",
+      "notes": "first folder 2026-09-04, last 2026-11-04",
+      "distinct_events": 1000,
+      "earliest_event_start_utc": "2026-09-04T22:30:00Z",
+      "latest_event_start_utc": "2026-11-05T00:30:00Z",
+      "earliest_observed_at_utc": "2026-09-04T07:31:28Z",
+      "latest_observed_at_utc": "2026-11-05T01:17:20Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 76164,
+          "no_timestamp": 13110
+        },
+        "total": {
+          "pregame": 60310,
+          "no_timestamp": 9459
+        },
+        "moneyline": {
+          "pregame": 1762,
+          "no_timestamp": 321
+        }
+      },
+      "events_with_spread_line_any": 868,
+      "events_with_spread_pregame": 811,
+      "events_with_spread_only_postgame_recon_or_untimed": 57,
+      "events_with_total_line_any": 839,
+      "events_with_total_pregame": 782,
+      "events_with_total_only_postgame_recon_or_untimed": 57,
+      "events_with_moneyline_line_any": 715,
+      "events_with_moneyline_pregame": 673,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 42,
+      "events_with_spread_or_total_pregame": 829,
+      "events_with_near_even_pregame_rung_spread": 753,
+      "events_with_near_even_pregame_rung_total": 754,
+      "pregame_lined_events_matched_to_reference": 369,
+      "pregame_lined_events_outside_reference": 460,
+      "pregame_lined_outside_reference_spread": 442,
+      "pregame_lined_outside_reference_total": 413,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 460,
+      "pregame_lined_outside_reference_with_result_in_history": 40,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0,
+      "usage_counts": {
+        "prospective_executable_bbo": 161126
+      },
+      "reconstructed_flag_counts": {
+        "False": 161126
+      },
+      "market_state_counts": {
+        "MARKET_STATE_OPEN": 160306,
+        "MARKET_STATE_EXPIRED": 351,
+        "MARKET_STATE_HALTED": 469
+      }
+    },
+    {
+      "source_id": "polymarket:runtime odds/ncaaf",
+      "path": "E:/model-prediction-runtime/odds/ncaaf/<date>/polymarket_snapshots.jsonl",
+      "file_count": 41,
+      "row_count_total": 166395,
+      "row_count_ncaaf": 166395,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true,
+        "american_odds_field_present": false,
+        "shape": "market ladder: many alternate spread/total rungs per event (line + long/short bid/ask); not a single consensus line"
+      },
+      "timestamp_basis": "per-row observed_at_utc (live gateway BBO capture); pregame iff observed_at <= event start",
+      "notes": "first folder 2026-09-04, last 2026-11-14",
+      "distinct_events": 1144,
+      "earliest_event_start_utc": "2026-09-04T22:30:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00:00Z",
+      "earliest_observed_at_utc": "2026-09-04T07:31:28Z",
+      "latest_observed_at_utc": "2026-11-15T01:35:40Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 79155,
+          "no_timestamp": 13241
+        },
+        "total": {
+          "pregame": 62068,
+          "no_timestamp": 9571
+        },
+        "moneyline": {
+          "pregame": 2004,
+          "no_timestamp": 356
+        }
+      },
+      "events_with_spread_line_any": 1007,
+      "events_with_spread_pregame": 907,
+      "events_with_spread_only_postgame_recon_or_untimed": 100,
+      "events_with_total_line_any": 974,
+      "events_with_total_pregame": 878,
+      "events_with_total_only_postgame_recon_or_untimed": 96,
+      "events_with_moneyline_line_any": 840,
+      "events_with_moneyline_pregame": 771,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 69,
+      "events_with_spread_or_total_pregame": 926,
+      "events_with_near_even_pregame_rung_spread": 849,
+      "events_with_near_even_pregame_rung_total": 850,
+      "pregame_lined_events_matched_to_reference": 402,
+      "pregame_lined_events_outside_reference": 524,
+      "pregame_lined_outside_reference_spread": 505,
+      "pregame_lined_outside_reference_total": 476,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 31,
+      "pregame_lined_outside_within_reference_span_unmatched": 493,
+      "pregame_lined_outside_reference_with_result_in_history": 40,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0,
+      "usage_counts": {
+        "prospective_executable_bbo": 166395
+      },
+      "reconstructed_flag_counts": {
+        "False": 166395
+      },
+      "market_state_counts": {
+        "MARKET_STATE_OPEN": 165575,
+        "MARKET_STATE_EXPIRED": 351,
+        "MARKET_STATE_HALTED": 469
+      }
+    },
+    {
+      "source_id": "runtime market_quotes.db",
+      "path": "E:/model-prediction-runtime/market_quotes.db",
+      "file_count": 1,
+      "row_count_total": 2504948,
+      "row_count_ncaaf": 293287,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true,
+        "american_odds_field_present": true,
+        "american_odds_populated_for_ncaaf_rows": 0
+      },
+      "timestamp_basis": "per-row observed_at_utc; event start joined from polymarket odds files by slug",
+      "notes": "event_id is the polymarket slug; slug date range 2026-09-04T00:00:00Z .. 2026-11-14T00:00:00Z; 13 (event, market) groups with no start resolved from odds files. Same capture lineage as data/odds/ncaaf (not independent).",
+      "distinct_events": 927,
+      "earliest_event_start_utc": "2026-09-04T22:30:00Z",
+      "latest_event_start_utc": "2026-11-14T17:00:00Z",
+      "earliest_observed_at_utc": "2026-09-04T07:31:28Z",
+      "latest_observed_at_utc": "2026-11-14T17:35:02Z",
+      "row_kinds": {
+        "spread": {
+          "no_timestamp": 10,
+          "pregame": 1494,
+          "postgame_or_live": 104
+        },
+        "total": {
+          "no_timestamp": 10,
+          "pregame": 1418,
+          "postgame_or_live": 106
+        },
+        "moneyline": {
+          "no_timestamp": 6,
+          "pregame": 1200,
+          "postgame_or_live": 76
+        }
+      },
+      "events_with_spread_line_any": 804,
+      "events_with_spread_pregame": 747,
+      "events_with_spread_only_postgame_recon_or_untimed": 57,
+      "events_with_total_line_any": 767,
+      "events_with_total_pregame": 709,
+      "events_with_total_only_postgame_recon_or_untimed": 58,
+      "events_with_moneyline_line_any": 641,
+      "events_with_moneyline_pregame": 600,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 41,
+      "events_with_spread_or_total_pregame": 757,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 338,
+      "pregame_lined_events_outside_reference": 419,
+      "pregame_lined_outside_reference_spread": 409,
+      "pregame_lined_outside_reference_total": 371,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 419,
+      "pregame_lined_outside_reference_with_result_in_history": 40,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0,
+      "note_reference_matching": "team names come from the polymarket event titles joined on slug"
+    },
+    {
+      "source_id": "snapshots:data/market_odds_snapshots.jsonl",
+      "path": "data/market_odds_snapshots.jsonl",
+      "file_count": 1,
+      "row_count_total": 4498,
+      "row_count_ncaaf": 0,
+      "earliest_event_start_utc": null,
+      "latest_event_start_utc": null,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "per-row observed_at_utc",
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "leagues": {},
+      "notes": "Zero NCAAF rows (MLB/WNBA snapshot files predating the college-football season)."
+    },
+    {
+      "source_id": "snapshots:data/polymarket_us_snapshots.jsonl",
+      "path": "data/polymarket_us_snapshots.jsonl",
+      "file_count": 1,
+      "row_count_total": 15,
+      "row_count_ncaaf": 0,
+      "earliest_event_start_utc": null,
+      "latest_event_start_utc": null,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "per-row observed_at_utc",
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "leagues": {},
+      "notes": "Zero NCAAF rows (MLB/WNBA snapshot files predating the college-football season)."
+    },
+    {
+      "source_id": "ledger: live ledgers.db",
+      "path": "E:/model-prediction-runtime/ledgers/ledgers.db :: ledger_records (sport=ncaaf, tiers main+flat)",
+      "file_count": 1,
+      "row_count_total": 51320,
+      "row_count_ncaaf": 6129,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true,
+        "american_odds_field_present": true,
+        "consensus_line_fields": [
+          "decision_consensus_line",
+          "closing_consensus_line",
+          "closing_line"
+        ]
+      },
+      "timestamp_basis": "decision-time observed_at_utc (decision_payload) <= event start; the line itself is the value quoted when the pick was decided. Per-quote market_quote_observed_at_utc is mostly blank.",
+      "notes": "Lines exist only for events a model picked (selection bias: not every game). Event ids are ESPN ids. This is the source the reference events were drawn from.",
+      "distinct_events": 607,
+      "earliest_event_start_utc": "2026-08-29T16:00:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00:00Z",
+      "earliest_observed_at_utc": "2026-08-29T15:45:00Z",
+      "latest_observed_at_utc": "2026-11-15T01:33:35Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 2133
+        },
+        "total": {
+          "pregame": 2167
+        },
+        "moneyline": {
+          "pregame": 1829
+        }
+      },
+      "events_with_spread_line_any": 606,
+      "events_with_spread_pregame": 606,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 605,
+      "events_with_total_pregame": 605,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 556,
+      "events_with_moneyline_pregame": 556,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 606,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 576,
+      "pregame_lined_events_outside_reference": 30,
+      "pregame_lined_outside_reference_spread": 30,
+      "pregame_lined_outside_reference_total": 30,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 24,
+      "pregame_lined_outside_within_reference_span_unmatched": 6,
+      "pregame_lined_outside_reference_with_result_in_history": 5,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0,
+      "counts": {
+        "tier:main": 1763,
+        "rows_moneyline": 1829,
+        "rows_with_american_odds_field_populated": 6129,
+        "rows_spread": 2133,
+        "rows_total": 2167,
+        "tier:flat": 4366,
+        "rows_with_market_quote_observed_at_utc": 783
+      },
+      "reference_entries_matched_to_ledger_events": 577,
+      "payload_provenance_counts": {
+        "record_source=<blank>": 6129,
+        "market_quote_provenance=<blank>": 5346,
+        "market_quote_source=<blank>": 5346,
+        "sportsbook=espn_consensus": 5328,
+        "sportsbook=polymarket_us": 801,
+        "market_quote_provenance=decision_time_executable_quote": 783,
+        "market_quote_source=polymarket_us": 783
+      }
+    },
+    {
+      "source_id": "runtime ledger backups",
+      "path": "E:/model-prediction-runtime/{backups/ledgers,ledgers}/*.db (excluding live ledgers.db)",
+      "file_count": 7,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "same ledger_records schema as the live DB",
+      "earliest_event_start_utc": "2026-08-29T16:00Z",
+      "per_file": [
+        {
+          "source_id": "ledger-backup:ledgers_20261022T013809_pre-dedupe.db",
+          "path": "E:/model-prediction-runtime/backups/ledgers/ledgers_20261022T013809_pre-dedupe.db",
+          "file_count": 1,
+          "line_rows": 1360,
+          "distinct_events_with_line": 370,
+          "earliest_event_start_utc": "2026-09-07T23:30Z",
+          "latest_event_start_utc": "2026-10-24T02:30Z",
+          "event_ids_not_in_live_ledger": 0
+        },
+        {
+          "source_id": "ledger-backup:ledgers_20261022T165742_pre-backfill2.db",
+          "path": "E:/model-prediction-runtime/backups/ledgers/ledgers_20261022T165742_pre-backfill2.db",
+          "file_count": 1,
+          "line_rows": 1375,
+          "distinct_events_with_line": 370,
+          "earliest_event_start_utc": "2026-09-07T23:30Z",
+          "latest_event_start_utc": "2026-10-24T02:30Z",
+          "event_ids_not_in_live_ledger": 0
+        },
+        {
+          "source_id": "ledger-backup:ledgers_20261025T215727_pre-legacy-import.db",
+          "path": "E:/model-prediction-runtime/backups/ledgers/ledgers_20261025T215727_pre-legacy-import.db",
+          "file_count": 1,
+          "line_rows": 1629,
+          "distinct_events_with_line": 414,
+          "earliest_event_start_utc": "2026-09-07T23:30Z",
+          "latest_event_start_utc": "2026-10-25T02:15Z",
+          "event_ids_not_in_live_ledger": 0
+        },
+        {
+          "source_id": "ledger-backup:ledgers_20261026T171805_pre-ncaaf-dedup.db",
+          "path": "E:/model-prediction-runtime/backups/ledgers/ledgers_20261026T171805_pre-ncaaf-dedup.db",
+          "file_count": 1,
+          "line_rows": 2229,
+          "distinct_events_with_line": 422,
+          "earliest_event_start_utc": "2026-08-29T16:00Z",
+          "latest_event_start_utc": "2026-10-25T02:15Z",
+          "event_ids_not_in_live_ledger": 0
+        },
+        {
+          "source_id": "ledger-backup:ledgers_20261105T195835_pre-ncaaf-dedup2.db",
+          "path": "E:/model-prediction-runtime/backups/ledgers/ledgers_20261105T195835_pre-ncaaf-dedup2.db",
+          "file_count": 1,
+          "line_rows": 2593,
+          "distinct_events_with_line": 483,
+          "earliest_event_start_utc": "2026-08-29T16:00Z",
+          "latest_event_start_utc": "2026-11-06T01:00Z",
+          "event_ids_not_in_live_ledger": 0
+        },
+        {
+          "source_id": "ledger-backup:ledgers.pre-dropped-settle-20261021T182116Z.db",
+          "path": "E:/model-prediction-runtime/ledgers/ledgers.pre-dropped-settle-20261021T182116Z.db",
+          "file_count": 1,
+          "line_rows": 1326,
+          "distinct_events_with_line": 362,
+          "earliest_event_start_utc": "2026-09-07T23:30Z",
+          "latest_event_start_utc": "2026-10-22T00:00Z",
+          "event_ids_not_in_live_ledger": 0
+        },
+        {
+          "source_id": "ledger-backup:ledgers.pre-relabel-superseded-20261021T190807Z.db",
+          "path": "E:/model-prediction-runtime/ledgers/ledgers.pre-relabel-superseded-20261021T190807Z.db",
+          "file_count": 1,
+          "line_rows": 1326,
+          "distinct_events_with_line": 362,
+          "earliest_event_start_utc": "2026-09-07T23:30Z",
+          "latest_event_start_utc": "2026-10-22T00:00Z",
+          "event_ids_not_in_live_ledger": 0
+        }
+      ],
+      "distinct_event_ids_in_backups_not_in_live": 0,
+      "notes": "Snapshots of the same ledger at earlier dates; they add no events beyond the live ledger unless the count above is non-zero."
+    },
+    {
+      "source_id": "espn scoreboard consensus (DraftKings via ESPN)",
+      "path": "data/raw/ncaaf/<date>/scores_ncaaf.json",
+      "file_count": 30,
+      "row_count_total": 297,
+      "row_count_ncaaf": 297,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true,
+        "open_close_lines_present": {
+          "pointSpread_home_open": 56,
+          "pointSpread_home_close": 56
+        }
+      },
+      "timestamp_basis": "no embedded fetch time; kind uses event state 'pre' at snapshot AND file mtime <= kickoff. Snapshots of started/completed games carry a closing-style line captured after kickoff.",
+      "notes": "events with an odds block: 56 of 297; odds-block provider counts {'DraftKings': 56}; snapshot state counts {'pre': 56}. Folder dates 2026-10-16.. only: same season as the reference events.",
+      "distinct_events": 56,
+      "earliest_event_start_utc": "2026-11-14T17:00:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00:00Z",
+      "earliest_observed_at_utc": "2026-11-14T05:34:11Z",
+      "latest_observed_at_utc": "2026-11-14T05:34:11Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 56
+        },
+        "total": {
+          "pregame": 56
+        },
+        "moneyline": {
+          "pregame": 56
+        }
+      },
+      "events_with_spread_line_any": 56,
+      "events_with_spread_pregame": 56,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 56,
+      "events_with_total_pregame": 56,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 56,
+      "events_with_moneyline_pregame": 56,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 56,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 31,
+      "pregame_lined_events_outside_reference": 25,
+      "pregame_lined_outside_reference_spread": 25,
+      "pregame_lined_outside_reference_total": 25,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 24,
+      "pregame_lined_outside_within_reference_span_unmatched": 1,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "runtime research/college_contract_candidates",
+      "path": "E:/model-prediction-runtime/research/college_contract_candidates/ncaaf/<date>/*.json",
+      "file_count": 80,
+      "row_count_total": 118450,
+      "row_count_ncaaf": 118450,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "quote_observed_at_utc per row (quote_hash + archive path recorded)",
+      "notes": "Decision-time views of the polymarket captures above (same lineage), 2026-11-04 onward.",
+      "distinct_events": 253,
+      "earliest_event_start_utc": "2026-11-05T00:00:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00:00Z",
+      "earliest_observed_at_utc": "2026-11-04T23:50:11Z",
+      "latest_observed_at_utc": "2026-11-15T01:33:35Z",
+      "row_kinds": {
+        "spread": {
+          "no_timestamp": 78993,
+          "pregame": 773
+        },
+        "total": {
+          "no_timestamp": 36019,
+          "pregame": 650
+        },
+        "moneyline": {
+          "no_timestamp": 1737,
+          "pregame": 278
+        }
+      },
+      "events_with_spread_line_any": 248,
+      "events_with_spread_pregame": 92,
+      "events_with_spread_only_postgame_recon_or_untimed": 156,
+      "events_with_total_line_any": 251,
+      "events_with_total_pregame": 94,
+      "events_with_total_only_postgame_recon_or_untimed": 157,
+      "events_with_moneyline_line_any": 252,
+      "events_with_moneyline_pregame": 94,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 158,
+      "events_with_spread_or_total_pregame": 95,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 31,
+      "pregame_lined_events_outside_reference": 64,
+      "pregame_lined_outside_reference_spread": 61,
+      "pregame_lined_outside_reference_total": 63,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 31,
+      "pregame_lined_outside_within_reference_span_unmatched": 33,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:E:/model-prediction-runtime/backups/restore_unreplaced_2026-11-10_20261111T021040Z/E_MP_data_main_ncaaf.xlsx",
+      "path": "E:/model-prediction-runtime/backups/restore_unreplaced_2026-11-10_20261111T021040Z/E_MP_data_main_ncaaf.xlsx",
+      "file_count": 1,
+      "row_count_total": 1051,
+      "row_count_ncaaf": 1051,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 447,
+      "earliest_event_start_utc": "2026-09-07T23:30:00Z",
+      "latest_event_start_utc": "2026-11-08T03:30:00Z",
+      "earliest_observed_at_utc": "2026-09-07T22:04:11Z",
+      "latest_observed_at_utc": "2026-11-08T01:37:38Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 384
+        },
+        "total": {
+          "pregame": 381
+        },
+        "moneyline": {
+          "pregame": 286
+        }
+      },
+      "events_with_spread_line_any": 384,
+      "events_with_spread_pregame": 384,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 381,
+      "events_with_total_pregame": 381,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 286,
+      "events_with_moneyline_pregame": 286,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 438,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 438,
+      "pregame_lined_events_outside_reference": 0,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/archive/2026-08-30-ncaaf-synthetic-main-quarantine/flat_ncaaf.xlsx",
+      "path": "data/archive/2026-08-30-ncaaf-synthetic-main-quarantine/flat_ncaaf.xlsx",
+      "file_count": 1,
+      "row_count_total": 40,
+      "row_count_ncaaf": 40,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). QUARANTINED synthetic main rows (archive 2026-08-30): not usable.",
+      "distinct_events": 8,
+      "earliest_event_start_utc": "2026-08-29T16:00:00Z",
+      "latest_event_start_utc": "2026-08-30T02:00:00Z",
+      "earliest_observed_at_utc": "2026-08-29T15:45:00Z",
+      "latest_observed_at_utc": "2026-08-30T01:45:00Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 16
+        },
+        "total": {
+          "pregame": 16
+        },
+        "moneyline": {
+          "pregame": 8
+        }
+      },
+      "events_with_spread_line_any": 8,
+      "events_with_spread_pregame": 8,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 8,
+      "events_with_total_pregame": 8,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 8,
+      "events_with_moneyline_pregame": 8,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 8,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 8,
+      "pregame_lined_events_outside_reference": 0,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/archive/2026-08-30-ncaaf-synthetic-main-quarantine/ncaaf.xlsx",
+      "path": "data/archive/2026-08-30-ncaaf-synthetic-main-quarantine/ncaaf.xlsx",
+      "file_count": 1,
+      "row_count_total": 16,
+      "row_count_ncaaf": 16,
+      "fields": {
+        "spread": false,
+        "total": true,
+        "moneyline": false
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). QUARANTINED synthetic main rows (archive 2026-08-30): not usable.",
+      "distinct_events": 8,
+      "earliest_event_start_utc": "2026-08-29T16:00:00Z",
+      "latest_event_start_utc": "2026-08-30T02:00:00Z",
+      "earliest_observed_at_utc": "2026-08-29T15:45:00Z",
+      "latest_observed_at_utc": "2026-08-30T01:45:00Z",
+      "row_kinds": {
+        "total": {
+          "pregame": 16
+        }
+      },
+      "events_with_spread_line_any": 0,
+      "events_with_spread_pregame": 0,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 8,
+      "events_with_total_pregame": 8,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 0,
+      "events_with_moneyline_pregame": 0,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 8,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 8,
+      "pregame_lined_events_outside_reference": 0,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/flat/ncaaf.xlsx",
+      "path": "data/flat/ncaaf.xlsx",
+      "file_count": 1,
+      "row_count_total": 853,
+      "row_count_ncaaf": 853,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 300,
+      "earliest_event_start_utc": "2026-08-29T16:00:00Z",
+      "latest_event_start_utc": "2026-10-04T03:59:00Z",
+      "earliest_observed_at_utc": "2026-08-29T15:45:00Z",
+      "latest_observed_at_utc": "2026-10-03T22:32:35Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 300
+        },
+        "total": {
+          "pregame": 300
+        },
+        "moneyline": {
+          "pregame": 253
+        }
+      },
+      "events_with_spread_line_any": 300,
+      "events_with_spread_pregame": 300,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 300,
+      "events_with_total_pregame": 300,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 253,
+      "events_with_moneyline_pregame": 253,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 300,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 300,
+      "pregame_lined_events_outside_reference": 0,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/flat/ncaaf.xlsx.pre_clear.bak",
+      "path": "data/flat/ncaaf.xlsx.pre_clear.bak",
+      "file_count": 1,
+      "row_count_total": 853,
+      "row_count_ncaaf": 853,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 300,
+      "earliest_event_start_utc": "2026-08-29T16:00:00Z",
+      "latest_event_start_utc": "2026-10-04T03:59:00Z",
+      "earliest_observed_at_utc": "2026-08-29T15:45:00Z",
+      "latest_observed_at_utc": "2026-10-03T22:32:35Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 300
+        },
+        "total": {
+          "pregame": 300
+        },
+        "moneyline": {
+          "pregame": 253
+        }
+      },
+      "events_with_spread_line_any": 300,
+      "events_with_spread_pregame": 300,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 300,
+      "events_with_total_pregame": 300,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 253,
+      "events_with_moneyline_pregame": 253,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 300,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 300,
+      "pregame_lined_events_outside_reference": 0,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/main/ncaaf.xlsx",
+      "path": "data/main/ncaaf.xlsx",
+      "file_count": 1,
+      "row_count_total": 829,
+      "row_count_ncaaf": 829,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 292,
+      "earliest_event_start_utc": "2026-09-07T23:30:00Z",
+      "latest_event_start_utc": "2026-10-04T03:59:00Z",
+      "earliest_observed_at_utc": "2026-09-07T22:04:11Z",
+      "latest_observed_at_utc": "2026-10-03T22:32:35Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 292
+        },
+        "total": {
+          "pregame": 292
+        },
+        "moneyline": {
+          "pregame": 245
+        }
+      },
+      "events_with_spread_line_any": 292,
+      "events_with_spread_pregame": 292,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 292,
+      "events_with_total_pregame": 292,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 245,
+      "events_with_moneyline_pregame": 245,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 292,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 292,
+      "pregame_lined_events_outside_reference": 0,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/main/ncaaf.xlsx.pre_clear.bak",
+      "path": "data/main/ncaaf.xlsx.pre_clear.bak",
+      "file_count": 1,
+      "row_count_total": 829,
+      "row_count_ncaaf": 829,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 292,
+      "earliest_event_start_utc": "2026-09-07T23:30:00Z",
+      "latest_event_start_utc": "2026-10-04T03:59:00Z",
+      "earliest_observed_at_utc": "2026-09-07T22:04:11Z",
+      "latest_observed_at_utc": "2026-10-03T22:32:35Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 292
+        },
+        "total": {
+          "pregame": 292
+        },
+        "moneyline": {
+          "pregame": 245
+        }
+      },
+      "events_with_spread_line_any": 292,
+      "events_with_spread_pregame": 292,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 292,
+      "events_with_total_pregame": 292,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 245,
+      "events_with_moneyline_pregame": 245,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 292,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 292,
+      "pregame_lined_events_outside_reference": 0,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/model_ledgers/ncaaf-moneyline-baseline.xlsx",
+      "path": "data/model_ledgers/ncaaf-moneyline-baseline.xlsx",
+      "file_count": 1,
+      "row_count_total": 1822,
+      "row_count_ncaaf": 1822,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 605,
+      "earliest_event_start_utc": "2026-09-04T22:30:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00:00Z",
+      "earliest_observed_at_utc": "2026-09-04T22:15:00Z",
+      "latest_observed_at_utc": "2026-11-15T01:33:35Z",
+      "row_kinds": {
+        "moneyline": {
+          "pregame": 1822
+        }
+      },
+      "events_with_spread_line_any": 0,
+      "events_with_spread_pregame": 0,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 0,
+      "events_with_total_pregame": 0,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 605,
+      "events_with_moneyline_pregame": 605,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 0,
+      "pregame_lined_events_outside_reference": 0,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 0,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/model_ledgers/ncaaf-spread-baseline.xlsx",
+      "path": "data/model_ledgers/ncaaf-spread-baseline.xlsx",
+      "file_count": 1,
+      "row_count_total": 2037,
+      "row_count_ncaaf": 2037,
+      "fields": {
+        "spread": true,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 674,
+      "earliest_event_start_utc": "2026-09-04T22:30:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00:00Z",
+      "earliest_observed_at_utc": "2026-09-04T22:03:40Z",
+      "latest_observed_at_utc": "2026-11-15T01:33:24Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 2037
+        }
+      },
+      "events_with_spread_line_any": 674,
+      "events_with_spread_pregame": 674,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 0,
+      "events_with_total_pregame": 0,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 0,
+      "events_with_moneyline_pregame": 0,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 674,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 568,
+      "pregame_lined_events_outside_reference": 106,
+      "pregame_lined_outside_reference_spread": 106,
+      "pregame_lined_outside_reference_total": 0,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 24,
+      "pregame_lined_outside_within_reference_span_unmatched": 82,
+      "pregame_lined_outside_reference_with_result_in_history": 42,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/model_ledgers/ncaaf-total-baseline.xlsx",
+      "path": "data/model_ledgers/ncaaf-total-baseline.xlsx",
+      "file_count": 1,
+      "row_count_total": 2042,
+      "row_count_ncaaf": 2042,
+      "fields": {
+        "spread": false,
+        "total": true,
+        "moneyline": false
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 676,
+      "earliest_event_start_utc": "2026-09-04T22:30:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00:00Z",
+      "earliest_observed_at_utc": "2026-09-04T22:03:40Z",
+      "latest_observed_at_utc": "2026-11-15T01:33:35Z",
+      "row_kinds": {
+        "total": {
+          "pregame": 2042
+        }
+      },
+      "events_with_spread_line_any": 0,
+      "events_with_spread_pregame": 0,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 676,
+      "events_with_total_pregame": 676,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 0,
+      "events_with_moneyline_pregame": 0,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 676,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 567,
+      "pregame_lined_events_outside_reference": 109,
+      "pregame_lined_outside_reference_spread": 0,
+      "pregame_lined_outside_reference_total": 109,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 24,
+      "pregame_lined_outside_within_reference_span_unmatched": 85,
+      "pregame_lined_outside_reference_with_result_in_history": 42,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/sports/ncaaf/flat.xlsx",
+      "path": "data/sports/ncaaf/flat.xlsx",
+      "file_count": 1,
+      "row_count_total": 742,
+      "row_count_ncaaf": 742,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 294,
+      "earliest_event_start_utc": "2026-08-29T16:00:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00:00Z",
+      "earliest_observed_at_utc": "2026-08-29T15:45:00Z",
+      "latest_observed_at_utc": "2026-11-15T01:33:35Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 236
+        },
+        "total": {
+          "pregame": 237
+        },
+        "moneyline": {
+          "pregame": 269
+        }
+      },
+      "events_with_spread_line_any": 236,
+      "events_with_spread_pregame": 236,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 237,
+      "events_with_total_pregame": 237,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 269,
+      "events_with_moneyline_pregame": 269,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 281,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 257,
+      "pregame_lined_events_outside_reference": 24,
+      "pregame_lined_outside_reference_spread": 24,
+      "pregame_lined_outside_reference_total": 24,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 24,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "xlsx:data/sports/ncaaf/main.xlsx",
+      "path": "data/sports/ncaaf/main.xlsx",
+      "file_count": 1,
+      "row_count_total": 1088,
+      "row_count_ncaaf": 1088,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "observed_at_utc (decision time) per row",
+      "notes": "Best-effort XLSX export of the ledger (disposable). ",
+      "distinct_events": 478,
+      "earliest_event_start_utc": "2026-09-07T23:30:00Z",
+      "latest_event_start_utc": "2026-11-15T02:30:00Z",
+      "earliest_observed_at_utc": "2026-09-07T22:04:11Z",
+      "latest_observed_at_utc": "2026-11-15T01:32:02Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 395
+        },
+        "total": {
+          "pregame": 399
+        },
+        "moneyline": {
+          "pregame": 294
+        }
+      },
+      "events_with_spread_line_any": 395,
+      "events_with_spread_pregame": 395,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 399,
+      "events_with_total_pregame": 399,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 294,
+      "events_with_moneyline_pregame": 294,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 465,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 456,
+      "pregame_lined_events_outside_reference": 9,
+      "pregame_lined_outside_reference_spread": 4,
+      "pregame_lined_outside_reference_total": 7,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 9,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "auto-buyer ledgers",
+      "path": "E:/model-prediction-runtime/{auto_buyer_ledger.jsonl,paper_auto_buyer/auto_buyer_ledger*.jsonl}, data/auto_buyer_ledger.jsonl, data/backups/auto_buyer_ledger*.jsonl",
+      "file_count": 10,
+      "row_count_total": 894,
+      "row_count_ncaaf": 42,
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "executed_at_utc of the order",
+      "notes": "Executed paper orders only; NCAAF auto-buying is disabled so only a handful of rows exist.",
+      "distinct_events": 32,
+      "earliest_event_start_utc": "2026-11-11T00:00:00Z",
+      "latest_event_start_utc": "2026-11-15T00:45:00Z",
+      "earliest_observed_at_utc": "2026-11-10T05:48:48Z",
+      "latest_observed_at_utc": "2026-11-14T23:53:39Z",
+      "row_kinds": {
+        "spread": {
+          "pregame": 10
+        },
+        "total": {
+          "pregame": 28
+        },
+        "moneyline": {
+          "pregame": 4
+        }
+      },
+      "events_with_spread_line_any": 10,
+      "events_with_spread_pregame": 10,
+      "events_with_spread_only_postgame_recon_or_untimed": 0,
+      "events_with_total_line_any": 28,
+      "events_with_total_pregame": 28,
+      "events_with_total_only_postgame_recon_or_untimed": 0,
+      "events_with_moneyline_line_any": 4,
+      "events_with_moneyline_pregame": 4,
+      "events_with_moneyline_only_postgame_recon_or_untimed": 0,
+      "events_with_spread_or_total_pregame": 31,
+      "events_with_near_even_pregame_rung_spread": 0,
+      "events_with_near_even_pregame_rung_total": 0,
+      "pregame_lined_events_matched_to_reference": 14,
+      "pregame_lined_events_outside_reference": 17,
+      "pregame_lined_outside_reference_spread": 6,
+      "pregame_lined_outside_reference_total": 16,
+      "pregame_lined_outside_PREDATING_earliest_reference": 0,
+      "pregame_lined_outside_predating_spread": 0,
+      "pregame_lined_outside_predating_total": 0,
+      "pregame_lined_outside_AFTER_latest_reference": 17,
+      "pregame_lined_outside_within_reference_span_unmatched": 0,
+      "pregame_lined_outside_reference_with_result_in_history": 0,
+      "pregame_lined_events_unknown_start": 0,
+      "pregame_lined_events_unmatchable_no_names_or_id": 0
+    },
+    {
+      "source_id": "db:E:/model-prediction-runtime/production/production.db",
+      "path": "E:/model-prediction-runtime/production/production.db",
+      "file_count": 1,
+      "row_count_ncaaf": 0,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "not applicable: no NCAAF rows",
+      "per_table": {
+        "predictions": {
+          "rows": 78,
+          "ncaaf_rows": 0
+        },
+        "market_snapshots": {
+          "rows": 0,
+          "ncaaf_rows": 0
+        },
+        "decisions": {
+          "rows": 0,
+          "ncaaf_rows": "no sport column"
+        }
+      },
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "notes": "Checked for NCAAF line rows; none."
+    },
+    {
+      "source_id": "db:E:/model-prediction-runtime/rebuild/shadow.db",
+      "path": "E:/model-prediction-runtime/rebuild/shadow.db",
+      "file_count": 1,
+      "row_count_ncaaf": 0,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "not applicable: no NCAAF rows",
+      "per_table": {
+        "predictions": {
+          "rows": 808,
+          "ncaaf_rows": 0
+        },
+        "market_snapshots": {
+          "rows": 0,
+          "ncaaf_rows": 0
+        },
+        "market_evaluations": {
+          "rows": 16720,
+          "ncaaf_rows": 0
+        }
+      },
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "notes": "Checked for NCAAF line rows; none."
+    },
+    {
+      "source_id": "db:E:/MP/data/rebuild/shadow.db",
+      "path": "E:/MP/data/rebuild/shadow.db",
+      "file_count": 1,
+      "row_count_ncaaf": 0,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "not applicable: no NCAAF rows",
+      "per_table": {
+        "predictions": {
+          "rows": 1728,
+          "ncaaf_rows": 0
+        },
+        "market_snapshots": {
+          "rows": 0,
+          "ncaaf_rows": 0
+        },
+        "market_evaluations": {
+          "rows": 21204,
+          "ncaaf_rows": 0
+        }
+      },
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "notes": "Checked for NCAAF line rows; none."
+    },
+    {
+      "source_id": "db:E:/model-prediction-runtime/runs.db",
+      "path": "E:/model-prediction-runtime/runs.db",
+      "file_count": 1,
+      "row_count_ncaaf": 0,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "not applicable: no NCAAF rows",
+      "per_table": {
+        "canonical_events": {
+          "rows": 1,
+          "ncaaf_rows": 0
+        }
+      },
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "notes": "Checked for NCAAF line rows; none."
+    },
+    {
+      "source_id": "db:dashboard_cache.db (derived from ledger)",
+      "path": "E:/model-prediction-runtime/dashboard_cache.db :: picks",
+      "file_count": 1,
+      "row_count_ncaaf": 1830,
+      "earliest_event_start_utc": "2026-08-29T16:00Z",
+      "latest_event_start_utc": "2026-11-15T04:00Z",
+      "fields": {
+        "spread": true,
+        "total": true,
+        "moneyline": true
+      },
+      "timestamp_basis": "derived cache of ledger picks; no independent quotes",
+      "distinct_events": 600,
+      "events_with_spread_or_total_pregame": null,
+      "notes": "Cache of ledger_records payloads; adds no event beyond the ledger."
+    },
+    {
+      "source_id": "experiment spec claim",
+      "path": "data/experiments/cfb_research_experiment_spec.json",
+      "file_count": 1,
+      "row_count_total": 0,
+      "row_count_ncaaf": 0,
+      "fields": {
+        "spread": false,
+        "total": false,
+        "moneyline": false
+      },
+      "timestamp_basis": "none: aggregates only",
+      "distinct_events": 0,
+      "events_with_spread_or_total_pregame": 0,
+      "claim": {
+        "dataset_summary": {
+          "total_games": 8146,
+          "train_seasons": "2016-2021",
+          "val_season": "2022",
+          "test_seasons": "2023-2024",
+          "market_seasons": "2020-2024"
+        },
+        "market_economic_evaluation_eligible_games": {
+          "moneyline": 4510,
+          "spread": 4510,
+          "total": 4510
+        }
+      },
+      "notes": "Claims 4,510 lined games over market_seasons 2020-2024. Generator traced: scripts/cfb_research_pipeline.py loads data/historical/ncaaf_games_all.jsonl, which has no line fields, and evaluates every game with g.get('spread_home_line', 0.0), g.get('total_line', 54.0), g.get('market_ml_home_prob') or 0.50 and a fixed 0.5238 ask (spread/total paths at lines ~274-317, 'eligible_games' = every 2020+ game). So the 4,510 'lined' games carry defaulted constants, not quotes: synthetic, not data. The 2026-08-30 quarantine archive is likewise 'synthetic main'."
+    }
+  ],
+  "residual_sweep": {
+    "ran": true,
+    "skipped_top_level_dirs": [
+      "availability",
+      "providers",
+      "esports",
+      "statcast",
+      "mlb_statsapi",
+      "weather",
+      "raw",
+      "odds",
+      "processed",
+      "international_baseball",
+      "calibration",
+      "player_priors",
+      "entities",
+      "statsapi",
+      "logs",
+      "sports",
+      "archive",
+      "backups"
+    ],
+    "max_bytes": 300000000,
+    "files_scanned": 10271,
+    "files_with_ncaaf_mentions": [
+      {
+        "path": "E:/MP/data/auto_buyer_state.json",
+        "bytes": 5798,
+        "mentions": 7
+      },
+      {
+        "path": "E:/MP/data/research/ncaaf_v6/history_snapshot.meta.json",
+        "bytes": 1317,
+        "mentions": 5
+      },
+      {
+        "path": "E:/MP/data/research/ncaaf_v6/ncaaf_games_backfill.jsonl",
+        "bytes": 11785384,
+        "mentions": 49134
+      },
+      {
+        "path": "E:/MP/data/research/ncaaf_v6/tracer/snap.meta.json",
+        "bytes": 941,
+        "mentions": 3
+      },
+      {
+        "path": "E:/model-prediction-runtime/audit.jsonl",
+        "bytes": 29840,
+        "mentions": 3
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json",
+        "bytes": 6074,
+        "mentions": 9
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-cfb-disable-20261110-222911.bak",
+        "bytes": 6241,
+        "mentions": 11
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-enable-live-20261111-035321.bak",
+        "bytes": 6184,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-live-off-20261111-035637.bak",
+        "bytes": 6183,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-lookahead-1h-20261111-220014.bak",
+        "bytes": 6348,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-nba-ml-champion-swap-20261111-170439.bak",
+        "bytes": 6347,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-nba-ml-v5-20261113-191519.bak",
+        "bytes": 6075,
+        "mentions": 8
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-nba-v9-whitelist-pull-20261113-135938.bak",
+        "bytes": 6190,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-ncaab-live-run-20261111-031259.bak",
+        "bytes": 6185,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-ncaab-retry-20261111-031747.bak",
+        "bytes": 6185,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-ncaab-side-audit-20261111-032129.bak",
+        "bytes": 14395,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-ncaaf-enable-nba-spread-keep-20261113-140813.bak",
+        "bytes": 6161,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-refresh-fix-20261111-031559.bak",
+        "bytes": 6184,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.json.pre-safety-pause-20261111-030648.bak",
+        "bytes": 6184,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.pre_ncaab_bucket_20261111T034555Z.json",
+        "bytes": 6223,
+        "mentions": 10
+      },
+      {
+        "path": "E:/model-prediction-runtime/auto_buyer_state.repo-seed.pre-cfb-disable-20261110-222911.bak",
+        "bytes": 5824,
+        "mentions": 8
+      },
+      {
+        "path": "E:/model-prediction-runtime/dashboard-inline-check.js",
+        "bytes": 230255,
+        "mentions": 3
+      },
+      {
+        "path": "E:/model-prediction-runtime/dashboard-staged.html",
+        "bytes": 314423,
+        "mentions": 5
+      },
+      {
+        "path": "E:/model-prediction-runtime/dashboard-staged.js",
+        "bytes": 231541,
+        "mentions": 3
+      },
+      {
+        "path": "E:/model-prediction-runtime/runs.db",
+        "bytes": 2506752,
+        "mentions": 12
+      },
+      {
+        "path": "E:/model-prediction-runtime/ledgers/ledgers.pre-dropped-settle-20261021T182116Z.db",
+        "bytes": 266326016,
+        "mentions": 71232
+      },
+      {
+        "path": "E:/model-prediction-runtime/ledgers/ledgers.pre-relabel-superseded-20261021T190807Z.db",
+        "bytes": 270364672,
+        "mentions": 72163
+      }
+    ]
+  },
+  "pricing_note": "Percentages and lines only; American-odds fields are reported as present, never printed."
+}

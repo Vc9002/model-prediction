@@ -12,19 +12,27 @@ Implements research-grounded point-in-time features for College Football:
 
 from __future__ import annotations
 
+import logging
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 from ..data_sources.cfb_data import (
+    CFBTeam,
     calculate_haversine_distance,
     calculate_timezone_difference,
     resolve_team,
 )
 from ..domain import parse_utc
 from ..features.base import GameRecord
+from .cfb_team_identity import FBS, UNKNOWN, CFBTeamClasses, CFBTeamIdentity, row_season, row_start
+
+_logger = logging.getLogger(__name__)
+
+# (row, home team key, away team key) for one history row before the decision time
+KeyedRow = tuple[Any, str, str]
 
 # Baseline Constants (Calibrated to 2026 Empirical Reality)
 CFB_BASELINE_TOTAL = 52.8
@@ -40,6 +48,10 @@ class CFBGameRecord(GameRecord):
     """Point-in-time completed CFB game with granular EPA, pace, and weather metadata."""
 
     possessions: float | None = None
+    # ESPN team ids and the scoreboard feed groups that listed the event (80 = FBS, 81 = FCS); None on legacy rows
+    home_team_id: str | None = None
+    away_team_id: str | None = None
+    feed_groups: tuple[int, ...] | None = None
     home_epa_per_play: float | None = None
     away_epa_per_play: float | None = None
     home_success_rate: float | None = None
@@ -139,6 +151,50 @@ def _get_val(obj: Any, key: str, default: Any = None) -> Any:
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
+
+
+def _keyed_past_rows(history: Sequence[Any], as_of_dt: datetime) -> tuple[CFBTeamIdentity, list[KeyedRow]]:
+    """History rows that started strictly before ``as_of_dt``, keyed by canonical team identity.
+
+    The identity is built from these rows only, so nothing after the decision time shapes it.
+    """
+    past = []
+    for g in history:
+        g_dt = row_start(g)
+        if g_dt is not None and g_dt < as_of_dt:
+            past.append(g)
+    identity = CFBTeamIdentity.from_rows(past)
+    return identity, [(g, *identity.row_keys(g)) for g in past]
+
+
+# (home value, away value) of a history row's "EPA" channel; None = no value for that row
+EpaReader = Callable[[Any], tuple[float | None, float | None]]
+
+
+def _stored_epa(row: Any) -> tuple[float | None, float | None]:
+    """The per-row ``*_epa_per_play`` fields the 2016-2026 backfill wrote (v2-v5). A row whose two values are both
+    exactly 0.0 is the backfill's no-prior-game default and counts as missing."""
+    h_epa = _get_val(row, "home_epa_per_play")
+    a_epa = _get_val(row, "away_epa_per_play")
+    if h_epa is None or a_epa is None or (h_epa == 0.0 and a_epa == 0.0):
+        return None, None
+    return h_epa, a_epa
+
+
+def _class_conference(classes: CFBTeamClasses, key: str, season: int, team: CFBTeam | None) -> str:
+    """Conference whose tier offset prices a team in ``season``: one rule for the team, its Elo opponents and
+    its efficiency opponents.
+
+    The three call sites used to disagree on an unresolved team (Mid-American, Mid-American, FBS Independents
+    +2.0), so one FCS opponent was priced three ways. FCS or UNKNOWN class => FCS; an FBS team the static
+    table misses (or lists as FCS) => Mid-American, the long-standing team-side fallback.
+    """
+    label, _ = classes.classify(key, season)
+    if label != FBS:
+        return "FCS"
+    if team is not None and team.tier != "FCS":
+        return team.conference
+    return "Mid-American"
 
 
 def _normal_cdf(x: float, mean: float, sd: float) -> float:
@@ -288,6 +344,29 @@ class CFBFeatureExtractor:
         self.margin_sd = margin_sd
         self.total_sd = total_sd
 
+    # Seams for cfb-structural-v5.1 (features/cfb_features_v51.py). The defaults are v2-v5's behaviour and must
+    # stay bit-identical: the static team table for the conference flag, the stored per-row "EPA" fields.
+    def _is_conference_matchup(
+        self,
+        season: int,
+        *,
+        away_team: str,
+        home_team: str,
+        away_obj: CFBTeam | None,
+        home_obj: CFBTeam | None,
+        away_team_id: str | None,
+        home_team_id: str | None,
+    ) -> bool:
+        return bool(
+            away_obj
+            and home_obj
+            and away_obj.conference == home_obj.conference
+            and away_obj.conference not in ("FBS Independents", "FCS")
+        )
+
+    def _epa_reader(self, keyed_rows: Sequence[KeyedRow]) -> EpaReader | None:
+        return None
+
     def _compute_team_state(
         self,
         history: Sequence[Any],
@@ -295,48 +374,50 @@ class CFBFeatureExtractor:
         as_of_dt: datetime,
         season_year: int,
         week: int,
+        *,
+        team_key: str | None = None,
+        keyed_rows: Sequence[KeyedRow] | None = None,
+        classes: CFBTeamClasses | None = None,
+        epa_of: EpaReader | None = None,
     ) -> CFBTeamState:
-        """Compute point-in-time team state using only games before as_of_dt."""
+        """Compute point-in-time team state using only games before as_of_dt.
+
+        History rows are matched on the canonical team key, not the display name: ESPN renamed teams mid-2026
+        (App State / Appalachian State, Hawai'i / Hawaii, San José / San Jose) and an exact-name match split each
+        into two partial histories.
+        """
+        if keyed_rows is None or team_key is None:
+            identity, keyed_rows = _keyed_past_rows(history, as_of_dt)
+            team_key = identity.key(team_name)
+        if classes is None:
+            classes = CFBTeamClasses.from_keyed_rows(keyed_rows)
         team_obj = resolve_team(team_name)
-        tier = team_obj.tier if team_obj else "G6"
-        conf = team_obj.conference if team_obj else "Mid-American"
+        # Tier follows the season's division class; the static table only says which FBS tier. A team with no
+        # class evidence is not-FBS (fail closed), so an unknown opponent cannot pass as an FBS-vs-FBS game.
+        team_class, _ = classes.classify(team_key, season_year)
+        if team_class == FBS:
+            tier = team_obj.tier if team_obj and team_obj.tier != "FCS" else "G6"
+        else:
+            tier = "FCS"
+        conf = _class_conference(classes, team_key, season_year, team_obj)
 
         # Prior power level from conference tier and historical baseline
         conf_offset = CONFERENCE_TIER_OFFSETS.get(conf, 0.0)
         base_elo = 1500.0 + (conf_offset * 25.0)
 
-        # Filter strictly past games in the same or previous season
-        past_games = []
-        for g in history:
-            a_tm = _get_val(g, "away_team")
-            h_tm = _get_val(g, "home_team")
-            if a_tm != team_name and h_tm != team_name:
-                continue
-            s_val = _get_val(g, "event_start_utc") or _get_val(g, "start")
-            if s_val is None:
-                continue
-            g_dt = parse_utc(s_val) if isinstance(s_val, str) else s_val
-            if g_dt < as_of_dt:
-                past_games.append(g)
+        # Strictly past games of this team (keyed_rows holds only rows before as_of_dt), in history order.
+        # Each entry is (row, is_home, opponent display name, opponent key).
+        past_games: list[tuple[Any, bool, str, str]] = []
+        for g, h_key, a_key in keyed_rows:
+            if h_key == team_key:
+                past_games.append((g, True, _get_val(g, "away_team", ""), a_key))
+            elif a_key == team_key:
+                past_games.append((g, False, _get_val(g, "home_team", ""), h_key))
 
         # Current season games: resolve from attribute or timestamp to prevent cross-season leakage
-        def _resolve_game_season(gm: Any) -> int | None:
-            s_val = _get_val(gm, "event_start_utc") or _get_val(gm, "start")
-            dt = parse_utc(s_val) if isinstance(s_val, str) else s_val
-            sy = _get_val(gm, "season_year")
-            if dt and dt.month in (1, 2):
-                if sy is not None and int(sy) == dt.year:
-                    return dt.year - 1
-                if sy is not None:
-                    return int(sy)
-                return dt.year - 1
-            if sy is not None:
-                return int(sy)
-            if dt:
-                return dt.year
-            return None
+        _resolve_game_season = row_season
 
-        curr_season_games = [g for g in past_games if _resolve_game_season(g) == season_year]
+        curr_season_games = [p for p in past_games if _resolve_game_season(p[0]) == season_year]
 
         n_games = len(curr_season_games)
         decay_w = PRESEASON_DECAY_WEIGHTS.get(min(week, 14), 0.10)
@@ -344,23 +425,22 @@ class CFBFeatureExtractor:
         # Elo rating calculation with opponent adjustment and 35% offseason reversion
         current_elo = base_elo
         last_season = None
-        for g in past_games[-20:]:  # Rolling 20 games
+        for g, is_home, opp_name, opp_key in past_games[-20:]:  # Rolling 20 games
             g_season = _resolve_game_season(g)
             if last_season is not None and g_season != last_season:
                 # 35% offseason regression toward conference baseline (reflects roster/portal turnover)
                 current_elo = 0.65 * current_elo + 0.35 * base_elo
             last_season = g_season
 
-            is_home = _get_val(g, "home_team", "") == team_name
             team_score = _get_val(g, "home_score", 0) if is_home else _get_val(g, "away_score", 0)
             opp_score = _get_val(g, "away_score", 0) if is_home else _get_val(g, "home_score", 0)
             won = team_score > opp_score
             margin = abs(team_score - opp_score)
 
             # Opponent-aware strength baseline
-            opp_name = _get_val(g, "away_team", "") if is_home else _get_val(g, "home_team", "")
-            opp_obj = resolve_team(opp_name)
-            opp_conf = opp_obj.conference if opp_obj else "Mid-American"
+            opp_conf = _class_conference(
+                classes, opp_key, g_season if g_season is not None else season_year, resolve_team(opp_name)
+            )
             opp_base_elo = 1500.0 + (CONFERENCE_TIER_OFFSETS.get(opp_conf, 0.0) * 25.0)
 
             # Margin of victory multiplier for CFB
@@ -391,11 +471,8 @@ class CFBFeatureExtractor:
             pts_allowed = []
             adj_scored = []
             adj_allowed = []
-            for g in curr_season_games:
-                is_home = _get_val(g, "home_team", "") == team_name
-                opp_name = _get_val(g, "away_team", "") if is_home else _get_val(g, "home_team", "")
-                opp_obj = resolve_team(opp_name)
-                opp_conf = opp_obj.conference if opp_obj else "FBS Independents"
+            for g, is_home, opp_name, opp_key in curr_season_games:
+                opp_conf = _class_conference(classes, opp_key, season_year, resolve_team(opp_name))
                 opp_offset = CONFERENCE_TIER_OFFSETS.get(opp_conf, 0.0)
 
                 s_pts = float(_get_val(g, "home_score", 0) if is_home else _get_val(g, "away_score", 0))
@@ -406,8 +483,9 @@ class CFBFeatureExtractor:
                 # Ridge-regularized opponent strength adjustment:
                 # Scoring against a top defense (e.g. SEC +8.5) is scaled up;
                 # Scoring against FCS (-18.0) is shrunk down to avoid soft-schedule inflation.
-                adj_scored.append(s_pts - (opp_offset * 0.35))
-                adj_allowed.append(a_pts + (opp_offset * 0.35))
+                # The signs were inverted until 2026-11-21 (FCS opponents credited +6.3 scored per game).
+                adj_scored.append(s_pts + (opp_offset * 0.35))
+                adj_allowed.append(a_pts - (opp_offset * 0.35))
 
             raw_off_ppg = float(sum(pts_scored)) / float(n_games)
             raw_def_ppg = float(sum(pts_allowed)) / float(n_games)
@@ -442,11 +520,10 @@ class CFBFeatureExtractor:
         # Rolling opponent-adjusted EPA from past games
         epas_off: list[float] = []
         epas_def: list[float] = []
-        for g in curr_season_games:
-            is_h = _get_val(g, "home_team", "") == team_name
-            h_epa = _get_val(g, "home_epa_per_play")
-            a_epa = _get_val(g, "away_epa_per_play")
-            if h_epa is not None and a_epa is not None and (h_epa != 0.0 or a_epa != 0.0):
+        read_epa = epa_of if epa_of is not None else _stored_epa
+        for g, is_h, _opp, _opp_key in curr_season_games:
+            h_epa, a_epa = read_epa(g)
+            if h_epa is not None and a_epa is not None:
                 epas_off.append(float(h_epa if is_h else a_epa))
                 epas_def.append(float(a_epa if is_h else h_epa))
 
@@ -500,6 +577,8 @@ class CFBFeatureExtractor:
         is_neutral_site: bool = False,
         qb_starter_prob_away: float = 1.0,
         qb_starter_prob_home: float = 1.0,
+        away_team_id: str | None = None,
+        home_team_id: str | None = None,
     ) -> CFBMatchupFeatures:
         start_dt = parse_utc(game_start_utc)
         # CFB bowl and CFP games are played in January and early February.
@@ -515,16 +594,57 @@ class CFBFeatureExtractor:
 
         away_obj = resolve_team(away_team)
         home_obj = resolve_team(home_team)
-        is_conf_matchup = bool(
-            away_obj
-            and home_obj
-            and away_obj.conference == home_obj.conference
-            and away_obj.conference not in ("FBS Independents", "FCS")
+        is_conf_matchup = self._is_conference_matchup(
+            resolved_season_year,
+            away_team=away_team,
+            home_team=home_team,
+            away_obj=away_obj,
+            home_obj=home_obj,
+            away_team_id=away_team_id,
+            home_team_id=home_team_id,
         )
 
-        # 1. State Computation
-        away_state = self._compute_team_state(history, away_team, start_dt, resolved_season_year, week)
-        home_state = self._compute_team_state(history, home_team, start_dt, resolved_season_year, week)
+        # 1. State Computation. Identity is built from rows before kickoff only; a slate team resolves by name,
+        # else by the event's ESPN team id.
+        identity, keyed_rows = _keyed_past_rows(history, start_dt)
+        epa_of = self._epa_reader(keyed_rows)
+        away_key = identity.key(away_team, str(away_team_id) if away_team_id else None)
+        home_key = identity.key(home_team, str(home_team_id) if home_team_id else None)
+        classes = CFBTeamClasses.from_keyed_rows(keyed_rows)
+        for name, key in ((away_team, away_key), (home_team, home_key)):
+            label, source = classes.classify(key, resolved_season_year)
+            if label == UNKNOWN:
+                _logger.warning(
+                    "NCAAF %s: %r (key %s) has no FBS/FCS class evidence for season %s (%s); "
+                    "treated as not-FBS, so is_fbs_vs_fcs is set (fail closed)",
+                    event_id,
+                    name,
+                    key,
+                    resolved_season_year,
+                    source,
+                )
+        away_state = self._compute_team_state(
+            history,
+            away_team,
+            start_dt,
+            resolved_season_year,
+            week,
+            team_key=away_key,
+            keyed_rows=keyed_rows,
+            classes=classes,
+            epa_of=epa_of,
+        )
+        home_state = self._compute_team_state(
+            history,
+            home_team,
+            start_dt,
+            resolved_season_year,
+            week,
+            team_key=home_key,
+            keyed_rows=keyed_rows,
+            classes=classes,
+            epa_of=epa_of,
+        )
 
         is_fbs_fcs = away_state.tier == "FCS" or home_state.tier == "FCS"
 
@@ -552,35 +672,11 @@ class CFBFeatureExtractor:
             altitude_penalty = min(1.5, 0.35 * ((stadium_elev - 3500.0) / 1000.0))
 
         # Rest & Bye-Week Modeling
-        past_away_games = [
-            g
-            for g in history
-            if (_get_val(g, "away_team") == away_team or _get_val(g, "home_team") == away_team)
-            and (
-                parse_utc(_get_val(g, "event_start_utc") or _get_val(g, "start"))
-                if isinstance(_get_val(g, "event_start_utc") or _get_val(g, "start"), str)
-                else (_get_val(g, "start") or start_dt)
-            )
-            < start_dt
-        ]
-        past_home_games = [
-            g
-            for g in history
-            if (_get_val(g, "away_team") == home_team or _get_val(g, "home_team") == home_team)
-            and (
-                parse_utc(_get_val(g, "event_start_utc") or _get_val(g, "start"))
-                if isinstance(_get_val(g, "event_start_utc") or _get_val(g, "start"), str)
-                else (_get_val(g, "start") or start_dt)
-            )
-            < start_dt
-        ]
-
-        def _get_dt(g_rec):
-            val = _get_val(g_rec, "event_start_utc") or _get_val(g_rec, "start")
-            return parse_utc(val) if isinstance(val, str) else val
-
-        away_last_dt = max([_get_dt(g) for g in past_away_games]) if past_away_games else None
-        home_last_dt = max([_get_dt(g) for g in past_home_games]) if past_home_games else None
+        # keyed_rows holds only rows with a start before kickoff, so every row_start here is a datetime.
+        away_dts = [d for g, h, a in keyed_rows if away_key in (h, a) and (d := row_start(g)) is not None]
+        home_dts = [d for g, h, a in keyed_rows if home_key in (h, a) and (d := row_start(g)) is not None]
+        away_last_dt = max(away_dts) if away_dts else None
+        home_last_dt = max(home_dts) if home_dts else None
 
         away_rest = (
             (start_dt - away_last_dt).total_seconds() / 86400.0

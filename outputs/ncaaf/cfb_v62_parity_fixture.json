@@ -1,0 +1,275 @@
+{
+  "spec_sha256": "1bb7462ad28e9cd8f3f2bdcd532ff4a0a0c156d88079f84856c859b12115f9cb",
+  "cases": [
+    {
+      "inputs": {
+        "anchor_margin": 3.0,
+        "anchor_total": 52.5,
+        "v6_margin": 6.1,
+        "v6_total": 55.0,
+        "slice": "established",
+        "spread_home_line": -3.0,
+        "total_line": 52.5
+      },
+      "expected": {
+        "mu_margin": 3.0,
+        "mu_total": 52.5,
+        "margin_sd": 16.0547121322709,
+        "total_sd": 16.05683190654119,
+        "home_win": 0.5744976778927898,
+        "away_win": 0.4255023221072102,
+        "home_cover": 0.4665430324103329,
+        "push_spread": 0.06691393517933433,
+        "away_cover": 0.4665430324103328,
+        "over": 0.5002411611193868,
+        "push_total": 0.0,
+        "under": 0.49975883888061323,
+        "pmf_margin_at_3": 0.06691393517933433,
+        "pmf_margin_at_minus_7": 0.04932306472697974
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": 7.0,
+        "anchor_total": 48.0,
+        "v6_margin": 2.0,
+        "v6_total": 50.2,
+        "slice": "established",
+        "spread_home_line": -6.5,
+        "total_line": 48.0
+      },
+      "expected": {
+        "mu_margin": 7.0,
+        "mu_total": 48.0,
+        "margin_sd": 15.643417262877191,
+        "total_sd": 15.543953808595933,
+        "home_win": 0.7003879427239131,
+        "away_win": 0.29961205727608686,
+        "home_cover": 0.5309362708105115,
+        "push_spread": 0.0,
+        "away_cover": 0.46906372918948847,
+        "over": 0.48761014523973994,
+        "push_total": 0.02568421663520842,
+        "under": 0.4867056381250517,
+        "pmf_margin_at_3": 0.06476007888960497,
+        "pmf_margin_at_minus_7": 0.03780623397604758
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": -7.5,
+        "anchor_total": 61.0,
+        "v6_margin": -12.0,
+        "v6_total": 58.0,
+        "slice": "thin_sample",
+        "spread_home_line": 7.5,
+        "total_line": 61.0
+      },
+      "expected": {
+        "mu_margin": -7.5,
+        "mu_total": 61.0,
+        "margin_sd": 16.175559212526835,
+        "total_sd": 17.787658957760158,
+        "home_win": 0.2800658971004134,
+        "away_win": 0.7199341028995866,
+        "home_cover": 0.4999999999999787,
+        "push_spread": 0.0,
+        "away_cover": 0.5000000000000213,
+        "over": 0.4889207637875955,
+        "push_total": 0.022431200157794217,
+        "under": 0.48864803605461027,
+        "pmf_margin_at_3": 0.04886867206293804,
+        "pmf_margin_at_minus_7": 0.0594013002976324
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": 0.0,
+        "anchor_total": 45.0,
+        "v6_margin": 0.0,
+        "v6_total": 45.0,
+        "slice": "established",
+        "spread_home_line": 0.0,
+        "total_line": 45.0
+      },
+      "expected": {
+        "mu_margin": 0.0,
+        "mu_total": 45.0,
+        "margin_sd": 15.895605947657534,
+        "total_sd": 15.543953808595933,
+        "home_win": 0.5000000000000001,
+        "away_win": 0.4999999999999999,
+        "home_cover": 0.5000000000000001,
+        "push_spread": 0.0,
+        "away_cover": 0.4999999999999999,
+        "over": 0.48800409954588064,
+        "push_total": 0.02570496765493611,
+        "under": 0.48629093279918323,
+        "pmf_margin_at_3": 0.06628372523337911,
+        "pmf_margin_at_minus_7": 0.05515563588426615
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": 14.0,
+        "anchor_total": 55.5,
+        "v6_margin": 17.3,
+        "v6_total": 60.1,
+        "slice": "established",
+        "spread_home_line": -14.0,
+        "total_line": 56.0
+      },
+      "expected": {
+        "mu_margin": 14.0,
+        "mu_total": 55.5,
+        "margin_sd": 15.58381807417114,
+        "total_sd": 16.05683190654119,
+        "home_win": 0.8210034355595989,
+        "away_win": 0.17899656444040113,
+        "home_cover": 0.4809196467325717,
+        "push_spread": 0.038160706534860596,
+        "away_cover": 0.4809196467325677,
+        "over": 0.47528622744433013,
+        "push_total": 0.024835640931026495,
+        "under": 0.4998781316246434,
+        "pmf_margin_at_3": 0.052419902613092914,
+        "pmf_margin_at_minus_7": 0.023543177748008726
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": 24.5,
+        "anchor_total": 64.0,
+        "v6_margin": 30.2,
+        "v6_total": 66.0,
+        "slice": "fbs_vs_fcs",
+        "spread_home_line": -24.5,
+        "total_line": 63.5
+      },
+      "expected": {
+        "mu_margin": 24.5,
+        "mu_total": 64.0,
+        "margin_sd": 15.379983102737253,
+        "total_sd": 17.787658957760158,
+        "home_win": 0.9385600228843364,
+        "away_win": 0.061439977115663624,
+        "home_cover": 0.49999999999999983,
+        "push_spread": 0.0,
+        "away_cover": 0.5000000000000002,
+        "over": 0.5112860965628881,
+        "push_total": 0.0,
+        "under": 0.48871390343711185,
+        "pmf_margin_at_3": 0.027462476222702415,
+        "pmf_margin_at_minus_7": 0.008115245720755851
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": -2.5,
+        "anchor_total": 39.5,
+        "v6_margin": 1.5,
+        "v6_total": 42.0,
+        "slice": "established",
+        "spread_home_line": 3.5,
+        "total_line": 40.0
+      },
+      "expected": {
+        "mu_margin": -2.5,
+        "mu_total": 39.5,
+        "margin_sd": 15.526545797933961,
+        "total_sd": 14.890175806505054,
+        "home_win": 0.4574399256981357,
+        "away_win": 0.5425600743018644,
+        "home_cover": 0.568782976428035,
+        "push_spread": 0.0,
+        "away_cover": 0.431217023571965,
+        "over": 0.4749433215028017,
+        "push_total": 0.026869241148124154,
+        "under": 0.4981874373490741,
+        "pmf_margin_at_3": 0.06585805938206417,
+        "pmf_margin_at_minus_7": 0.058693874188512137
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": null,
+        "anchor_total": null,
+        "v6_margin": 4.2,
+        "v6_total": 53.3,
+        "slice": "established",
+        "spread_home_line": -3.0,
+        "total_line": 53.5
+      },
+      "expected": {
+        "mu_margin": 4.2,
+        "mu_total": 53.3,
+        "margin_sd": 16.346327492548937,
+        "total_sd": 16.855480222947282,
+        "home_win": 0.6020332128740811,
+        "away_win": 0.39796678712591893,
+        "home_cover": 0.4964938407265514,
+        "push_spread": 0.06559577844785618,
+        "away_cover": 0.43791038082559247,
+        "over": 0.49561675616417394,
+        "push_total": 0.0,
+        "under": 0.504383243835826,
+        "pmf_margin_at_3": 0.06559577844785618,
+        "pmf_margin_at_minus_7": 0.0464440197473814
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": null,
+        "anchor_total": null,
+        "v6_margin": -10.8,
+        "v6_total": 47.9,
+        "slice": "thin_sample",
+        "spread_home_line": 10.5,
+        "total_line": 47.0
+      },
+      "expected": {
+        "mu_margin": -10.8,
+        "mu_total": 47.9,
+        "margin_sd": 16.885410959686002,
+        "total_sd": 16.717518755807525,
+        "home_win": 0.2617980398111421,
+        "away_win": 0.7382019601888579,
+        "home_cover": 0.5291333585788116,
+        "push_spread": 0.0,
+        "away_cover": 0.4708666414211884,
+        "over": 0.5105118910398024,
+        "push_total": 0.02387085699638354,
+        "under": 0.46561725196381404,
+        "pmf_margin_at_3": 0.04514878717513261,
+        "pmf_margin_at_minus_7": 0.05617585064800041
+      }
+    },
+    {
+      "inputs": {
+        "anchor_margin": null,
+        "anchor_total": null,
+        "v6_margin": 35.0,
+        "v6_total": 62.0,
+        "slice": "fbs_vs_fcs",
+        "spread_home_line": -34.5,
+        "total_line": 61.5
+      },
+      "expected": {
+        "mu_margin": 35.0,
+        "mu_total": 62.0,
+        "margin_sd": 16.755084899014047,
+        "total_sd": 17.426918027204575,
+        "home_win": 0.9798707109386656,
+        "away_win": 0.020129289061334377,
+        "home_cover": 0.513362421994807,
+        "push_spread": 0.0,
+        "away_cover": 0.48663757800519303,
+        "over": 0.5115303307321823,
+        "push_total": 0.0,
+        "under": 0.48846966926781765,
+        "pmf_margin_at_3": 0.010746635407126642,
+        "pmf_margin_at_minus_7": 0.0025971269481116967
+      }
+    }
+  ]
+}

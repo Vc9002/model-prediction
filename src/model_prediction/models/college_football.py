@@ -17,14 +17,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from ..config import PROJECT_ROOT
-from ..domain import parse_utc, utc_now
+from ..domain import EASTERN, parse_utc, utc_now
 from ..features.base import GameRecord
 from ..features.cfb_features import CFBGameRecord
 from ..pricing import implied_probability
@@ -87,6 +87,9 @@ class UpcomingCFBGame:
     week: int = 1
     qb_starter_prob_away: float = 1.0
     qb_starter_prob_home: float = 1.0
+    # ESPN team ids from the scoreboard event: the identity of a slate name the history never used
+    away_team_id: str | None = None
+    home_team_id: str | None = None
 
 
 class CollegeFootballModel(CFBStructuralV4Model):
@@ -188,6 +191,8 @@ def cfb_serving_code_hash() -> str:
         digest.update(name.encode("utf-8"))
         digest.update((here / name).read_bytes())
     digest.update((here.parent / "features" / "cfb_features.py").read_bytes())
+    digest.update((here.parent / "features" / "cfb_team_identity.py").read_bytes())
+    digest.update((here.parent / "features" / "cfb_features_v6.py").read_bytes())  # TeamResolver
     digest.update((here.parent / "features" / "cfb_qb_availability.py").read_bytes())
     return digest.hexdigest()[:16]
 
@@ -240,6 +245,7 @@ def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> lis
                     home_team = g.get("home_team") or (g.get("home") or {}).get("team_name") or ""
                     if not away_team or not home_team:
                         continue
+                    feed_groups = g.get("feed_groups")
                     rec = CFBGameRecord(
                         event_id=eid,
                         event_start_utc=start_str,
@@ -252,6 +258,11 @@ def _load_cfb_history(data_root: Path, cutoff_dt: datetime | None = None) -> lis
                         season_year=g.get("season_year"),
                         competition_type=str(g.get("competition_type", "STD")),
                         possessions=float(g["possessions"]) if g.get("possessions") is not None else None,
+                        home_team_id=str(g["home_team_id"]) if g.get("home_team_id") else None,
+                        away_team_id=str(g["away_team_id"]) if g.get("away_team_id") else None,
+                        feed_groups=tuple(sorted(int(x) for x in feed_groups))
+                        if isinstance(feed_groups, list) and feed_groups
+                        else None,
                         home_epa_per_play=float(g["home_epa_per_play"])
                         if g.get("home_epa_per_play") is not None
                         else None,
@@ -322,6 +333,24 @@ def _canonical_market_snapshot_lineage(row: dict[str, Any], archive_path: Path) 
     }
 
 
+def _quote_label_side(label: str, away_team: str, home_team: str, away_res: Any, home_res: Any) -> str | None:
+    """Side a Polymarket quote's team label names, or None when it names neither or both."""
+    from ..data_sources.cfb_data import resolve_team
+    from ..learned_forward import _team_matches
+
+    if not label:
+        return None
+    res = resolve_team(_clean_cfb_school(label))
+    if res is not None and res == away_res:
+        return "away"
+    if res is not None and res == home_res:
+        return "home"
+    is_away, is_home = _team_matches(away_team, label), _team_matches(home_team, label)
+    if is_away != is_home:
+        return "away" if is_away else "home"
+    return None
+
+
 def _match_cfb_moneyline(
     away_team: str,
     home_team: str,
@@ -348,7 +377,7 @@ def _match_cfb_moneyline(
             continue
         long_dict = r.get("long") or {}
         short_dict = r.get("short") or {}
-        if long_dict.get("ask") is None or short_dict.get("ask") is None:
+        if long_dict.get("ask") is None or short_dict.get("ask") is None or not _quote_tradable(r):
             continue
 
         title = str(r.get("event_title") or "")
@@ -370,33 +399,65 @@ def _match_cfb_moneyline(
 
         h1 = (p1_c == home_canon) or _team_matches(home_team, p1)
         a2 = (p2_c == away_canon) or _team_matches(away_team, p2)
-        if h1 and a2:
-            team = str(r.get("team") or "")
-            long_desc = str(long_dict.get("description") or "")
-            is_home_long = (
-                (p1_res is not None and resolve_team(_clean_cfb_school(team)) == home_res)
-                or _team_matches(home_team, team)
-                or _team_matches(home_team, long_desc)
-            )
-            matched.append((str(r.get("observed_at_utc") or ""), r, "home" if is_home_long else "away"))
-            continue
-
         a1 = (p1_c == away_canon) or _team_matches(away_team, p1)
         h2 = (p2_c == home_canon) or _team_matches(home_team, p2)
-        if a1 and h2:
-            team = str(r.get("team") or "")
-            long_desc = str(long_dict.get("description") or "")
-            is_away_long = (
-                (p1_res is not None and resolve_team(_clean_cfb_school(team)) == away_res)
-                or _team_matches(away_team, team)
-                or _team_matches(away_team, long_desc)
-            )
-            matched.append((str(r.get("observed_at_utc") or ""), r, "away" if is_away_long else "home"))
+        if h1 and a2 and not (a1 and h2):
+            p1_side = "home"
+        elif a1 and h2 and not (h1 and a2):
+            p1_side = "away"
+        else:
+            continue
+        # The long side is the title's first team (2026-11-21 audit: 1,165 of 1,165 resolvable
+        # labels). The label only cross-checks it: "University of Arizona" and bare mascots do not
+        # resolve, and "Wildcats" names both Arizona and Kansas State.
+        if _quote_label_side(str(r.get("team") or ""), away_team, home_team, away_res, home_res) not in (
+            None,
+            p1_side,
+        ):
+            continue
+        matched.append((str(r.get("observed_at_utc") or ""), r, p1_side))
 
     if not matched:
         return None, None
     _, row, side = max(matched, key=lambda item: item[0])
     return row, side
+
+
+# A capture run quotes every rung of a game within a few minutes; a rung last seen more than this
+# before the game's newest capture is one the capture stopped polling (2026-11-21: Wake Forest @ Georgia
+# Tech -20.5 priced at a 05:45Z ask for a 14:21Z decision while -21.5 was quoted at 14:08Z).
+_CAPTURE_FRESH_WINDOW = timedelta(minutes=30)
+
+
+def _quote_tradable(row: dict[str, Any]) -> bool:
+    """A captured book must be OPEN with a valid timestamp; indicative rows carry neither field."""
+    state = row.get("market_state")
+    if state is not None and str(state) != "MARKET_STATE_OPEN":
+        return False
+    return row.get("timestamp_valid") is not False
+
+
+def _observed(row: dict[str, Any]) -> datetime | None:
+    try:
+        return parse_utc(str(row.get("observed_at_utc") or ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _freshest_capture(cands: list[Any], row_of: Callable[[Any], dict[str, Any]]) -> list[Any]:
+    """Drop rungs last seen well before the game's newest capture (see _CAPTURE_FRESH_WINDOW)."""
+    seen = [_observed(row_of(c)) for c in cands]
+    known = [t for t in seen if t is not None]
+    if not known:
+        return cands
+    floor = max(known) - _CAPTURE_FRESH_WINDOW
+    return [c for c, t in zip(cands, seen, strict=True) if t is None or t >= floor]
+
+
+def _balance_then_newest(row: dict[str, Any]) -> tuple[float, float]:
+    """Most balanced ask first; an exact tie (49c vs 51c) goes to the newer quote, not file order."""
+    seen = _observed(row)
+    return (abs(float(row["long"]["ask"]) - 0.5), -(seen.timestamp() if seen else 0.0))
 
 
 def _match_cfb_spread(
@@ -409,7 +470,7 @@ def _match_cfb_spread(
     from ..learned_forward import _team_matches
 
     partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
-    cands: list[dict[str, Any]] = []
+    cands: list[tuple[dict[str, Any], str]] = []
     away_res = resolve_team(_clean_cfb_school(away_team))
     home_res = resolve_team(_clean_cfb_school(home_team))
     away_canon = away_res.canonical_name if away_res else away_team
@@ -427,7 +488,7 @@ def _match_cfb_spread(
         # which overstated the edge by the full spread (review 2026-11-11 #8b).
         l_ask = (r.get("long") or {}).get("ask")
         s_ask = (r.get("short") or {}).get("ask")
-        if l_ask is None or s_ask is None:
+        if l_ask is None or s_ask is None or not _quote_tradable(r):
             continue
 
         title = str(r.get("event_title") or "")
@@ -453,27 +514,25 @@ def _match_cfb_spread(
         match_reverse = ((p1_c == home_canon) or _team_matches(home_team, p1)) and (
             (p2_c == away_canon) or _team_matches(away_team, p2)
         )
-        if match_normal or match_reverse:
-            cands.append(r)
+        if match_normal == match_reverse:
+            continue
+        # The quote's line belongs to the title's first team (2026-11-21 audit: 22,256 of 22,256
+        # resolvable labels; the long description equals the line on 94,072 of 94,072 rows). Guessing
+        # the side from the label instead defaulted "University of Arizona" to home and priced
+        # Kansas State +10.5 as Arizona +10.5 for v5, v6.2 and v7. The label only cross-checks.
+        p1_side = "away" if match_normal else "home"
+        if _quote_label_side(str(r.get("team") or ""), away_team, home_team, away_res, home_res) not in (
+            None,
+            p1_side,
+        ):
+            continue
+        cands.append((r, p1_side))
 
     if not cands:
         return None, None
 
-    def _spread_ask_balance(row: dict[str, Any]) -> float:
-        return abs(float(row["long"]["ask"]) - 0.5)
-
-    best = min(cands, key=_spread_ask_balance)
-    anchor_team = str(best.get("team") or "")
-    anchor_res = resolve_team(_clean_cfb_school(anchor_team)) if anchor_team else None
-    if anchor_res and anchor_res == away_res:
-        anchor_side = "away"
-    elif anchor_res and anchor_res == home_res:
-        anchor_side = "home"
-    elif _team_matches(away_team, anchor_team):
-        anchor_side = "away"
-    else:
-        anchor_side = "home"
-
+    cands = _freshest_capture(cands, lambda item: item[0])
+    best, anchor_side = min(cands, key=lambda item: _balance_then_newest(item[0]))
     return best, anchor_side
 
 
@@ -505,7 +564,7 @@ def _match_cfb_total(
         # which overstated the edge by the full spread (review 2026-11-11 #8b).
         l_ask = (r.get("long") or {}).get("ask")
         s_ask = (r.get("short") or {}).get("ask")
-        if l_ask is None or s_ask is None:
+        if l_ask is None or s_ask is None or not _quote_tradable(r):
             continue
 
         title = str(r.get("event_title") or "")
@@ -537,10 +596,7 @@ def _match_cfb_total(
     if not cands:
         return None
 
-    def _total_ask_balance(row: dict[str, Any]) -> float:
-        return abs(float(row["long"]["ask"]) - 0.5)
-
-    return min(cands, key=_total_ask_balance)
+    return min(_freshest_capture(cands, lambda row: row), key=_balance_then_newest)
 
 
 # A live event list fetched this long after the decision time postdates it and
@@ -634,6 +690,64 @@ def _latest_capture_per_market(rows: list[dict[str, Any]]) -> list[dict[str, Any
     return list(latest.values()) + unslugged
 
 
+def _load_decision_snapshot_rows(
+    snapshot_path: Path, iso_date: str, decision_at: datetime
+) -> list[dict[str, Any]]:
+    """Archived quotes that may price a decision on ``iso_date`` made at ``decision_at``.
+
+    A row is kept when it was observed no later than the decision and no earlier than
+    00:00 Eastern on the decision's day (the game date, or the earlier decision date of a
+    forecast run ahead of it). The lower bound exists because the day-ahead capture
+    (quick 261121-dac) files D+1/D+2 books under the game's date: the spread/total
+    selectors take the most balanced rung across slugs with no age bound, so a rung from
+    an earlier day that the decision day's shortlist dropped would outrank the current one
+    and price the pick at a day-old ask. Scheduled runs only ever wrote today's date, so
+    this is the status quo for game-day quotes. Rows without an observation time are kept.
+    """
+    if not snapshot_path.is_file():
+        return []
+    decision_day = min(datetime.fromisoformat(iso_date).date(), decision_at.astimezone(EASTERN).date())
+    window_start = datetime.combine(decision_day, datetime.min.time(), EASTERN)
+    rows: list[dict[str, Any]] = []
+    try:
+        with snapshot_path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                observed_raw = str(row.get("observed_at_utc") or "")
+                if not observed_raw:
+                    rows.append(row)
+                    continue
+                try:
+                    observed = parse_utc(observed_raw)
+                except (ValueError, TypeError):
+                    continue
+                if window_start <= observed <= decision_at:
+                    rows.append(row)
+    except OSError:
+        return []
+    return rows
+
+
+def _ncaaf_challenger_routes(repo_root: str | Path | None = None) -> dict[str, tuple[list[str], str | None]]:
+    """Routed NCAAF challenger id -> (its markets, its registered artifact hash), in route order.
+
+    Read from ``challengers.NCAAF`` through the registry, which leaves out each broken challenger on its own.
+    """
+    registry = ProductionModelRegistry.load(Path(repo_root) if repo_root is not None else PROJECT_ROOT)
+    routes: dict[str, tuple[list[str], str | None]] = {}
+    for market in ("moneyline", "spread", "total"):
+        for entry in registry.challengers_for("NCAAF", market):
+            routes.setdefault(entry.model_id, ([], entry.artifact_hash))[0].append(market)
+    return routes
+
+
 def build_cfb_slate(
     data_root: str | Path,
     game_date: str,
@@ -641,6 +755,7 @@ def build_cfb_slate(
     observed_at: datetime | None = None,
     model: CFBStructuralV4Model | None = None,
     polymarket_events: list[dict[str, Any]] | None = None,
+    price_challenger: bool | None = None,
 ) -> dict[str, Any]:
     """Build prospective slate for College Football (Moneyline, Spread, Total).
 
@@ -651,6 +766,9 @@ def build_cfb_slate(
     Polymarket event list's indicative price, ESPN's sportsbook consensus. The event
     list is fetched live when ``client`` is None (production); ``polymarket_events``
     supplies one already observed no later than ``observed_at``.
+
+    ``price_challenger`` (default: production only, i.e. ``client`` is None) also prices the routed NCAAF
+    challenger (cfb-structural-v6.2) and appends its contracts after the champion's.
     """
     from ..data_sources.espn import ESPNClient
     from ..features.cfb_qb_availability import (
@@ -686,30 +804,7 @@ def build_cfb_slate(
     from ..college_contract_evidence import evidence_root
 
     snapshot_path = evidence_root(root) / "odds" / "ncaaf" / iso_date / "polymarket_snapshots.jsonl"
-    snapshot_rows: list[dict[str, Any]] = []
-    if snapshot_path.is_file():
-        try:
-            with snapshot_path.open(encoding="utf-8") as f:
-                for line in f:
-                    if not line.strip():
-                        continue
-                    try:
-                        r = json.loads(line)
-                        if isinstance(r, dict):
-                            obs_str = str(r.get("observed_at_utc") or "")
-                            if obs_str:
-                                try:
-                                    if parse_utc(obs_str) <= obs:
-                                        snapshot_rows.append(r)
-                                except (ValueError, TypeError):
-                                    pass
-                            else:
-                                snapshot_rows.append(r)
-                    except json.JSONDecodeError:
-                        continue
-        except OSError:
-            snapshot_rows = []
-    snapshot_rows = _latest_capture_per_market(snapshot_rows)
+    snapshot_rows = _latest_capture_per_market(_load_decision_snapshot_rows(snapshot_path, iso_date, obs))
 
     # Polymarket event list, fetched once: the indicative fallback for a market
     # with no captured book, and the inventory for candidate evidence below. Without
@@ -737,6 +832,10 @@ def build_cfb_slate(
     priced_contracts: list[dict[str, Any]] = []
     unmatched: list[dict[str, Any]] = []
     candidate_bases: list[dict[str, Any]] = []
+    challenger_events: list[dict[str, Any]] = []
+    # event id -> the champion loop's UpcomingCFBGame (season, model week, neutral site, ESPN ids, weather, QB) for
+    # cfb-structural-v5.1, kept apart from challenger_events, whose keys v6.2 unpacks into EventQuotes.
+    challenger_games: dict[str, UpcomingCFBGame] = {}
 
     for ev in events:
         competition = (ev.get("competitions") or [{}])[0]
@@ -824,6 +923,49 @@ def build_cfb_slate(
                 if tot_sportsbook == "polymarket_us"
                 else _indicative_quote_lineage(listed_observed.isoformat())
             )
+
+        # The challengers are priced against these Polymarket quotes only (never ESPN consensus). v6.2 builds
+        # EventQuotes(**event) from each dict, so a key added here for another challenger would make v6.2 raise.
+        challenger_events.append(
+            {
+                "event_id": event_id,
+                "event_start_utc": event_start_utc,
+                "away_team": away_team,
+                "home_team": home_team,
+                "is_neutral_site": is_neutral,
+                "home_team_id": (home.get("team") or {}).get("id"),
+                "away_team_id": (away.get("team") or {}).get("id"),
+                "moneyline": None
+                if pm_ml_home_prob is None or pm_ml is None
+                else {
+                    "home_ask": pm_ml_home_prob,
+                    "away_ask": pm_ml_away_prob,
+                    "slug_base": str(pm_ml.get("market_slug")),
+                    "sportsbook": ml_sportsbook,
+                    "lineage": pm_ml_lineage,
+                },
+                "spread": None
+                if pm_sp is None
+                else {
+                    "home_line": pm_spread_home_line,
+                    "home_ask": pm_spread_home_prob,
+                    "away_ask": pm_spread_away_prob,
+                    "slug": str(pm_sp.get("market_slug")),
+                    "sportsbook": sp_sportsbook,
+                    "lineage": pm_spread_lineage,
+                },
+                "total": None
+                if pm_tot is None
+                else {
+                    "line": pm_total_line,
+                    "over_ask": pm_total_over_prob,
+                    "under_ask": pm_total_under_prob,
+                    "slug": str(pm_tot.get("market_slug")),
+                    "sportsbook": tot_sportsbook,
+                    "lineage": pm_total_lineage,
+                },
+            }
+        )
 
         # 3b. Extract fallback sportsbook odds if available from ESPN
         odds_list = competition.get("odds", [])
@@ -968,8 +1110,11 @@ def build_cfb_slate(
             week=ev_week,
             qb_starter_prob_away=away_qb.starter_prob,
             qb_starter_prob_home=home_qb.starter_prob,
+            away_team_id=str((away.get("team") or {}).get("id") or "") or None,
+            home_team_id=str((home.get("team") or {}).get("id") or "") or None,
         )
 
+        challenger_games[event_id] = upcoming
         preds = model.predict_matchup(history, upcoming, project_missing_lines=True)
         schedule_context = {
             "espn_season_type": ev_season_type,
@@ -1265,7 +1410,8 @@ def build_cfb_slate(
                     except (KeyError, TypeError, ValueError):
                         continue
                     candidate_probabilities[slug] = {
-                        "model_version": MODEL_VERSION,
+                        # The served model's id: this said "cfb-structural-v4" on every v5 packet (models.md #8).
+                        "model_version": str(getattr(model, "version", MODEL_VERSION)),
                         "model_event_id": base["event_id"],
                         "feature_packet_hash": hashlib.sha256(
                             json.dumps(
@@ -1333,6 +1479,65 @@ def build_cfb_slate(
         except Exception as exc:  # noqa: BLE001
             candidate_capture = {"status": "capture_error", "reason": f"{type(exc).__name__}: {exc}"}
 
+    # Challengers (quick-261121-v62; several per market since quick-261121-v7r): each model routed in
+    # challengers.NCAAF appends its own contracts AFTER the champion's and after the candidate evidence, in
+    # route order (v6.2, v7, then v5.1), so v5's contracts and evidence are untouched; _forecast_cfb_sport sends any
+    # version outside v2-v5 to the research and Flat tiers only. Each challenger runs in its own try/except:
+    # one failing blocks neither the champion nor the other challengers. ``challenger_pricing`` stays v6.2's
+    # summary; ``challenger_pricing_by_model`` has every routed challenger's.
+    challenger_pricing: dict[str, Any] = {"status": "not_requested"}
+    challenger_pricing_by_model: dict[str, Any] = {}
+    if (client is None) if price_challenger is None else price_challenger:
+        import logging
+
+        challenger_pricing = {"status": "not_routed"}
+        try:
+            routes = _ncaaf_challenger_routes()
+        except Exception as exc:
+            logging.getLogger(__name__).warning("NCAAF challenger routes unavailable", exc_info=True)
+            routes = {}
+            challenger_pricing = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+        for challenger_id, (challenger_markets, challenger_hash) in routes.items():
+            try:
+                if challenger_id == "cfb-structural-v6.2":
+                    from .cfb_structural_v62 import price_challenger_slate
+
+                    challenger_contracts, summary = price_challenger_slate(root, obs, challenger_events)
+                elif challenger_id == "cfb-structural-v5.1":
+                    from .cfb_structural_v51 import price_challenger_slate as price_v51_slate
+
+                    challenger_contracts, summary = price_v51_slate(
+                        root,
+                        obs,
+                        challenger_events,
+                        games=challenger_games,
+                        markets=challenger_markets,
+                        expected_artifact_hash=challenger_hash,
+                    )
+                elif challenger_id in ("cfb-structural-v7", "cfb-structural-v7.1"):
+                    from .cfb_structural_v7_challenger import price_challenger_slate as price_v7_slate
+
+                    challenger_contracts, summary = price_v7_slate(
+                        root,
+                        obs,
+                        challenger_events,
+                        markets=challenger_markets,
+                        expected_artifact_hash=challenger_hash,
+                        model_id=challenger_id,
+                    )
+                else:
+                    # A registered challenger with no NCAAF slate pricer prices nothing (fail closed).
+                    challenger_contracts, summary = [], {"status": "no_pricer", "markets": challenger_markets}
+                priced_contracts.extend(challenger_contracts)
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "NCAAF challenger %s pricing failed", challenger_id, exc_info=True
+                )
+                summary = {"status": "error", "reason": f"{type(exc).__name__}: {exc}"}
+            challenger_pricing_by_model[challenger_id] = summary
+            if challenger_id == "cfb-structural-v6.2":
+                challenger_pricing = summary
+
     return {
         "game_date": iso_date,
         "sport": "ncaaf",
@@ -1340,6 +1545,8 @@ def build_cfb_slate(
         "status": "research",
         "model_version": MODEL_VERSION,
         "model_code_hash": code_hash,
+        "challenger_pricing": challenger_pricing,
+        "challenger_pricing_by_model": challenger_pricing_by_model,
         "priced_contracts": priced_contracts,
         "unmatched_events": unmatched,
         "event_count": len(events),

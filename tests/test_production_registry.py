@@ -12,6 +12,7 @@ import yaml
 
 from model_prediction.production_canary import _compute_artifact_hash, health_check
 from model_prediction.production_registry import (
+    CODE_BACKED_ENTRYPOINTS,
     IMPLEMENTATION_CODE_BACKED,
     IMPLEMENTATION_JSON_ARTIFACT,
     ProductionModelRegistry,
@@ -99,11 +100,16 @@ def test_real_production_yaml_resolves_every_model() -> None:
     registry = ProductionModelRegistry.load(REPO)
 
     assert registry.schema_version == "3"
-    assert len(registry.entries) == 89
+    # 2026-11-21 (quick-261121-v62): +1 enabled entry, the cfb-structural-v6.2 NCAAF challenger.
+    # 2026-11-21 (quick-261121-hmc): +1 enabled entry, the ncaab-moneyline-v7m candidate.
+    # 2026-11-21 (quick-261121-v7): +1 enabled entry, cfb-structural-v7, registered but not routed.
+    # 2026-11-22 (quick-261122-v71): +1 enabled entry, the cfb-structural-v7.1 refit (routed in v7's place).
+    # 2026-11-22 (quick-261122-v51): +1 enabled entry, cfb-structural-v5.1, the third NCAAF challenger.
+    assert len(registry.entries) == 95
     # Scope 2026-11-13: the 40 entries for switched-off sports are enabled: false and
     # therefore unavailable by decision, not by a failed contract. Every in-scope entry
     # must still resolve, so a healthy registry has zero *failed* entries.
-    assert len(registry.available_entries()) == 49
+    assert len(registry.available_entries()) == 55
     problems = registry.problem_entries()
     assert len(problems) == 40
     assert all(not e.enabled and e.load_error is None for e in problems)
@@ -138,6 +144,23 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert registry.champion("NCAAF", "spread").model_id == "cfb-structural-v5"
     assert registry.lifecycle_contract("NCAAF", "spread").rollback_model_id == "cfb-structural-v4"
     assert registry.champion("NCAAF", "total").model_id == "cfb-structural-v5"
+    # The v6.2 challenger is routed for all three NCAAF markets; the champion is untouched (quick-261121-v62).
+    for market in ("moneyline", "spread", "total"):
+        assert registry.challenger("NCAAF", market).model_id == "cfb-structural-v6.2"
+        assert registry.lifecycle_contract("NCAAF", market).challenger_model_id == "cfb-structural-v6.2"
+    assert registry.entries["cfb-structural-v6.2"].serving_status == "shadow"
+    # v7 stays registered (hash-verified, shadow) but unrouted; its refit v7.1 is the second challenger after
+    # v6.2 (quick-261122-v71), and v5.1 (quick-261122-v51) the third; v6.2 stays the primary the lifecycle
+    # contract names. All are paper challengers, never the champion.
+    for model_id in ("cfb-structural-v7", "cfb-structural-v7.1", "cfb-structural-v5.1"):
+        assert registry.entries[model_id].serving_status == "shadow"
+        assert registry.entries[model_id].load_error is None
+    for market in ("moneyline", "spread", "total"):
+        assert [e.model_id for e in registry.challengers_for("NCAAF", market)] == [
+            "cfb-structural-v6.2",
+            "cfb-structural-v7.1",
+            "cfb-structural-v5.1",
+        ]
     assert registry.lifecycle_contract("NCAAF", "total").rollback_model_id == "cfb-structural-v4"
     assert registry.champion("MLB", "spread").model_id == "mlb-structural-runline-v4"
     assert registry.champion("MLB", "spread").rollback_model == "measured-edge-margin-v3"
@@ -212,8 +235,10 @@ def test_real_production_yaml_resolves_every_model() -> None:
     ncaab = registry.entries["ncaab-tempo-v1"]
     assert ncaab.implementation == IMPLEMENTATION_CODE_BACKED
     assert ncaab.entry == "model_prediction.models.basketball_leagues:ncaab_model"
-    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-spread-v6"
-    assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v6"
+    # Spread promoted 2026-11-21 (quick 261120-nip; rollback ncaab-spread-v6); moneyline moved to the
+    # margin-only v7m the same day (quick 261121-hmc; rollback ncaab-spread-v7).
+    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-moneyline-v7m"
+    assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v7"
     assert registry.champion("NCAAB", "total").model_id == "ncaab-total-v6"
 
     config = yaml.safe_load((REPO / "config/production.yaml").read_text(encoding="utf-8"))
@@ -475,3 +500,34 @@ def test_unverified_registry_entries_never_carry_a_qualified_artifact_claim() ->
         if qualification.get("qualified") is True or qualification.get("locked_holdout") is True:
             offenders.append(entry["model_id"])
     assert offenders == []
+
+
+def test_ncaab_v7_entry_is_registered_with_v6_as_rollback() -> None:
+    registry = ProductionModelRegistry.load(REPO)
+    entry = registry.entries["ncaab-spread-v7"]
+    assert entry.implementation == IMPLEMENTATION_CODE_BACKED
+    assert entry.entry == "model_prediction.models.ncaab_spread_v6:ncaab_spread_v7_model"
+    assert entry.enabled and entry.load_error is None
+    assert entry.rollback_model == "ncaab-spread-v6"
+
+
+def test_ncaab_moneyline_v7m_entry_is_moneyline_only() -> None:
+    """Moneyline only, so it can never be promoted onto the spread route."""
+    registry = ProductionModelRegistry.load(REPO)
+    entry = registry.entries["ncaab-moneyline-v7m"]
+    assert entry.implementation == IMPLEMENTATION_CODE_BACKED
+    assert entry.entry == "model_prediction.models.ncaab_spread_v6:ncaab_moneyline_v7m_model"
+    assert (entry.sport, entry.market) == ("NCAAB", "moneyline")
+    assert entry.enabled and entry.load_error is None
+    assert entry.rollback_model == "ncaab-spread-v7"
+    assert CODE_BACKED_ENTRYPOINTS["ncaab-moneyline-v7m"] == entry.entry
+    for market in ("spread", "total"):
+        assert registry.champion("NCAAB", market).model_id != "ncaab-moneyline-v7m"
+
+
+def test_ncaab_v7_spread_and_v7m_moneyline_champions() -> None:
+    registry = ProductionModelRegistry.load(REPO)
+    assert registry.champion("NCAAB", "moneyline").model_id == "ncaab-moneyline-v7m"
+    assert registry.rollback("NCAAB", "moneyline").model_id == "ncaab-spread-v7"
+    assert registry.champion("NCAAB", "spread").model_id == "ncaab-spread-v7"
+    assert registry.rollback("NCAAB", "spread").model_id == "ncaab-spread-v6"

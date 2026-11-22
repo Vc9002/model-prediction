@@ -1,0 +1,23 @@
+{
+  "got": {
+    "margin_bias_actual_minus_model": -0.284,
+    "margin_mae": 12.4674,
+    "ml_brier": 0.16356,
+    "ml_ece": 0.028002268384250486,
+    "ml_log_loss": 0.48661,
+    "ml_n": 1948,
+    "n": 1948,
+    "total_mae": 12.8922
+  },
+  "pass": true,
+  "published": {
+    "margin_bias_actual_minus_model": -0.284,
+    "margin_mae": 12.4674,
+    "ml_brier": 0.16356,
+    "ml_ece": 0.028002268384250486,
+    "ml_log_loss": 0.48661,
+    "ml_n": 1948,
+    "n": 1948,
+    "total_mae": 12.8922
+  }
+}

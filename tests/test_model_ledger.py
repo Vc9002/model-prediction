@@ -13,6 +13,7 @@ from model_prediction.model_ledger import (
     INTEGRITY_FAILURE_REASONS,
     ModelLedger,
     compute_model_evidence,
+    model_id_for,
     record_from_pick_request,
     settle_from_pick_row,
 )
@@ -433,17 +434,24 @@ def test_settle_from_pick_row_is_a_no_op_when_already_settled(tmp_path) -> None:
     assert settle_from_pick_row(tmp_path, pick_row) == []
 
 
-def test_record_from_pick_request_returns_none_for_an_unmapped_league(tmp_path) -> None:
+def test_record_from_pick_request_files_an_unmapped_market_under_its_model_version(tmp_path) -> None:
     """Must degrade gracefully -- this always runs alongside the real,
-    working PickLedger write and can never break it."""
-    request = _pick_request(
-        league=League.TENNIS, market_type=MarketType.SPREAD
-    )  # tennis has no spread mapping
+    working PickLedger write and can never break it.
+
+    A (league, market) with no mapping falls back to the request's own
+    model_version as the ledger identity (model_id_for), so the pick is
+    still recorded; only a request with neither is a no-op. This test pinned
+    the older "unmapped means None" behaviour with tennis spread, which has
+    since gained a mapping, and failed on both counts.
+    """
+    assert model_id_for("MLB", "double_chance") is None
+    request = _pick_request(league=League.MLB, market_type=MarketType.DOUBLE_CHANCE, selection="1X")
 
     row = record_from_pick_request(tmp_path, request, _eligibility())
 
-    assert row is None
-    assert list(tmp_path.glob("*.xlsx")) == []
+    assert row is not None
+    assert row["model_id"] == "mlb-elo-trend-lr-v7"
+    assert [path.name for path in tmp_path.glob("*.xlsx")] == ["mlb-elo-trend-lr-v7.xlsx"]
 
 
 def test_compute_model_evidence_on_an_empty_ledger(tmp_path) -> None:
@@ -626,3 +634,33 @@ def test_repair_events_from_canonical_updates_open_and_zero_pnl_refreshes_atomic
         "1.2500"
     }
     assert rows[second["prediction_id"]]["status"] == "settled"
+
+
+def test_rows_cache_sees_external_writes_and_is_not_mutable_by_callers(tmp_path, monkeypatch) -> None:
+    from model_prediction import model_ledger
+
+    path = tmp_path / "mlb-moneyline-elo-trend-lr.xlsx"
+    ModelLedger(path).append_prediction(_prediction(event_id="event-1"))
+
+    parses: list[int] = []
+    real_read = model_ledger._read_predictions
+
+    def counting_read(target):
+        parses.append(1)
+        return real_read(target)
+
+    monkeypatch.setattr(model_ledger, "_read_predictions", counting_read)
+    first = ModelLedger(path).rows()
+    first[0]["status"] = "mutated by caller"
+    second = ModelLedger(path).rows()
+    assert len(parses) == 1
+    assert second[0]["status"] == "open"
+
+    # A write by anyone replaces the file, so the next read parses it again.
+    ModelLedger(path).append_prediction(_prediction(event_id="event-2"))
+    assert [row["event_id"] for row in ModelLedger(path).rows()] == ["event-1", "event-2"]
+    assert len(parses) == 2
+
+    # Same for a writer this process never saw: a replace with different rows.
+    model_ledger._write_predictions_atomic(path, real_read(path)[:1])
+    assert [row["event_id"] for row in ModelLedger(path).rows()] == ["event-1"]

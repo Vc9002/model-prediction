@@ -1,0 +1,23 @@
+{
+  "artifact_hash": "f69908c3f64478bca6ea654dcb6089203140d5aeb7f93b6896dc281ebc21ca82",
+  "base_artifact_hash": "db869a4d96642983697571a828301585cc08a834f4d28b738622a7f57b38e5d2",
+  "base_model_version": "cfb-structural-v6",
+  "components": [],
+  "composition": "v6.1 = v6 + tracker (no source beyond the tracker is PIT_PASS)",
+  "league": "NCAAF",
+  "method": "cfb_structural_v6_plus_walk_forward_level_tracker",
+  "model_version": "cfb-structural-v6.1",
+  "note": "INERT research challenger (quick-261115-183). Frozen v6 total plus the walk-forward level tracker; spreads unchanged. The tracker entered by operator instruction, not by a passing test: it removes part of v6's over lean, adds no MAE gain and does not beat the closing line. Built from outputs/ncaaf/cfb_v61_spec.json; no weight is hardcoded in the model module.",
+  "rule_sha256": "1481273f1fbd860a5e35ecc25a864818e74818f564aa0f6d5710ea42f524145f",
+  "schema_version": "1",
+  "spec_sha256": "8a3e5c6612aa72d0d9fc40b94d1ade4e40acb2ea649201750cbd74747db4573c",
+  "sport": "ncaaf",
+  "tracker": {
+    "day_window_fallback_games": 150,
+    "day_window_min_games": 50,
+    "result_buffer_hours": 5.0,
+    "window_kind": "days",
+    "window_size": 90
+  },
+  "v6_frozen_params_sha256": "6e38b14ca486acfd836c1259e5c4fd4fb8e9b5894a06f367322b1eb0c7b13e70"
+}

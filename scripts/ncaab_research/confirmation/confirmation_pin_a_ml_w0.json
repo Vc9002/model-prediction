@@ -1,0 +1,74 @@
+{
+  "arms": {
+    "candidate": "clip(P_t8(margin >= 1 | mu_v7, scale_v7), 0.0001, 0.9999)",
+    "mu_v7_scale_v7": "models/ncaab_v7_serving.combine_f1(rg_c010_l02_k14, v6_mean, sample), frozen constants (verified against outputs/ncaab/ncaab_v7_multiseason_frozen.json by grader)",
+    "v7_served": "clip(0.5 x Elo + 0.5 x P_t8(margin >= 1 | mu_v7, scale_v7), 0.0001, 0.9999), Elo = grader.reconstruct_elo_win(v6_p_home, v6_mean, v6_scale)"
+  },
+  "bound": "plain one-sided 95%: upper bound = the 95th percentile (nr._percentiles(samples, 0.05)[1]) of a day-cluster bootstrap (Eastern game day, 4000 resamples, seed 17, grader._boot) of the pooled delta. The 97.5th percentile (two-sided 95% interval) is reported alongside, not used.",
+  "candidate": "A_ml_w0: p_home = P_t8(margin >= 1) under served v7 (Elo weight 0)",
+  "code_sha256": {
+    "scripts/ncaab_research/confirmation/confirm_a_ml_w0.py": "37ee98c208f66b767b74fd5491b939e714cee598b6d0d217a55ff1b2c4f42af6",
+    "scripts/ncaab_research/confirmation/replay_261120.py": "69235d8decc7e1cc2cb4ca5654d6486529eaeff17a30a79fc6e28bab591b8e90"
+  },
+  "cohort": "every completed D1-vs-D1 game of the window seasons (as-of conference ids, non-D1 stubs demoted) that the replay predicts; per-season coverage = predicted / completed D1-vs-D1 events in the history source; coverage < 99% in any season => INCOMPLETE (no PASS/FAIL)",
+  "cohort_deviation_from_v1": "v1 cohort requires a non-null closing spread line. The moneyline statistic uses no line, CBBD lines are refused until their rule is pinned, and the ESPN backfill has lines only for 2018, 2019, 2020, 2022, so the lined cohort cannot cover the pinned window. The primary cohort is therefore all D1-vs-D1 games (operator task instruction); the lined subset is a labelled secondary with no verdict.",
+  "coverage_by_season_outcome_free": {
+    "2015": 1.0,
+    "2016": 1.0,
+    "2017": 1.0,
+    "2018": 1.0,
+    "2019": 1.0,
+    "2020": 1.0,
+    "2022": 1.0
+  },
+  "development_verdict": "DEV_ELIGIBLE (read 2026-11-21T08:24:23Z, delta -0.00399, K-adj CI [-0.00578, -0.00215])",
+  "disclosures": [
+    "Backcast direction: v7 constants were fit on 2022-23/2023-24 (later seasons) and are applied to earlier ones; the protocol accepted this (confirmation_backcast.design).",
+    "2014-15 history (2014 burn-in, 2015 scored) comes from the CBBD cache converted to ESPN ids; CBBD has no AP rank, so the v6 rank prior and the ridge rank prior are absent in 2015 (and a team's first 2016 game cannot inherit a 2015 end-of-season rank).",
+    "Non-D1 opponents that ESPN stamps with their current conference (<= 3 games in the season) are demoted to non-D1 (7 team-seasons; CBBD agrees for each in its overlap).",
+    "v6 Elo and ratings use history back to 2013-14 (development replay history began 2021-22).",
+    "Conference tier priors are the frozen current-era table (DEFAULT_CONFERENCE_TIER_PRIORS) applied to each season's as-of memberships; only the legacy Pac-12 has an era override. Every ESPN conference id in 2014-22 was already in CONFERENCE_ID_NAMES / UNMAPPED_D1_IDS, so no map extension was needed (history_audit.json asof_unknown_conference_ids_by_season is empty).",
+    "The read-log entry shares grid name A_ml_w0, so a later development re-score of A_ml_w0 returns REREAD_NO_VERDICT."
+  ],
+  "grid_name": "A_ml_w0",
+  "history_audit": "outputs/ncaab/research_261120/confirmation/history_audit.json",
+  "history_inputs_combined_sha256": "fe497dfe31e89afc49a7982c48efc7c34a054da480579f87d7faa9cee69a6b40",
+  "id": "ncaab-research-protocol-261120-confirmation-A_ml_w0",
+  "pass_rule": "PASS iff coverage met and upper_one_sided_95 < 0; FAIL otherwise; never re-read",
+  "predictions_file": "outputs/ncaab/research_261120/confirmation/A_ml_w0_confirmation_preds.jsonl",
+  "predictions_sha256": "d1c0f45a15ad6249300e0d28871a54d3c4814f5aaeb10433a385479e76c2d930",
+  "reported_not_gating": [
+    "per-season point deltas",
+    "pooled excluding 2015 (CBBD-built season, no AP ranks) with the same bound",
+    "lined secondary: games with an espn_backfill_261120 selected spread line (2018, 2019, 2020, 2022)",
+    "moneyline Brier delta"
+  ],
+  "reproduction_gates": {
+    "reproduction_gate_2025": true,
+    "reproduction_gate_2026": true
+  },
+  "statistic": "moneyline_logloss_delta_vs_v7 = mean over the cohort of logloss(p_cand, home_win) - logloss(p_v7, home_win); grader.logloss (clip 1e-6); home_win = home points > away points",
+  "under": {
+    "addendum_sha256": "75241bc7885378f266ba66ce383f3b50fe58869e9b699ae90f0ddd9c8ead6317",
+    "protocol_sha256": "72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813"
+  },
+  "window": {
+    "burn_in": [
+      2014
+    ],
+    "history_only": [
+      2021
+    ],
+    "season_years": [
+      2015,
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2022
+    ]
+  },
+  "written_before": "any confirmation-window outcome is joined to an A_ml_w0 or v7 prediction as a score",
+  "written_utc": "2026-11-21T12:09:44Z"
+}
