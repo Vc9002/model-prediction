@@ -158,15 +158,23 @@ CFBD_FIELDS: dict[str, str] = {
 CFBD_MIN_TEAMS = 20
 
 
-def standardise_covariates(season_rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, float]]:
+def standardise_covariates(
+    season_rows: Iterable[Mapping[str, Any]], population: Iterable[str] | None = None
+) -> dict[str, dict[str, float]]:
     """ESPN team id -> z-scored covariates for ONE season's CFBD prior rows (all preseason values).
 
     A field with fewer than 20 non-null teams, or no spread, is dropped; a team's missing field is absent (the
-    prior reads it as 0, the season mean)."""
+    prior reads it as 0, the season mean).
+
+    ``population`` (v7.1: the season's FBS team ids) restricts both the reference set and the recipients to those
+    teams. CFBD's FCS coverage drifts by season (talent: 26-101 FCS teams through 2024, none from 2025), so a
+    within-season z over every row measured FBS teams against a different population in training than in serving,
+    and FCS teams carried a covariate in training that they cannot carry live. ``None`` is v7's rule."""
+    keep = None if population is None else {str(t) for t in population}
     teams: dict[str, dict[str, float]] = {}
     for r in season_rows:
         tid = r.get("espn_team_id")
-        if not tid:
+        if not tid or (keep is not None and str(tid) not in keep):
             continue
         teams[str(tid)] = {k: float(r[src]) for k, src in CFBD_FIELDS.items() if r.get(src) is not None}
     z: dict[str, dict[str, float]] = {t: {} for t in teams}
@@ -453,6 +461,7 @@ class MatchupFeatures:
     home_games: int
     away_games: int
     is_fbs_vs_fcs: bool
+    neutral: bool = False  # v7.1's stage-2 margin calibration has a separate neutral-site intercept
 
 
 def _side(state: RatingState, k: str, off: str, deff: str, sign: int, c_o: str, c_d: str) -> float:
@@ -485,6 +494,7 @@ def matchup_features(
         home_games=state.games_played.get(home_id, 0),
         away_games=state.games_played.get(away_id, 0),
         is_fbs_vs_fcs=(ch == FBS) != (ca == FBS),
+        neutral=bool(neutral),
     )
 
 

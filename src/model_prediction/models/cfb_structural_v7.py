@@ -6,7 +6,11 @@ discrete margin pmf with fitted key-number mass (v6.2's construction, refit for 
 pmf. Moneyline, spread cover and total probabilities all come from those pmfs.
 
 Everything numeric comes from the hash-verified artifact ``config/models/cfb-structural-v7.json``. The pmfs are
-analytic (no RNG). It is registered but not routed: ``challengers.NCAAF`` holds one model per market (v6.2).
+analytic (no RNG). ``cfb-structural-v7.1`` (quick-261122-v71, ``scripts/cfb_v71_fit.py``) is the same code with
+the 2026-11-22 bug-hunt fixes switched on by its artifact: a neutral-site margin intercept, FBS-only CFBD
+covariates, each game fit at min(run clock, its research decision time), points-only rows only for games ESPN will
+never cover, and a model-input snapshot per result. v7.1 is routed after v6.2 in ``challengers.NCAAF``; v7 stays
+registered, unrouted, and prices exactly as before.
 
 Serving fails closed (``V7NoCall`` with a ``NO_CALL_*`` reason) when a team has no rating history, when a team id is
 unknown, when the artifact's prior uses CFBD and no covariates were supplied, or when a completed current-season game of either team has no play-by-play row yet (the crawl is behind),
@@ -40,15 +44,30 @@ from ..production_registry import compute_artifact_hash
 
 CFB_V7_MODEL_VERSION = "cfb-structural-v7"
 CFB_V7_ARTIFACT_PATH = PROJECT_ROOT / "config" / "models" / f"{CFB_V7_MODEL_VERSION}.json"
+# quick-261122-v71: v7 refit with the 2026-11-22 bug-hunt fixes. Same code, switched on by artifact fields.
+CFB_V71_MODEL_VERSION = "cfb-structural-v7.1"
+CFB_V71_ARTIFACT_PATH = PROJECT_ROOT / "config" / "models" / f"{CFB_V71_MODEL_VERSION}.json"
+V7_FAMILY = (CFB_V7_MODEL_VERSION, CFB_V71_MODEL_VERSION)
 NO_CALL_PBP_MISSING = "NO_CALL_V7_PBP_MISSING"
 NO_CALL_NO_CFBD = "NO_CALL_V7_NO_CFBD_PRIOR"
 NO_CALL_NO_CLASS = "NO_CALL_V7_NO_CLASS_LABEL"
+NO_CALL_NO_KICKOFF = "NO_CALL_V7_NO_KICKOFF"
+# v7.1 artifact switches (absent in v7's artifact = v7's behaviour).
+PER_GAME_FIT = "per_game_research_decision_time"
+SCORE_ONLY_TERMINAL = "terminal_without_pbp"
+FBS_POPULATION = "fbs"
 
 
-def load_cfb_structural_v7_artifact(path: str | Path | None = None) -> dict[str, Any]:
-    artifact_path = Path(path) if path is not None else CFB_V7_ARTIFACT_PATH
+def load_cfb_structural_v7_artifact(
+    path: str | Path | None = None, *, model_version: str = CFB_V7_MODEL_VERSION
+) -> dict[str, Any]:
+    """A v7-family artifact (v7 or v7.1), hash-verified; ``model_version`` must match the file's."""
+    if model_version not in V7_FAMILY:
+        raise ValueError(f"not a cfb v7-family model: {model_version!r}")
+    default = PROJECT_ROOT / "config" / "models" / f"{model_version}.json"
+    artifact_path = Path(path) if path is not None else default
     payload = json.loads(artifact_path.read_text(encoding="utf-8"))
-    if payload.get("model_version") != CFB_V7_MODEL_VERSION:
+    if payload.get("model_version") != model_version:
         raise ValueError(f"cfb v7 artifact model_version mismatch: {payload.get('model_version')!r}")
     if payload.get("artifact_hash") != compute_artifact_hash(payload):
         raise ValueError(f"cfb v7 artifact_hash mismatch for {artifact_path}")
@@ -81,8 +100,25 @@ class CFBStructuralV7Model:
     def __init__(self, artifact: Mapping[str, Any]) -> None:
         if artifact.get("artifact_hash") != compute_artifact_hash(dict(artifact)):
             raise ValueError("cfb v7 artifact_hash mismatch")
-        if float(artifact["point_in_time"]["result_buffer_hours"]) != core.RESULT_BUFFER_HOURS:
+        if artifact.get("model_version") not in V7_FAMILY:
+            raise ValueError(f"not a cfb v7-family artifact: {artifact.get('model_version')!r}")
+        self.version = str(artifact["model_version"])
+        pit = artifact["point_in_time"]
+        if float(pit["result_buffer_hours"]) != core.RESULT_BUFFER_HOURS:
             raise ValueError("cfb v7 artifact result buffer differs from the rating core")
+        # v7.1 (bug hunt 2026-11-22 #3): fit each game at min(run clock, its research decision time) instead of
+        # the run clock, and add points-only rows only for games ESPN will never give play-by-play for.
+        fit_rule = pit.get("serving_fit_rule")
+        serving = artifact.get("serving") or {}
+        if fit_rule not in (None, PER_GAME_FIT) or serving.get("score_only_rows") not in (
+            None,
+            SCORE_ONLY_TERMINAL,
+        ):
+            raise ValueError("cfb v7 artifact serving rule is not one this module implements")
+        self.per_game_fit = fit_rule == PER_GAME_FIT
+        self.score_only_terminal = serving.get("score_only_rows") == SCORE_ONLY_TERMINAL
+        # v7.1 (bug hunt item 6): contracts carry a feature-capture snapshot of the model inputs.
+        self.feature_capture = bool(serving.get("feature_capture"))
         pr = artifact["prior"]
         self.params = core.PriorParams(
             rho_off={k: float(v) for k, v in pr["rho_off"].items()},
@@ -96,6 +132,10 @@ class CFBStructuralV7Model:
         self.uses_cfbd = pr["arm"] != "core"
         if self.uses_cfbd and dict(pr["cfbd_fields"]) != core.CFBD_FIELDS:
             raise ValueError("cfb v7 artifact CFBD fields differ from the rating core")
+        # v7.1 (#2): covariates z-scored over, and applied to, the season's FBS teams only.
+        if pr.get("covariate_population") not in (None, FBS_POPULATION):
+            raise ValueError("cfb v7 artifact covariate population is not one this module implements")
+        self.covariate_population = pr.get("covariate_population")
         if (
             float(pr["finals_team_lambda"]) != core.FINALS_TEAM_LAMBDA
             or float(pr["league_lambda"]) != core.LEAGUE_LAMBDA
@@ -106,6 +146,8 @@ class CFBStructuralV7Model:
         self.coef = [float(v) for v in s2["coef"]]
         self.intercept = float(s2["intercept"])
         self.margin_cal = {k: float(v) for k, v in s2["margin_calibration"].items()}
+        if set(self.margin_cal) - {"intercept", "slope", "neutral_intercept"}:
+            raise ValueError("cfb v7 artifact margin calibration has terms this module does not implement")
         self.total_cal = {k: float(v) for k, v in s2["total_calibration"].items()}
         md = artifact["margin_distribution"]
         self.margin_grid = np.arange(-int(md["support"]), int(md["support"]) + 1, dtype=float)
@@ -137,10 +179,29 @@ class CFBStructuralV7Model:
         ph, pa = core.project_points(feat, self.coef, self.intercept, self.features)
         raw_m = ph - pa
         raw_t = ph + pa
+        # v7 pooled one intercept (-1.62) over home and neutral games; the rating core already carries home field
+        # (zero at a neutral site), so at neutral sites it leaned every margin toward ESPN's away team (bug hunt
+        # 2026-11-22 #1: actual minus model +2.62 +/- 0.77 on 477 neutral games). v7.1 fits its own neutral term.
+        icpt = self.margin_cal["intercept"]
+        if feat.neutral and "neutral_intercept" in self.margin_cal:
+            icpt = self.margin_cal["neutral_intercept"]
         return (
-            self.margin_cal["intercept"] + self.margin_cal["slope"] * raw_m,
+            icpt + self.margin_cal["slope"] * raw_m,
             self.total_cal["intercept"] + self.total_cal["slope"] * raw_t,
         )
+
+    def covariates(
+        self, cfbd_rows: Sequence[Mapping[str, Any]], fbs_teams: Iterable[str] | None
+    ) -> dict[str, dict[str, float]] | None:
+        """This season's standardised CFBD covariates under the artifact's population rule (None: no rows, or
+        the FBS-only rule without an FBS list)."""
+        if not cfbd_rows:
+            return None
+        if self.covariate_population == FBS_POPULATION:
+            if fbs_teams is None:
+                return None
+            return core.standardise_covariates(cfbd_rows, population=fbs_teams) or None
+        return core.standardise_covariates(cfbd_rows) or None
 
     def margin_sd(self, mu: float, total: float, *, early: bool, fcs: bool) -> float:
         c = self.sd_coef
@@ -207,8 +268,24 @@ class CFBStructuralV7Model:
         return V7Pricing(mu, tot, sd_m, sd_t, early, feat.is_fbs_vs_fcs, out)
 
 
-def cfb_structural_v7_model() -> CFBStructuralV7Model:
-    return CFBStructuralV7Model(load_cfb_structural_v7_artifact())
+def cfb_structural_v7_model(model_version: str = CFB_V7_MODEL_VERSION) -> CFBStructuralV7Model:
+    return CFBStructuralV7Model(load_cfb_structural_v7_artifact(model_version=model_version))
+
+
+def cfb_structural_v71_model() -> CFBStructuralV7Model:
+    return cfb_structural_v7_model(CFB_V71_MODEL_VERSION)
+
+
+def fit_decision(model: CFBStructuralV7Model, run_decision: datetime, kickoff: datetime | None) -> datetime:
+    """The time the ratings are fit at: v7 uses the run clock; v7.1 uses the validated research rule,
+    min(run clock, min(kickoff, 08:00 ET on the kickoff's ET date)). The observation cutoff stays the run clock:
+    a row fetched after the fit time but before the run is information the run has (no leak), and dropping it
+    would turn a game admitted at the fit time into a false NO_CALL_V7_PBP_MISSING."""
+    if not model.per_game_fit:
+        return run_decision
+    if kickoff is None:
+        raise core.V7NoCall(NO_CALL_NO_KICKOFF, "v7.1 fits at the game's research decision time")
+    return min(run_decision, core.decision_time_for(kickoff))
 
 
 # ------------------------------------------------------------------------------------------------ serving entry
@@ -288,6 +365,7 @@ class V7ServingData:
     classes: dict[tuple[str, int], str]
     covariates: dict[str, dict[str, float]] | None
     expected_games: dict[str, list[str]]  # team -> admitted current-season games that must have pbp rows
+    expected_kickoffs: dict[str, datetime]  # event -> kickoff for every event in expected_games
     slate_no_call: tuple[str, str] | None  # (reason, detail) when no game of the slate can be priced
     stats: dict[str, Any]
 
@@ -316,10 +394,12 @@ def _score_only_rows(rec: Mapping[str, Any]) -> list[core.TeamGame]:
     return out
 
 
-def _live_history_completed(path: Path, season: int, decision: datetime) -> list[tuple[str, str, str]]:
-    """(event, home, away) of completed, admitted ``season`` games in the live NCAAF score history (FBS-involved
+def _live_history_completed(
+    path: Path, season: int, decision: datetime
+) -> list[tuple[str, str, str, datetime]]:
+    """(event, home, away, kickoff) of completed, admitted ``season`` games in the live NCAAF score history (FBS-involved
     only). An independent witness: when the v7 update failed, these games still demand play-by-play."""
-    out: list[tuple[str, str, str]] = []
+    out: list[tuple[str, str, str, datetime]] = []
     if not path.exists():
         return out
     with path.open(encoding="utf-8") as fh:
@@ -336,9 +416,10 @@ def _live_history_completed(path: Path, season: int, decision: datetime) -> list
                 or not r.get("event_start_utc")
             ):
                 continue
-            if not core.admitted(parse_utc(r["event_start_utc"]), decision):
+            kick = parse_utc(r["event_start_utc"])
+            if not core.admitted(kick, decision):
                 continue
-            out.append((str(r.get("event_id")), str(r.get("home_team_id")), str(r.get("away_team_id"))))
+            out.append((str(r.get("event_id")), str(r.get("home_team_id")), str(r.get("away_team_id")), kick))
     return out
 
 
@@ -347,6 +428,7 @@ def load_v7_serving_data(
     decision: datetime,
     *,
     team_ids: Iterable[str] = (),
+    model: CFBStructuralV7Model | None = None,
 ) -> V7ServingData:
     """Serving inputs as of ``decision`` from ``RuntimePaths.ncaaf_v7_root`` (resolved from ``data_root`` the way
     the daily step writes it).
@@ -355,7 +437,12 @@ def load_v7_serving_data(
     schedule games without play-by-play, which is how the fit script built its spine. Classes: the season FBS
     lists (last season's too: its finals are the prior). Covariates: this season's CFBD rows. The slate no-calls
     as a whole when a season date up to the decision was never scanned (unseen games) or a class list is
-    missing; per team, every admitted current-season schedule game must have a pbp row unless ESPN has none."""
+    missing; per team, every admitted current-season schedule game must have a pbp row unless ESPN has none.
+
+    ``model`` selects the v7.1 rules: points-only rows only for games ESPN will never give play-by-play for
+    (v7 also added them for games whose pbp was merely not fetched yet, so a lagging crawl fed other teams'
+    games in as points only), and the artifact's covariate population. ``kickoffs`` maps every expected event
+    to its kickoff so a per-game fit time can re-filter ``expected_games``."""
     if decision.tzinfo is None:
         raise ValueError("decision must be timezone-aware")
     store = live.store_for(live.v7_paths(data_root))
@@ -365,9 +452,13 @@ def load_v7_serving_data(
     rows = [core.team_game_from_row(r) for r in pbp]
     pbp_events = {r.event_id for r in rows}
     schedule = live.read_schedule(store, as_of=decision)
+    terminal = live.terminal_without_pbp(store, schedule, as_of=decision)
+    score_only_terminal = model is not None and model.score_only_terminal
     score_only = 0
     for rec in schedule.values():
         if int(rec["season"]) not in seasons or rec["status"] != live.FINAL or rec["event_id"] in pbp_events:
+            continue
+        if score_only_terminal and rec["event_id"] not in terminal:
             continue
         if rec.get("home_score") is None or rec.get("away_score") is None:
             continue
@@ -392,28 +483,33 @@ def load_v7_serving_data(
     if gap is not None:
         slate_no_call = (NO_CALL_PBP_MISSING, gap)
 
-    terminal = live.terminal_without_pbp(store, schedule, as_of=decision)
     expected: dict[str, set[str]] = defaultdict(set)
+    kickoffs: dict[str, datetime] = {}
     for rec in schedule.values():
         if int(rec["season"]) != season or rec["status"] in live.NOT_PLAYED_STATES:
             continue
         if rec["event_id"] in terminal or not core.admitted(parse_utc(rec["kickoff_utc"]), decision):
             continue
+        kickoffs[str(rec["event_id"])] = parse_utc(rec["kickoff_utc"])
         expected[str(rec["home_id"])].add(str(rec["event_id"]))
         expected[str(rec["away_id"])].add(str(rec["event_id"]))
     not_played = {e for e, r in schedule.items() if r["status"] in live.NOT_PLAYED_STATES}
     witnessed = 0
-    for eid, home, away in _live_history_completed(
+    for eid, home, away, kick in _live_history_completed(
         Path(data_root) / "processed" / "ncaaf" / "games.jsonl", season, decision
     ):
         if eid in terminal or eid in not_played:
             continue
+        kickoffs.setdefault(eid, kick)
         witnessed += eid not in expected.get(home, set())
         expected[home].add(eid)
         expected[away].add(eid)
 
     cfbd_rows = live.read_cfbd_rows(store, season)
-    covariates = core.standardise_covariates(cfbd_rows) if cfbd_rows else None
+    if model is not None:
+        covariates = model.covariates(cfbd_rows, fbs.get(season))
+    else:
+        covariates = core.standardise_covariates(cfbd_rows) if cfbd_rows else None
     return V7ServingData(
         season=season,
         decision=decision,
@@ -421,6 +517,7 @@ def load_v7_serving_data(
         classes=classes,
         covariates=covariates or None,
         expected_games={t: sorted(v) for t, v in expected.items()},
+        expected_kickoffs=kickoffs,
         slate_no_call=slate_no_call,
         stats={
             "pbp_rows": len(pbp),
@@ -440,6 +537,16 @@ def _game_field(game: Any, name: str, default: Any = None) -> Any:
     return getattr(game, name, default)
 
 
+def _kickoff(game: Any) -> datetime | None:
+    raw = _game_field(game, "event_start_utc")
+    if not raw:
+        return None
+    try:
+        return parse_utc(str(raw))
+    except (TypeError, ValueError):
+        return None  # v7.1 then no-calls (NO_CALL_V7_NO_KICKOFF); v7 never reads it
+
+
 def price_v7_slate(
     data_root: str | Path,
     decision_time: datetime,
@@ -450,24 +557,32 @@ def price_v7_slate(
     """v7 prices (or a NO_CALL reason) for each game of a slate at ``decision_time``.
 
     ``games`` are mappings or objects with ``event_id``, ``home_team_id``, ``away_team_id`` (ESPN ids),
-    ``is_neutral_site`` and optionally ``spread_home_line`` / ``total_line``. The rating state is fitted once
-    for the slate; per game the arithmetic is ``price_game``'s (tested equal). Never raises ``V7NoCall``."""
+    ``is_neutral_site``, ``event_start_utc`` (required by v7.1) and optionally ``spread_home_line`` /
+    ``total_line``. The rating state is fitted once per fit time (v7: the run clock, one fit per slate; v7.1:
+    one fit per distinct research decision time); per game the arithmetic is ``price_game``'s (tested equal).
+    Never raises ``V7NoCall``. A v7.1 result also carries ``inputs``, the model-input snapshot for the ledger."""
     model = model or cfb_structural_v7_model()
     team_ids = sorted(
         {str(t) for g in games for t in (_game_field(g, "home_team_id"), _game_field(g, "away_team_id")) if t}
     )
-    data = load_v7_serving_data(data_root, decision_time, team_ids=team_ids)
+    data = load_v7_serving_data(data_root, decision_time, team_ids=team_ids, model=model)
     season, decision = data.season, data.decision
     slate_no_call = data.slate_no_call
     if slate_no_call is None and model.uses_cfbd and not data.covariates:
         slate_no_call = (NO_CALL_NO_CFBD, f"season {season}")
-    state = None
+    finals = None
     if slate_no_call is None:
         prev_rows = [r for r in data.rows if r.season == season - 1]
         finals = core.fit_finals(prev_rows, season - 1, data.classes) if prev_rows else None
-        state = core.fit_state(
-            data.rows, season, decision, data.classes, finals, model.params, team_ids, data.covariates
-        )
+    states: dict[datetime, core.RatingState] = {}
+
+    def state_at(fit_time: datetime) -> core.RatingState:
+        if fit_time not in states:
+            states[fit_time] = core.fit_state(
+                data.rows, season, fit_time, data.classes, finals, model.params, team_ids, data.covariates
+            )
+        return states[fit_time]
+
     results: list[dict[str, Any]] = []
     reasons: Counter[str] = Counter()
     for g in games:
@@ -477,18 +592,23 @@ def price_v7_slate(
             "event_id": str(_game_field(g, "event_id")),
             "home_team_id": None if home is None else str(home),
             "away_team_id": None if away is None else str(away),
-            "model_version": CFB_V7_MODEL_VERSION,
+            "model_version": model.version,
             "decision_utc": decision.isoformat(),
         }
         try:
             if slate_no_call is not None:
                 raise core.V7NoCall(*slate_no_call)
-            assert state is not None
+            fit_time = fit_decision(model, decision, _kickoff(g))
             h, a = str(home), str(away)
-            check_pbp_complete(data.rows, data.expected_games, (h, a), season, decision)
-            feat = core.matchup_features(
-                state, h, a, neutral=bool(_game_field(g, "is_neutral_site")), classes=data.classes
-            )
+            expected = {
+                t: [e for e in evs if core.admitted(data.expected_kickoffs[e], fit_time)]
+                for t, evs in data.expected_games.items()
+                if t in (h, a)
+            }
+            check_pbp_complete(data.rows, expected, (h, a), season, fit_time)
+            neutral = bool(_game_field(g, "is_neutral_site"))
+            state = state_at(fit_time)
+            feat = core.matchup_features(state, h, a, neutral=neutral, classes=data.classes)
             pricing = model.price(
                 feat,
                 spread_home_line=_game_field(g, "spread_home_line"),
@@ -507,10 +627,26 @@ def price_v7_slate(
                 early=pricing.early,
                 is_fbs_vs_fcs=pricing.is_fbs_vs_fcs,
                 probabilities=pricing.probabilities,
+                fit_decision_utc=fit_time.isoformat(),
             )
+            if model.feature_capture:
+                cov = data.covariates or {}
+                out["inputs"] = {
+                    "fit_decision_utc": fit_time.isoformat(),
+                    "run_decision_utc": decision.isoformat(),
+                    "neutral_site": neutral,
+                    "home_class": data.classes.get((h, season)),
+                    "away_class": data.classes.get((a, season)),
+                    "home_games": feat.home_games,
+                    "away_games": feat.away_games,
+                    "home_expected": {k: round(v, 6) for k, v in feat.home.values.items()},
+                    "away_expected": {k: round(v, 6) for k, v in feat.away.values.items()},
+                    "home_cfbd_z": {k: round(v, 6) for k, v in cov.get(h, {}).items()},
+                    "away_cfbd_z": {k: round(v, 6) for k, v in cov.get(a, {}).items()},
+                }
         results.append(out)
     summary = {
-        "model_version": CFB_V7_MODEL_VERSION,
+        "model_version": model.version,
         "decision_utc": decision.isoformat(),
         "season": season,
         "games": len(results),

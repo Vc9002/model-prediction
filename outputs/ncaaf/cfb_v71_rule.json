@@ -1,0 +1,50 @@
+{
+  "holdout_walk_files_sha256": {
+    "walk_cfbd_m0.25_hl45.holdout.jsonl": "04fd91869a7d668210def432b8ffc6ea70c3cf8cee4732a3639f317b25200651",
+    "walk_cfbd_m0.25_hlnone.holdout.jsonl": "05ae2ff9d7d34b143a4b83eeea74c47c4bc47ae912ad335af8bbaba30dd07a09",
+    "walk_cfbd_m0.5_hl45.holdout.jsonl": "2afcbefba1953e150508da7bc5ebaba359b266c4682c84424767afd4f73ab02d",
+    "walk_cfbd_m0.5_hlnone.holdout.jsonl": "77222e9ec8f5058da685bbe3ef132b33df94478c5b4acdc7869496c06bea7f02",
+    "walk_cfbd_m1_hl45.holdout.jsonl": "bce10464aaedf553e9c3436eb58849e6dae1d8aff5afa2005e34bb71769cda15",
+    "walk_cfbd_m1_hlnone.holdout.jsonl": "2a30004966719351daaf6ea8b4bd3e32ec8a18bf18e9311295dfc48edb089a94",
+    "walk_cfbd_m2_hl45.holdout.jsonl": "4626f2cbb117dca17df78f2f2c58cf58165092d6ce50d54a5cd3a19307e680cd",
+    "walk_cfbd_m2_hlnone.holdout.jsonl": "55711ac8006ba4f6857c5e2f5541c26dfe6cfc9496cc07e011f4abda5ac5a676",
+    "walk_cfbd_portal_m0.25_hl45.holdout.jsonl": "d1721524b062fe0b164286e93a7c08ab7d5ebbb2d8de05d26d5db966cfd65b1e",
+    "walk_cfbd_portal_m0.25_hlnone.holdout.jsonl": "49bb429dd56aa7c6c7b4c774f74ef4da1292e9e9f0e6c8f6984ef0262a31310f",
+    "walk_cfbd_portal_m0.5_hl45.holdout.jsonl": "5260b2de400d504616cf354003fa26945da53ff13c693247c9da1f55fae17d75",
+    "walk_cfbd_portal_m0.5_hlnone.holdout.jsonl": "73fa4fd884053f87b8c95d7b874292670558f894fb8b95101287c429f5e68607",
+    "walk_cfbd_portal_m1_hl45.holdout.jsonl": "c50873961fff5422d3327c471ad3c56d6605fed78746c2d64e2287604ac65231",
+    "walk_cfbd_portal_m1_hlnone.holdout.jsonl": "9f25491f9c6d1126736e76b4124ce457f30eb8286f209f06dbbb1f6e32071099",
+    "walk_cfbd_portal_m2_hl45.holdout.jsonl": "1b63b0e2f700e9c8bdca7b4905c44eae7371d2d4bffec99a74c59295f97bc37f",
+    "walk_cfbd_portal_m2_hlnone.holdout.jsonl": "68704d09ca380ebe2161459ab461d2930583501c7d4d8f5105221c7d1d55a4ba"
+  },
+  "pinned_at_utc": "2026-11-22T03:13:48Z",
+  "prior_arms_sha256": "699fb53537288941afb229574068e06530f4501ae20162c00de3aa43a59c5a08",
+  "rule": {
+    "approval": "operator 2026-11-22: 'Refit NCAAF v7'; paper challenger, Flat only, never champion",
+    "bootstrap": "paired v7.1 - v7 (and v7.1 - v5) deltas, date-clustered, 2000 resamples, seed 11, 95% CI",
+    "changes_vs_v7": [
+      "stage-2 margin calibration a_home*(1-neutral) + a_neutral*neutral + b*raw_margin, fit on train",
+      "CFBD covariates z-scored over and applied to the season's FBS teams only; CFBD prior gammas re-estimated on 2016-2021 finals; the 16 CFBD walks re-run; the 8 core walks reused from v7"
+    ],
+    "holdout_status": "SECOND READ. The v7 holdout window (2024-11-15 onwards) was read for v7 on 2026-11-21T21:12:25Z (cfb_v7_report.md), and the 2026-11-21/22 bug hunt read holdout neutral-site residuals (+2.02, n 115). This read is confirmatory only: nothing is selected or tuned on it, and the neutral-site before/after is design-informed.",
+    "id": "cfb-v71-holdout-rule-1",
+    "inherits": "cfb-v7-holdout-rule-1 (windows, point in time, grid, selection rule, pmf fitting, scored set)",
+    "model_version": "cfb-structural-v7.1",
+    "pre_pin_exposure": "Disclosed: before this pin, a path bug in `v7repro` (fixed) scored v7's published stage 2 and pmfs on the v7.1 holdout walk of the selected CFBD combo (FBS-only covariates) instead of v7's own walk: n 1948, margin MAE 12.5031, Brier 0.16391, log loss 0.48721 (v7 published 12.4674 / 0.16356 / 0.48661). That is a holdout look at the fix-2 features under v7's stage 2, seen while `fit` was already running. Nothing was changed after it: the grid, the selection rule and the pmf fit are v7's, applied on train/validation only.",
+    "reported_not_gating": [
+      "v7.1 vs v5 with v7's gate (coverage, significant improvement, no point regression)",
+      "home / neutral / FBS-FBS / FBS-FCS / weeks 0-4 / 5-14 / postseason",
+      "neutral-site and home mean residual with se, v7 vs v7.1",
+      "calibration: ECE and favourite buckets",
+      "market-relative vs ESPN close (DESIGN-INFORMED): corr(model - line, result - line), slopes, ATS"
+    ],
+    "scored_set": "holdout games both v7 (as published) and v7.1 call; v5 as reproduced for v7 alongside",
+    "verdict": {
+      "CONFIRMED": "not WORSE, and point deltas within v7's no_point_regression (margin MAE <= 0, Brier <= +0.0005, log loss <= +0.0015), and |mean actual - model| on neutral-site games smaller for v7.1 than for v7",
+      "NOT_CONFIRMED": "neither: v7.1 is packaged as the routed challenger and the shortfall is reported",
+      "WORSE (stop)": "v7.1 - v7 on all scored games: margin MAE delta CI low > 0, or moneyline Brier delta CI low > 0, or log loss delta CI low > 0. Then no v7.1 artifact is routed; v7 stays the routed challenger and the operator decides"
+    }
+  },
+  "rule_sha256": "fe97151186fcca713cdba0a1dcd2c6787a5d06d9ae1d1698938023f86e532e9b",
+  "spec_sha256": "061e32d02542fe16439e897ab79c58be4e9aace148b782330172008c00bf5da7"
+}

@@ -103,11 +103,13 @@ def test_real_production_yaml_resolves_every_model() -> None:
     # 2026-11-21 (quick-261121-v62): +1 enabled entry, the cfb-structural-v6.2 NCAAF challenger.
     # 2026-11-21 (quick-261121-hmc): +1 enabled entry, the ncaab-moneyline-v7m candidate.
     # 2026-11-21 (quick-261121-v7): +1 enabled entry, cfb-structural-v7, registered but not routed.
-    assert len(registry.entries) == 93
+    # 2026-11-22 (quick-261122-v71): +1 enabled entry, the cfb-structural-v7.1 refit (routed in v7's place).
+    # 2026-11-22 (quick-261122-v51): +1 enabled entry, cfb-structural-v5.1, the third NCAAF challenger.
+    assert len(registry.entries) == 95
     # Scope 2026-11-13: the 40 entries for switched-off sports are enabled: false and
     # therefore unavailable by decision, not by a failed contract. Every in-scope entry
     # must still resolve, so a healthy registry has zero *failed* entries.
-    assert len(registry.available_entries()) == 53
+    assert len(registry.available_entries()) == 55
     problems = registry.problem_entries()
     assert len(problems) == 40
     assert all(not e.enabled and e.load_error is None for e in problems)
@@ -147,14 +149,17 @@ def test_real_production_yaml_resolves_every_model() -> None:
         assert registry.challenger("NCAAF", market).model_id == "cfb-structural-v6.2"
         assert registry.lifecycle_contract("NCAAF", market).challenger_model_id == "cfb-structural-v6.2"
     assert registry.entries["cfb-structural-v6.2"].serving_status == "shadow"
-    # v7 is registered (hash-verified, shadow) and routed as the second challenger after v6.2
-    # (quick-261121-v7r); v6.2 stays the primary the lifecycle contract names.
-    assert registry.entries["cfb-structural-v7"].serving_status == "shadow"
-    assert registry.entries["cfb-structural-v7"].load_error is None
+    # v7 stays registered (hash-verified, shadow) but unrouted; its refit v7.1 is the second challenger after
+    # v6.2 (quick-261122-v71), and v5.1 (quick-261122-v51) the third; v6.2 stays the primary the lifecycle
+    # contract names. All are paper challengers, never the champion.
+    for model_id in ("cfb-structural-v7", "cfb-structural-v7.1", "cfb-structural-v5.1"):
+        assert registry.entries[model_id].serving_status == "shadow"
+        assert registry.entries[model_id].load_error is None
     for market in ("moneyline", "spread", "total"):
         assert [e.model_id for e in registry.challengers_for("NCAAF", market)] == [
             "cfb-structural-v6.2",
-            "cfb-structural-v7",
+            "cfb-structural-v7.1",
+            "cfb-structural-v5.1",
         ]
     assert registry.lifecycle_contract("NCAAF", "total").rollback_model_id == "cfb-structural-v4"
     assert registry.champion("MLB", "spread").model_id == "mlb-structural-runline-v4"

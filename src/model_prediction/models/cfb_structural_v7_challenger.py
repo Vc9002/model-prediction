@@ -1,6 +1,10 @@
-"""Routing for the cfb-structural-v7 research challenger: NCAAF Flat/research rows only, never Main or the buyer.
+"""Routing for the cfb-structural-v7 family (v7, v7.1) challengers: NCAAF Flat/research rows only, never Main or
+the buyer.
 
-quick-261121-v7r. ``challengers.NCAAF`` lists v7 after v6.2 for moneyline/spread/total.
+quick-261121-v7r routed v7 after v6.2 for moneyline/spread/total; quick-261122-v71 routes the v7.1 refit there
+instead (v7 stays registered, unrouted). Every function takes ``model_id`` (default v7), so one module serves both.
+v7.1 contracts also carry ``feature_capture``: the forecast writer stores their model inputs as a
+feature-capture-v1 snapshot (v7 rows stored none).
 ``models/college_football.build_cfb_slate`` calls ``price_challenger_slate`` after the champion's contracts and
 after v6.2's, with the same per-event Polymarket quotes v6.2 receives. ``cli/forecast._forecast_cfb_sport`` sends
 any version outside v2-v5 to the research and Flat tiers only, so v7 rows carry zero Main units.
@@ -37,6 +41,7 @@ from ..domain import parse_utc
 from ..features import cfb_features_v7 as core
 from .cfb_structural_v7 import (
     CFB_V7_MODEL_VERSION,
+    V7_FAMILY,
     CFBStructuralV7Model,
     V7Pricing,
     cfb_structural_v7_model,
@@ -80,8 +85,9 @@ def default_slate_pricer() -> SlatePricer | None:
     return pricer if callable(pricer) else None
 
 
-def routed_markets(repo_root: str | Path | None = None) -> list[str]:
-    """NCAAF markets whose ``challengers.NCAAF`` route lists v7 (and the registry has not failed it closed)."""
+def routed_markets(repo_root: str | Path | None = None, model_id: str = CFB_V7_MODEL_VERSION) -> list[str]:
+    """NCAAF markets whose ``challengers.NCAAF`` route lists ``model_id`` (and the registry has not failed it
+    closed)."""
     from ..config import PROJECT_ROOT
     from ..production_registry import ProductionModelRegistry
 
@@ -89,7 +95,7 @@ def routed_markets(repo_root: str | Path | None = None) -> list[str]:
     return [
         market
         for market in _ROUTABLE_MARKETS
-        if any(e.model_id == CFB_V7_MODEL_VERSION for e in registry.challengers_for("NCAAF", market))
+        if any(e.model_id == model_id for e in registry.challengers_for("NCAAF", market))
     ]
 
 
@@ -120,10 +126,15 @@ def build_contracts(
     decision_time: datetime,
     markets: Sequence[str],
     data_stats: Mapping[str, Any] | None = None,
+    model_inputs: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Max-edge v7 contracts against the captured books; a market is emitted only when its best edge is above 0."""
+    """Max-edge v7 contracts against the captured books; a market is emitted only when its best edge is above 0.
+
+    ``model_inputs`` (v7.1) is the seam's per-game input snapshot (fit time, expected metric values per side,
+    games played, classes, CFBD z-scores); it goes into ``feature_basis`` and the ledger's feature snapshot."""
     pr = pricing.probabilities
     code_revision = v7_serving_code_hash()
+    label = model.version.removeprefix("cfb-structural-")
     basis_common: dict[str, Any] = {
         "challenger_of": "cfb-structural-v5",
         "season": season,
@@ -138,6 +149,8 @@ def build_contracts(
         "quote_provenance": "polymarket_executable_ask",
         "live_data": dict(data_stats or {}),
     }
+    if model_inputs:
+        basis_common["model_inputs"] = dict(model_inputs)
     contracts: list[dict[str, Any]] = []
 
     def emit(market: str, pick: tuple[str, float, float, float], line: float | None, slug: str, q) -> None:
@@ -158,13 +171,13 @@ def build_contracts(
                 "model_probability": round(prob, 6),
                 "model_uncertainty": 0.0,
                 "weather_inputs_verified": None,
-                "model_version": CFB_V7_MODEL_VERSION,
+                "model_version": model.version,
                 "model_artifact_hash": model.artifact_hash,
                 "feature_basis": basis_common,
                 "inference_inputs": None,
                 # No parenthesised token: settlement takes the first hyphenated one for the slug.
                 "rationale": (
-                    f"CFB v7 challenger: fair margin {pricing.mu_margin:+.2f}, total {pricing.mu_total:.2f}, "
+                    f"CFB {label} challenger: fair margin {pricing.mu_margin:+.2f}, total {pricing.mu_total:.2f}, "
                     f"SD {pricing.margin_sd:.2f}/{pricing.total_sd:.2f}. Max-edge side {selection} at "
                     f"{100 * prob:.1f}% vs ask {100 * ask:.1f}%. market_slug={slug}."
                 ),
@@ -176,6 +189,8 @@ def build_contracts(
                 "edge_vs_executable_ask": round(edge, 6),
                 "sportsbook": CAPTURED_BOOK,
                 "market_lineage": q.get("lineage") or {},
+                # The forecast writer stores feature_basis as a feature-capture-v1 snapshot for these rows.
+                "feature_capture": bool(model.feature_capture),
             }
         )
 
@@ -231,22 +246,28 @@ def price_challenger_slate(
     model: CFBStructuralV7Model | None = None,
     slate_pricer: SlatePricer | None = None,
     expected_artifact_hash: str | None = None,
+    model_id: str = CFB_V7_MODEL_VERSION,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """v7 contracts for one slate plus a summary. Fails closed slate-wide and per game; never raises V7NoCall.
+    """v7-family contracts for one slate plus a summary. Fails closed slate-wide and per game; never raises
+    V7NoCall.
 
     Only events with a priceable captured book in a routed market and both ESPN team ids reach the seam.
     ``expected_artifact_hash`` is the registry entry's hash; a model whose artifact differs is refused before
-    anything is priced.
+    anything is priced, and so is a model whose version is not ``model_id``.
     """
     if decision_time.tzinfo is None:
         raise ValueError("decision_time must be timezone-aware")
+    if model_id not in V7_FAMILY:
+        raise ValueError(f"not a cfb v7-family model: {model_id!r}")
     slate = [ev if isinstance(ev, EventQuotes) else EventQuotes(**ev) for ev in events]
-    routed = list(markets) if markets is not None else routed_markets()
-    summary: dict[str, Any] = {"model_version": CFB_V7_MODEL_VERSION, "markets": routed, "events": len(slate)}
+    routed = list(markets) if markets is not None else routed_markets(model_id=model_id)
+    summary: dict[str, Any] = {"model_version": model_id, "markets": routed, "events": len(slate)}
     if not routed or not slate:
         summary["status"] = "not_routed" if not routed else "no_events"
         return [], summary
-    model = model or cfb_structural_v7_model()
+    model = model or cfb_structural_v7_model(model_id)
+    if model.version != model_id:
+        raise ValueError(f"cfb v7 model {model.version} is not the routed {model_id}")
     if expected_artifact_hash is not None and model.artifact_hash != expected_artifact_hash:
         raise ValueError(
             f"cfb v7 model artifact {model.artifact_hash[:12]} is not the registered {expected_artifact_hash[:12]}"
@@ -276,6 +297,7 @@ def price_challenger_slate(
             "home_team_id": str(ev.home_team_id),
             "away_team_id": str(ev.away_team_id),
             "is_neutral_site": ev.is_neutral_site,
+            "event_start_utc": ev.event_start_utc,
             "spread_home_line": None if ev.spread is None else float(ev.spread["home_line"]),
             "total_line": None if ev.total is None else float(ev.total["line"]),
         }
@@ -304,6 +326,7 @@ def price_challenger_slate(
                 decision_time=decision_time,
                 markets=ev_markets,
                 data_stats=seam_summary.get("data"),
+                model_inputs=result.get("inputs") if model.feature_capture else None,
             )
         )
     summary.update(

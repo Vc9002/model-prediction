@@ -5789,6 +5789,21 @@ def _forecast_cfb_sport(
                 if contract.get("inference_inputs") is not None
                 else None
             )
+            if cfb_snapshot_json is None and (
+                contract.get("feature_capture") or contract.get("snapshot_mode") == "feature_capture"
+            ):
+                # v7.1 (feature_capture flag) and v5.1 (snapshot_mode) price without NB-engine replay inputs
+                # (bug hunt 2026-11-22 item 6): record every model input as a feature-capture snapshot under
+                # the contract's own artifact hash; never an exact replay.
+                cfb_snapshot_json = contract_snapshot_json(
+                    contract,
+                    sport="NCAAF",
+                    selection=str(contract["selection"]),
+                    line=None if contract["line"] is None else float(contract["line"]),
+                    probability=float(contract["model_probability"]),
+                    observed_at_utc=contract_obs,
+                    artifact_hash=str(contract.get("model_artifact_hash") or ""),
+                )
             contract_sportsbook = str(contract.get("sportsbook") or "espn_consensus")
             contract_slug = str(contract.get("market_slug") or "")
             # A challenger contract (cfb-structural-v6.2) carries its own artifact hash; champion rows keep v5's.

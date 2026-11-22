@@ -833,6 +833,9 @@ def build_cfb_slate(
     unmatched: list[dict[str, Any]] = []
     candidate_bases: list[dict[str, Any]] = []
     challenger_events: list[dict[str, Any]] = []
+    # event id -> the champion loop's UpcomingCFBGame (season, model week, neutral site, ESPN ids, weather, QB) for
+    # cfb-structural-v5.1, kept apart from challenger_events, whose keys v6.2 unpacks into EventQuotes.
+    challenger_games: dict[str, UpcomingCFBGame] = {}
 
     for ev in events:
         competition = (ev.get("competitions") or [{}])[0]
@@ -1111,6 +1114,7 @@ def build_cfb_slate(
             home_team_id=str((home.get("team") or {}).get("id") or "") or None,
         )
 
+        challenger_games[event_id] = upcoming
         preds = model.predict_matchup(history, upcoming, project_missing_lines=True)
         schedule_context = {
             "espn_season_type": ev_season_type,
@@ -1406,7 +1410,8 @@ def build_cfb_slate(
                     except (KeyError, TypeError, ValueError):
                         continue
                     candidate_probabilities[slug] = {
-                        "model_version": MODEL_VERSION,
+                        # The served model's id: this said "cfb-structural-v4" on every v5 packet (models.md #8).
+                        "model_version": str(getattr(model, "version", MODEL_VERSION)),
                         "model_event_id": base["event_id"],
                         "feature_packet_hash": hashlib.sha256(
                             json.dumps(
@@ -1476,7 +1481,7 @@ def build_cfb_slate(
 
     # Challengers (quick-261121-v62; several per market since quick-261121-v7r): each model routed in
     # challengers.NCAAF appends its own contracts AFTER the champion's and after the candidate evidence, in
-    # route order (v6.2, then v7), so v5's contracts and evidence are untouched; _forecast_cfb_sport sends any
+    # route order (v6.2, v7, then v5.1), so v5's contracts and evidence are untouched; _forecast_cfb_sport sends any
     # version outside v2-v5 to the research and Flat tiers only. Each challenger runs in its own try/except:
     # one failing blocks neither the champion nor the other challengers. ``challenger_pricing`` stays v6.2's
     # summary; ``challenger_pricing_by_model`` has every routed challenger's.
@@ -1498,7 +1503,18 @@ def build_cfb_slate(
                     from .cfb_structural_v62 import price_challenger_slate
 
                     challenger_contracts, summary = price_challenger_slate(root, obs, challenger_events)
-                elif challenger_id == "cfb-structural-v7":
+                elif challenger_id == "cfb-structural-v5.1":
+                    from .cfb_structural_v51 import price_challenger_slate as price_v51_slate
+
+                    challenger_contracts, summary = price_v51_slate(
+                        root,
+                        obs,
+                        challenger_events,
+                        games=challenger_games,
+                        markets=challenger_markets,
+                        expected_artifact_hash=challenger_hash,
+                    )
+                elif challenger_id in ("cfb-structural-v7", "cfb-structural-v7.1"):
                     from .cfb_structural_v7_challenger import price_challenger_slate as price_v7_slate
 
                     challenger_contracts, summary = price_v7_slate(
@@ -1507,6 +1523,7 @@ def build_cfb_slate(
                         challenger_events,
                         markets=challenger_markets,
                         expected_artifact_hash=challenger_hash,
+                        model_id=challenger_id,
                     )
                 else:
                     # A registered challenger with no NCAAF slate pricer prices nothing (fail closed).

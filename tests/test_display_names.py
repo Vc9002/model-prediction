@@ -69,6 +69,7 @@ def test_one_bucket_set_everywhere() -> None:
         ("ncaab-moneyline-v7m", "moneyline", _V7_ENGINE, "NCAAB Moneyline v7m"),
         ("cfb-structural-v5", "total", None, "NCAAF Total v5"),
         ("cfb-structural-v6.2", "spread", None, "NCAAF Spread v6.2"),
+        ("cfb-structural-v7.1", "moneyline", None, "NCAAF Moneyline v7.1"),
         ("college-football-v1", "moneyline", None, "NCAAF Moneyline v1"),
         ("nba-elo-trend-lr-v5", "moneyline", None, "NBA Moneyline v5"),
         ("mlb-structural-v10-frozen", "total", None, "MLB Total v10"),

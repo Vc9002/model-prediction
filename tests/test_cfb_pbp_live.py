@@ -293,6 +293,41 @@ def test_no_plays_is_retried_until_a_day_after_kickoff(tmp_path):
     assert "B" in live.terminal_without_pbp(store, live.read_schedule(store))
 
 
+def test_a_404_is_retried_until_a_day_after_kickoff_then_succeeds(tmp_path):
+    """quick-261122-v71 (bug hunt #4): one transient summary 404 made a just-final game points-only forever."""
+    paths = _seeded_paths(tmp_path)
+    fake = FakeESPN([FBS_A, FBS_B, *PAD_FBS])
+    fake.add("2030-08-23", (80,), _sb_event("A", FBS_A, FBS_B, SAT, "final", 31, 24))  # summary 404s
+    now = Now(datetime(2030, 8, 24, 16, 0, tzinfo=UTC))
+    fake.clock = now  # advancing clock: every request takes a minute
+    _update(paths, fake, now)
+    store = live.store_for(paths)
+    assert fake.summary_calls == ["A"]
+    assert "A" not in live.terminal_without_pbp(store, live.read_schedule(store))  # < 24 h: not terminal
+    now.at += timedelta(hours=1)
+    _update(paths, fake, now)
+    assert fake.summary_calls == ["A", "A"]  # refetched on the next run
+    fake.summaries["A"] = _summary(FBS_A, FBS_B, SAT, 31, 24)  # ESPN recovers
+    now.at += timedelta(hours=1)
+    _update(paths, fake, now)
+    assert fake.summary_calls == ["A", "A", "A"]
+    assert {r["event_id"] for r in _pbp_rows(paths)} == {"A"}
+    assert "A" not in live.terminal_without_pbp(store, live.read_schedule(store))
+
+
+def test_a_404_a_day_after_kickoff_is_terminal_and_not_refetched(tmp_path):
+    paths = _seeded_paths(tmp_path)
+    fake = FakeESPN([FBS_A, FBS_B, *PAD_FBS])
+    fake.add("2030-08-23", (80,), _sb_event("A", FBS_A, FBS_B, SAT, "final", 31, 24))
+    now = Now(SAT + timedelta(hours=25))
+    _update(paths, fake, now)
+    now.at += timedelta(hours=1)
+    _update(paths, fake, now)
+    assert fake.summary_calls == ["A"]  # fetched >= 24 h after kickoff: terminal, bounded
+    store = live.store_for(paths)
+    assert "A" in live.terminal_without_pbp(store, live.read_schedule(store))
+
+
 def test_budget_stops_the_run_and_the_next_run_resumes(tmp_path):
     paths = _seeded_paths(tmp_path)
     fake = FakeESPN([FBS_A, FBS_B, *PAD_FBS])
@@ -578,6 +613,9 @@ def test_missing_pbp_for_a_team_fails_closed_for_its_games_only(tmp_path, model,
     assert gone in results[0]["detail"]
     assert results[1]["status"] == "ok"
     # ESPN confirmed it has no play-by-play for that game: it becomes a score-only row and the call comes back.
+    # A 404 is terminal only when fetched >= 24 h after kickoff (quick-261122-v71, bug hunt #4).
+    fetched = built["events"][gone]["kickoff"] + timedelta(hours=25)
+    assert fetched <= decision
     live._append_jsonl(
         built["store"].manifest,
         [
@@ -585,7 +623,7 @@ def test_missing_pbp_for_a_team_fails_closed_for_its_games_only(tmp_path, model,
                 "event_id": gone,
                 "season": fixture["season"],
                 "status": "http_404",
-                "fetched_at_utc": "2023-01-01T00:00:00Z",
+                "fetched_at_utc": live._iso(fetched),
             }
         ],
     )

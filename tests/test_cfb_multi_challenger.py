@@ -41,7 +41,8 @@ from model_prediction.production_registry import (
     remove_challenger_route,
 )
 
-V5, V62, V7 = "cfb-structural-v5", CFB_V62_MODEL_VERSION, CFB_V7_MODEL_VERSION
+V5, V62, V7, V51 = "cfb-structural-v5", CFB_V62_MODEL_VERSION, CFB_V7_MODEL_VERSION, "cfb-structural-v5.1"
+V71 = "cfb-structural-v7.1"  # quick-261122-v71: routed in v7's place; v7 stays registered, unrouted
 PARITY = PROJECT_ROOT / "outputs" / "ncaaf" / "cfb_v7_parity_fixture.json"
 # Parity fixture case: home 130 vs away 259, 2023 season, the 2023-11-11 morning decision (fair margin +26.46).
 HOME_ID, AWAY_ID, SEASON = "130", "259", 2023
@@ -69,7 +70,8 @@ def _model(config: dict, model_id: str) -> dict:
 def test_ncaaf_routes_v62_then_v7_and_v62_stays_the_primary() -> None:
     registry = ProductionModelRegistry.load(PROJECT_ROOT)
     for market in ("moneyline", "spread", "total"):
-        assert [e.model_id for e in registry.challengers_for("NCAAF", market)] == [V62, V7]
+        # v7.1 (quick-261122-v71) replaced v7; v5.1 (quick-261122-v51) is appended; v6.2 stays the primary.
+        assert [e.model_id for e in registry.challengers_for("NCAAF", market)] == [V62, V71, V51]
         assert registry.challenger("NCAAF", market).model_id == V62
         contract = registry.lifecycle_contract("NCAAF", market)
         assert contract.champion_model_id == V5 and contract.challenger_model_id == V62
@@ -103,7 +105,7 @@ def test_each_broken_challenger_fails_closed_on_its_own() -> None:
     assert [e.model_id for e in registry.challengers_for("NCAAF", "moneyline")] == [V7]
     # No fall-through: the primary is broken, so single-challenger consumers see no challenger at all.
     assert registry.challenger("NCAAF", "moneyline") is None
-    assert [e.model_id for e in registry.challengers_for("NCAAF", "spread")] == [V7]
+    assert [e.model_id for e in registry.challengers_for("NCAAF", "spread")] == [V71, V51]
     problems = "\n".join(registry.challenger_problems)
     for fragment in (
         "'no-such-model': not a registered",
@@ -121,12 +123,12 @@ def test_each_broken_challenger_fails_closed_on_its_own() -> None:
 def test_a_broken_v7_leaves_v62_routed_and_primary() -> None:
     config = _config()
     bad = "config/models/does-not-exist-v7.json"
-    _model(config, V7)["artifact"] = bad
-    config["prediction_service"]["artifact_map"][V7] = bad
+    _model(config, V71)["artifact"] = bad
+    config["prediction_service"]["artifact_map"][V71] = bad
     registry = _registry(config)
-    assert registry.entries[V7].load_error
+    assert registry.entries[V71].load_error
     for market in ("moneyline", "spread", "total"):
-        assert [e.model_id for e in registry.challengers_for("NCAAF", market)] == [V62]
+        assert [e.model_id for e in registry.challengers_for("NCAAF", market)] == [V62, V51]
         assert registry.challenger("NCAAF", market).model_id == V62
 
 
@@ -138,7 +140,7 @@ def test_metadata_keys_are_not_routes() -> None:
     config["prediction_service"]["challengers"]["NFL"] = None  # not a mapping: that sport only
     registry = _registry(config)
     assert any("challengers[NFL] must be a mapping" in p for p in registry.challenger_problems)
-    assert [e.model_id for e in registry.challengers_for("NCAAF", "total")] == [V62, V7]
+    assert [e.model_id for e in registry.challengers_for("NCAAF", "total")] == [V62, V71, V51]
 
 
 def test_remove_challenger_route_handles_lists_and_scalars() -> None:
@@ -630,6 +632,9 @@ def test_v62_still_routes_every_market_and_neither_challenger_can_be_bought() ->
 
     # v6.2 reads registry.challenger() (the primary): it must stay first in each list to keep its markets.
     assert v62_routed_markets() == ["moneyline", "spread", "total"]
-    assert v7_routed_markets() == ["moneyline", "spread", "total"]
+    # quick-261122-v71: the v7.1 refit is routed in v7's place; v7 stays registered but prices nothing.
+    assert v7_routed_markets() == []
+    assert v7_routed_markets(model_id="cfb-structural-v7.1") == ["moneyline", "spread", "total"]
     assert V5 in DEFAULT_WHITELIST_MODELS
     assert V62 not in DEFAULT_WHITELIST_MODELS and V7 not in DEFAULT_WHITELIST_MODELS
+    assert "cfb-structural-v7.1" not in DEFAULT_WHITELIST_MODELS

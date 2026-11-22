@@ -5,6 +5,18 @@ Pinned 2026-11-21, before the 2027 season. The binding text is `outputs/ncaaf/cf
 differ, the JSON wins. Changing a threshold after 2027 data exists makes the gate void; a new gate needs a new id
 and a fresh count.
 
+## Model under test: cfb-structural-v7.1
+
+The JSON names "cfb-structural-v7 (the artifact frozen at the start of 2027 week 0; any refit during the season is
+a new version and restarts the count)". On 2026-11-22 the operator approved a refit before any 2027 data exists
+(quick-261122-v71): `cfb-structural-v7.1` (`config/models/cfb-structural-v7.1.json`) fixes the bug-hunt findings
+(neutral-site intercept, FBS-only CFBD covariates, the validated serving fit time and points-only rule, the 404
+retry, feature snapshots on ledger rows). It replaces v7 in `challengers.NCAAF`, so v7.1 is the v7-family
+artifact this gate scores, unless another refit is frozen before 2027 week 0. Every "v7" in the metrics below means
+the routed v7-family artifact (v7.1 today). Thresholds, comparators and the decision rule are unchanged, and the
+JSON's sha256 is unchanged. v7 stays registered and unrouted for comparison. The v7.1 holdout read was a second,
+confirmatory read of v7's window (`outputs/ncaaf/cfb_v71_report.md`), so 2027 remains the first clean test.
+
 ## Why a forward gate
 
 Every ESPN lined window 2017-2025 and the 2024-11-15+ holdout have been read by earlier NCAAF work (v5 recheck,
@@ -49,6 +61,6 @@ picking throughout; nothing is disabled.
 - Pre-kickoff NCAAF close capture (reuse `pretip_close_capture.py` with `sport="ncaaf"`); without it the primary
   cannot be computed.
 - The forward DraftKings capture (`espn_cfb_pregame_capture`) kept running for openers and closes.
-- A Flat-pick route for v7: `challengers.NCAAF` holds one model id per market (v6.2 today), so routing v7 means
-  replacing v6.2 there or adding multi-challenger support to `production_registry.py`. That is an operator decision.
+- A Flat-pick route: done. `challengers.NCAAF` lists v6.2 then v7.1 per market (quick-261121-v7r multi-challenger
+  support; v7.1 replaced v7 in quick-261122-v71).
 - Live 2027 play-by-play for v7's in-season ratings (see the quick-261121-v7 SUMMARY for what is missing).

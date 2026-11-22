@@ -617,6 +617,32 @@ prediction_service:
     evidence_status: unverified
     replacement_priority: low
     rollback_model: null
+  # quick-261122-v71: v7 refit with the 2026-11-22 bug-hunt fixes (neutral-site intercept, FBS-only CFBD
+  # covariates, validated fit time, 404 retry, feature snapshot). Paper challenger: Flat/research rows only,
+  # never champion, never Main, never the auto-buyer. It replaces v7 in challengers.NCAAF; v7 stays registered.
+  - model_id: cfb-structural-v7.1
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v7.1.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: unverified
+    replacement_priority: low
+    rollback_model: null
+  # quick-261122-v51: v5 with the 2026-11-21 bug-hunt fixes (season-keyed conference flag, in-path scoring proxy,
+  # refit, integer margin pmf, max-edge sides). Paper challenger routed after v6.2 and v7.1: Flat/research rows only,
+  # never champion, never Main, never the auto-buyer. Promotion not approved.
+  - model_id: cfb-structural-v5.1
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v5.1.json
+    enabled: true
+    serving_status: shadow
+    evidence_status: unverified
+    replacement_priority: low
+    rollback_model: null
   - model_id: cs2-tiered-elo-v6
     sport: CS2
     market: moneyline
@@ -1028,16 +1054,21 @@ prediction_service:
       total: wnba-total-possession-v3
     # quick-261121-v7r: a route may list several challengers; the first is the primary (lifecycle
     # contract, qualification). Each prices its own Flat/research rows; none reaches Main or the buyer.
+    # quick-261122-v71: the v7.1 refit replaces v7 (registered, unrouted); v6.2 stays first.
+    # quick-261122-v51: v5.1 is the third challenger.
     NCAAF:
       moneyline:
       - cfb-structural-v6.2
-      - cfb-structural-v7
+      - cfb-structural-v7.1
+      - cfb-structural-v5.1
       spread:
       - cfb-structural-v6.2
-      - cfb-structural-v7
+      - cfb-structural-v7.1
+      - cfb-structural-v5.1
       total:
       - cfb-structural-v6.2
-      - cfb-structural-v7
+      - cfb-structural-v7.1
+      - cfb-structural-v5.1
     NBA: {}
     NFL:
       moneyline: null
@@ -1215,6 +1246,8 @@ prediction_service:
   - cfb-total-v1
   - cfb-structural-v6.2
   - cfb-structural-v7
+  - cfb-structural-v7.1
+  - cfb-structural-v5.1
   - cs2-tiered-elo-v6
   - dota2-tiered-elo-v6
   - lol-tiered-elo-v6
@@ -1295,6 +1328,8 @@ prediction_service:
     cfb-total-v1: config/models/cfb-total-v1.json
     cfb-structural-v6.2: config/models/cfb-structural-v6.2.json
     cfb-structural-v7: config/models/cfb-structural-v7.json
+    cfb-structural-v7.1: config/models/cfb-structural-v7.1.json
+    cfb-structural-v5.1: config/models/cfb-structural-v5.1.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
     dota2-tiered-elo-v6: config/models/dota2-tiered-elo-v6.json
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json

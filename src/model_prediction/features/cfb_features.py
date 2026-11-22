@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -165,6 +165,20 @@ def _keyed_past_rows(history: Sequence[Any], as_of_dt: datetime) -> tuple[CFBTea
             past.append(g)
     identity = CFBTeamIdentity.from_rows(past)
     return identity, [(g, *identity.row_keys(g)) for g in past]
+
+
+# (home value, away value) of a history row's "EPA" channel; None = no value for that row
+EpaReader = Callable[[Any], tuple[float | None, float | None]]
+
+
+def _stored_epa(row: Any) -> tuple[float | None, float | None]:
+    """The per-row ``*_epa_per_play`` fields the 2016-2026 backfill wrote (v2-v5). A row whose two values are both
+    exactly 0.0 is the backfill's no-prior-game default and counts as missing."""
+    h_epa = _get_val(row, "home_epa_per_play")
+    a_epa = _get_val(row, "away_epa_per_play")
+    if h_epa is None or a_epa is None or (h_epa == 0.0 and a_epa == 0.0):
+        return None, None
+    return h_epa, a_epa
 
 
 def _class_conference(classes: CFBTeamClasses, key: str, season: int, team: CFBTeam | None) -> str:
@@ -330,6 +344,29 @@ class CFBFeatureExtractor:
         self.margin_sd = margin_sd
         self.total_sd = total_sd
 
+    # Seams for cfb-structural-v5.1 (features/cfb_features_v51.py). The defaults are v2-v5's behaviour and must
+    # stay bit-identical: the static team table for the conference flag, the stored per-row "EPA" fields.
+    def _is_conference_matchup(
+        self,
+        season: int,
+        *,
+        away_team: str,
+        home_team: str,
+        away_obj: CFBTeam | None,
+        home_obj: CFBTeam | None,
+        away_team_id: str | None,
+        home_team_id: str | None,
+    ) -> bool:
+        return bool(
+            away_obj
+            and home_obj
+            and away_obj.conference == home_obj.conference
+            and away_obj.conference not in ("FBS Independents", "FCS")
+        )
+
+    def _epa_reader(self, keyed_rows: Sequence[KeyedRow]) -> EpaReader | None:
+        return None
+
     def _compute_team_state(
         self,
         history: Sequence[Any],
@@ -341,6 +378,7 @@ class CFBFeatureExtractor:
         team_key: str | None = None,
         keyed_rows: Sequence[KeyedRow] | None = None,
         classes: CFBTeamClasses | None = None,
+        epa_of: EpaReader | None = None,
     ) -> CFBTeamState:
         """Compute point-in-time team state using only games before as_of_dt.
 
@@ -482,10 +520,10 @@ class CFBFeatureExtractor:
         # Rolling opponent-adjusted EPA from past games
         epas_off: list[float] = []
         epas_def: list[float] = []
+        read_epa = epa_of if epa_of is not None else _stored_epa
         for g, is_h, _opp, _opp_key in curr_season_games:
-            h_epa = _get_val(g, "home_epa_per_play")
-            a_epa = _get_val(g, "away_epa_per_play")
-            if h_epa is not None and a_epa is not None and (h_epa != 0.0 or a_epa != 0.0):
+            h_epa, a_epa = read_epa(g)
+            if h_epa is not None and a_epa is not None:
                 epas_off.append(float(h_epa if is_h else a_epa))
                 epas_def.append(float(a_epa if is_h else h_epa))
 
@@ -556,16 +594,20 @@ class CFBFeatureExtractor:
 
         away_obj = resolve_team(away_team)
         home_obj = resolve_team(home_team)
-        is_conf_matchup = bool(
-            away_obj
-            and home_obj
-            and away_obj.conference == home_obj.conference
-            and away_obj.conference not in ("FBS Independents", "FCS")
+        is_conf_matchup = self._is_conference_matchup(
+            resolved_season_year,
+            away_team=away_team,
+            home_team=home_team,
+            away_obj=away_obj,
+            home_obj=home_obj,
+            away_team_id=away_team_id,
+            home_team_id=home_team_id,
         )
 
         # 1. State Computation. Identity is built from rows before kickoff only; a slate team resolves by name,
         # else by the event's ESPN team id.
         identity, keyed_rows = _keyed_past_rows(history, start_dt)
+        epa_of = self._epa_reader(keyed_rows)
         away_key = identity.key(away_team, str(away_team_id) if away_team_id else None)
         home_key = identity.key(home_team, str(home_team_id) if home_team_id else None)
         classes = CFBTeamClasses.from_keyed_rows(keyed_rows)
@@ -590,6 +632,7 @@ class CFBFeatureExtractor:
             team_key=away_key,
             keyed_rows=keyed_rows,
             classes=classes,
+            epa_of=epa_of,
         )
         home_state = self._compute_team_state(
             history,
@@ -600,6 +643,7 @@ class CFBFeatureExtractor:
             team_key=home_key,
             keyed_rows=keyed_rows,
             classes=classes,
+            epa_of=epa_of,
         )
 
         is_fbs_fcs = away_state.tier == "FCS" or home_state.tier == "FCS"

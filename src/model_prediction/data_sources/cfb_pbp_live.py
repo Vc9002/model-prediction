@@ -83,6 +83,8 @@ DEFAULT_BUDGET_S = (
 BLOCK_STREAK_LIMIT = 3  # consecutive 403/429 responses end the run (resume next run)
 RESULT_BUFFER = timedelta(hours=RESULT_BUFFER_HOURS)
 NO_PLAYS_FINAL_AFTER = timedelta(hours=24)  # ESPN sometimes posts the play feed late; retry until then
+# A summary 404 gets the same grace (bug hunt 2026-11-22 #4): one transient 404 used to make a just-final game
+# points-only for the rest of the season. Retries stop once a fetch made >= 24 h after kickoff still fails.
 SEASON_FIRST_DAY = (8, 15)  # (month, day): first scoreboard date of a season (week 0 is late August)
 SEASON_LAST_DAY = (1, 31)  # (month, day) of the next calendar year: after the national championship
 MIN_FBS_TEAMS = 100  # an FBS list shorter than this is a broken response, never a class map
@@ -277,7 +279,7 @@ def terminal_without_pbp(
     manifest: Mapping[str, Mapping[str, Any]] | None = None,
     index: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> set[str]:
-    """Events ESPN will not give play-by-play for: 404, "no plays" fetched >= 24 h after kickoff, or a final
+    """Events ESPN will not give play-by-play for: a 404 or "no plays" fetched >= 24 h after kickoff, or a final
     feed with no scrimmage plays. The research fit used these games as score-only rows; requiring pbp for them
     would blank both teams for the rest of the season."""
     manifest = manifest if manifest is not None else read_manifest(store, as_of)
@@ -285,7 +287,7 @@ def terminal_without_pbp(
     out: set[str] = set()
     for eid, rec in manifest.items():
         status = rec.get("status")
-        if status == "http_404" or (status == "no_plays" and _no_plays_is_final(rec, schedule.get(eid))):
+        if status in ("http_404", "no_plays") and _no_plays_is_final(rec, schedule.get(eid)):
             out.add(eid)
         elif status == "ok":
             idx = index.get(eid)
@@ -299,6 +301,7 @@ def terminal_without_pbp(
 
 
 def _no_plays_is_final(rec: Mapping[str, Any], sched: Mapping[str, Any] | None) -> bool:
+    """A "no plays" or 404 fetch is terminal once it was made >= 24 h after kickoff (seeded records: always)."""
     if rec.get("seeded"):
         return True  # the research crawl treated "no plays" as terminal; its fetches came long after kickoff
     kickoff = rec.get("start_utc") or (sched or {}).get("kickoff_utc")
@@ -613,9 +616,7 @@ def _fetch_done(rec: Mapping[str, Any] | None, sched: Mapping[str, Any], store: 
         return store.raw_path(int(sched["season"]), str(sched["event_id"])).exists() or bool(
             rec.get("seeded")
         )
-    if status == "http_404":
-        return True
-    if status == "no_plays":
+    if status in ("http_404", "no_plays"):
         return _no_plays_is_final(rec, sched)
     return False
 
