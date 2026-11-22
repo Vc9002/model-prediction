@@ -24,7 +24,7 @@ decision cutoff (games on an earlier Eastern date).
 
 Usage:
     .venv/Scripts/python scripts/backfill_ncaab_player_boxes.py [--seasons 2022 2023 2024 2025 2026]
-        [--scope d1|non-d1|all] [--pause 0.6] [--limit N] [--dry-run]
+        [--scope d1|non-d1|all] [--pause 0.6] [--limit N] [--dry-run] [--events PATH]
 """
 
 from __future__ import annotations
@@ -97,11 +97,11 @@ class NotFoundError(Exception):
     """The provider answered 404 for this event: a data gap, not a provider fault."""
 
 
-def iter_events(seasons: set[int], scope: str) -> list[tuple[str, dict[str, Any]]]:
+def iter_events(seasons: set[int], scope: str, path: Path = SCOREBOARD) -> list[tuple[str, dict[str, Any]]]:
     d1: list[tuple[str, dict[str, Any]]] = []
     other: list[tuple[str, dict[str, Any]]] = []
     seen: set[str] = set()
-    with SCOREBOARD.open(encoding="utf-8") as handle:
+    with path.open(encoding="utf-8") as handle:
         for line in handle:
             if not line.strip():
                 continue
@@ -288,11 +288,17 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0, help="stop after N fetch attempts (pilot runs)")
     ap.add_argument("--stride", type=int, default=1, help="take every Nth pending event (pilot sampling)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--events",
+        type=Path,
+        default=SCOREBOARD,
+        help="event list in scoreboard.jsonl row format (addendum v5: the 2014-2022 confirmation export)",
+    )
     args = ap.parse_args()
     if max(args.seasons) >= 2027:
         raise SystemExit("season 2027 (2026-27) is locked for this research program")
 
-    events = iter_events(set(args.seasons), args.scope)
+    events = iter_events(set(args.seasons), args.scope, args.events)
     todo = [(day, game) for day, game in events if not (OUT_ROOT / day / f"{game['event_id']}.json").exists()]
     todo = todo[:: max(args.stride, 1)]
     print(

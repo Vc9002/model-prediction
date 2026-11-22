@@ -484,15 +484,18 @@ def feature_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return summary
 
 
-def audit(root: Path = BOX_ROOT) -> dict[str, Any]:
+def audit(
+    root: Path = BOX_ROOT, events_path: Path = SCOREBOARD, seasons: Iterable[int] = SEASONS
+) -> dict[str, Any]:
+    seasons = tuple(seasons)
     in_scope: dict[str, tuple[int, bool]] = {}
-    with SCOREBOARD.open(encoding="utf-8") as handle:
+    with events_path.open(encoding="utf-8") as handle:
         for line in handle:
             if not line.strip():
                 continue
             row = json.loads(line)
             for event in row.get("events") or []:
-                if event.get("season_year") in SEASONS and event.get("completed"):
+                if event.get("season_year") in seasons and event.get("completed"):
                     d1 = (
                         event.get("home_conference_id") is not None
                         and event.get("away_conference_id") is not None
@@ -516,8 +519,10 @@ def audit(root: Path = BOX_ROOT) -> dict[str, Any]:
     name_team_season_ids: dict[tuple, set] = defaultdict(set)
     for record in iter_box_records(root):
         eid = str(record["event_id"])
-        files_per_event[eid] += 1
         season = int(record["season_year"])
+        if season not in seasons:
+            continue
+        files_per_event[eid] += 1
         coverage[str(season)]["files_d1" if record.get("d1_vs_d1") else "files_non_d1"] += 1
         ids_by_side = {}
         for side in ("home", "away"):
@@ -596,6 +601,16 @@ def audit(root: Path = BOX_ROOT) -> dict[str, Any]:
             Counter(str(season) for (_, season), c in team_season_quality.items() if c[False] > c[True])
         ),
         "d1_team_seasons_by_season": dict(Counter(str(season) for _, season in team_season_quality)),
+        # Addendum v4/v5 season-usability input: share of D1 team-games (the team carries a conference id
+        # in the event source) whose box passes the gate.
+        "d1_team_games_box_pass_rate_by_season": {
+            str(season): round(
+                sum(c[True] for (_, s2), c in team_season_quality.items() if s2 == season)
+                / max(sum(sum(c.values()) for (_, s2), c in team_season_quality.items() if s2 == season), 1),
+                4,
+            )
+            for season in sorted({s2 for _, s2 in team_season_quality})
+        },
         "team_games_without_player_box_by_season": dict(empty_team),
         "minutes_vs_expected": dict(minutes_dev),
         "minutes_off_examples": minutes_bad_examples,
@@ -617,28 +632,43 @@ def audit(root: Path = BOX_ROOT) -> dict[str, Any]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("command", choices=("audit", "build"))
+    # Addendum v5: the event/schedule source, season list and output directory are pluggable. The
+    # defaults reproduce the v4-pinned table; feature logic is not parameterised.
+    ap.add_argument("--events", type=Path, default=SCOREBOARD, help="event list, scoreboard.jsonl row format")
+    ap.add_argument("--seasons", type=int, nargs="+", default=list(SEASONS))
+    ap.add_argument("--out-dir", type=Path, default=OUT_ROOT)
     args = ap.parse_args()
-    OUT_ROOT.mkdir(parents=True, exist_ok=True)
+    seasons = tuple(args.seasons)
+    out_dir = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
     if args.command == "audit":
-        result = audit()
-        (OUT_ROOT / "audit_261121.json").write_text(
+        result = audit(BOX_ROOT, args.events, seasons)
+        (out_dir / "audit_261121.json").write_text(
             json.dumps(result, indent=2, sort_keys=True), encoding="utf-8"
         )
         print(json.dumps(result, indent=2, sort_keys=True))
         return
-    team_games = [tg for record in iter_box_records() for tg in team_games_from_record(record)]
-    rows = build_feature_rows(team_games, load_schedule())
-    with FEATURES_PATH.open("w", encoding="utf-8") as handle:
+    # The box tree holds every fetched season; only the requested ones enter (a season outside the list
+    # must not become another season's prior).
+    team_games = [
+        tg
+        for record in iter_box_records()
+        if int(record["season_year"]) in seasons
+        for tg in team_games_from_record(record)
+    ]
+    rows = build_feature_rows(team_games, load_schedule(seasons, args.events))
+    features_path = out_dir / FEATURES_PATH.name
+    with features_path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
     summary = feature_summary(rows)
     summary["minutes_sum_median_team_game"] = statistics.median(
         sum(p.minutes for p in tg.players) for tg in team_games if tg.box_available
     )
-    (OUT_ROOT / "feature_summary_261121.json").write_text(
+    (out_dir / "feature_summary_261121.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
     )
-    print(f"wrote {len(rows)} rows to {FEATURES_PATH}")
+    print(f"wrote {len(rows)} rows to {features_path}")
     print(json.dumps(summary, indent=2, sort_keys=True))
 
 
