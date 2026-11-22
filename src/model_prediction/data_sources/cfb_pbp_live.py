@@ -63,6 +63,7 @@ from ..features.cfb_features_v7 import RESULT_BUFFER_HOURS
 from ..features.cfb_pbp_rows import game_rows, load_raw
 from ..filelock import lock_exclusive, unlock
 from ..runtime_paths import RuntimePaths, rerouted_data_root
+from .provider_capture import iso_utc_z as _iso
 
 _logger = logging.getLogger(__name__)
 
@@ -146,10 +147,6 @@ def store_for(paths: RuntimePaths) -> Store:
 
 
 # ------------------------------------------------------------------------------------------------ small io
-def _iso(dt: datetime) -> str:
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 

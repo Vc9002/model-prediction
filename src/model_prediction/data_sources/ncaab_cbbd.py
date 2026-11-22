@@ -51,6 +51,8 @@ from .ncaab_team_crosswalk import (
     TeamCrosswalk,
     normalize_team_name,
 )
+from .provider_capture import iso_utc_z as _iso
+from .provider_capture import opt_float as _opt_float
 
 CBBD_BASE_URL = "https://api.collegebasketballdata.com"
 CBBD_API_KEY_ENV = "CBBD_API_KEY"
@@ -215,10 +217,6 @@ class CBBDClient:
         return self.fetch_windowed("games/teams", season)
 
 
-def _iso(moment: datetime) -> str:
-    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def season_windows(season: int) -> list[tuple[datetime, datetime]]:
     """Season = spring year (2026 = 2025-26). Contiguous UTC windows from Oct 15 to May 15."""
     cuts = [
@@ -241,10 +239,6 @@ def _get(row: Mapping[str, Any], *names: str) -> Any:
         if snake in row:
             return row[snake]
     return None
-
-
-def _opt_float(value: Any) -> float | None:
-    return None if value is None else float(value)
 
 
 def _moneyline_prob(value: Any) -> float | None:

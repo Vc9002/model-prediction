@@ -46,6 +46,7 @@ from .ncaab_team_crosswalk import (
     CrosswalkResult,
     EspnTeam,
 )
+from .provider_capture import opt_float as _opt_float
 
 CBBDATA_BASE_URL = "https://www.cbbdata.com/api"
 CBBDATA_API_KEY_ENV = "CBBDATA_API_KEY"
@@ -261,10 +262,6 @@ def _to_date(value: Any) -> date:
     except ValueError:
         pass
     raise CBBDataSchemaError(f"unparseable archive date: {text!r}")
-
-
-def _opt_float(value: Any) -> float | None:
-    return None if value is None else float(value)
 
 
 def parse_ratings_archive(raw: bytes) -> list[TorvikSnapshot]:

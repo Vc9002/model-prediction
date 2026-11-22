@@ -15,7 +15,6 @@ capture, append-only, each record hashed. Readers must filter on observed_at_utc
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 from datetime import UTC, date, datetime, timedelta
@@ -25,6 +24,7 @@ from typing import Any
 from ..domain import EASTERN, parse_utc
 from ..pricing import implied_probability
 from ..runtime_paths import rerouted_data_root
+from .provider_capture import record_hash as _record_hash
 
 _logger = logging.getLogger(__name__)
 
@@ -164,11 +164,6 @@ def consensus_for_selection(
         if side == "away":
             return p_away, None
     return None, None
-
-
-def _record_hash(record: dict[str, Any]) -> str:
-    payload = {k: v for k, v in record.items() if k != "record_hash"}
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
 def espn_odds_path(data_root: str | Path, game_date_et: str) -> Path:

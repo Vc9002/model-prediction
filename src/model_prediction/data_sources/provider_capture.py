@@ -22,13 +22,14 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
 SNAPSHOT_SCHEMA_VERSION = "1"
 EASTERN = ZoneInfo("America/New_York")
+BROWSER_USER_AGENT = "Mozilla/5.0"  # ESPN's public endpoints are fetched with a browser UA
 
 
 @dataclass(frozen=True)
@@ -114,3 +115,37 @@ def write_provider_snapshot(
     raw_path.write_text(text, encoding="utf-8")
     snapshot_path.write_text(text, encoding="utf-8")
     return payload, raw_path, snapshot_path
+
+
+# Small helpers shared by the per-provider capture modules. Each importing module
+# binds them under its old private name (``_record_hash``, ``_iso``, ...), so tests
+# that reach or monkeypatch ``module._name`` keep working.
+
+
+def record_hash(record: dict[str, Any]) -> str:
+    """SHA-256 of a capture record's canonical JSON, excluding its own ``record_hash`` field."""
+    payload = {k: v for k, v in record.items() if k != "record_hash"}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def iso_utc(moment: datetime) -> str:
+    """``moment`` in UTC as ``datetime.isoformat()`` (``+00:00`` offset, microseconds kept)."""
+    return moment.astimezone(UTC).isoformat()
+
+
+def iso_utc_z(moment: datetime) -> str:
+    """``moment`` in UTC truncated to whole seconds with a ``Z`` suffix."""
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def browser_http_get(url: str) -> tuple[int, bytes]:
+    """GET ``url`` with a browser User-Agent and a 20 s timeout; returns (status, body)."""
+    import httpx
+
+    response = httpx.get(url, headers={"User-Agent": BROWSER_USER_AGENT}, timeout=20.0, follow_redirects=True)
+    return response.status_code, response.content
+
+
+def opt_float(value: Any) -> float | None:
+    """``None`` stays ``None``; anything else goes through ``float()`` and may raise."""
+    return None if value is None else float(value)

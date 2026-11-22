@@ -44,6 +44,9 @@ from typing import Any
 
 from ..domain import parse_utc
 from ..runtime_paths import RuntimePaths, rerouted_data_root
+from .provider_capture import browser_http_get as _default_http_get
+from .provider_capture import iso_utc as _iso
+from .provider_capture import record_hash as _record_hash
 
 _logger = logging.getLogger(__name__)
 
@@ -58,7 +61,6 @@ CORE_ODDS_URL = (
     "events/{eid}/competitions/{eid}/odds"
 )
 INJURIES_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/injuries"
-USER_AGENT = "Mozilla/5.0"
 QB_DEPTH_STATUS = "endpoint_unavailable"
 SCHEMA_VERSION = "1"
 
@@ -229,23 +231,7 @@ def parse_injuries(payload: dict[str, Any], team_ids: tuple[str, str]) -> dict[s
     return out
 
 
-def _record_hash(record: dict[str, Any]) -> str:
-    payload = {k: v for k, v in record.items() if k != "record_hash"}
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-
-
-def _iso(moment: datetime) -> str:
-    return moment.astimezone(UTC).isoformat()
-
-
 # --------------------------------------------------------------------------- transport
-def _default_http_get(url: str) -> tuple[int, bytes]:
-    import httpx
-
-    response = httpx.get(url, headers={"User-Agent": USER_AGENT}, timeout=20.0, follow_redirects=True)
-    return response.status_code, response.content
-
-
 def capture_path(data_root: str | Path | None) -> Path:
     """The one capture file. ``None`` resolves the runtime root (fail-closed); a repo-local ``data/`` is rerouted."""
     if data_root is None:

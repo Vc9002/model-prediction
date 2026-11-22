@@ -54,6 +54,9 @@ from ..devig import DEFAULT_DEVIG_METHOD, devig, overround
 from ..domain import EASTERN, parse_utc
 from ..pricing import implied_probability
 from ..runtime_paths import rerouted_data_root
+from .provider_capture import browser_http_get as _default_http_get
+from .provider_capture import iso_utc as _iso
+from .provider_capture import record_hash as _record_hash
 
 _logger = logging.getLogger(__name__)
 
@@ -62,7 +65,6 @@ SCOREBOARD_URL = (
 )
 ESPN_ODDS_FILENAME = "espn_odds.jsonl"
 SCHEMA_VERSION = "1"
-USER_AGENT = "Mozilla/5.0"
 DEFAULT_WINDOW_MINUTES = 25.0
 # ESPN odds for the rest of the slate: one scoreboard call per date, no Polymarket cost. The daily
 # forecast runs hours before tip, and nba-anchor-v10 only accepts a consensus anchor up to 90 minutes
@@ -354,25 +356,9 @@ def espn_line_slugs(record: dict[str, Any], normalized_event: dict[str, Any]) ->
 
 
 # --------------------------------------------------------------------------- storage
-def _record_hash(record: dict[str, Any]) -> str:
-    payload = {k: v for k, v in record.items() if k != "record_hash"}
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-
-
 def espn_odds_path(data_root: str | Path, game_date_et: str) -> Path:
     """ESPN odds file for one Eastern game date, beside that date's Polymarket snapshots."""
     return rerouted_data_root(data_root) / "odds" / "nba" / game_date_et / ESPN_ODDS_FILENAME
-
-
-def _iso(moment: datetime) -> str:
-    return moment.astimezone(UTC).isoformat()
-
-
-def _default_http_get(url: str) -> tuple[int, bytes]:
-    import httpx
-
-    response = httpx.get(url, headers={"User-Agent": USER_AGENT}, timeout=20.0, follow_redirects=True)
-    return response.status_code, response.content
 
 
 _CAPTURE_SUMMARY_KEYS = (

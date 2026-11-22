@@ -30,6 +30,7 @@ from typing import Any
 
 from ..domain import EASTERN
 from .nba_injury_report import parse_report, row_is_consistent
+from .provider_capture import iso_utc as _iso
 
 _logger = logging.getLogger(__name__)
 
@@ -69,10 +70,6 @@ def header_time_utc(text: str | None) -> datetime | None:
     except ValueError:
         return None
     return local.astimezone(UTC)
-
-
-def _iso(moment: datetime) -> str:
-    return moment.astimezone(UTC).isoformat()
 
 
 def _default_http_get(url: str) -> tuple[int, bytes]:
