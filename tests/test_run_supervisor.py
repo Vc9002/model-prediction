@@ -60,6 +60,57 @@ def test_failed_run_records_failure_and_returns_worker_exit_code(tmp_path) -> No
     sup.close()
 
 
+def test_worker_exit_75_is_recorded_skipped_and_still_returned(tmp_path) -> None:
+    # daily_lock.py exits 75 for a coalesced lock skip; that is never a failure.
+    sup = _supervisor(tmp_path)
+    code = sup.run_worker("daily", command=[sys.executable, "-c", "import sys; sys.exit(75)"])
+
+    assert code == 75
+    row = sup.latest_runs()[0]
+    assert row["status"] == "skipped"
+    assert row["exit_code"] == 75
+    assert "lock busy" in row["note"]
+    assert row["finished_at_utc"]
+    sup.close()
+
+
+def test_exit_codes_other_than_75_keep_their_status(tmp_path) -> None:
+    sup = _supervisor(tmp_path)
+    assert sup.run_worker("daily", command=[sys.executable, "-c", "import sys; sys.exit(1)"]) == 1
+    assert sup.latest_runs()[0]["status"] == "failed"
+    assert sup.run_worker("daily", command=[sys.executable, "-c", "pass"]) == 0
+    assert sup.latest_runs()[0]["status"] == "completed"
+    sup.close()
+
+
+def test_timeout_killed_run_stays_failed_even_if_the_exit_code_were_75(tmp_path, monkeypatch) -> None:
+    # The 75 mapping applies only when no timeout kill happened (note is None).
+    import subprocess
+
+    real_wait = subprocess.Popen.wait
+    calls = {"n": 0}
+
+    def _wait(self, timeout=None):
+        if self.args[0] != sys.executable:  # leave the supervisor's git probe alone
+            return real_wait(self, timeout=timeout)
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise subprocess.TimeoutExpired(self.args, timeout)
+        return 75
+
+    monkeypatch.setattr(subprocess.Popen, "wait", _wait)
+    sup = _supervisor(tmp_path)
+    code = sup.run_worker(
+        "daily", command=[sys.executable, "-c", "import time; time.sleep(30)"], timeout_seconds=0.2
+    )
+
+    assert code == 75
+    row = sup.latest_runs()[0]
+    assert row["status"] == "failed"
+    assert "exceeded timeout" in row["note"]
+    sup.close()
+
+
 def test_lease_contention_skips_and_records_the_skip(tmp_path) -> None:
     sup = _supervisor(tmp_path)
 

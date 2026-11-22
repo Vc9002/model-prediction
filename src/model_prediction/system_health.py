@@ -530,7 +530,7 @@ def system_health(
             if row["status"] == "failed":
                 down(f"worker '{worker}' last run failed (exit {row['exit_code']})")
             elif row["status"] == "skipped":
-                degrade(f"worker '{worker}' last run was skipped (lease held)")
+                degrade(f"worker '{worker}' last run was skipped ({row['note'] or 'no reason recorded'})")
         report["checks"]["runs"] = runs_check
     finally:
         supervisor.close()

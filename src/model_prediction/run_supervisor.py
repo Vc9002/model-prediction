@@ -380,9 +380,15 @@ class RunSupervisor:
                     counters = json.loads(metrics_path.read_text(encoding="utf-8"))
                 except (OSError, json.JSONDecodeError):
                     counters = None
+            status = "completed" if exit_code == 0 else "failed"
+            if exit_code == _LOCK_BUSY_EXIT and note is None:
+                # daily_lock.py exits 75 after waiting on a held lock: a coalesced skip, never a
+                # failure (a timeout-killed run keeps its note and stays failed).
+                status = "skipped"
+                note = f"worker exited {_LOCK_BUSY_EXIT} (lock busy; coalesced skip)"
             self._update_run(
                 run_id,
-                status="completed" if exit_code == 0 else "failed",
+                status=status,
                 finished_at_utc=datetime.now(UTC).isoformat(),
                 exit_code=exit_code,
                 note=note,

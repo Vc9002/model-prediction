@@ -176,6 +176,26 @@ def test_failed_worker_run_is_down(tmp_path: Path) -> None:
     assert any("last run failed" in r for r in report["reasons"])
 
 
+def test_worker_exit_75_lock_skip_is_degraded_not_down(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    sup = RunSupervisor(
+        db_path=repo / "data" / "runs.db",
+        paths=RuntimePaths(repo_root=repo, runtime_root=repo / "data"),
+        heartbeat_interval_seconds=0.05,
+    )
+    sup.run_worker("daily", command=[sys.executable, "-c", "import sys; sys.exit(75)"])
+    sup.close()
+
+    report = system_health(repo_root=repo, runtime_root=repo / "data")
+
+    assert report["checks"]["runs"]["daily"]["status"] == "skipped"
+    assert report["checks"]["runs"]["daily"]["exit_code"] == 75
+    assert report["status"] == "DEGRADED"
+    assert not any("last run failed" in r for r in report["reasons"])
+    # The reason carries the row's own note, not a hard-coded "(lease held)".
+    assert any("last run was skipped (worker exited 75" in r for r in report["reasons"])
+
+
 def test_worker_never_run_under_supervisor_degrades(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
 
