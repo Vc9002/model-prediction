@@ -1222,6 +1222,8 @@ def _forecast_wnba_spread_slate(data_root, args_date: str, client) -> dict:
 
     snapshot_path = Path(data_root) / "odds" / "wnba" / args_date / "polymarket_snapshots.jsonl"
     snapshot_rows = _read_polymarket_snapshot_rows(snapshot_path)
+    # Latest-per-slug selection would otherwise let a capture appended after observed_at win.
+    snapshot_rows = _quotes_known_at(snapshot_rows, observed_at)
     spread_rows = [row for row in snapshot_rows if row.get("market_type") == "spread"]
 
     prior_file = Path(data_root) / "player_priors" / "wnba" / f"{args_date}.json"
@@ -1451,6 +1453,8 @@ def _forecast_wnba_total_slate(data_root, args_date: str, client) -> dict:
 
     snapshot_path = Path(data_root) / "odds" / "wnba" / args_date / "polymarket_snapshots.jsonl"
     snapshot_rows = _read_polymarket_snapshot_rows(snapshot_path)
+    # Latest-per-slug selection would otherwise let a capture appended after observed_at win.
+    snapshot_rows = _quotes_known_at(snapshot_rows, observed_at)
     total_rows = [
         row
         for row in snapshot_rows

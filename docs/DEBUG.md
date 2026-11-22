@@ -1,5 +1,12 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-22 — Placeholder rungs priced as the main line; MLB single-inning totals (quick-261122-l17)
+
+- **Bug:** NBA/WNBA/NFL main-line selectors ranked rungs by |long ask − 0.5| only. A rung with no real bid (2¢ / 49¢) beat a real market and its other side was priced at 1 − bid = 98–99¢. Reproduced: BKN@MEM 2026-11-14 05:35Z (real 227.5 at 35¢/47¢ lost to 229.5 at 2¢/49¢, under at 98¢), UTA@LAL 11-18 (whole ladder 1¢/51¢), PHI@DET 11-04 (+19.5 at 94¢). The NFL 11-12 band checked the long side only. Size: NBA 26 of ~2,400 checkable spread/total rows (23 superseded, 3 settled, ~+0.01u), NFL 2 (before 11-12), WNBA 16.
+- **Fix:** `forecast_market_select._is_two_sided_rung` requires both asks in 20–80% (the NFL band), after latest-per-slug (WNBA now reduces to latest per slug too, and filters quotes to `observed_at` like NBA); NFL band covers the short ask. No qualifying rung → NBA/WNBA skip the game this run; NFL falls back to ESPN consensus as before. MLB `_is_full_game_market` rejects `-i<N>-` single-inning totals (captured 09-29..10-28 as `total` at ~47.5% mid; no pick ever priced on one). Tests: `tests/test_main_line_placeholder_rungs.py` (real ladders, each fails with its fix reverted).
+- **Not bugs (ralph NBA loop flags):** WNBA spread orientation is correct (snapshot team vs ML favourite 196/201, ledger home/away vs slug 131/131; clean-rung home cover 45/77); NFL period rungs exist only in pre-10-21 snapshots; MLB F5 excluded since v1.0.0; NCAAB name mismatch was the research loader only.
+- **Open:** NCAAF `college_football._match_cfb_spread/_total` rank by long ask without a band (same class); ranking inside the band still uses the long ask.
+
 ## 2026-11-22 — Daily-run speed: model-ledger spool and event-horizon skip (quick-261122-spd)
 
 Operator: "Skip per-sport tasks when a sport has no event in the horizon, and batch ledger writes. Goal: zero exit-1 runs over a week." Commits `1771e8f1`, `d5b1bdca`, `553c2380`, `b1c85e93` (docs `c0df9a09`), landed ff-only with `runs.db` idle.

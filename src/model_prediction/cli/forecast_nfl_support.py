@@ -164,7 +164,13 @@ def _select_latest_balanced_market(
     if not latest_by_contract:
         return None
     low, high = ask_band
-    plausible = [row for row in latest_by_contract.values() if low <= float(row["long"]["ask"]) <= high]
+    # Both sides: a rung quoted 2c bid / 49c ask passes a long-only band but has no
+    # market behind it (NBA BKN@MEM 2026-11-14 priced its under at 98c that way).
+    plausible = [
+        row
+        for row in latest_by_contract.values()
+        if low <= float(row["long"]["ask"]) <= high and low <= float(row["short"]["ask"]) <= high
+    ]
     if not plausible:
         return None
 

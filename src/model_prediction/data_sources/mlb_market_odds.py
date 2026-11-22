@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -427,9 +428,18 @@ _PARTIAL_GAME_MARKERS = (
 )
 
 
+# Single-inning totals ("tsc-mlb-cws-hou-2026-09-29-i4-0pt5", captured from the 2026-09-29
+# postseason on) are typed "total" and trade near 50%, so "most balanced" could pick one.
+_SINGLE_INNING_SLUG = re.compile(r"-i\d+-")
+
+
 def _is_full_game_market(market: dict[str, Any]) -> bool:
     slug = str(market.get("market_slug") or "").casefold()
-    return bool(slug) and not any(marker in slug for marker in _PARTIAL_GAME_MARKERS)
+    return (
+        bool(slug)
+        and not any(marker in slug for marker in _PARTIAL_GAME_MARKERS)
+        and not _SINGLE_INNING_SLUG.search(slug)
+    )
 
 
 def _market_balance(market: dict[str, Any]) -> float:

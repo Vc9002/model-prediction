@@ -2773,18 +2773,21 @@ def test_select_nba_spread_market_ignores_old_balanced_quote() -> None:
             "market_slug": "miami-neg-9pt5",
             "observed_at_utc": "2026-11-10T05:32:04Z",
             "long": {"ask": 0.50},
+            "short": {"ask": 0.52},
         },
         {
             "line": -9.5,
             "market_slug": "miami-neg-9pt5",
             "observed_at_utc": "2026-11-11T00:19:50Z",
             "long": {"ask": 0.40},
+            "short": {"ask": 0.62},
         },
         {
             "line": -6.5,
             "market_slug": "miami-neg-6pt5",
             "observed_at_utc": "2026-11-11T00:19:55Z",
             "long": {"ask": 0.50},
+            "short": {"ask": 0.52},
         },
     ]
     picked = cli._select_nba_spread_market(rows, as_of=as_of)
@@ -2800,12 +2803,14 @@ def test_select_nba_spread_market_uses_six_hour_fallback_only_without_fresh_quot
         "market_slug": "miami-neg-9pt5",
         "observed_at_utc": "2026-11-10T22:20:00Z",
         "long": {"ask": 0.50},
+        "short": {"ask": 0.52},
     }
     fresh = {
         "line": -6.5,
         "market_slug": "miami-neg-6pt5",
         "observed_at_utc": "2026-11-11T00:19:00Z",
         "long": {"ask": 0.53},
+        "short": {"ask": 0.49},
     }
     assert cli._select_nba_spread_market([old], as_of=as_of) == old
     assert cli._select_nba_spread_market([old, fresh], as_of=as_of) == fresh
