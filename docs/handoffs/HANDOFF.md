@@ -1,18 +1,32 @@
-# Handoff — open work (updated 2026-11-11)
+# Handoff — open work (updated 2026-11-22)
 
 **Status: OPEN.** Delete this file when every item below is done or explicitly dropped.
-Items from the 2026-11-05 version that finished (project folder rename to `E:\MP`, NCAAF
-duplicate dedup, NCAAF champion v3->v4, `cfb-total-v1` backtest correction, research-ledger
-merge into Flat/Main) were removed; history is in git and `ROADMAP.md`.
+Finished and removed: the `refactor/cleanup-2026-11-11` triage (the branch is the live branch at
+`7a234da4`; the 12 failures it listed all pass now: `test_cli`, `test_five_blind_spot_guards`,
+`test_forecast_runtime_regressions`, `test_tennis_markov`, 111 passed on 2026-11-22), the 2026-11-22
+review fixes and the helper dedupe (merged, worktrees and branches removed). History is in git,
+`DEBUG.md` and `ROADMAP.md`. Nothing is pushed.
 
 ## Next action
 
-Decide what to do with branch `refactor/cleanup-2026-11-11` (head `3a776f29`): the pass is
-finished but not merged, and 12 tests fail on it (the same 12 fail at the pre-refactor
-checkpoint `0af19ecd`: 9 in `tests/test_cli.py`, 1 each in `test_five_blind_spot_guards.py`,
-`test_forecast_runtime_regressions.py`, `test_tennis_markov.py`). Triage those 12 with
-targeted runs (`-o addopts='' -q`, never the full suite), then merge or hold. The scheduled
-tasks run the working tree, so do not edit source while a daily run is in progress.
+Decide the items in section 0 (operator decisions left by the 2026-11-22 review fixes), then
+section 1. The scheduled tasks run the working tree, so do not edit source while a run is in
+progress (check `runs.db` for `started` rows first).
+
+## 0. Review-fix follow-ups (2026-11-22; decisions only, no code owed)
+
+Detail in the `ROADMAP.md` section "2026-11-22 — Project-review fixes and the decisions they leave".
+
+- **Non-binary terminal markets stay open.** `_settle_by_resolution` no longer voids them; a market
+  that legitimately settles non-binary needs a hand-void. Decide on an age-out void.
+  `portfolio/auto_buyer_ledger.py` (~2173) still books a push on non-binary outcomes.
+- **207 earlier non-binary pushes** are in the ledger (198 esports, none in the six in-scope sports).
+  Decide whether to re-grade them.
+- **v9 unread/defaulted artifact keys** are logged and pinned by `tests/test_nba_v9_artifact_keys.py`
+  only. Making them take effect is a new version through `model_promotion`.
+- **Exit 75** is now `skipped` and degrades `system_health`. Consecutive-skip escalation is not built.
+- **From the review, not touched:** paper quote age is unbounded (`max_quote_age_seconds` unset),
+  and the live-order path in the auto-buyer worker is gated only by the saved `mode` (`paper`).
 
 ## 1. NCAAB (updated 2026-11-21 evening, quick 261121-hmc)
 
@@ -156,7 +170,7 @@ differs (discrete PMF with push mass), so it cannot repair a mean with no signal
 
 ## Done when
 
-Items 1 through 6 are each resolved or explicitly dropped, and this file has been deleted.
+Sections 0 through 6 are each resolved or explicitly dropped, and this file has been deleted.
 
 ## 7. NFL fix batch 2026-11-11 (done; follow-ups open)
 
@@ -302,4 +316,3 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
   it); upcoming games are treated as regular season in the forward log (fix before April); 2026
   playoff games are absent from `nba_games_all.jsonl`; a pre-existing 311 s capture run (19:50Z
   11-21) brushed the 300 s supervisor timeout.
-- **Leftover:** four empty locked worktrees under `.claude/worktrees/agent-*` (removal was denied).
