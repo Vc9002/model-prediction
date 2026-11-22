@@ -333,6 +333,24 @@ def _canonical_market_snapshot_lineage(row: dict[str, Any], archive_path: Path) 
     }
 
 
+def _quote_label_side(label: str, away_team: str, home_team: str, away_res: Any, home_res: Any) -> str | None:
+    """Side a Polymarket quote's team label names, or None when it names neither or both."""
+    from ..data_sources.cfb_data import resolve_team
+    from ..learned_forward import _team_matches
+
+    if not label:
+        return None
+    res = resolve_team(_clean_cfb_school(label))
+    if res is not None and res == away_res:
+        return "away"
+    if res is not None and res == home_res:
+        return "home"
+    is_away, is_home = _team_matches(away_team, label), _team_matches(home_team, label)
+    if is_away != is_home:
+        return "away" if is_away else "home"
+    return None
+
+
 def _match_cfb_moneyline(
     away_team: str,
     home_team: str,
@@ -381,28 +399,23 @@ def _match_cfb_moneyline(
 
         h1 = (p1_c == home_canon) or _team_matches(home_team, p1)
         a2 = (p2_c == away_canon) or _team_matches(away_team, p2)
-        if h1 and a2:
-            team = str(r.get("team") or "")
-            long_desc = str(long_dict.get("description") or "")
-            is_home_long = (
-                (p1_res is not None and resolve_team(_clean_cfb_school(team)) == home_res)
-                or _team_matches(home_team, team)
-                or _team_matches(home_team, long_desc)
-            )
-            matched.append((str(r.get("observed_at_utc") or ""), r, "home" if is_home_long else "away"))
-            continue
-
         a1 = (p1_c == away_canon) or _team_matches(away_team, p1)
         h2 = (p2_c == home_canon) or _team_matches(home_team, p2)
-        if a1 and h2:
-            team = str(r.get("team") or "")
-            long_desc = str(long_dict.get("description") or "")
-            is_away_long = (
-                (p1_res is not None and resolve_team(_clean_cfb_school(team)) == away_res)
-                or _team_matches(away_team, team)
-                or _team_matches(away_team, long_desc)
-            )
-            matched.append((str(r.get("observed_at_utc") or ""), r, "away" if is_away_long else "home"))
+        if h1 and a2 and not (a1 and h2):
+            p1_side = "home"
+        elif a1 and h2 and not (h1 and a2):
+            p1_side = "away"
+        else:
+            continue
+        # The long side is the title's first team (2026-11-21 audit: 1,165 of 1,165 resolvable
+        # labels). The label only cross-checks it: "University of Arizona" and bare mascots do not
+        # resolve, and "Wildcats" names both Arizona and Kansas State.
+        if _quote_label_side(str(r.get("team") or ""), away_team, home_team, away_res, home_res) not in (
+            None,
+            p1_side,
+        ):
+            continue
+        matched.append((str(r.get("observed_at_utc") or ""), r, p1_side))
 
     if not matched:
         return None, None
@@ -420,7 +433,7 @@ def _match_cfb_spread(
     from ..learned_forward import _team_matches
 
     partial_tokens = ("-1h-", "-2h-", "-1q-", "-2q-", "-3q-", "-4q-")
-    cands: list[dict[str, Any]] = []
+    cands: list[tuple[dict[str, Any], str]] = []
     away_res = resolve_team(_clean_cfb_school(away_team))
     home_res = resolve_team(_clean_cfb_school(home_team))
     away_canon = away_res.canonical_name if away_res else away_team
@@ -464,27 +477,24 @@ def _match_cfb_spread(
         match_reverse = ((p1_c == home_canon) or _team_matches(home_team, p1)) and (
             (p2_c == away_canon) or _team_matches(away_team, p2)
         )
-        if match_normal or match_reverse:
-            cands.append(r)
+        if match_normal == match_reverse:
+            continue
+        # The quote's line belongs to the title's first team (2026-11-21 audit: 22,256 of 22,256
+        # resolvable labels; the long description equals the line on 94,072 of 94,072 rows). Guessing
+        # the side from the label instead defaulted "University of Arizona" to home and priced
+        # Kansas State +10.5 as Arizona +10.5 for v5, v6.2 and v7. The label only cross-checks.
+        p1_side = "away" if match_normal else "home"
+        if _quote_label_side(str(r.get("team") or ""), away_team, home_team, away_res, home_res) not in (
+            None,
+            p1_side,
+        ):
+            continue
+        cands.append((r, p1_side))
 
     if not cands:
         return None, None
 
-    def _spread_ask_balance(row: dict[str, Any]) -> float:
-        return abs(float(row["long"]["ask"]) - 0.5)
-
-    best = min(cands, key=_spread_ask_balance)
-    anchor_team = str(best.get("team") or "")
-    anchor_res = resolve_team(_clean_cfb_school(anchor_team)) if anchor_team else None
-    if anchor_res and anchor_res == away_res:
-        anchor_side = "away"
-    elif anchor_res and anchor_res == home_res:
-        anchor_side = "home"
-    elif _team_matches(away_team, anchor_team):
-        anchor_side = "away"
-    else:
-        anchor_side = "home"
-
+    best, anchor_side = min(cands, key=lambda item: abs(float(item[0]["long"]["ask"]) - 0.5))
     return best, anchor_side
 
 

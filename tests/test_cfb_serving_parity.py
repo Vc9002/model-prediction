@@ -720,3 +720,47 @@ def test_shared_rng_advances_across_games_and_replays_exactly() -> None:
                 replay_inputs(prediction.inference_inputs, prediction.market_type) == prediction.probabilities
             )
     assert model.distribution_engine.margin_sd == model.margin_sd
+
+
+# --------------------------------------------------------------------------- quote side from title position
+def _az_ksu_row(market_type: str, team: str, long_ask: float, short_ask: float, **extra) -> dict:
+    """The 2026-11-21 quote: both teams are "Wildcats" and the label is "University of Arizona"."""
+    return _pm_row(
+        f"x-{market_type}-arz-kanst",
+        "2026-11-21T23:55:00Z",
+        long_ask,
+        short_ask,
+        event_title="Arizona vs. Kansas State",
+        team=team,
+        market_type=market_type,
+        long={"ask": long_ask, "description": extra.pop("long_desc", "-10.50")},
+        short={"ask": short_ask, "description": extra.pop("short_desc", "+10.50")},
+        **extra,
+    )
+
+
+def test_spread_side_is_the_title_first_team_when_the_label_does_not_resolve() -> None:
+    """The label used to fall back to home: Kansas State +10.5 at 52c was priced as Arizona +10.5."""
+    rows = [_az_ksu_row("spread", "University of Arizona", 0.485, 0.52, line=-10.5)]
+    _row, side = college_football._match_cfb_spread("Arizona Wildcats", "Kansas State Wildcats", rows)
+    assert side == "away"
+    _row, side = college_football._match_cfb_spread("Kansas State Wildcats", "Arizona Wildcats", rows)
+    assert side == "home"
+
+
+def test_moneyline_long_side_is_the_title_first_team_when_the_label_does_not_resolve() -> None:
+    rows = [
+        _az_ksu_row("moneyline", "University of Arizona", 0.77, 0.235, line=None, long_desc="", short_desc="")
+    ]
+    _row, side = college_football._match_cfb_moneyline("Kansas State Wildcats", "Arizona Wildcats", rows)
+    assert side == "home"
+    _row, side = college_football._match_cfb_moneyline("Arizona Wildcats", "Kansas State Wildcats", rows)
+    assert side == "away"
+
+
+def test_a_label_that_names_the_other_team_fails_closed() -> None:
+    rows = [_az_ksu_row("spread", "Kansas State", 0.485, 0.52, line=-10.5)]
+    assert college_football._match_cfb_spread("Arizona Wildcats", "Kansas State Wildcats", rows) == (
+        None,
+        None,
+    )
