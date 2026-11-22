@@ -972,7 +972,7 @@ def test_latest_completed_run_after_a_long_streak_is_healthy(tmp_path: Path) -> 
 def test_skip_escalation_is_per_worker(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     # The same 3 skips over 4 h: past daily's 3 runs / 3 h, short of auto-buyer's
-    # 6 runs / 4 h (a 30-minute cadence produces far more skips per hour).
+    # 12 runs / 3 h (a 15-minute cadence produces far more skips per hour).
     history = [("completed", 10.0), ("skipped", 5.0), ("skipped", 3.0), ("skipped", 1.0)]
     _seed_runs_with_history(
         repo,
@@ -1016,3 +1016,30 @@ def test_failed_rows_still_go_down_and_break_a_skip_streak(tmp_path: Path) -> No
     assert report["checks"]["runs"]["daily"]["skip_streak"]["count"] == 1
     assert not _stuck_reasons(report)
     assert not any("last run failed" in r for r in report["reasons"])
+
+
+def test_started_run_between_skips_breaks_the_streak(tmp_path: Path) -> None:
+    repo = _make_repo(tmp_path)
+    # A live (started) run proves the lock was acquired, so only the two skips after it count.
+    # Without that rule the four skips spanning 4.5 h would trip the daily threshold.
+    _seed_runs_with_history(
+        repo,
+        "daily",
+        [("skipped", 5.0), ("skipped", 4.0), ("started", 3.0), ("skipped", 1.5), ("skipped", 0.5)],
+    )
+
+    report = _health_for(repo)
+
+    assert report["checks"]["runs"]["daily"]["skip_streak"]["count"] == 2
+    assert not _stuck_reasons(report)
+
+
+def test_skip_escalation_span_threshold_boundary(tmp_path: Path) -> None:
+    # daily is 3 runs / 3 h: 2.9 h of three skips degrades, 3.1 h is DOWN.
+    under = _make_repo(tmp_path / "under")
+    _seed_runs_with_history(under, "daily", [("skipped", 3.0), ("skipped", 1.5), ("skipped", 0.1)])
+    assert not _stuck_reasons(_health_for(under))
+
+    over = _make_repo(tmp_path / "over")
+    _seed_runs_with_history(over, "daily", [("skipped", 3.2), ("skipped", 1.5), ("skipped", 0.1)])
+    assert len(_stuck_reasons(_health_for(over))) == 1

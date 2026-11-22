@@ -68,14 +68,15 @@ _SERVED_VALUE_MIN_ROWS = 10
 # streak ever recorded was daily <=2 rows / 0.02 h and auto-buyer <=7 rows /
 # 3.0 h (the 2026-10-31 hung-lease episode, which self-cleared). Each T sits
 # above the worker's DEFAULT_WORKER_TIMEOUTS (a live run can legitimately hold
-# the lock that long) and above the longest observed streak; N is the number
-# of skips the cadence produces within T. Workers absent from this table use
-# _SKIP_ESCALATION_DEFAULT.
+# the lock that long); N is roughly the number of skips the scheduled cadence
+# produces within T, so T is the binding limit. Cadences are the Task Scheduler
+# triggers in scripts/register_windows_tasks.ps1. Workers absent from this
+# table use _SKIP_ESCALATION_DEFAULT.
 _SKIP_ESCALATION_DEFAULT = (3, 6.0)  # slowest cadences (calibrate 6 h, manual-bet-sync)
 _SKIP_ESCALATION: dict[str, tuple[int, float]] = {
-    "daily": (3, 3.0),  # ~every 1.5-2 h; 60 min timeout, observed max 2 skips
+    "daily": (3, 3.0),  # every 90 min 09:00-21:00 (each skip waits up to 45 min); 60 min timeout
     "production": (3, 6.0),  # every 3 h; 15 min timeout, no skip ever recorded
-    "auto-buyer": (6, 4.0),  # every 30 min; 25 min timeout, observed max 7 skips / 3.0 h
+    "auto-buyer": (12, 3.0),  # every 15 min; 25 min timeout; 2026-10-31 hung lease ran >3 h
     "nba-pretip-capture": (6, 1.0),  # every 10 min, takes no lock; 5 min timeout
     "ncaaf-prekickoff-capture": (6, 1.0),  # every 10 min, takes no lock; 6 min timeout
 }
