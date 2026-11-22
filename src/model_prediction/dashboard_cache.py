@@ -160,16 +160,19 @@ class DashboardCache:
         try:
             event_count = store.event_count()
             counts: dict[str, int] = {}
+            column_key = hashlib.sha256("\0".join(DASHBOARD_COLUMNS).encode()).hexdigest()[:12]
             for tier in ("main", "flat", "research", "gated_research"):
+                state_key = f"sqlite-events:{event_count}:tier:{tier}:columns:{column_key}"
+                # Check freshness before materialising: building all four tiers'
+                # rows on every no-op refresh cost ~11 s CPU in the profile, and
+                # _read_split_picks refreshes once per tier read.
+                if not force and self._is_fresh(conn, tier, state_key):
+                    continue
                 rows = [
                     self._dashboard_row(row)
                     for row in store.pick_rows(tier=tier)
                     if row.get("status") not in RETIRED_STATUSES
                 ]
-                column_key = hashlib.sha256("\0".join(DASHBOARD_COLUMNS).encode()).hexdigest()[:12]
-                state_key = f"sqlite-events:{event_count}:tier:{tier}:columns:{column_key}"
-                if not force and self._is_fresh(conn, tier, state_key):
-                    continue
                 self._replace_tier(conn, tier, rows, state_key)
                 counts[tier] = len(rows)
             return counts

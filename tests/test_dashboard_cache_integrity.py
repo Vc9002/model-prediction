@@ -85,6 +85,43 @@ def test_sqlite_cache_uses_canonical_rows_and_preserves_clv_odds(tmp_path) -> No
     store.close()
 
 
+def test_sqlite_refresh_skips_pick_rows_when_event_count_unchanged(tmp_path) -> None:
+    class _FakeStore:
+        def __init__(self) -> None:
+            self.events = 1
+            self.calls: list[str] = []
+
+        def event_count(self) -> int:
+            return self.events
+
+        def pick_rows(self, *, tier: str) -> list[dict]:
+            self.calls.append(tier)
+            return []
+
+    fake = _FakeStore()
+    cache = DashboardCache(
+        tmp_path / "repo-data",
+        db_path=tmp_path / "dashboard-cache.db",
+        authority="sqlite",
+        ledger_store=fake,
+    )
+    all_tiers = {"main": 0, "flat": 0, "research": 0, "gated_research": 0}
+
+    assert cache.refresh() == all_tiers
+    assert len(fake.calls) == 4
+
+    # Unchanged event_count: a no-op refresh must not materialise any tier.
+    assert cache.refresh() == {}
+    assert len(fake.calls) == 4
+
+    fake.events += 1
+    assert cache.refresh() == all_tiers
+    assert len(fake.calls) == 8
+
+    assert cache.refresh(force=True) == all_tiers
+    assert len(fake.calls) == 12
+
+
 def test_empty_sqlite_cache_tier_does_not_fall_back_to_stale_xlsx(tmp_path, monkeypatch) -> None:
     from model_prediction.dashboard import picks
     from model_prediction.ledger import FIELDNAMES
