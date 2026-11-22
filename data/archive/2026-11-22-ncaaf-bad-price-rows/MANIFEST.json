@@ -1,0 +1,84 @@
+{
+ "created_utc": "2026-11-22T02:25:52.621248+00:00",
+ "operation": "ncaaf-bad-price-2026-11-22",
+ "approved_by": "Vincent (2026-11-22, 'Archive bad old rows' in the next-fixes question)",
+ "evidence": "E:/MP/outputs/ncaaf/bug_hunt/settlement.md (F1, F2) and pricing.md (finding 1)",
+ "items": {
+  "collided_quote": {
+   "reason": "ncaaf-bad-price-2026-11-22: priced on another game's Polymarket contract (pre-32528f57 one-word team join); graded on its own game at the other game's line and price",
+   "pick_ids": [
+    "07fa23ae52954ada",
+    "e5a035615a50414e",
+    "8321c28ba0ca456e",
+    "463e7d62b1c64de5",
+    "f8d737b1b8644e61",
+    "103bc4f68005402b",
+    "1e8c93a5f4ce4a5a",
+    "aad4db471cab4f71",
+    "84a7435ae73447f8",
+    "861618c1943a403a",
+    "cd201aa13391404d",
+    "766fafab4f2946dc"
+   ]
+  },
+  "fabricated_50c": {
+   "reason": "ncaaf-bad-price-2026-11-22: opening-weekend legacy import with a fabricated 50c decision price (edge = model - 0.5) and PnL from a different price; same class as the 2026-08-30 void note",
+   "pick_ids": [
+    "19ce0365f44d45b0",
+    "5d9019677d97400f",
+    "168367adc7004e74",
+    "3d64dbbd304248d1",
+    "3d8a984b6f2b4b1b",
+    "44bd72e2b35a4d2e",
+    "471546048c1c4f95",
+    "6baec084dd2446df",
+    "7d336336dc224676",
+    "a52d27898b5847fd",
+    "ea381bef94d645b0",
+    "c6960e4228f24bb9",
+    "069a8c294c5f4338",
+    "1e9902aa1d474b76",
+    "2c9c560e577c47d7",
+    "35f75567bf10472e",
+    "4ba103d5eb794e1e",
+    "777d4520a2934789",
+    "a3fd0d6da83c4eee",
+    "aea038cefe1140a8",
+    "b3ad75beb0d94f4a"
+   ]
+  }
+ },
+ "summary_by_item_tier": {
+  "collided_quote/flat": {
+   "n": 10,
+   "pnl": 11.54,
+   "W-L-P": [
+    10,
+    0,
+    0
+   ]
+  },
+  "collided_quote/main": {
+   "n": 2,
+   "pnl": 2.4,
+   "W-L-P": [
+    2,
+    0,
+    0
+   ]
+  },
+  "fabricated_50c/flat": {
+   "n": 21,
+   "pnl": -2.9697,
+   "W-L-P": [
+    11,
+    10,
+    0
+   ]
+  }
+ },
+ "rows_file": "settled_rows.jsonl",
+ "rows_file_sha256": "27546303ad4aeeb29bce40d647d8b6104c215c657057f95fa8a1ecdbecea6e22",
+ "sqlite_backup_before": "E:\\model-prediction-runtime\\ledgers\\ledgers.db.pre-ncaaf-bad-price-2026-11-22-20261122T022542Z.bak",
+ "audit_backup_before": "E:\\model-prediction-runtime\\backups\\ncaaf-bad-price-2026-11-22-20261122T022542Z\\E_MP_data_events.jsonl"
+}

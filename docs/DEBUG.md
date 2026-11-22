@@ -1,5 +1,12 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-22 — NCAAF/NCAAB bug hunt fixes and bad-price archive (quick-261122-nbf)
+
+- **Selectors (7af9d47d)**: spread/total rungs last seen >30 min before the game's newest capture no longer win on balance (11-21: 33 rows, 4 Main, priced off hours-old rungs after the day-ahead capture b87d6452); exact balance ties go to the newer quote; HALTED/untimed books skipped; v6.2 no longer logs 1e-12 "0.0000-edge" picks.
+- **Settlement (b1d48666)**: NCAAF spread/moneyline closes resolve the side by team identity and title position (NM State, UMass, San José, App State, Georgia Southern "Eagles", "Fightin' Blue Hens" were blank); resolution settle applies `ncaaf_settlement_slug` and declines ambiguous outcomes; a losing whole-number spread was graded a push in resolution scores; NCAAF name fallback never pairs namesakes; NCAAB fallback dropped the bare-mascot rule and fails closed on two different matching games (NCAAB 53c03c58cbaa4a05 Samford @ USC Upstate 11-18 was settled 78-72 W on UNCG @ Gardner-Webb; real 64-74 L; 0U row, left in place).
+- **Archive (operator "Archive bad old rows", 2026-11-22)**: 33 settled NCAAF rows via `archive_settled_rows`: 12 priced on another game's contract (pre-32528f57 one-word team join, 10-24..11-07; 2 Main +2.40U, 10 Flat +11.54U, all wins) and 21 opening-weekend legacy rows with a fabricated 50c decision price (Flat, 11-10, -2.97U). Archive `data/archive/2026-11-22-ncaaf-bad-price-rows/` (MANIFEST.json, settled_rows.jsonl); backups `ledgers.db.pre-ncaaf-bad-price-2026-11-22-*.bak`, `E:\model-prediction-runtime\backups\ncaaf-bad-price-2026-11-22-*`. Not archived (not in the approved list): 881b2c77229146ee (NM State 10-21 v2 Flat, priced at the other side's ask, graded W, contract bought lost).
+- Evidence: `outputs/ncaaf/bug_hunt/{settlement,pricing,models}.md`, NCAAB replay `outputs/ncaab/ncaab_v7_vs_v6_daily.md`.
+
 ## 2026-11-21 — NCAAF Polymarket quote side guessed from an unresolvable label (quick-261121-qsd)
 
 - **Bug**: `_match_cfb_spread` / `_match_cfb_moneyline` decided which team a quote's line belongs to by resolving its `team` label and fell back to home. Polymarket labels Arizona "University of Arizona" (also "NM State", "U. of Idaho", bare mascots early season). On 11-21 Arizona -10.5 at Kansas State (both "Wildcats") was read as Kansas State -10.5, so v5, v6.2 and v7 each priced "Arizona +10.5" at the Kansas State +10.5 ask (52%): phantom edges of 31-42% on Flat (v5 Main's 8% max-edge gate kept it out of Main and the buyer).
