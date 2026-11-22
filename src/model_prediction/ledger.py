@@ -63,7 +63,7 @@ from .domain import (
     utc_now,
 )
 from .eligibility import EligibilityResult
-from .model_ledger import record_from_pick_request, settle_from_pick_row
+from .model_ledger import defer_model_ledger_writes, record_from_pick_request, settle_from_pick_row
 from .pricing import (
     american_to_decimal,
     grade_pick,
@@ -111,7 +111,10 @@ def defer_sqlite_xlsx_exports() -> Iterator[None]:
     with _DEFERRED_XLSX_EXPORTS_LOCK:
         _DEFERRED_XLSX_EXPORTS_DEPTH += 1
     try:
-        yield
+        # The per-model workbooks are rewritten whole on every append (~90% of one append's cost,
+        # measured 2026-11-22); they are spooled and folded once when this context exits.
+        with defer_model_ledger_writes():
+            yield
     finally:
         ledgers: list[PickLedger] = []
         with _DEFERRED_XLSX_EXPORTS_LOCK:

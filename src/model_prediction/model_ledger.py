@@ -18,6 +18,8 @@ write here are separate, later steps -- see DEBUG.md/docs for status.
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import tempfile
 import threading
@@ -41,6 +43,9 @@ from .xlsx_ledger import _replace_with_retry, _sweep_orphaned_temp_files
 
 MODEL_LEDGER_SCHEMA_VERSION = "1"
 SHEET_NAME = "Predictions"
+# Durable write-behind journal next to a workbook (see defer_model_ledger_writes). Not an .xlsx name, so
+# directory scans for model workbooks never mistake it for a ledger.
+SPOOL_SUFFIX = ".pending.jsonl"
 
 # fcntl.flock(LOCK_EX) blocks indefinitely with no built-in timeout -- a hung
 # holder (not crashed; POSIX auto-releases on process death) would otherwise
@@ -397,10 +402,9 @@ def settle_from_pick_row(model_ledgers_dir: str | Path, row: dict[str, Any]) -> 
     )
     if model_id is None:
         return []
-    path = Path(model_ledgers_dir) / f"{model_id}.xlsx"
-    if not path.exists():
+    ledger = ModelLedger(Path(model_ledgers_dir) / f"{model_id}.xlsx")
+    if not ledger.exists():
         return []
-    ledger = ModelLedger(path)
     key = _event_settlement_key(
         {
             "event_id": row.get("event_id", ""),
@@ -437,6 +441,69 @@ _ROWS_CACHE_LOCK = threading.Lock()
 _ROWS_CACHE_MAX_LEDGERS = 32
 
 
+_DEFERRED_WRITES_LOCK = threading.RLock()
+_DEFERRED_WRITES_DEPTH = 0
+_DEFERRED_LEDGERS: dict[str, ModelLedger] = {}
+
+
+def _model_ledger_writes_deferred() -> bool:
+    with _DEFERRED_WRITES_LOCK:
+        return _DEFERRED_WRITES_DEPTH > 0
+
+
+def _register_deferred_model_ledger(ledger: ModelLedger) -> None:
+    with _DEFERRED_WRITES_LOCK:
+        _DEFERRED_LEDGERS[str(ledger.path.resolve())] = ledger
+
+
+@contextmanager
+def defer_model_ledger_writes() -> Iterator[None]:
+    """Spool ``ModelLedger.append_prediction`` rows and fold them into each workbook once on exit.
+
+    Process-wide like ``ledger.defer_sqlite_xlsx_exports`` (the daily forecast fans out over threads), and
+    nested contexts flush only when the outermost one exits. Every spooled row is fsync'd before the append
+    returns, reads merge the spool, and a failed or skipped flush leaves the spool for the next reader or
+    ``flush_pending_model_ledgers`` to fold, so a crash loses nothing the caller was told was written.
+    """
+    global _DEFERRED_WRITES_DEPTH
+    with _DEFERRED_WRITES_LOCK:
+        _DEFERRED_WRITES_DEPTH += 1
+    try:
+        yield
+    finally:
+        pending: list[ModelLedger] = []
+        with _DEFERRED_WRITES_LOCK:
+            _DEFERRED_WRITES_DEPTH -= 1
+            if _DEFERRED_WRITES_DEPTH == 0:
+                pending = list(_DEFERRED_LEDGERS.values())
+                _DEFERRED_LEDGERS.clear()
+        for ledger in pending:
+            try:
+                ledger.flush_pending()
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "deferred model-ledger flush failed for %s; rows stay in %s",
+                    ledger.path,
+                    ledger.spool_path,
+                    exc_info=True,
+                )
+
+
+def flush_pending_model_ledgers(model_ledgers_dir: str | Path) -> int:
+    """Fold any spools a crashed run left behind; returns the rows folded. Never raises."""
+    folded = 0
+    directory = Path(model_ledgers_dir)
+    if not directory.is_dir():
+        return 0
+    for spool in sorted(directory.glob(f"*.xlsx{SPOOL_SUFFIX}")):
+        workbook = spool.with_name(spool.name[: -len(SPOOL_SUFFIX)])
+        try:
+            folded += ModelLedger(workbook).flush_pending()
+        except Exception:
+            logging.getLogger(__name__).warning("could not fold model-ledger spool %s", spool, exc_info=True)
+    return folded
+
+
 class ModelLedger:
     """One file per model identity (e.g. mlb-moneyline-elo-trend-lr.xlsx).
 
@@ -452,6 +519,52 @@ class ModelLedger:
         if self.path.suffix.casefold() != ".xlsx":
             raise ValueError("a model ledger must be an .xlsx workbook")
         self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        self.spool_path = self.path.with_name(self.path.name + SPOOL_SUFFIX)
+
+    def exists(self) -> bool:
+        """The workbook or a not-yet-flushed spool holds rows for this model."""
+        return self.path.exists() or self.spool_path.exists()
+
+    def _read_spool(self) -> list[dict[str, str]]:
+        """Rows appended under ``defer_model_ledger_writes`` and not yet folded into the workbook."""
+        try:
+            lines = self.spool_path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            return []
+        rows: list[dict[str, str]] = []
+        for number, line in enumerate(lines, start=1):
+            if not line.strip():
+                continue
+            try:
+                loaded = json.loads(line)
+            except json.JSONDecodeError:
+                # A crash mid-append can leave one torn line; it was never acknowledged to a caller.
+                logging.getLogger(__name__).warning(
+                    "ignoring unparseable spool line %d in %s", number, self.spool_path
+                )
+                continue
+            if isinstance(loaded, dict):
+                rows.append(
+                    {name: "" if loaded.get(name) is None else str(loaded[name]) for name in FIELDNAMES}
+                )
+        return rows
+
+    def _append_spool(self, row: dict[str, str]) -> None:
+        self.spool_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.spool_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+
+    def flush_pending(self) -> int:
+        """Fold spooled rows into the workbook and delete the spool; returns the rows folded."""
+        with self._lock():
+            pending = self._read_spool()
+            if pending:
+                self._write_unlocked(self._read_unlocked())
+            else:
+                self.spool_path.unlink(missing_ok=True)
+            return len(pending)
 
     @contextmanager
     def _lock(self) -> Iterator[None]:
@@ -464,6 +577,16 @@ class ModelLedger:
                 unlock(lock.fileno())
 
     def _read_unlocked(self) -> list[dict[str, str]]:
+        """Workbook rows plus any spooled rows the workbook does not hold yet (a spool row whose id is
+        already in the workbook is a flush that crashed before deleting the spool)."""
+        rows = self._read_workbook_unlocked()
+        pending = self._read_spool()
+        if pending:
+            known = {row["prediction_id"] for row in rows}
+            rows.extend(row for row in pending if row["prediction_id"] not in known)
+        return rows
+
+    def _read_workbook_unlocked(self) -> list[dict[str, str]]:
         try:
             stat = self.path.stat()
         except FileNotFoundError:
@@ -490,6 +613,9 @@ class ModelLedger:
         with _ROWS_CACHE_LOCK:
             _ROWS_CACHE.pop(str(self.path.resolve()), None)
         _write_predictions_atomic(self.path, rows)
+        # ``rows`` always comes from _read_unlocked, so every spooled row is in the workbook now. A crash
+        # between the replace and this unlink only leaves duplicates that _read_unlocked ignores by id.
+        self.spool_path.unlink(missing_ok=True)
 
     def rows(self) -> list[dict[str, str]]:
         with self._lock():
@@ -521,6 +647,13 @@ class ModelLedger:
             row["ledger_schema_version"] = MODEL_LEDGER_SCHEMA_VERSION
             if not row["status"]:
                 row["status"] = "open"
+            if _model_ledger_writes_deferred():
+                # Durable (fsync'd) but O(1): rewriting the whole workbook per pick made one slate of
+                # appends quadratic in ledger size. The workbook catches up once, when the outermost
+                # deferral context exits, and readers see the spool in the meantime.
+                self._append_spool(row)
+                _register_deferred_model_ledger(self)
+                return row
             rows.append(row)
             self._write_unlocked(rows)
             return row
