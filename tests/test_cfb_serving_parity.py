@@ -764,3 +764,42 @@ def test_a_label_that_names_the_other_team_fails_closed() -> None:
         None,
         None,
     )
+
+
+# --------------------------------------------------------------------------- stale rungs / tradable books
+def _rung(slug: str, observed: str, long_ask: float, line: float, **extra) -> dict:
+    return _pm_row(
+        slug, observed, long_ask, round(1.02 - long_ask, 2), market_type="spread", line=line, **extra
+    )
+
+
+def test_a_rung_the_capture_stopped_polling_never_outranks_a_fresh_one() -> None:
+    """2026-11-21 Wake Forest @ Georgia Tech: a 05:45Z rung at 52c beat the 14:08Z rung at 53c."""
+    rows = [
+        _rung("sp-old", "2026-11-21T05:45:00Z", 0.52, -20.5),
+        _rung("sp-new", "2026-11-21T14:08:00Z", 0.53, -21.5),
+    ]
+    row, _side = college_football._match_cfb_spread("Duke Blue Devils", "Miami Hurricanes", rows)
+    assert row is not None and row["market_slug"] == "sp-new"
+    totals = [dict(r, market_type="total", line=abs(r["line"]) + 30) for r in rows]
+    assert (
+        college_football._match_cfb_total("Duke Blue Devils", "Miami Hurricanes", totals)["market_slug"]
+        == "sp-new"
+    )
+
+
+def test_an_exact_balance_tie_goes_to_the_newer_quote() -> None:
+    rows = [
+        _rung("sp-49", "2026-11-21T14:00:00Z", 0.49, -6.5),
+        _rung("sp-51", "2026-11-21T14:05:00Z", 0.51, -7.5),
+    ]
+    row, _side = college_football._match_cfb_spread("Duke Blue Devils", "Miami Hurricanes", rows)
+    assert row is not None and row["market_slug"] == "sp-51"
+
+
+@pytest.mark.parametrize("extra", [{"market_state": "MARKET_STATE_HALTED"}, {"timestamp_valid": False}])
+def test_halted_or_untimed_books_are_never_priced(extra: dict) -> None:
+    rows = [_rung("sp-bad", "2026-11-21T14:08:00Z", 0.50, -3.5, **extra)]
+    assert college_football._match_cfb_spread("Duke Blue Devils", "Miami Hurricanes", rows) == (None, None)
+    ml = [_pm_row("ml-bad", "2026-11-21T14:08:00Z", 0.40, 0.62, **extra)]
+    assert college_football._match_cfb_moneyline("Duke Blue Devils", "Miami Hurricanes", ml) == (None, None)

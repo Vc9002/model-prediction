@@ -460,7 +460,8 @@ def build_contracts(
         q: Mapping[str, Any],
     ):
         selection, prob, ask, edge = pick
-        if edge <= 0 or str(q.get("sportsbook")) != _CAPTURED_BOOK:
+        # The ledger stores the edge to 4 places; an edge of 1e-12 was logged as a 0.0000-edge pick.
+        if round(edge, 4) <= 0 or str(q.get("sportsbook")) != _CAPTURED_BOOK:
             return
         lineage = q.get("lineage") or {}
         # A captured book must carry its own observation time, at or before the decision; otherwise emit nothing.

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -377,7 +377,7 @@ def _match_cfb_moneyline(
             continue
         long_dict = r.get("long") or {}
         short_dict = r.get("short") or {}
-        if long_dict.get("ask") is None or short_dict.get("ask") is None:
+        if long_dict.get("ask") is None or short_dict.get("ask") is None or not _quote_tradable(r):
             continue
 
         title = str(r.get("event_title") or "")
@@ -423,6 +423,43 @@ def _match_cfb_moneyline(
     return row, side
 
 
+# A capture run quotes every rung of a game within a few minutes; a rung last seen more than this
+# before the game's newest capture is one the capture stopped polling (2026-11-21: Wake Forest @ Georgia
+# Tech -20.5 priced at a 05:45Z ask for a 14:21Z decision while -21.5 was quoted at 14:08Z).
+_CAPTURE_FRESH_WINDOW = timedelta(minutes=30)
+
+
+def _quote_tradable(row: dict[str, Any]) -> bool:
+    """A captured book must be OPEN with a valid timestamp; indicative rows carry neither field."""
+    state = row.get("market_state")
+    if state is not None and str(state) != "MARKET_STATE_OPEN":
+        return False
+    return row.get("timestamp_valid") is not False
+
+
+def _observed(row: dict[str, Any]) -> datetime | None:
+    try:
+        return parse_utc(str(row.get("observed_at_utc") or ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _freshest_capture(cands: list[Any], row_of: Callable[[Any], dict[str, Any]]) -> list[Any]:
+    """Drop rungs last seen well before the game's newest capture (see _CAPTURE_FRESH_WINDOW)."""
+    seen = [_observed(row_of(c)) for c in cands]
+    known = [t for t in seen if t is not None]
+    if not known:
+        return cands
+    floor = max(known) - _CAPTURE_FRESH_WINDOW
+    return [c for c, t in zip(cands, seen, strict=True) if t is None or t >= floor]
+
+
+def _balance_then_newest(row: dict[str, Any]) -> tuple[float, float]:
+    """Most balanced ask first; an exact tie (49c vs 51c) goes to the newer quote, not file order."""
+    seen = _observed(row)
+    return (abs(float(row["long"]["ask"]) - 0.5), -(seen.timestamp() if seen else 0.0))
+
+
 def _match_cfb_spread(
     away_team: str,
     home_team: str,
@@ -451,7 +488,7 @@ def _match_cfb_spread(
         # which overstated the edge by the full spread (review 2026-11-11 #8b).
         l_ask = (r.get("long") or {}).get("ask")
         s_ask = (r.get("short") or {}).get("ask")
-        if l_ask is None or s_ask is None:
+        if l_ask is None or s_ask is None or not _quote_tradable(r):
             continue
 
         title = str(r.get("event_title") or "")
@@ -494,7 +531,8 @@ def _match_cfb_spread(
     if not cands:
         return None, None
 
-    best, anchor_side = min(cands, key=lambda item: abs(float(item[0]["long"]["ask"]) - 0.5))
+    cands = _freshest_capture(cands, lambda item: item[0])
+    best, anchor_side = min(cands, key=lambda item: _balance_then_newest(item[0]))
     return best, anchor_side
 
 
@@ -526,7 +564,7 @@ def _match_cfb_total(
         # which overstated the edge by the full spread (review 2026-11-11 #8b).
         l_ask = (r.get("long") or {}).get("ask")
         s_ask = (r.get("short") or {}).get("ask")
-        if l_ask is None or s_ask is None:
+        if l_ask is None or s_ask is None or not _quote_tradable(r):
             continue
 
         title = str(r.get("event_title") or "")
@@ -558,10 +596,7 @@ def _match_cfb_total(
     if not cands:
         return None
 
-    def _total_ask_balance(row: dict[str, Any]) -> float:
-        return abs(float(row["long"]["ask"]) - 0.5)
-
-    return min(cands, key=_total_ask_balance)
+    return min(_freshest_capture(cands, lambda row: row), key=_balance_then_newest)
 
 
 # A live event list fetched this long after the decision time postdates it and
