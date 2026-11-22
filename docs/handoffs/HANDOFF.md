@@ -14,13 +14,22 @@ checkpoint `0af19ecd`: 9 in `tests/test_cli.py`, 1 each in `test_five_blind_spot
 targeted runs (`-o addopts='' -q`, never the full suite), then merge or hold. The scheduled
 tasks run the working tree, so do not edit source while a daily run is in progress.
 
-## 1. NCAAB (updated 2026-11-21, quick 261120-nip)
+## 1. NCAAB (updated 2026-11-21 evening, quick 261121-hmc)
 
-- **Next action:** operator decision on A_ml_w0 (moneyline at Elo weight 0, v7 margin unchanged). The
-  confirmation read PASSED (`2e8b2bca`): 2015-2020 + 2022, 38,471 games, log-loss delta -0.004627,
-  one-sided 95% upper -0.003872, every season negative. If approved: new id, code-backed, promoted for
-  the NCAAB moneyline only via `model_promotion` (spread stays `ncaab-spread-v7`); the
-  `_ncaab_spread_champion_id` check that ML and spread champions match must be relaxed first.
+- **Next action:** verify the first Daily after 2026-11-21 16:50 ET serves NCAAB moneyline rows with
+  model_id `ncaab-moneyline-v7m` (hash `5ea1cb06…`), spread rows still `ncaab-spread-v7`, and
+  `model_version` `ncaab-moneyline-v7m+ncaab-spread-v7+ncaab-total-v6`. Then read the addendum v4
+  scorecards (`outputs/ncaab/research_261120/P1_player_availability/`, `P2_returning_production_early/`).
+- **Done 2026-11-21:** `ncaab-moneyline-v7m` (pure margin probability, A_ml_w0) promoted for the NCAAB
+  moneyline only (`e865f518`, operator-approved after an all-season check: better log loss on 856 D1
+  games, slightly worse on 178 priced games, market beats both). Rollback order: moneyline first
+  (`model_promotion rollback --sport NCAAB --market moneyline` returns `ncaab-spread-v7`), then spread.
+  Buyer state v979 blacklists v7m (backup `*.pre-ncaab-v7m-20261121-165215.bak`). The forward-check
+  cohort SQL must include v7m moneyline rows (model_id `ncaab-moneyline-v7m`).
+- **Spread/total research (261121-hmc):** totals grid T1-T3 not eligible; v6 stays. Player boxes
+  2022-2026 backfilled (`data/research/ncaab_external/espn_player_boxes/`, 31,039 events) and PIT
+  player features built; addendum v4 (`5d4a3da5`, K spread 25) pins P1 availability and P2 returning
+  production. Confirmation needs 2014-2021 boxes, fetched only if a candidate is DEV_ELIGIBLE.
 - **06:00 Daily 2026-11-21 verified:** 69/69 NCAAB v7 rows and 16/16 total rows carry
   `model_artifact_hash`; all NCAAB calibrators served identity; trial evaluated v7 (8 candidates, 0
   orders); pre-tip capture idle before tips (87 open rows, none in window).
@@ -35,8 +44,10 @@ tasks run the working tree, so do not edit source while a daily run is in progre
   Daily `result["calibration"]` decisions.
 - **CLV:** NCAAB closes must be observed strictly after the decision; the 15-min buyer worker captures
   pre-tip snapshots (NCAAB, tips within 25 min). First real captures from ~10:40 ET 2026-11-21. Check
-  settled NCAAB rows from 11-21 carry a close != decision price. Not yet on `_settle_by_resolution` /
-  `auto_buyer_ledger.py:1404` paths.
+  settled NCAAB rows from 11-21 carry a close != decision price. The resolution-settle and auto-buyer
+  ledger paths got the same rule on 2026-11-21 (`9adde04e`, NCAAB/NCAAF, forward only). Open: NBA paper
+  rows have the same zero-CLV close (33 of 48); a top-up buy can still take a close observed between
+  the first fill and the top-up.
 - **Forward check (re-pinned by engine):** split on
   `COALESCE(json_extract(json_extract(decision_payload_json,'$.model_input_snapshot_json'),'$.features.margin_engine'),'v6')`;
   v7 cohort = (v6 id AND engine v7) OR v7 id. Spread 5-8% edge since 11-12 was 13-16 (n=29) at review.
