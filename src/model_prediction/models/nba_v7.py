@@ -236,11 +236,12 @@ class NBAStructuralV7Engine:
             # Full margin impact from star/starter availability differential
             expected_margin += game.availability_points_gap
 
-            # v8: shrink toward the market's own posted spread (home margin = -away_line),
-            # the market line already embeds information (injuries, public line moves, sharp
-            # action) this model never sees. Weight 0.0 reproduces v7 exactly.
+            # v8: shrink toward the market's own posted spread, the market line already embeds
+            # information (injuries, public line moves, sharp action) this model never sees.
+            # Weight 0.0 reproduces v7 exactly.
             if self.market_blend_weight > 0.0 and game.spread_away_line is not None:
-                market_home_margin = -game.spread_away_line
+                # B4: spread_away_line is the home-margin line (away covers iff margin < line).
+                market_home_margin = game.spread_away_line
                 expected_margin = (
                     1.0 - self.market_blend_weight
                 ) * expected_margin + self.market_blend_weight * market_home_margin

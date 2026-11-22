@@ -94,9 +94,9 @@ def test_b4_blend_uses_spread_away_line_as_home_margin_line() -> None:
     for pred in spread.values():
         assert pred.inference_inputs["mean"] == pytest.approx(6.5)  # type: ignore[attr-defined]
         assert pred.probabilities["away"] == pytest.approx(0.5)  # type: ignore[attr-defined]
-    # v9 as served negates the line (documented bug B4; inert at weight 0).
+    # v9 used to negate the line (B4, inert at weight 0); fixed in 261121-xbn, so v9 now agrees.
     v9 = _by(NBAStructuralV9Engine.from_artifact(params).predict_games(history, upcoming), "spread")
-    assert next(iter(v9.values())).inference_inputs["mean"] == pytest.approx(-6.5)  # type: ignore[attr-defined]
+    assert next(iter(v9.values())).inference_inputs["mean"] == pytest.approx(6.5)  # type: ignore[attr-defined]
 
 
 def test_b5_baseline_tracks_current_season_scoring() -> None:
