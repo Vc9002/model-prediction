@@ -1,0 +1,299 @@
+{
+ "addendum_v4_sha256": "ccb107fc6f0b5b525337f8e48e7c9717b27afe824b78f7ea6c354f354618490e",
+ "addendum_v5_sha256": "c11e1910cec9fbc1cc1c5ea7b9ef9422d4eb8b8eafae48e96f65c255b5df7b57",
+ "by_season": {
+  "2018": {
+   "corr_cand": 0.085541,
+   "corr_v7": 0.105627,
+   "delta": -0.020087,
+   "n": 4432,
+   "share_adjusted_nonzero": 0.39892
+  },
+  "2019": {
+   "corr_cand": 0.027069,
+   "corr_v7": 0.037332,
+   "delta": -0.010263,
+   "n": 5593,
+   "share_adjusted_nonzero": 0.35562
+  },
+  "2020": {
+   "corr_cand": 0.026083,
+   "corr_v7": 0.043758,
+   "delta": -0.017675,
+   "n": 5325,
+   "share_adjusted_nonzero": 0.35418
+  },
+  "2022": {
+   "corr_cand": 0.086266,
+   "corr_v7": 0.11547,
+   "delta": -0.029205,
+   "n": 5476,
+   "share_adjusted_nonzero": 0.40924
+  }
+ },
+ "candidate": "P1: v7 + b1*d(avail_top7_prev1) + b2*d(top7_minutes_share_out_3plus), pooled 2023-2026 OLS (v5 d)",
+ "coefficients": [
+  5.804739185553095,
+  -2.683617378023771
+ ],
+ "coefficients_file_commit": "411f2a19240b5ae07e41ea7ca8b944388677a46e",
+ "cohort": {
+  "definition": "replayed D1-vs-D1 games of the usable seasons (A_ml_w0 confirmation rules) with a non-null espn_backfill_261120 selected spread line",
+  "lined_events_matched": 20826,
+  "n": 20826,
+  "n_by_season": {
+   "2018": 4432,
+   "2019": 5593,
+   "2020": 5325,
+   "2022": 5476
+  },
+  "replayed_d1_games_by_season": {
+   "2018": 5533,
+   "2019": 5597,
+   "2020": 5328,
+   "2022": 5485
+  }
+ },
+ "disclosures": [
+  "Coefficients: one pooled 2023-2026 fit (clause d), committed before any confirmation line or outcome was loaded; no refit.",
+  "Backcast: v7 constants and P1 coefficients come from later seasons and are applied to 2018-2022.",
+  "Date quirk (clause e): table date 0 or 1 day before the Eastern tip day; quirk rows kept.",
+  "Transfers carrying a new ESPN id count as newcomers (v4 feature_table.transfers); P1's inputs are same-season only."
+ ],
+ "games_by_season": {
+  "2018": {
+   "adjusted_nonzero": 2175,
+   "all_inputs_non_null": 4703,
+   "feature_rows_found_both_sides": 5533,
+   "found_but_null_input": 830,
+   "not_found": 0,
+   "v7_rows": 5533
+  },
+  "2019": {
+   "adjusted_nonzero": 1991,
+   "all_inputs_non_null": 4360,
+   "feature_rows_found_both_sides": 5597,
+   "found_but_null_input": 1237,
+   "not_found": 0,
+   "v7_rows": 5597
+  },
+  "2020": {
+   "adjusted_nonzero": 1888,
+   "all_inputs_non_null": 3946,
+   "feature_rows_found_both_sides": 5328,
+   "found_but_null_input": 1382,
+   "not_found": 0,
+   "v7_rows": 5328
+  },
+  "2022": {
+   "adjusted_nonzero": 2243,
+   "all_inputs_non_null": 4102,
+   "feature_rows_found_both_sides": 5485,
+   "found_but_null_input": 1383,
+   "not_found": 0,
+   "v7_rows": 5485
+  }
+ },
+ "generated_at_utc": "2026-11-22T19:53:10Z",
+ "grid_name": "P1_player_availability",
+ "line_source": {
+  "name": "espn_backfill_261120",
+  "rule": "ncaab-espn-lines-rule-1",
+  "sha256": "2382fbb2b560aabadefa359cb6aa684f57af8ef74886b7792b2924fe50fe550f"
+ },
+ "pass_rule": "v4: CONFIRMED iff the plain one-sided 95% lower bound of the pooled corr delta > 0 (day-cluster bootstrap, 4000, seed 17); fewer than 3 usable seasons => CONFIRMATION_UNAVAILABLE",
+ "pinned_inputs": {
+  "data/research/ncaab_external/player_events_v5/events_2014_2022.jsonl": "14fbf653f04f86742ccf1f0e5a54b8fdd210175c1aaa8380d7dde8992508557b",
+  "data/research/ncaab_external/player_features/pit_player_features.jsonl": "a9a406d87af14fc6ac9a6023dda79ad8ce8b02c0459825bebdc605f69f93062a",
+  "data/research/ncaab_external/player_features_v5/pit_player_features.jsonl": "e08ff54483ef1cc7723b28f4b679c594d2cb317dc3bfb718a83294ff0255f928",
+  "data/research/ncaab_market/backfill_261120/scoreboard.jsonl": "5eeeb8fc64d02ba400dec5ed525376b0267fdbd7bb8a8fbb7d49ef64b9ddb43a",
+  "outputs/ncaab/research_261120/confirmation/A_ml_w0_confirmation_preds.jsonl": "d1c0f45a15ad6249300e0d28871a54d3c4814f5aaeb10433a385479e76c2d930",
+  "scripts/backfill_ncaab_player_boxes.py": "3cf28c2ce45365f22f04cf8cebcae65e2467920bca2b242da873a1671d85e9d5",
+  "scripts/ncaab_research/confirmation/replay_261120.py": "69235d8decc7e1cc2cb4ca5654d6486529eaeff17a30a79fc6e28bab591b8e90",
+  "scripts/ncaab_research/export_player_events_v5.py": "391fc36017fc428f87d3638cc28dd99c8c46bdf54750ceb0f08404f7f5b7508b",
+  "scripts/ncaab_research/player_features_261121.py": "29ab4b838360ff28259039d5b1e368c07f798a398536927f4b7719d68f65999a"
+ },
+ "predictions_sha256": "70c6248e69ae31ebdf0c3e490c59c171c3e23ab7b5c7e66642b0ca740f376173",
+ "primary_spread_corr_delta_vs_v7": {
+  "ci95_two_sided": [
+   -0.023288,
+   -0.015445
+  ],
+  "corr_cand": 0.056766,
+  "corr_v7": 0.076031,
+  "days": 564,
+  "delta": -0.019266,
+  "lower_one_sided_95": -0.022638,
+  "n": 20826
+ },
+ "protocol_sha256": "72a8a9ff216c4f84cc80acd9dda6fcdac14b6cafb9131bb05fcb210ce3677813",
+ "secondary_no_verdict": {
+  "cover_logloss_delta_vs_v7": {
+   "ci95": [
+    0.00261,
+    0.00395
+   ],
+   "ci_adj": [
+    0.0023,
+    0.0043
+   ],
+   "delta": 0.003277,
+   "k": 16,
+   "n": 20606
+  },
+  "margin_rmse_delta_vs_v7": {
+   "ci95": [
+    0.04267,
+    0.06008
+   ],
+   "delta": 0.05139
+  },
+  "moneyline_brier_delta_vs_v7": {
+   "ci95": [
+    0.00023,
+    0.00049
+   ],
+   "delta": 0.000359,
+   "n": 20826
+  },
+  "moneyline_logloss_delta_vs_v7": {
+   "ci95": [
+    0.00084,
+    0.00147
+   ],
+   "ci_adj": [
+    0.00067,
+    0.00163
+   ],
+   "delta": 0.001152,
+   "k": 16,
+   "n": 20826
+  },
+  "mu_equals_v7": false,
+  "nonzero_adjustment_subset": {
+   "adjustment": {
+    "mean": 0.0148,
+    "mean_abs": 0.8411,
+    "p99_abs": 2.5035,
+    "sd": 0.9721
+   },
+   "by_season": {
+    "2018": {
+     "n": 4432,
+     "n_nonzero": 1768,
+     "share": 0.39892
+    },
+    "2019": {
+     "n": 5593,
+     "n_nonzero": 1989,
+     "share": 0.35562
+    },
+    "2020": {
+     "n": 5325,
+     "n_nonzero": 1886,
+     "share": 0.35418
+    },
+    "2022": {
+     "n": 5476,
+     "n_nonzero": 2241,
+     "share": 0.40924
+    }
+   },
+   "n_nonzero": 7884,
+   "paired_vs_v7": {
+    "cover_logloss_delta_vs_v7": {
+     "ci95": [
+      0.007,
+      0.01037
+     ],
+     "ci_adj": [
+      0.00627,
+      0.01105
+     ],
+     "delta": 0.00865,
+     "k": 16,
+     "n": 7806
+    },
+    "margin_rmse_delta_vs_v7": {
+     "ci95": [
+      0.11561,
+      0.15976
+     ],
+     "delta": 0.13786
+    },
+    "moneyline_brier_delta_vs_v7": {
+     "ci95": [
+      0.00061,
+      0.00129
+     ],
+     "delta": 0.000949,
+     "n": 7884
+    },
+    "moneyline_logloss_delta_vs_v7": {
+     "ci95": [
+      0.00223,
+      0.00388
+     ],
+     "ci_adj": [
+      0.00183,
+      0.00432
+     ],
+     "delta": 0.003044,
+     "k": 16,
+     "n": 7884
+    },
+    "mu_equals_v7": false,
+    "spread_corr_delta_vs_v7": {
+     "ci95": [
+      -0.0701,
+      -0.04857
+     ],
+     "ci_adj": [
+      -0.07704,
+      -0.04246
+     ],
+     "delta": -0.05882,
+     "k": 25
+    }
+   },
+   "share_nonzero_all": 0.37857,
+   "verdict": "none (reported alongside, null_rule)"
+  },
+  "rmse": {
+   "cand": {
+    "bias": 0.0415,
+    "n": 20826,
+    "rmse": 16.6586
+   },
+   "line": {
+    "bias": 0.0247,
+    "n": 20826,
+    "rmse": 16.6003
+   },
+   "v7": {
+    "bias": 0.0471,
+    "n": 20826,
+    "rmse": 16.6072
+   }
+  }
+ },
+ "shuffled_outcomes": true,
+ "usable_seasons": {
+  "dropped": [],
+  "rates": {
+   "2018": 0.963,
+   "2019": 0.9257,
+   "2020": 0.9086,
+   "2022": 0.9107
+  },
+  "usable": [
+   2018,
+   2019,
+   2020,
+   2022
+  ]
+ },
+ "verdict": "PLUMBING_ONLY",
+ "window": "confirmation_v5",
+ "would_be_verdict": "NOT_CONFIRMED"
+}

@@ -1,0 +1,69 @@
+{
+  "adjustment": {
+    "mean_abs_nonzero": 0.8386,
+    "share_nonzero": 0.37812
+  },
+  "coefficients": [
+    5.804739185553095,
+    -2.683617378023771
+  ],
+  "coefficients_file_commit": "411f2a19240b5ae07e41ea7ca8b944388677a46e",
+  "date_gap_days_counts": {
+    "0": 21920,
+    "1": 23
+  },
+  "games_by_season": {
+    "2018": {
+      "adjusted_nonzero": 2175,
+      "all_inputs_non_null": 4703,
+      "feature_rows_found_both_sides": 5533,
+      "found_but_null_input": 830,
+      "not_found": 0,
+      "v7_rows": 5533
+    },
+    "2019": {
+      "adjusted_nonzero": 1991,
+      "all_inputs_non_null": 4360,
+      "feature_rows_found_both_sides": 5597,
+      "found_but_null_input": 1237,
+      "not_found": 0,
+      "v7_rows": 5597
+    },
+    "2020": {
+      "adjusted_nonzero": 1888,
+      "all_inputs_non_null": 3946,
+      "feature_rows_found_both_sides": 5328,
+      "found_but_null_input": 1382,
+      "not_found": 0,
+      "v7_rows": 5328
+    },
+    "2022": {
+      "adjusted_nonzero": 2243,
+      "all_inputs_non_null": 4102,
+      "feature_rows_found_both_sides": 5485,
+      "found_but_null_input": 1383,
+      "not_found": 0,
+      "v7_rows": 5485
+    }
+  },
+  "n_rows": 21943,
+  "orientation_flipped": 0,
+  "predictions_file": "outputs/ncaab/research_261120/P1_player_availability/confirmation_v5_preds.jsonl",
+  "predictions_sha256": "70c6248e69ae31ebdf0c3e490c59c171c3e23ab7b5c7e66642b0ca740f376173",
+  "usable_seasons": {
+    "dropped": [],
+    "rates": {
+      "2018": 0.963,
+      "2019": 0.9257,
+      "2020": 0.9086,
+      "2022": 0.9107
+    },
+    "usable": [
+      2018,
+      2019,
+      2020,
+      2022
+    ]
+  },
+  "written_utc": "2026-11-22T19:52:17Z"
+}
