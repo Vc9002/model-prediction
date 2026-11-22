@@ -1,12 +1,14 @@
 """Execution-ticket boundary (consolidation C, item 13).
 
 Order execution is separated from research/shadow by an explicit ticket
-contract: the dashboard (or any future execution service) issues a
-short-lived HMAC-signed ticket naming the exact order it authorizes;
-nothing else in the system can fabricate one. Research and shadow
-pipelines have no import path to this module (enforced by
-``tests/test_execution_boundary.py``) and no access to the signing
-secret, which lives under the runtime root, not the repo.
+contract: an execution service issues a short-lived HMAC-signed ticket
+naming the exact order it authorizes; nothing else in the system can
+fabricate one. No production code calls ``create_ticket`` yet: the
+dashboard's order path neither issues nor checks tickets. Research and
+shadow pipelines have no import path to this module (for the rebuild
+package, enforced by ``tests/test_consolidation_c.py::
+test_research_and_shadow_have_no_import_path_to_execution``) and no access
+to the signing secret, which lives under the runtime root, not the repo.
 
 Automated orders remain disabled unless separately authorized — the
 ticket machinery is the boundary, not a license to trade.

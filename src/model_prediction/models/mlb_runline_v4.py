@@ -1,7 +1,9 @@
 """MLB Structural Runline v4 (mlb-structural-runline-v4).
 
 Derives point-in-time spread / runline (-1.5 / +1.5) probabilities directly from the
-bivariate joint Poisson run distribution P(R_H = h, R_A = a):
+joint run distribution P(R_H = h, R_A = a) of two independent Poisson marginals (their
+outer product, truncated at ``max_runs`` and renormalized; there is no correlation term,
+despite the "bivariate" names below):
 - P(Home -1.5) = sum_{h >= a + 2} P(R_H=h, R_A=a)
 - P(Away +1.5) = sum_{h <= a + 1} P(R_H=h, R_A=a) = 1 - P(Home -1.5)
 - P(Away -1.5) = sum_{a >= h + 2} P(R_H=h, R_A=a)
@@ -56,7 +58,7 @@ def compute_bivariate_run_matrix(
 
 
 class MLBStructuralRunlineV4Model:
-    """Structural Runline (-1.5 / +1.5) Engine derived from Bivariate Poisson Scoring."""
+    """Structural Runline (-1.5 / +1.5) Engine derived from independent Poisson run scoring."""
 
     version: str = MLB_RUNLINE_V4_MODEL_VERSION
 

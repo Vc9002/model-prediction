@@ -1,8 +1,8 @@
 """Meta Tail-Calibrator for extreme sports betting market probabilities.
 
 Post-processes extreme probability predictions (NRFI, Runline -1.5, K props, extreme ML)
-using Isotonic Regression and Beta Calibration (Kull et al., 2017) to eliminate tail miscalibration
-while strictly preserving rank monotonicity.
+using isotonic regression (outputs clamped to [eps, 1 - eps]) to reduce tail miscalibration
+while preserving rank order (non-decreasing; ties are possible). There is no Beta calibration step.
 """
 
 from __future__ import annotations
