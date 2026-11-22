@@ -34,7 +34,7 @@ import logging
 import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 from pathlib import Path
 from typing import Any
@@ -388,10 +388,6 @@ def parse_team_box(rows: Iterable[Mapping[str, Any]]) -> list[CBBDTeamBox]:
 
 def season_label(season: int) -> str:
     return f"{season - 1}-{str(season)[-2:]}"
-
-
-def game_date_utc(start_utc: str) -> date:
-    return datetime.fromisoformat(start_utc).date()
 
 
 def build_cbbd_crosswalk(
