@@ -1,0 +1,340 @@
+{
+  "artifact_hash": "807204808070d934a9379b3ebc6912a8a34b756d9f88a0bf9502e9703a33e4c0",
+  "base_model": "cfb-structural-v7.1",
+  "frozen_at_utc": "2026-11-22T03:14:17+00:00",
+  "gates": {
+    "block_fcs": true,
+    "max_edge": 0.08,
+    "max_moneyline_dog_odds": 200,
+    "max_spread_line": 21.5,
+    "min_edge": 0.02,
+    "sizing": "dynamic_edge_scaled"
+  },
+  "gates_source": "config/models/cfb-structural-v5.2.json gates, copied verbatim (quick-261123-6q5 OD-1); not validated on v7",
+  "league": "NCAAF",
+  "margin_distribution": {
+    "centring": "mean",
+    "early_games": 4,
+    "key_log_multipliers": [
+      0.0603830477225862,
+      -0.23455879408094912,
+      1.012769408326984,
+      0.07710458153551891,
+      -0.18735018441083706,
+      0.04355245994629293,
+      0.9324527976293198,
+      -0.16355709547701414,
+      -0.7442198641680214,
+      0.3467981815932625,
+      -0.1839285684035943,
+      -0.700357858617062,
+      -0.46547495564860925,
+      0.44400405344007154,
+      -0.451528272897994,
+      -0.45646330142831043,
+      0.2473813753068479,
+      0.04776017671362545,
+      -0.36331130016229146,
+      -0.2815827047138128,
+      0.5697079346567631,
+      -0.3625584811803841,
+      -0.1982043436601985,
+      0.31988543039709166,
+      -0.05042183591363683,
+      -0.5158029594763442,
+      -0.010864416754536059,
+      0.5552074882654028
+    ],
+    "key_max": 28,
+    "recentre_iterations": 4,
+    "sd_coef": [
+      2.8174760130108876,
+      -0.02187517810191349,
+      0.03733493311556951,
+      0.04570061496194362,
+      -0.00523659355320925
+    ],
+    "sd_scale": 10.0,
+    "sd_terms": [
+      "const",
+      "abs_mu/10",
+      "(total-55)/10",
+      "early",
+      "fbs_vs_fcs"
+    ],
+    "sd_total_centre": 55.0,
+    "support": 130
+  },
+  "method": "cfb_v7_pit_pbp_ridge_ratings_linear_points_keyed_margin_pmf",
+  "model_version": "cfb-structural-v7.2",
+  "note": "NCAAF CHAMPION CANDIDATE (quick-261123-6q5): cfb-structural-v7.1 with only the total probability shrunk toward 50% (v5.2's construction) because v7.1's totals carry no information against the close. Moneyline and spread are v7.1's, bit for bit, and their evidence is v7.1's (holdout read twice before, NOT_CONFIRMED vs v7, CFBD current-revised). Promotion only via model_promotion, all three NCAAF markets.",
+  "point_in_time": {
+    "research_decision_time": "min(kickoff, 08:00 America/New_York on the kickoff's ET date)",
+    "result_buffer_hours": 5.0,
+    "rule": "a game feeds ratings only if kickoff + result_buffer_hours <= decision time",
+    "serving_fit_rule": "per_game_research_decision_time"
+  },
+  "prior": {
+    "arm": "cfbd_portal",
+    "cfbd_fields": {
+      "pout": "portal_out_stars_sum",
+      "rec": "recruiting_points_4yr_weighted",
+      "ret": "returning_off_ppa_pct",
+      "tal": "talent_prev_season"
+    },
+    "cfbd_values": "current-revised (as_published_verified false); preseason rows only",
+    "cov_def": {
+      "exp": {
+        "pout": 0.00069332044476857,
+        "rec": -0.00777926135644367,
+        "tal": 0.003927140340023274
+      },
+      "plays": {
+        "pout": 1.1135274312000534,
+        "rec": -1.8771986065385258,
+        "tal": 1.8805498601851318
+      },
+      "ppd": {
+        "pout": 0.03817373272499977,
+        "rec": -0.2699816315716631,
+        "tal": 0.12918122126496828
+      },
+      "pts": {
+        "pout": 0.15629754961771333,
+        "rec": -3.0308354826317436,
+        "tal": 1.7494491786867274
+      },
+      "sr": {
+        "pout": 0.005992874905724549,
+        "rec": -0.024391242356850962,
+        "tal": 0.012952167778832673
+      },
+      "to": {
+        "pout": -0.0008845684916286424,
+        "rec": 8.51160375311004e-05,
+        "tal": 0.0007052079782921891
+      },
+      "ypp": {
+        "pout": 0.1187490000247328,
+        "rec": -0.5194342428890437,
+        "tal": 0.23816299435496688
+      }
+    },
+    "cov_off": {
+      "exp": {
+        "pout": 3.5682195308369332e-06,
+        "rec": 0.006245373697548524,
+        "ret": 0.004317300723294667,
+        "ret_x_prev": 0.05722108704697838,
+        "tal": -0.0010325520173160038
+      },
+      "plays": {
+        "pout": 0.5689485302765699,
+        "rec": 0.3341317984555944,
+        "ret": 0.29197674869627294,
+        "ret_x_prev": 0.021914674328208955,
+        "tal": -0.14438756936640992
+      },
+      "ppd": {
+        "pout": 0.063368190174868,
+        "rec": 0.3963798827973818,
+        "ret": 0.16483923466298564,
+        "ret_x_prev": 0.06641671600202434,
+        "tal": -0.24902390893169346
+      },
+      "pts": {
+        "pout": 0.6521228430042367,
+        "rec": 3.6330751774812273,
+        "ret": 1.6717166184411751,
+        "ret_x_prev": 0.05199840929634181,
+        "tal": -2.04849270447471
+      },
+      "sr": {
+        "pout": 0.0030952944097264396,
+        "rec": 0.026761801336507147,
+        "ret": 0.012167700431287775,
+        "ret_x_prev": 0.05239686727418927,
+        "tal": -0.01629788223881605
+      },
+      "to": {
+        "pout": -0.00017531235134758861,
+        "rec": -0.002521885586500832,
+        "ret": -0.0010058062196535817,
+        "ret_x_prev": -0.013595830615560326,
+        "tal": 0.001476151582576573
+      },
+      "ypp": {
+        "pout": 0.018030401970893936,
+        "rec": 0.465617819723555,
+        "ret": 0.2510696382741705,
+        "ret_x_prev": 0.13457697330283164,
+        "tal": -0.17938450133168127
+      }
+    },
+    "covariate_population": "fbs",
+    "finals_team_lambda": 1.0,
+    "half_life_days": 45.0,
+    "lam_def": {
+      "exp": 4.162190043072898,
+      "plays": 4.413648404809953,
+      "ppd": 2.6969237261023964,
+      "pts": 2.3204068698010487,
+      "sr": 2.2208579821445276,
+      "to": 12.496932227940963,
+      "ypp": 6.2577728257269225
+    },
+    "lam_off": {
+      "exp": 3.980407011078852,
+      "plays": 3.916974260266439,
+      "ppd": 2.4198753444789274,
+      "pts": 2.3825289830091054,
+      "sr": 2.214076167189196,
+      "to": 10.755177612826923,
+      "ypp": 4.950733951966116
+    },
+    "lambda_multiplier": 0.5,
+    "league_lambda": 20.0,
+    "rho_def": {
+      "exp": 0.37563514504251266,
+      "plays": 0.4382769129992111,
+      "ppd": 0.5438579652976404,
+      "pts": 0.5718749295977519,
+      "sr": 0.486382907685933,
+      "to": 0.15260775173599336,
+      "ypp": 0.2842493971995474
+    },
+    "rho_off": {
+      "exp": 0.3371502024354149,
+      "plays": 0.44888402502907826,
+      "ppd": 0.5239114218511668,
+      "pts": 0.5293682098230295,
+      "sr": 0.5601373297756174,
+      "to": 0.21338260877982335,
+      "ypp": 0.2904232889641136
+    }
+  },
+  "promotion_protocol_hash": "fe97151186fcca713cdba0a1dcd2c6787a5d06d9ae1d1698938023f86e532e9b",
+  "qualification": {
+    "framework": "cfb_v7_pit_pbp_ridge_ratings_linear_points_keyed_margin_pmf",
+    "locked_holdout": true,
+    "note": "Operator-approved 2026-11-23 (quick-261123-6q5): promote NCAAF v7.1 for spread and moneyline; totals keep a shrink toward 50%. v7.1 stays the Flat challenger for the 2027 gate (OD-4).",
+    "qualified": false,
+    "status": "CANDIDATE"
+  },
+  "schema_version": "1",
+  "serving": {
+    "feature_capture": true,
+    "score_only_rows": "terminal_without_pbp"
+  },
+  "sport": "ncaaf",
+  "stage2": {
+    "coef": [
+      29.973838978718813,
+      0.041543341949067614,
+      59.80441844585557,
+      0.5042145380186243,
+      0.5699710875413011,
+      0.15919953750052684,
+      -8.612498942053989
+    ],
+    "features": [
+      "e_sr",
+      "e_ypp",
+      "e_exp",
+      "e_ppd",
+      "e_pts",
+      "e_plays",
+      "e_to"
+    ],
+    "intercept": -16.745156679502216,
+    "margin_calibration": {
+      "intercept": -2.01908347519183,
+      "neutral_intercept": 1.416127269249023,
+      "slope": 1.0897369340550258
+    },
+    "total_calibration": {
+      "intercept": 7.371196265357094,
+      "slope": 0.8693024550191344
+    }
+  },
+  "total_distribution": {
+    "bucket_sds": [
+      15.069137571056512,
+      16.1249480945951,
+      16.435447692966196,
+      18.50383165839358
+    ],
+    "buckets": [
+      [
+        0.0,
+        45.0
+      ],
+      [
+        45.0,
+        52.0
+      ],
+      [
+        52.0,
+        60.0
+      ],
+      [
+        60.0,
+        999.0
+      ]
+    ],
+    "support": 180
+  },
+  "total_probability_logit_slope": 0.0,
+  "total_shrink_fit": {
+    "base_artifact": "config/models/cfb-structural-v7.1.json",
+    "base_artifact_hash": "e15d12d1af566f04ecc20c8d4df91dc1605fb968cc9f5f68cc8c414e9cf3c022",
+    "bootstrap_95ci": [
+      -0.18671962927152472,
+      0.1090313286830357
+    ],
+    "design_informed": true,
+    "fit_output": "outputs/ncaaf/cfb_v72_total_shrink.json",
+    "fit_output_sha256": "54f4542a30ddfabde17173bc9ba42a9f8dd56b85faa0377cf1456f6d83911050",
+    "fit_output_sha256_basis": "sha256 of the fit JSON's bytes with CRLF folded to LF",
+    "fitted_on": "train only (slope-only logistic, pushes dropped, clipped to [0, 1]); checked on validation; holdout scored once by this script, but it was read twice before and every ESPN lined window was read before (design-informed)",
+    "formula": "p_over' = sigmoid(s * logit(p_over / (p_over + p_under))) * (1 - p_push); p_under' = 1 - p_push - p_over'",
+    "script": "scripts/fit_cfb_v72_total_shrink.py",
+    "slope_unclipped": -0.040523805102292566,
+    "split": {
+      "locked_holdout": {
+        "end": "2026-11-14",
+        "observations": 1785,
+        "start": "2024-11-27"
+      },
+      "method": "complete_date_60_20_20",
+      "train": {
+        "end": "2022-11-26",
+        "observations": 5537,
+        "start": "2016-09-09"
+      },
+      "validation": {
+        "end": "2024-11-24",
+        "observations": 1731,
+        "start": "2022-11-27"
+      }
+    },
+    "walk_holdout_sha256": "5260b2de400d504616cf354003fa26945da53ff13c693247c9da1f55fae17d75",
+    "walk_sha256": "4f757d56f43ed165a3553b5ef76e4ce80f2bc85a6ab39a831aed1c9902563e9c"
+  },
+  "training": {
+    "holdout_verdict": "NOT_CONFIRMED",
+    "refit_of": "cfb-structural-v7",
+    "report_sha256": "d159f62432971700643453412f007df806ffc9568264ff83db20e629eb7c70e1",
+    "rule_sha256": "fe97151186fcca713cdba0a1dcd2c6787a5d06d9ae1d1698938023f86e532e9b",
+    "selected": {
+      "arm": "cfbd_portal",
+      "combo": "cfbd_portal_m0.5_hl45",
+      "feature_set": "full",
+      "half_life_days": 45.0,
+      "lambda_multiplier": 0.5
+    },
+    "spec_sha256": "061e32d02542fe16439e897ab79c58be4e9aace148b782330172008c00bf5da7",
+    "train_end": "2022-11-11",
+    "validation_end": "2024-11-14"
+  }
+}

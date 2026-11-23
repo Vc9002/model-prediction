@@ -1,0 +1,252 @@
+{
+  "assumed_asks": [
+    0.5,
+    0.48
+  ],
+  "base_model": "cfb-structural-v7.1",
+  "copied_gates": {
+    "block_fcs": true,
+    "max_edge": 0.08,
+    "max_spread_line": 21.5,
+    "min_edge": 0.02,
+    "min_moneyline_ask": 0.333333,
+    "sizing": "dynamic_edge_scaled"
+  },
+  "disclosures": [
+    "Third read of the holdout window (v7, v7.1, this fit); ESPN lined windows 2017-2025 read before; design-informed.",
+    "v7.1 total calibration and total SDs were fitted on <= 2022-11-11: train-window probabilities are in-sample for those layers.",
+    "Main-rule count assumes asks of 50% and 48%; the weather gate (rejects every v7 total in Main), exposure caps and disagreement are not evaluated."
+  ],
+  "fit": {
+    "adjusted_after_validation": false,
+    "bootstrap": "1000 resamples of train kickoff dates, seed 11",
+    "bootstrap_95ci": [
+      -0.18671962927152472,
+      0.1090313286830357
+    ],
+    "method": "slope-only logistic (intercept 0) of over at the closing total on logit(v7.1 no-push over share)",
+    "slope": 0.0,
+    "slope_unclipped": -0.040523805102292566,
+    "validation_slope_only_bootstrap_95ci": [
+      0.010642210864737498,
+      0.44239622786415717
+    ]
+  },
+  "gate1": {
+    "holdout": {
+      "file": "E:\\MP\\data\\research\\ncaaf_v71_work\\walk_cfbd_portal_m0.5_hl45.holdout.jsonl",
+      "pin_cfb_v71_rule": "5260b2de400d504616cf354003fa26945da53ff13c693247c9da1f55fae17d75",
+      "sha256": "5260b2de400d504616cf354003fa26945da53ff13c693247c9da1f55fae17d75"
+    },
+    "pass": true,
+    "train_validation": {
+      "file": "E:\\MP\\data\\research\\ncaaf_v71_work\\walk_cfbd_portal_m0.5_hl45.jsonl",
+      "pin_cfb_v71_spec": "4f757d56f43ed165a3553b5ef76e4ce80f2bc85a6ab39a831aed1c9902563e9c",
+      "sha256": "4f757d56f43ed165a3553b5ef76e4ce80f2bc85a6ab39a831aed1c9902563e9c"
+    }
+  },
+  "gate2": {
+    "holdout": {
+      "got": {
+        "margin_mae": 12.505714278831176,
+        "ml_brier": 0.16408555711083078,
+        "n": 1948,
+        "total_mae": 12.84318402395148
+      },
+      "pass": true,
+      "published": {
+        "margin_mae": 12.5057,
+        "ml_brier": 0.16409,
+        "n": 1948,
+        "total_mae": 12.8432
+      }
+    },
+    "pass": true,
+    "validation": {
+      "got": {
+        "margin_mae": 12.63137055608745,
+        "ml_brier": 0.161740839971501,
+        "n": 1858,
+        "total_mae": 12.83108581454906
+      },
+      "pass": true,
+      "published": {
+        "margin_mae": 12.63137055608745,
+        "ml_brier": 0.16174,
+        "n": 1858,
+        "total_mae": 12.83108581454906
+      }
+    }
+  },
+  "holdout_main_rule": {
+    "ask_48.0pct": {
+      "raw_v7.1": {
+        "games": 259,
+        "over_sides": 190,
+        "under_sides": 69
+      },
+      "v7.2_shrunk": {
+        "games": 1006,
+        "over_sides": 1006,
+        "under_sides": 808
+      }
+    },
+    "ask_50.0pct": {
+      "raw_v7.1": {
+        "games": 442,
+        "over_sides": 337,
+        "under_sides": 105
+      },
+      "v7.2_shrunk": {
+        "games": 0,
+        "over_sides": 0,
+        "under_sides": 0
+      }
+    }
+  },
+  "inputs": {
+    "config/models/cfb-structural-v5.2.json": "08232608222a6d8698ba44739cb538a04b9b01e1207e58f78ba3d4377ed7c2f7",
+    "config/models/cfb-structural-v7.1.json": "9aeebe2e931722da7b1b600d2ac2c3c78985940f13cc92fec9db99aa490d63d2",
+    "espn_lines (E:/MP/data/research/ncaaf_v6/espn_lines.jsonl)": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54",
+    "outputs/ncaaf/cfb_v71_report.json": "fc1d7a727c8b5c165502e3f01f915d74d0c465611810cdffddc60f10c93d5162",
+    "outputs/ncaaf/cfb_v71_rule.json": "3a6e833eae6e2e3a1d801f35db2d348109eb4932854470f887dfb840359477a1",
+    "outputs/ncaaf/cfb_v71_spec.json": "ad9c8689b92e4e47326ac728d0f7ad95e0e5db7c3d947af0f6b8beecd2851edc",
+    "scripts/fit_cfb_v52_total_shrink.py": "d7844a8a0b51fb1b7c20a71654460cf61f80caa7155731773c787bf28da11164",
+    "scripts/fit_cfb_v72_total_shrink.py": "5d1bc9889a395e78a60fe38fc3375e779a9e860bc305019d5d062457b26144cb",
+    "walk_cfbd_portal_m0.5_hl45.holdout.jsonl (E:/MP/data/research/ncaaf_v71_work)": "5260b2de400d504616cf354003fa26945da53ff13c693247c9da1f55fae17d75",
+    "walk_cfbd_portal_m0.5_hl45.jsonl (E:/MP/data/research/ncaaf_v71_work)": "4f757d56f43ed165a3553b5ef76e4ce80f2bc85a6ab39a831aed1c9902563e9c"
+  },
+  "main_rule": {
+    "block_fcs": true,
+    "main_total_gates": {
+      "max_model_probability": 0.62,
+      "min_projection_gap": 1.5,
+      "under_min_line": 56.5
+    },
+    "max_edge": 0.08,
+    "min_edge": 0.02
+  },
+  "model_version": "cfb-structural-v7.2",
+  "rows": {
+    "called_games": 9384,
+    "lined_games": 9053,
+    "pushes": 71,
+    "unlined_games": 331
+  },
+  "sensitivity_v71_artifact_split": {
+    "holdout_slope_only": -0.05223390554385317,
+    "slope_unclipped": -0.05903692423709389,
+    "train_end": "2022-11-11",
+    "train_scored": 5307,
+    "validation_end": "2024-11-14",
+    "validation_slope_only": 0.28718657076402987
+  },
+  "split": {
+    "locked_holdout": {
+      "end": "2026-11-14",
+      "observations": 1785,
+      "start": "2024-11-27"
+    },
+    "method": "complete_date_60_20_20",
+    "train": {
+      "end": "2022-11-26",
+      "observations": 5537,
+      "start": "2016-09-09"
+    },
+    "validation": {
+      "end": "2024-11-24",
+      "observations": 1731,
+      "start": "2022-11-27"
+    }
+  },
+  "stop": {
+    "reason": null,
+    "stopped": false
+  },
+  "windows": {
+    "locked_holdout": {
+      "end": "2026-11-14",
+      "games_lined": 1785,
+      "games_scored": 1785,
+      "mean_served_total_minus_line": 0.841,
+      "over_rate": 0.5003,
+      "pushes_dropped": 0,
+      "raw": {
+        "brier": 0.259957,
+        "calibration_intercept": 0.0048,
+        "calibration_slope": -0.0468,
+        "log_loss": 0.714624,
+        "max_abs_minus_half": 0.416012,
+        "mean_p_over": 0.52,
+        "slope_only": -0.0445
+      },
+      "shrunk": {
+        "brier": 0.25,
+        "calibration_intercept": NaN,
+        "calibration_slope": NaN,
+        "log_loss": 0.693147,
+        "max_abs_minus_half": 0.0,
+        "mean_p_over": 0.5,
+        "slope_only": NaN,
+        "slopes_basis": "analytic: raw slope / s, raw intercept"
+      },
+      "start": "2024-11-27"
+    },
+    "train": {
+      "end": "2022-11-26",
+      "games_lined": 5537,
+      "games_scored": 5477,
+      "mean_served_total_minus_line": 0.319,
+      "over_rate": 0.4873,
+      "pushes_dropped": 60,
+      "raw": {
+        "brier": 0.259723,
+        "calibration_intercept": -0.0497,
+        "calibration_slope": -0.03,
+        "log_loss": 0.714445,
+        "max_abs_minus_half": 0.481555,
+        "mean_p_over": 0.5087,
+        "slope_only": -0.0405
+      },
+      "shrunk": {
+        "brier": 0.25,
+        "calibration_intercept": NaN,
+        "calibration_slope": NaN,
+        "log_loss": 0.693147,
+        "max_abs_minus_half": 0.0,
+        "mean_p_over": 0.5,
+        "slope_only": NaN,
+        "slopes_basis": "analytic: raw slope / s, raw intercept"
+      },
+      "start": "2016-09-09"
+    },
+    "validation": {
+      "end": "2024-11-24",
+      "games_lined": 1731,
+      "games_scored": 1720,
+      "mean_served_total_minus_line": 0.941,
+      "over_rate": 0.5169,
+      "pushes_dropped": 11,
+      "raw": {
+        "brier": 0.255189,
+        "calibration_intercept": 0.0489,
+        "calibration_slope": 0.2023,
+        "log_loss": 0.704503,
+        "max_abs_minus_half": 0.402498,
+        "mean_p_over": 0.5227,
+        "slope_only": 0.2281
+      },
+      "shrunk": {
+        "brier": 0.25,
+        "calibration_intercept": NaN,
+        "calibration_slope": NaN,
+        "log_loss": 0.693147,
+        "max_abs_minus_half": 0.0,
+        "mean_p_over": 0.5,
+        "slope_only": NaN,
+        "slopes_basis": "analytic: raw slope / s, raw intercept"
+      },
+      "start": "2022-11-27"
+    }
+  }
+}
