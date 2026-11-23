@@ -122,6 +122,7 @@ def test_cfb_slate_spread_total_interaction(tmp_path):
     from types import SimpleNamespace
 
     from model_prediction.models.college_football import build_cfb_slate
+    from tests.test_cfb_serving_parity import nb_rollback_model
 
     mock_event = {
         "id": "mock-cfb-blowout",
@@ -170,6 +171,7 @@ def test_cfb_slate_spread_total_interaction(tmp_path):
         game_date="2026-11-01",
         client=client,
         observed_at=datetime(2026, 11, 1, 12, tzinfo=UTC),
+        model=nb_rollback_model(),
     )
     assert "priced_contracts" in slate
     tot_contracts = [c for c in slate["priced_contracts"] if c["market_type"] == "total"]

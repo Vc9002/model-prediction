@@ -46,8 +46,16 @@ from model_prediction.models.cfb_structural_v4 import (
     load_cfb_structural_v4_artifact,
     main_gates_from_artifact,
 )
-from model_prediction.models.cfb_structural_v5 import CFB_V5_MODEL_VERSION, CFBStructuralV5Model
-from model_prediction.models.college_football import UpcomingCFBGame, _load_cfb_history, cfb_model
+from model_prediction.models.cfb_structural_v5 import (
+    CFB_V5_MODEL_VERSION,
+    CFBStructuralV5Model,
+    load_cfb_structural_v52_artifact,
+)
+from model_prediction.models.college_football import (
+    UpcomingCFBGame,
+    _load_cfb_history,
+    cfb_model_for_artifact,
+)
 from model_prediction.production_registry import compute_artifact_hash
 from model_prediction.roadmap_challenger import _cluster_bootstrap_brier_delta
 from model_prediction.validation import chronological_split
@@ -77,7 +85,9 @@ def season_of(start: datetime) -> int:
 # --------------------------------------------------------------------------- cache
 def build_cache() -> None:
     replay = _replay_module()
-    model = cfb_model()
+    # Pinned to the NB v5.2 artifact (what cfb_model() serves today), so a champion
+    # flip to a different engine cannot silently change what this script prices.
+    model = cfb_model_for_artifact(load_cfb_structural_v52_artifact())
     history = _load_cfb_history(REPO / "data")
     facts = replay.load_schedule_facts()
     starts = [h.start for h in history]

@@ -18,6 +18,7 @@ from model_prediction.models.college_football import (
     _match_cfb_moneyline,
     _match_cfb_spread,
 )
+from tests.test_cfb_serving_parity import nb_rollback_model
 
 GAME_DATE = "2030-09-07"  # a Saturday; decisions below are made on it
 
@@ -153,7 +154,9 @@ def test_forecast_reads_only_its_own_date_and_prices_from_the_newest_valid_quote
         ]
 
     monkeypatch.setattr(college_football.CFBStructuralV4Model, "predict_matchup", predict)
-    slate = college_football.build_cfb_slate(tmp_path, GAME_DATE, client=client, observed_at=decision)
+    slate = college_football.build_cfb_slate(
+        tmp_path, GAME_DATE, client=client, observed_at=decision, model=nb_rollback_model()
+    )
     moneylines = [row for row in slate["priced_contracts"] if row["market_type"] == "moneyline"]
     assert moneylines
     for row in moneylines:

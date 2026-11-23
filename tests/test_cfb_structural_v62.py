@@ -26,6 +26,7 @@ from model_prediction.models.cfb_structural_v62 import (
     v62_serving_code_hash,
 )
 from model_prediction.production_registry import compute_artifact_hash
+from tests.test_cfb_serving_parity import nb_rollback_model
 
 FIXTURE = PROJECT_ROOT / "outputs" / "ncaaf" / "cfb_v62_parity_fixture.json"
 SPEC = PROJECT_ROOT / "outputs" / "ncaaf" / "cfb_v62_spec.json"
@@ -436,9 +437,16 @@ def test_build_cfb_slate_appends_challenger_after_an_unchanged_champion(monkeypa
         return [sentinel], {"status": "ok"}
 
     monkeypatch.setattr(cfb_structural_v62, "price_challenger_slate", fake)
-    off = college_football.build_cfb_slate(tmp_path, "2026-11-21", client=client, observed_at=DECISION)
+    off = college_football.build_cfb_slate(
+        tmp_path, "2026-11-21", client=client, observed_at=DECISION, model=nb_rollback_model()
+    )
     on = college_football.build_cfb_slate(
-        tmp_path, "2026-11-21", client=client, observed_at=DECISION, price_challenger=True
+        tmp_path,
+        "2026-11-21",
+        client=client,
+        observed_at=DECISION,
+        price_challenger=True,
+        model=nb_rollback_model(),
     )
     assert off["challenger_pricing"] == {"status": "not_requested"} and seen and len(seen) == 1
     champion_on = [c for c in on["priced_contracts"] if c.get("model_version") != CFB_V62_MODEL_VERSION]
@@ -455,7 +463,12 @@ def test_build_cfb_slate_appends_challenger_after_an_unchanged_champion(monkeypa
 
     monkeypatch.setattr(cfb_structural_v62, "price_challenger_slate", boom)
     failed = college_football.build_cfb_slate(
-        tmp_path, "2026-11-21", client=client, observed_at=DECISION, price_challenger=True
+        tmp_path,
+        "2026-11-21",
+        client=client,
+        observed_at=DECISION,
+        price_challenger=True,
+        model=nb_rollback_model(),
     )
     assert failed["challenger_pricing"]["status"] == "error"
     assert json.dumps(failed["priced_contracts"], sort_keys=True, default=str) == json.dumps(

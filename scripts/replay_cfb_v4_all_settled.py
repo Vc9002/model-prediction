@@ -50,11 +50,12 @@ from model_prediction.models.cfb_structural_v4 import (
     load_cfb_structural_v4_artifact,
     main_gates_from_artifact,
 )
+from model_prediction.models.cfb_structural_v5 import load_cfb_structural_v52_artifact
 from model_prediction.models.college_football import (
     CFB_POSTSEASON_WEEK,
     UpcomingCFBGame,
     _load_cfb_history,
-    cfb_model,
+    cfb_model_for_artifact,
     cfb_serving_code_hash,
 )
 
@@ -597,7 +598,9 @@ def main() -> None:
 
     artifact = load_cfb_structural_v4_artifact()
     gates = main_gates_from_artifact(artifact)
-    model = cfb_model()
+    # Pinned to the NB v5.2 artifact (what cfb_model() serves today), so a champion
+    # flip to a different engine cannot silently change what this script prices.
+    model = cfb_model_for_artifact(load_cfb_structural_v52_artifact())
     history = _load_cfb_history(REPO / "data")
     facts = load_schedule_facts()
     print(

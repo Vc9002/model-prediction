@@ -14,6 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 from model_prediction.models import college_football
+from tests.test_cfb_serving_parity import nb_rollback_model
 
 GAME_DATE = "2030-09-07"
 DECISION_AT = datetime(2030, 9, 7, 18, tzinfo=UTC)
@@ -129,6 +130,7 @@ def test_event_list_prices_markets_with_no_captured_book(tmp_path, stubbed_model
         client=_espn_client(),
         observed_at=DECISION_AT,
         polymarket_events=[_listed_event()],
+        model=nb_rollback_model(),
     )
     rows = _by_market(slate)
 
@@ -186,6 +188,7 @@ def test_captured_book_beats_the_event_list(tmp_path, stubbed_model):
         client=_espn_client(),
         observed_at=DECISION_AT,
         polymarket_events=[_listed_event()],
+        model=nb_rollback_model(),
     )
     rows = _by_market(slate)
 
@@ -198,7 +201,7 @@ def test_captured_book_beats_the_event_list(tmp_path, stubbed_model):
 
 def test_consensus_rows_carry_a_quote_provenance(tmp_path, stubbed_model):
     slate = college_football.build_cfb_slate(
-        tmp_path, GAME_DATE, client=_espn_client(), observed_at=DECISION_AT
+        tmp_path, GAME_DATE, client=_espn_client(), observed_at=DECISION_AT, model=nb_rollback_model()
     )
     rows = _by_market(slate)
 
@@ -222,12 +225,16 @@ def test_live_event_list_never_prices_a_past_decision(tmp_path, stubbed_model, m
     monkeypatch.setattr("model_prediction.data_sources.polymarket_us.PolymarketUSClient", LiveList)
     past_decision = datetime(2026, 9, 5, 18, tzinfo=UTC)
 
-    slate = college_football.build_cfb_slate(tmp_path, GAME_DATE, observed_at=past_decision)
+    slate = college_football.build_cfb_slate(
+        tmp_path, GAME_DATE, observed_at=past_decision, model=nb_rollback_model()
+    )
 
     assert {row["sportsbook"] for row in slate["priced_contracts"]} == {"espn_consensus"}
 
     # The same live list does price a decision made now.
-    slate = college_football.build_cfb_slate(tmp_path, GAME_DATE, observed_at=datetime.now(UTC))
+    slate = college_football.build_cfb_slate(
+        tmp_path, GAME_DATE, observed_at=datetime.now(UTC), model=nb_rollback_model()
+    )
 
     assert {row["sportsbook"] for row in slate["priced_contracts"]} == {"polymarket_us_indicative"}
 
@@ -240,7 +247,12 @@ def test_quote_provenance_reaches_the_ledger_row(tmp_path, stubbed_model, monkey
     # No total on the event list: that market falls through to ESPN consensus.
     listed["markets"] = [market for market in listed["markets"] if market["market_type"] != "total"]
     slate = college_football.build_cfb_slate(
-        tmp_path, GAME_DATE, client=_espn_client(), observed_at=DECISION_AT, polymarket_events=[listed]
+        tmp_path,
+        GAME_DATE,
+        client=_espn_client(),
+        observed_at=DECISION_AT,
+        polymarket_events=[listed],
+        model=nb_rollback_model(),
     )
     monkeypatch.setattr(college_football, "build_cfb_slate", lambda **_kwargs: slate)
     monkeypatch.setattr(forecast, "utc_now", lambda: DECISION_AT)

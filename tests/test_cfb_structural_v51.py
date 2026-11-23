@@ -39,6 +39,7 @@ from model_prediction.models.cfb_structural_v51 import (
 )
 from model_prediction.models.cfb_structural_v62 import EventQuotes
 from model_prediction.models.college_football import UpcomingCFBGame
+from tests.test_cfb_serving_parity import nb_rollback_model
 
 V5 = "cfb-structural-v5"
 BOISE, WSU, BAMA, UGA, AUB, LSU = "68", "265", "333", "61", "2", "99"
@@ -610,7 +611,12 @@ def _hook_slate(tmp_path: Path, monkeypatch, membership, routes: dict, v51_model
     monkeypatch.setattr(cfb_structural_v62, "price_challenger_slate", v62_fake)
     monkeypatch.setattr(v51, "cfb_structural_v51_model", lambda: v51_model or _model(membership))
     slate = college_football.build_cfb_slate(
-        tmp_path, "2026-11-07", client=client, observed_at=DECISION, price_challenger=True
+        tmp_path,
+        "2026-11-07",
+        client=client,
+        observed_at=DECISION,
+        price_challenger=True,
+        model=nb_rollback_model(),
     )
     return slate, seen, sentinel
 

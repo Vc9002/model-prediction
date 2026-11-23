@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from model_prediction.models import college_football
+from tests.test_cfb_serving_parity import nb_rollback_model
 
 
 @pytest.mark.parametrize("missing_market", ("moneyline", "spread", "total"))
@@ -62,10 +63,14 @@ def test_cfb_missing_side_price_blocks_that_market(tmp_path, monkeypatch, missin
             )
         ]
 
-    # Patch the shared base so whichever champion class cfb_model() returns is stubbed.
+    # Patch the shared base; the v5.2 rollback model is pinned so the champion flip cannot change this path.
     monkeypatch.setattr(college_football.CFBStructuralV4Model, "predict_matchup", predict)
     slate = college_football.build_cfb_slate(
-        tmp_path, "2030-09-07", client=client, observed_at=datetime(2030, 9, 7, 18, tzinfo=UTC)
+        tmp_path,
+        "2030-09-07",
+        client=client,
+        observed_at=datetime(2030, 9, 7, 18, tzinfo=UTC),
+        model=nb_rollback_model(),
     )
     markets = {row["market_type"] for row in slate["priced_contracts"]}
     assert missing_market not in markets

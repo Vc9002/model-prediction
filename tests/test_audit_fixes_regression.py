@@ -175,11 +175,14 @@ def test_cfb_slate_default_status_is_research(tmp_path: Path):
     """Verify build_cfb_slate returns status 'research'."""
     from types import SimpleNamespace
 
+    from tests.test_cfb_serving_parity import nb_rollback_model
+
     slate = build_cfb_slate(
         data_root=tmp_path,
         game_date="2026-09-01",
         client=SimpleNamespace(scoreboard=lambda *args: {"events": []}),
         observed_at=datetime.now(UTC),
+        model=nb_rollback_model(),
     )
     assert slate["status"] == "research"
 

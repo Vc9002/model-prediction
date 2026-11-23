@@ -31,6 +31,7 @@ from model_prediction.models.cfb_structural_v4 import (
     load_cfb_structural_v4_artifact,
     main_gates_from_artifact,
 )
+from model_prediction.models.cfb_structural_v5 import load_cfb_structural_v52_artifact
 from model_prediction.models.college_football import (
     MODEL_VERSION,
     CollegeFootballModel,
@@ -107,8 +108,19 @@ def _event(
     }
 
 
+def nb_rollback_model() -> CFBStructuralV4Model:
+    """The cfb-structural-v5.2 Negative Binomial rollback model, built from its hash-verified artifact.
+
+    Tests of the NB engine's slate and quote plumbing pin this instead of the default ``cfb_model()`` /
+    ``build_cfb_slate`` path, which follows whichever model is the live NCAAF champion. The pin keeps them
+    testing the same NB model before and after a champion flip to a different engine.
+    """
+    return college_football.cfb_model_for_artifact(load_cfb_structural_v52_artifact())
+
+
 def _slate(tmp_path: Path, event: dict, **kwargs):
     client = SimpleNamespace(scoreboard=lambda *_a, **_k: {"events": [event]})
+    kwargs.setdefault("model", nb_rollback_model())
     return build_cfb_slate(tmp_path, "2026-11-14", client=client, observed_at=DECISION_AT, **kwargs)
 
 
@@ -122,19 +134,27 @@ def _champion_artifact() -> dict:
     return json.loads((PROJECT_ROOT / "config" / "models" / f"{ids.pop()}.json").read_text(encoding="utf-8"))
 
 
+def _assert_nb_model_matches_artifact(model: CFBStructuralV4Model, artifact: dict) -> None:
+    assert model.version == artifact["model_version"]
+    base_margin_sd = artifact.get("margin_sd") or artifact["margin_sd_table"]["established"]
+    assert model.margin_sd == base_margin_sd
+    assert model.total_sd == artifact["total_sd"]
+    assert model.home_advantage_points == artifact["home_advantage_points"]
+    assert model.distribution_type.value == artifact["distribution"]
+    assert model.n_simulations == CFB_V4_N_SIMULATIONS == 200_000
+
+
 def test_production_factory_follows_the_champion_map_and_its_artifact() -> None:
     """cfb_model() must be the class and parameters of whatever production.yaml names as the
-    NCAAF champion -- never a class default. Today that is cfb-structural-v5."""
+    NCAAF champion -- never a class default. The version always follows the champion; the NB-engine
+    parameter checks apply when the champion is an NB model and always to the v5.2 rollback."""
     champion = _champion_artifact()
     model = cfb_model()
-    assert isinstance(model, CFBStructuralV4Model)
     assert model.version == champion["model_version"]
-    base_margin_sd = champion.get("margin_sd") or champion["margin_sd_table"]["established"]
-    assert model.margin_sd == base_margin_sd
-    assert model.total_sd == champion["total_sd"]
-    assert model.home_advantage_points == champion["home_advantage_points"]
-    assert model.distribution_type.value == champion["distribution"]
-    assert model.n_simulations == CFB_V4_N_SIMULATIONS == 200_000
+    if isinstance(model, CFBStructuralV4Model):
+        _assert_nb_model_matches_artifact(model, champion)
+    # The v5.2 rollback artifact builds its NB model whichever model is champion.
+    _assert_nb_model_matches_artifact(nb_rollback_model(), load_cfb_structural_v52_artifact())
     # The v4 artifact still builds the v4 class (rollback path), with its own numbers.
     v4 = json.loads(ARTIFACT_PATH.read_text(encoding="utf-8"))
     rollback = college_football.cfb_model_for_artifact(v4)
@@ -147,11 +167,11 @@ def test_serving_entry_point_records_the_artifact_margin_sd_not_the_legacy_const
     """The slate builder's replay inputs must carry the v4 class's effective SDs for the
     priced line, derived from the artifact's 14.5 base. The retired implementation
     recorded 16.2 x widening under the same model label."""
-    champion = _champion_artifact()
+    champion = load_cfb_structural_v52_artifact()
     slate = _slate(tmp_path, _event())
     spread = next(c for c in slate["priced_contracts"] if c["market_type"] == "spread")
     features = spread["feature_basis"]
-    served = cfb_model()
+    served = nb_rollback_model()
     expected_margin_sd = served.margin_sd_for_features(features, -3.5)
     params = spread["inference_inputs"]["parameters"]
     assert params["margin_sd"] == pytest.approx(expected_margin_sd)
@@ -177,7 +197,7 @@ def test_parity_test_detects_a_mis_parameterised_serving_model(tmp_path) -> None
     spread = next(c for c in slate["priced_contracts"] if c["market_type"] == "spread")
     features = spread["feature_basis"]
     assert spread["inference_inputs"]["parameters"]["margin_sd"] != pytest.approx(
-        cfb_model().margin_sd_for_features(features, -3.5)
+        nb_rollback_model().margin_sd_for_features(features, -3.5)
     )
 
 
@@ -702,7 +722,7 @@ def test_code_revision_hashes_the_serving_source_not_the_version_string(tmp_path
 
 
 def test_shared_rng_advances_across_games_and_replays_exactly() -> None:
-    model = cfb_model()
+    model = nb_rollback_model()
     game = SimpleNamespace(
         event_id="e",
         event_start_utc=KICKOFF,
