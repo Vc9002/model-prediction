@@ -73,6 +73,7 @@ from ..lifecycle import model_enabled
 from ..main_ledgers import MAIN_LEDGER_SPORTS, MultiSportPickLedger
 from ..market_blend import MarketBlendBlockedError, MarketBlendPolicy, canonical_config_logical_hash
 from ..models.mlb import canonical_mlb_artifact_hash, load_formula_spec
+from ..models.nba_v91 import NBA_TOTAL_V92_VERSION, NBATotalModelV92
 from ..pricing import implied_probability
 from ..production_registry import ProductionModelRegistry, compute_artifact_hash
 from ..runtime_paths import RuntimePaths
@@ -96,6 +97,7 @@ from .forecast_market_select import (
     _select_wnba_spread_market,
     _select_wnba_total_market,
 )
+from .forecast_nba_anchor_v10 import _season_types as _nba_season_types
 from .forecast_nba_anchor_v10 import log_nba_anchor_v10
 from .forecast_nba_anchor_v10 import spread_inputs as nba_anchor_v10_spread_inputs
 from .forecast_nba_anchor_v10 import total_inputs as nba_anchor_v10_total_inputs
@@ -2369,10 +2371,19 @@ def _log_basketball_spread_picks(
     return forecast
 
 
+# NBA total versions whose served mean takes the player-availability heuristic (B9). v9.2 is not
+# one: the v9.1 engine never fitted it, and the 2026-11-19 tests showed the served heuristic raised
+# live margin MAE 11.78 -> 12.51 (quick-261123-h40). NBATotalModelV92 also zeroes it itself.
+NBA_TOTAL_AVAILABILITY_VERSIONS = ("nba-total-margin-v7", "nba-total-margin-v9")
+
+
 def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     """Price NBA totals with BasketballModel's normal-CDF score approach
     (nba-total-margin-v2), matched against the main (most-balanced)
     Polymarket alternate line per game.
+
+    Serving follows the champion map: the champion's exact artifact is loaded and dispatched on
+    its id below, so `model_promotion` promote/rollback alone moves the slate between v9 and v9.2.
     """
     from ..learned_forward import _teams
     from ..models.basketball import BasketballModel, UpcomingGame
@@ -2505,9 +2516,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         availability_diagnostics[event_id] = {
             "estimated_margin_adjustment": float(avail.get("availability_points_gap", 0.0)),
             "estimated_total_adjustment": float(avail.get("availability_total_loss", 0.0)),
-            "applied_to_qualified_model": bool(
-                model_version in ("nba-total-margin-v7", "nba-total-margin-v9")
-            ),
+            "applied_to_qualified_model": bool(model_version in NBA_TOTAL_AVAILABILITY_VERSIONS),
         }
         upcoming.append(
             UpcomingGame(
@@ -2519,12 +2528,12 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
                 neutral_site=_nfl_is_neutral_site(event),
                 availability_points_gap=(
                     float(avail.get("availability_points_gap", 0.0))
-                    if model_version in ("nba-total-margin-v7", "nba-total-margin-v9")
+                    if model_version in NBA_TOTAL_AVAILABILITY_VERSIONS
                     else 0.0
                 ),
                 availability_total_loss=(
                     float(avail.get("availability_total_loss", 0.0))
-                    if model_version in ("nba-total-margin-v7", "nba-total-margin-v9")
+                    if model_version in NBA_TOTAL_AVAILABILITY_VERSIONS
                     else 0.0
                 ),
                 league="NBA",
@@ -2532,7 +2541,13 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
         )
         market_by_event_id[event_id] = market
 
-    if model_version == "nba-total-margin-v9":
+    if model_version == NBA_TOTAL_V92_VERSION:
+        # Season types come from the scoreboard (schedule information known before tip); without
+        # them the B7 playoff total offset would be silently off.
+        total_predict = partial(
+            NBATotalModelV92.from_artifact(artifact).predict_totals, season_types=_nba_season_types(events)
+        )
+    elif model_version == "nba-total-margin-v9":
         from ..models.nba_v9 import NBATotalModelV9
 
         total_predict = NBATotalModelV9.from_artifact(artifact).predict_totals
@@ -2554,7 +2569,7 @@ def _forecast_nba_total_slate(data_root, args_date: str, client) -> dict:
     if predictions:
         try:
             component_trend = _nba_trend_engine(artifact, history)
-            if model_version in ("nba-total-margin-v7", "nba-total-margin-v9"):
+            if model_version in NBA_TOTAL_AVAILABILITY_VERSIONS:
                 pre_availability_means = _nba_pre_availability_means(total_predict, history, upcoming)
             else:
                 # Availability is not applied to these versions: the served mean is it.

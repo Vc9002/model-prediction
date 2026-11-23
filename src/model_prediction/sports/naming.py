@@ -151,6 +151,14 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="NBA Total (Total Margin v9)",
         description="NBA total champion: margin-normal totals model.",
     ),
+    "nba-total-margin-v9.2": ModelDescriptor(
+        model_id="nba-total-margin-v9.2",
+        sport="NBA",
+        market="total",
+        standard_name="nba-total-margin-v9.2",
+        display_name="NBA Total (Total Margin v9.2)",
+        description="NBA total v9.1 engine (rolling baseline, fitted fatigue, playoff offset) with its over probability shrunk toward 50% (probability_logit_slope fitted on the replay harness train window).",
+    ),
     "ncaab-tempo-v3": ModelDescriptor(
         model_id="ncaab-tempo-v3",
         sport="NCAAB",

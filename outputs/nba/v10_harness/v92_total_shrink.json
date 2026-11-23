@@ -1,0 +1,217 @@
+{
+  "data_root": "E:\\MP\\data",
+  "generated_at_utc": "2026-11-23T17:31:18.810341+00:00",
+  "inputs": {
+    "cached_v91_total_final_rows": "27d97435ce7410ff9f70a336e1b222c350602603a0ccc4ee30e680666ea30134",
+    "cached_v9_rows": "6019a89b64427d51bc3a07f8d208a42822d01c50f65859b4864f67a06cb67141",
+    "closing_lines_jsonl": "4b72ce5b3f7f42fcebfed04b720219a54d71ddd37dde6dab33912a5fc5a833f1",
+    "games_jsonl": "3e77a2cfe3d266d729ce13142f8a0ecb64eafe64f8fcf8b0bfff69128042b5c2",
+    "research_artifact_hash": "7364a664cca253d1666a0b2fb15a64515d015af7f8ecb5d1f01d821f6c22a8cd"
+  },
+  "main_rule": {
+    "assumed_asks": [
+      0.5238,
+      0.5
+    ],
+    "max_edge": 0.1,
+    "min_edge": 0.05,
+    "not_modelled": "eligibility CALL/qualified (registration, input freshness); edge only",
+    "over_floor": 0.09,
+    "over_floor_games": 15,
+    "source": "src/model_prediction/cli/forecast.py _log_basketball_total_picks (nba_rules=True); config/model.yaml"
+  },
+  "reproduction": {
+    "cached": 2811,
+    "max_abs_model_total_diff": 0.0,
+    "max_abs_p_over_diff": 0.0,
+    "ok": true,
+    "only_cached": [],
+    "only_replayed": [],
+    "replayed_pre_holdout": 2811
+  },
+  "served_probability_examples": {
+    "0.35": 0.483756,
+    "0.45": 0.494733,
+    "0.55": 0.505267,
+    "0.65": 0.516244,
+    "0.75": 0.528807
+  },
+  "slope_fit_train": {
+    "clipped": 0.10508535823453634,
+    "mle": 0.10508535823453634,
+    "n_train_decided": 2049,
+    "standard_error": 0.0916265955407411,
+    "stop_rule_clipped_at_1": false,
+    "stored_probability_logit_slope": 0.105
+  },
+  "split": {
+    "holdout_start": "2026-02-23",
+    "source": "scripts/nba_v10/replay_harness.py PINNED_VAL_START / PINNED_HOLDOUT_START (nba_replay_harness.assign_splits)",
+    "validation_start": "2025-11-03"
+  },
+  "windows": {
+    "locked_holdout": {
+      "end": "2026-06-13",
+      "main_rule_clears": {
+        "ask_0.5000": {
+          "v91_raw": 126,
+          "v92_shrunk": 1
+        },
+        "ask_0.5238": {
+          "v91_raw": 105,
+          "v92_shrunk": 0
+        }
+      },
+      "season_types": {
+        "play-in-season": 6,
+        "post-season": 85,
+        "regular-season": 375
+      },
+      "start": "2026-02-23",
+      "v91_raw": {
+        "bias_actual_minus_model": 2.326622140420497,
+        "brier": 0.25760366679985464,
+        "calibration_intercept": 0.07929930250906092,
+        "calibration_slope": 0.19391982383832915,
+        "ece": 0.07276555097613885,
+        "log_loss": 0.7092544188615015,
+        "mean_abs_distance_from_50": 0.08372695661605206,
+        "n": 466,
+        "n_decided": 461,
+        "over_share_called": 0.3882863340563991,
+        "rmse": 18.65474127731523
+      },
+      "v92_shrunk": {
+        "bias_actual_minus_model": 2.326622140420497,
+        "brier": 0.2497026411996976,
+        "calibration_intercept": 0.07929930250906085,
+        "calibration_slope": 1.8468554651269382,
+        "ece": 0.018170184506706627,
+        "log_loss": 0.6925506354846453,
+        "mean_abs_distance_from_50": 0.009105171902889285,
+        "n": 466,
+        "n_decided": 461,
+        "over_share_called": 0.3882863340563991,
+        "rmse": 18.65474127731523
+      }
+    },
+    "train": {
+      "end": "2025-11-02",
+      "main_rule_clears": {
+        "ask_0.5000": {
+          "v91_raw": 489,
+          "v92_shrunk": 0,
+          "v9_champion": 470
+        },
+        "ask_0.5238": {
+          "v91_raw": 444,
+          "v92_shrunk": 0,
+          "v9_champion": 435
+        }
+      },
+      "season_types": {
+        "play-in-season": 12,
+        "post-season": 166,
+        "regular-season": 1871
+      },
+      "start": "2024-01-29",
+      "v91_raw": {
+        "bias_actual_minus_model": 0.5794706420882079,
+        "brier": 0.260299884396652,
+        "calibration_intercept": 0.056610362056192395,
+        "calibration_slope": 0.10725840210824439,
+        "ece": 0.0892673284529039,
+        "log_loss": 0.7154251209778147,
+        "mean_abs_distance_from_50": 0.0939037364568082,
+        "n": 2049,
+        "n_decided": 2049,
+        "over_share_called": 0.4978038067349927,
+        "rmse": 18.323457690906157
+      },
+      "v92_shrunk": {
+        "bias_actual_minus_model": 0.5794706420882079,
+        "brier": 0.2498394349051766,
+        "calibration_intercept": 0.0566103620561924,
+        "calibration_slope": 1.021508591507088,
+        "ece": 0.01413469449227971,
+        "log_loss": 0.6928259273032873,
+        "mean_abs_distance_from_50": 0.010207253595512429,
+        "n": 2049,
+        "n_decided": 2049,
+        "over_share_called": 0.4978038067349927,
+        "rmse": 18.323457690906157
+      },
+      "v9_champion": {
+        "bias_actual_minus_model": 0.32991265675793596,
+        "brier": 0.2687305493003045,
+        "calibration_intercept": 0.05492280923087625,
+        "calibration_slope": 0.04638748285977119,
+        "ece": 0.11050755783308931,
+        "log_loss": 0.7356666919031338,
+        "mean_abs_distance_from_50": 0.11500090678379699,
+        "n": 2049,
+        "n_decided": 2049,
+        "over_share_called": 0.48121034651049294,
+        "rmse": 18.873001184736722
+      }
+    },
+    "validation": {
+      "end": "2026-02-22",
+      "main_rule_clears": {
+        "ask_0.5000": {
+          "v91_raw": 212,
+          "v92_shrunk": 1,
+          "v9_champion": 154
+        },
+        "ask_0.5238": {
+          "v91_raw": 190,
+          "v92_shrunk": 0,
+          "v9_champion": 169
+        }
+      },
+      "season_types": {
+        "regular-season": 762
+      },
+      "start": "2025-11-03",
+      "v91_raw": {
+        "bias_actual_minus_model": -0.3405309757007177,
+        "brier": 0.26564786478453367,
+        "calibration_intercept": -0.10720600598905304,
+        "calibration_slope": -0.16689932594878754,
+        "ece": 0.09556821664464991,
+        "log_loss": 0.7268334981323918,
+        "mean_abs_distance_from_50": 0.08830269484808455,
+        "n": 762,
+        "n_decided": 757,
+        "over_share_called": 0.47424042272126815,
+        "rmse": 19.024697444634512
+      },
+      "v92_shrunk": {
+        "bias_actual_minus_model": -0.3405309757007177,
+        "brier": 0.2505707864992781,
+        "calibration_intercept": -0.10720600598905305,
+        "calibration_slope": -1.5895173899884567,
+        "ece": 0.025141968766352937,
+        "log_loss": 0.6942896016335621,
+        "mean_abs_distance_from_50": 0.00958758985195895,
+        "n": 762,
+        "n_decided": 757,
+        "over_share_called": 0.47424042272126815,
+        "rmse": 19.024697444634512
+      },
+      "v9_champion": {
+        "bias_actual_minus_model": 3.3366203800901144,
+        "brier": 0.2688708261127054,
+        "calibration_intercept": -0.13121376100629617,
+        "calibration_slope": -0.07872388478378456,
+        "ece": 0.14120536856010563,
+        "log_loss": 0.7357386639505076,
+        "mean_abs_distance_from_50": 0.11940880317040951,
+        "n": 762,
+        "n_decided": 757,
+        "over_share_called": 0.2509907529722589,
+        "rmse": 19.422892270109944
+      }
+    }
+  }
+}

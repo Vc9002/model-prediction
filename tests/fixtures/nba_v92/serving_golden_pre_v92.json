@@ -1,0 +1,566 @@
+{
+ "nba-spread-margin-v7": {
+  "model": [
+   {
+    "feature_basis": {
+     "effective_margin_sd": 12.0,
+     "elo_away": 1524.0,
+     "elo_home": 1507.9,
+     "est_possessions": 98.4,
+     "expected_margin": 3.85,
+     "history_games": 9
+    },
+    "inference_inputs": {
+     "line": 2.5,
+     "mean": 3.8456498665386105,
+     "sd": 12.0
+    },
+    "market_type": "spread",
+    "model_version": "nba-spread-margin-v7",
+    "probabilities": {
+     "away": 0.455357,
+     "away_cover": 0.455357,
+     "home": 0.544643,
+     "home_cover": 0.544643
+    },
+    "rationale": "NBA v7 spread: margin +3.8, sd 12.0."
+   }
+  ],
+  "slate_error": "ValueError: scalar_replay_artifact_parameter_mismatch"
+ },
+ "nba-spread-margin-v9": {
+  "model": [
+   {
+    "feature_basis": {
+     "current_season_games_min": 4,
+     "effective_margin_sd": 14.0,
+     "elo_away": 1524.0,
+     "elo_home": 1507.9,
+     "est_possessions": 98.4,
+     "expected_margin": 3.85,
+     "history_games": 9
+    },
+    "inference_inputs": {
+     "line": 2.5,
+     "mean": 3.8456498665386105,
+     "sd": 14.0
+    },
+    "market_type": "spread",
+    "model_version": "nba-spread-margin-v9",
+    "probabilities": {
+     "away": 0.461713,
+     "home": 0.538287
+    },
+    "rationale": "NBA v9 margin +3.8 vs away line +2.5 (cover 46.2%)."
+   }
+  ],
+  "slate": {
+   "anchor_v10_inputs": [
+    {
+     "asks": {
+      "away": 0.5,
+      "home": 0.52
+     },
+     "away_team": "LA Clippers",
+     "contract_line": 2.5,
+     "event_id": "401",
+     "event_start_utc": "2026-11-20T01:00Z",
+     "home_team": "San Antonio Spurs",
+     "market_lineage": null,
+     "market_slug": "asc-nba-lac-sa-2026-11-19-pos-2pt5",
+     "market_type": "spread",
+     "mids": {
+      "away": 0.49,
+      "home": 0.51
+     },
+     "model_mean": 3.8456498665386105,
+     "model_source": "nba-spread-margin-v9",
+     "quote_observed_at_utc": "2026-11-19T19:59:00Z",
+     "season_type": ""
+    }
+   ],
+   "game_date": "2026-11-19",
+   "market_candidates": 1,
+   "model_name": "NBA Spread (composite margin normal CDF)",
+   "model_qualified": true,
+   "model_version": "nba-spread-margin-v9",
+   "observed_at_utc": "2026-11-19T20:00:00+00:00",
+   "priced_contracts": [
+    {
+     "away_team": "LA Clippers",
+     "event_id": "401",
+     "event_start_utc": "2026-11-20T01:00Z",
+     "executable_ask": 0.52,
+     "home_team": "San Antonio Spurs",
+     "line": -2.5,
+     "market_lineage": null,
+     "market_slug": "asc-nba-lac-sa-2026-11-19-pos-2pt5",
+     "market_type": "spread",
+     "model_artifact_hash": "03f33721fcfd3e098e229609f1880258c658459c3721d88d792f02889b66a33c",
+     "model_input_snapshot": {
+      "artifact": {
+       "artifact_hash": "03f33721fcfd3e098e229609f1880258c658459c3721d88d792f02889b66a33c",
+       "b2b_pace_drag": 0.8,
+       "b2b_penalty_away": 1.5,
+       "b2b_penalty_home": 2.0,
+       "baseline_points_per_team": 113.8,
+       "cdf_family": "normal",
+       "coherent_moneyline": true,
+       "dynamic_matchup_pace": true,
+       "dynamic_volatility": false,
+       "elo_home_advantage": 38.0,
+       "elo_weight": 0.7,
+       "expected_margin_detail": "Unified NBA Structural v9. Calibrated modern HCA (1.75 pts), early-season Elo weighting (0.70), empirical B2B fatigue (-2.0 home, -1.5 away), schedule density drag (-0.8 home, -1.2 away), stabilized variance (dynamic_volatility=False), and replacement-aware player availability.",
+       "expected_margin_formula": "0.70 * elo_margin + 0.30 * trend_margin + 0.15 * rest_diff + availability_points_gap",
+       "expected_margin_source": "nba_structural_v9_joint_engine",
+       "half_pace_additive": true,
+       "home_court_points": 1.75,
+       "isolate_postseason": true,
+       "league": "NBA",
+       "logistic_scale": 11.8,
+       "margin_sd": 14.0,
+       "market_blend_weight": 0.0,
+       "method": "margin_normal",
+       "model_version": "nba-spread-margin-v9",
+       "moneyline_margin_weight": 0.3,
+       "note": "Stabilized NBA point spread model v9. Dynamic volatility disabled to eliminate small-sample tail inflation (holdout z-SD 1.1008, holdout NLL 8.5587).",
+       "offseason_gap_days": 60.0,
+       "offseason_retention": 0.4,
+       "overtime_risk_adjustment": true,
+       "pace_sd_scaling": false,
+       "positive_class": "away_cover",
+       "possession_model": true,
+       "prediction_formula": "P(away_cover) = normal_cdf(spread_away_line, expected_margin, effective_margin_sd)",
+       "qualification": {
+        "framework": "nba_structural_v9_joint_engine",
+        "holdout_brier_score": 0.1948,
+        "holdout_log_loss": 0.5495,
+        "locked_holdout": true,
+        "mae": 12.04,
+        "model_version": "nba-spread-margin-v9",
+        "note": "Point-in-time walk-forward validated on locked holdout and live 2026-27 games (Spread win rate 60.0%, +6.34u).",
+        "qualified": true,
+        "rmse": 15.45,
+        "sample_size": 664,
+        "status": "qualified"
+       },
+       "rest_weight": 0.15,
+       "sample_scaled_overtime": true,
+       "schedule_density_drag": true,
+       "schema_version": "2",
+       "sport": "nba",
+       "total_sd": 18.0,
+       "trend_weight": 0.3,
+       "use_logistic_moneyline": true
+      },
+      "artifact_hash": "03f33721fcfd3e098e229609f1880258c658459c3721d88d792f02889b66a33c",
+      "engine_source_sha256": "d1d1a6cd66bc9fd2fbe523d774eb86e346503369900431c02296273695d91023",
+      "event_id": "401",
+      "event_start_utc": "2026-11-20T01:00Z",
+      "features": {
+       "availability_margin_component": 2.0,
+       "availability_points_gap_input": 2.0,
+       "availability_total_loss_input": 6.0,
+       "b2b_away": true,
+       "b2b_home": false,
+       "current_season_games_away": 3,
+       "current_season_games_home": 2,
+       "current_season_games_min": 4,
+       "current_season_games_played_min": 2,
+       "decision_market_mid_long": 0.49,
+       "decision_market_mid_selection": 0.51,
+       "decision_market_mid_short": 0.51,
+       "decision_market_quote_observed_at_utc": "2026-11-19T19:59:00Z",
+       "effective_margin_sd": 14.0,
+       "elo_away": 1524.0,
+       "elo_home": 1507.9,
+       "est_possessions": 98.4,
+       "expected_margin": 3.85,
+       "expected_margin_pre_availability": 1.8456,
+       "history_games": 9,
+       "rest_days_away": 0.8958,
+       "rest_days_home": 3.0
+      },
+      "historical_source_observation_times_verified": false,
+      "inference_inputs": {
+       "line": 2.5,
+       "mean": 3.8456498665386105,
+       "sd": 14.0
+      },
+      "model_version": "nba-spread-margin-v9",
+      "observed_at_utc": "2026-11-19T20:00:00+00:00",
+      "replay_scope": "Exact final classifier/distribution inputs and artifact. Upstream historical feature construction not certified.",
+      "schema": "scalar-artifact-replay-v1",
+      "snapshot_hash": "c1c35772e43363bdc810dceb5ca7b02b56fbf426bf7b457c2581e0bd0196d54b"
+     },
+     "model_probability": 0.538287,
+     "model_qualified": true,
+     "model_uncertainty": 0.155,
+     "model_version": "nba-spread-margin-v9",
+     "observed_at_utc": "2026-11-19T20:00:00+00:00",
+     "rationale": "NBA v9 margin +3.8 vs away line +2.5 (cover 46.2%).",
+     "research_availability": {
+      "applied_to_qualified_model": true,
+      "estimated_margin_adjustment": 2.0,
+      "estimated_total_adjustment": 6.0
+     },
+     "selection": "home"
+    }
+   ],
+   "scheduled_games": 1,
+   "sport": "nba_spread",
+   "unmatched": []
+  }
+ },
+ "nba-total-margin-v7": {
+  "model": [
+   {
+    "feature_basis": {
+     "effective_total_sd": 18.0,
+     "est_possessions": 98.4,
+     "expected_total": 208.69,
+     "history_games": 9
+    },
+    "inference_inputs": {
+     "line": 197.5,
+     "mean": 208.68588404172903,
+     "sd": 18.0
+    },
+    "market_type": "total",
+    "model_version": "nba-total-margin-v7",
+    "probabilities": {
+     "over": 0.732844,
+     "under": 0.267156
+    },
+    "rationale": "NBA v7 total: proj 208.7, sd 18.0."
+   }
+  ],
+  "slate": {
+   "anchor_v10_inputs": [
+    {
+     "asks": {
+      "over": 0.5,
+      "under": 0.53
+     },
+     "away_team": "LA Clippers",
+     "contract_line": 197.5,
+     "event_id": "401",
+     "event_start_utc": "2026-11-20T01:00Z",
+     "home_team": "San Antonio Spurs",
+     "market_lineage": null,
+     "market_slug": "tsc-nba-lac-sa-2026-11-19-197pt5",
+     "market_type": "total",
+     "mids": {
+      "over": 0.485,
+      "under": 0.515
+     },
+     "model_artifact_hash": "7364a664cca253d1666a0b2fb15a64515d015af7f8ecb5d1f01d821f6c22a8cd",
+     "model_mean": 208.3117147782692,
+     "model_source": "nba-total-margin-v9-1",
+     "quote_observed_at_utc": "2026-11-19T19:59:00Z",
+     "season_type": "",
+     "v9_mean": 208.68588404172903
+    }
+   ],
+   "calibration": {
+    "status": "test"
+   },
+   "game_date": "2026-11-19",
+   "market_candidates": 1,
+   "model_name": "NBA Total (composite trend/team normal CDF)",
+   "model_qualified": true,
+   "model_version": "nba-total-margin-v7",
+   "observed_at_utc": "2026-11-19T20:00:00+00:00",
+   "priced_contracts": [
+    {
+     "away_team": "LA Clippers",
+     "calibration_artifact_hash": "1bc89b8c5261f3de28652d740093d2e1af870b884c6fbbcd3085e70ba54cdb47",
+     "calibration_method": "total_normal",
+     "calibration_version": "nba-total-margin-v7",
+     "event_id": "401",
+     "event_start_utc": "2026-11-20T01:00Z",
+     "executable_ask": 0.5,
+     "home_team": "San Antonio Spurs",
+     "line": 197.5,
+     "market_lineage": null,
+     "market_slug": "tsc-nba-lac-sa-2026-11-19-197pt5",
+     "market_type": "total",
+     "model_artifact_hash": "1bc89b8c5261f3de28652d740093d2e1af870b884c6fbbcd3085e70ba54cdb47",
+     "model_input_snapshot": {
+      "artifact": {
+       "artifact_hash": "1bc89b8c5261f3de28652d740093d2e1af870b884c6fbbcd3085e70ba54cdb47",
+       "b2b_pace_drag": 0.8,
+       "baseline_points_per_team": 113.8,
+       "cdf_family": "normal",
+       "dynamic_matchup_pace": true,
+       "expected_total_detail": "Unified NBA Structural v7 totals engine. KenPom matchup pace, B2B drag (-0.8 poss), 3-in-4 schedule fatigue (-0.6 pts), close-game OT risk (+1.2 pts), and 15% replacement-aware injury shrinkage.",
+       "expected_total_formula": "est_possessions * (off_away + off_home) / 100 with OT adjustment (+1.2 pts if abs(margin) <= 3.5)",
+       "expected_total_source": "nba_structural_v7_joint_engine",
+       "isolate_postseason": true,
+       "league": "NBA",
+       "method": "total_normal",
+       "model_version": "nba-total-margin-v7",
+       "note": "Overhauled NBA total points model v7. Validated on 650 holdout games and 88 live 2026-27 games (Total MAE 15.16).",
+       "offseason_gap_days": 60.0,
+       "offseason_retention": 0.4,
+       "overtime_risk_adjustment": true,
+       "pace_sd_scaling": false,
+       "positive_class": "over",
+       "possession_model": true,
+       "prediction_formula": "P(over) = 1 - normal_cdf(total_line, expected_total, effective_total_sd)",
+       "qualification": {
+        "framework": "nba_structural_v7_joint_engine",
+        "holdout_brier_score": 0.2241,
+        "holdout_log_loss": 0.641,
+        "locked_holdout": true,
+        "mae": 15.927,
+        "model_version": "nba-total-margin-v7",
+        "note": "Point-in-time walk-forward validated on 650 games from locked holdout.",
+        "qualified": true,
+        "rmse": 20.12,
+        "sample_size": 650,
+        "status": "qualified"
+       },
+       "schedule_density_drag": true,
+       "schema_version": "2",
+       "sport": "nba",
+       "team_total_weight": 0.15,
+       "total_sd": 18.0,
+       "trend_total_weight": 0.85
+      },
+      "artifact_hash": "1bc89b8c5261f3de28652d740093d2e1af870b884c6fbbcd3085e70ba54cdb47",
+      "engine_source_sha256": "d1d1a6cd66bc9fd2fbe523d774eb86e346503369900431c02296273695d91023",
+      "event_id": "401",
+      "event_start_utc": "2026-11-20T01:00Z",
+      "features": {
+       "availability_points_gap_input": 2.0,
+       "availability_total_component": -1.5,
+       "availability_total_loss_input": 6.0,
+       "b2b_away": true,
+       "b2b_home": false,
+       "current_season_games_away": 3,
+       "current_season_games_home": 2,
+       "current_season_games_played_min": 2,
+       "decision_market_mid_long": 0.485,
+       "decision_market_mid_selection": 0.485,
+       "decision_market_mid_short": 0.515,
+       "decision_market_quote_observed_at_utc": "2026-11-19T19:59:00Z",
+       "effective_total_sd": 18.0,
+       "est_possessions": 98.4,
+       "expected_total": 208.69,
+       "expected_total_pre_availability": 210.1859,
+       "history_games": 9,
+       "rest_days_away": 0.8958,
+       "rest_days_home": 3.0
+      },
+      "historical_source_observation_times_verified": false,
+      "inference_inputs": {
+       "line": 197.5,
+       "mean": 208.68588404172903,
+       "sd": 18.0
+      },
+      "model_version": "nba-total-margin-v7",
+      "observed_at_utc": "2026-11-19T20:00:00+00:00",
+      "replay_scope": "Exact final classifier/distribution inputs and artifact. Upstream historical feature construction not certified.",
+      "schema": "scalar-artifact-replay-v1",
+      "snapshot_hash": "5eceaf72d031b857c75dca9adc9785aad6a1a4daa4cdb2ad89c9af774968cfb2"
+     },
+     "model_probability": 0.732844,
+     "model_probability_raw": 0.732844,
+     "model_qualified": true,
+     "model_uncertainty": 0.155,
+     "model_version": "nba-total-margin-v7",
+     "observed_at_utc": "2026-11-19T20:00:00+00:00",
+     "rationale": "NBA v7 total: proj 208.7, sd 18.0.",
+     "research_availability": {
+      "applied_to_qualified_model": true,
+      "estimated_margin_adjustment": 2.0,
+      "estimated_total_adjustment": 6.0
+     },
+     "selection": "over"
+    }
+   ],
+   "scheduled_games": 1,
+   "sport": "nba_total",
+   "unmatched": []
+  }
+ },
+ "nba-total-margin-v9": {
+  "model": [
+   {
+    "feature_basis": {
+     "current_season_games_min": 4,
+     "effective_total_sd": 18.0,
+     "est_possessions": 98.4,
+     "expected_total": 209.48,
+     "history_games": 9
+    },
+    "inference_inputs": {
+     "line": 197.5,
+     "mean": 209.47753498403384,
+     "sd": 18.0
+    },
+    "market_type": "total",
+    "model_version": "nba-total-margin-v9",
+    "probabilities": {
+     "over": 0.747109,
+     "under": 0.252891
+    },
+    "rationale": "NBA v9 total 209.5 vs line 197.5 (over 74.7%, under 25.3%)."
+   }
+  ],
+  "slate": {
+   "anchor_v10_inputs": [
+    {
+     "asks": {
+      "over": 0.5,
+      "under": 0.53
+     },
+     "away_team": "LA Clippers",
+     "contract_line": 197.5,
+     "event_id": "401",
+     "event_start_utc": "2026-11-20T01:00Z",
+     "home_team": "San Antonio Spurs",
+     "market_lineage": null,
+     "market_slug": "tsc-nba-lac-sa-2026-11-19-197pt5",
+     "market_type": "total",
+     "mids": {
+      "over": 0.485,
+      "under": 0.515
+     },
+     "model_artifact_hash": "7364a664cca253d1666a0b2fb15a64515d015af7f8ecb5d1f01d821f6c22a8cd",
+     "model_mean": 208.3117147782692,
+     "model_source": "nba-total-margin-v9-1",
+     "quote_observed_at_utc": "2026-11-19T19:59:00Z",
+     "season_type": "",
+     "v9_mean": 209.47753498403384
+    }
+   ],
+   "calibration": {
+    "status": "test"
+   },
+   "game_date": "2026-11-19",
+   "market_candidates": 1,
+   "model_name": "NBA Total (composite trend/team normal CDF)",
+   "model_qualified": true,
+   "model_version": "nba-total-margin-v9",
+   "observed_at_utc": "2026-11-19T20:00:00+00:00",
+   "priced_contracts": [
+    {
+     "away_team": "LA Clippers",
+     "calibration_artifact_hash": "d5f865d21c97aafdb5254bc279e65583adc5dae0d296eabeb40af1fb142ef74e",
+     "calibration_method": "total_normal",
+     "calibration_version": "nba-total-margin-v9",
+     "event_id": "401",
+     "event_start_utc": "2026-11-20T01:00Z",
+     "executable_ask": 0.5,
+     "home_team": "San Antonio Spurs",
+     "line": 197.5,
+     "market_lineage": null,
+     "market_slug": "tsc-nba-lac-sa-2026-11-19-197pt5",
+     "market_type": "total",
+     "model_artifact_hash": "d5f865d21c97aafdb5254bc279e65583adc5dae0d296eabeb40af1fb142ef74e",
+     "model_input_snapshot": {
+      "artifact": {
+       "artifact_hash": "d5f865d21c97aafdb5254bc279e65583adc5dae0d296eabeb40af1fb142ef74e",
+       "b2b_pace_drag": 0.8,
+       "baseline_points_per_team": 113.8,
+       "cdf_family": "normal",
+       "dynamic_matchup_pace": true,
+       "dynamic_volatility": false,
+       "expected_total_detail": "Unified NBA Structural v9 totals engine. Decoupled additive half-pace adjustment (+0.55 pts/poss), B2B drag (-0.8 poss), 3-in-4 schedule fatigue (-0.6 pts), sample-maturity scaled close-game OT risk (+1.2 pts * sample/15), and 15% replacement-aware injury shrinkage.",
+       "expected_total_formula": "(away_points + home_points) + 0.55 * (est_possessions - 99.2) with sample-scaled OT adjustment (+1.2 * min(1, games/15) if abs(margin) <= 3.5)",
+       "expected_total_source": "nba_structural_v9_joint_engine",
+       "half_pace_additive": true,
+       "isolate_postseason": true,
+       "league": "NBA",
+       "method": "total_normal",
+       "model_version": "nba-total-margin-v9",
+       "note": "Overhauled NBA total points model v9. Decouples pace from raw points to eliminate double-multiplication bias and sample-scales close-game overtime.",
+       "offseason_gap_days": 60.0,
+       "offseason_retention": 0.4,
+       "overtime_risk_adjustment": true,
+       "pace_sd_scaling": false,
+       "positive_class": "over",
+       "possession_model": true,
+       "prediction_formula": "P(over) = 1 - normal_cdf(total_line, expected_total, effective_total_sd)",
+       "qualification": {
+        "framework": "nba_structural_v9_joint_engine",
+        "holdout_brier_score": 0.2235,
+        "holdout_log_loss": 0.639,
+        "locked_holdout": true,
+        "mae": 14.87,
+        "model_version": "nba-total-margin-v9",
+        "note": "Validated across 138 games of 2026-27 (Total MAE drops from 15.14 to 14.87) and 664 holdout games.",
+        "qualified": true,
+        "rmse": 19.85,
+        "sample_size": 664,
+        "status": "qualified"
+       },
+       "sample_scaled_overtime": true,
+       "schedule_density_drag": true,
+       "schema_version": "2",
+       "sport": "nba",
+       "team_total_weight": 0.15,
+       "total_sd": 18.0,
+       "trend_total_weight": 0.85
+      },
+      "artifact_hash": "d5f865d21c97aafdb5254bc279e65583adc5dae0d296eabeb40af1fb142ef74e",
+      "engine_source_sha256": "d1d1a6cd66bc9fd2fbe523d774eb86e346503369900431c02296273695d91023",
+      "event_id": "401",
+      "event_start_utc": "2026-11-20T01:00Z",
+      "features": {
+       "availability_points_gap_input": 2.0,
+       "availability_total_component": -1.06,
+       "availability_total_loss_input": 6.0,
+       "b2b_away": true,
+       "b2b_home": false,
+       "current_season_games_away": 3,
+       "current_season_games_home": 2,
+       "current_season_games_min": 4,
+       "current_season_games_played_min": 2,
+       "decision_market_mid_long": 0.485,
+       "decision_market_mid_selection": 0.485,
+       "decision_market_mid_short": 0.515,
+       "decision_market_quote_observed_at_utc": "2026-11-19T19:59:00Z",
+       "effective_total_sd": 18.0,
+       "est_possessions": 98.4,
+       "expected_total": 209.48,
+       "expected_total_pre_availability": 210.5375,
+       "history_games": 9,
+       "rest_days_away": 0.8958,
+       "rest_days_home": 3.0
+      },
+      "historical_source_observation_times_verified": false,
+      "inference_inputs": {
+       "line": 197.5,
+       "mean": 209.47753498403384,
+       "sd": 18.0
+      },
+      "model_version": "nba-total-margin-v9",
+      "observed_at_utc": "2026-11-19T20:00:00+00:00",
+      "replay_scope": "Exact final classifier/distribution inputs and artifact. Upstream historical feature construction not certified.",
+      "schema": "scalar-artifact-replay-v1",
+      "snapshot_hash": "7e9e25fe247e603c85d5f26e0670c7cc78b2dd5c4b518cd28f0a0c7e6d3fce86"
+     },
+     "model_probability": 0.747109,
+     "model_probability_raw": 0.747109,
+     "model_qualified": true,
+     "model_uncertainty": 0.155,
+     "model_version": "nba-total-margin-v9",
+     "observed_at_utc": "2026-11-19T20:00:00+00:00",
+     "rationale": "NBA v9 total 209.5 vs line 197.5 (over 74.7%, under 25.3%).",
+     "research_availability": {
+      "applied_to_qualified_model": true,
+      "estimated_margin_adjustment": 2.0,
+      "estimated_total_adjustment": 6.0
+     },
+     "selection": "over"
+    }
+   ],
+   "scheduled_games": 1,
+   "sport": "nba_total",
+   "unmatched": []
+  }
+ }
+}
