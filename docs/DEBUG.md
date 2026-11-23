@@ -1,5 +1,29 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-23 — Overconfident NCAAF totals and NFL v7 shrunk toward 50% (quick-261123-2w2)
+
+Operator: "find out whether it's a bias or general overconfidence ... go ahead", then chose: shrink NCAAF v5 totals, shrink both NFL v7 markets, promote NCAAF v7 (deferred, see HANDOFF), do not touch NCAAB.
+
+- **Diagnosis (read-only).**
+  - NCAAF v5 totals: no information plus compression. Holdout calibration slope +0.01 on 1,511 games. The model sits +1.56 [1.22, 1.88] points over the close: +3.6 at low lines, -1.0 at high lines, +3.2 in weeks 0-4. Slope of model on line 0.68.
+  - NFL v7: Brier 0.2496 (spread) / 0.2506 (total) over about 1,450 games. Holdout slope 0.24 / 0.13. No directional bias.
+  - Live NCAAF 129 / NFL 43 picks were consistent with that plus small-sample noise.
+  - Missing-information audit: NBA availability is already served and raised live margin MAE 11.78 to 12.51. NFL QB is already wired in and re-running with real starters changed nothing. NCAAF early-season gains live in the v7.1 challenger.
+- **cfb-structural-v5.2 (promoted, all three markets, 5ba35aad).**
+  - v5 plus `total_probability_logit_slope` 0.0095, fitted on train 2016-2022; validation/holdout report only (`outputs/ncaaf/cfb_v52_total_shrink.md`).
+  - Totals Brier: 0.2587 raw -> 0.2500 on holdout. Main total clears at a 50% ask: 382 -> 0.
+  - Spread and moneyline are bit-identical to v5, pinned against a golden fixture regenerated from untouched dab60a87 source.
+  - `model.yaml active_production_version` switched too, because `_forecast_cfb_sport` reads it, not the champion map.
+- **nfl-total-structural-v7.1 (promoted, 9e9e27e4).**
+  - v7 plus `probability_logit_slope` 0.522, fitted on train 2021-09 to 2024-09 (SE 0.36). Served over probabilities are now 42-58%. Main total clears per season: about 20 -> about 0.
+  - The NFL slate now serves the champion map (`_nfl_serving_model_version`), not a hardcoded v7.
+  - The spread fit clipped at 1.0, so `nfl-spread-structural-v7.1.json` is unregistered and spreads serve v7.
+- **Promotion mechanics.**
+  - `model_promotion promote` rewrites production.yaml with yaml.dump and drops comments. Restore the commented copy and hand-apply the champion lines.
+  - It refuses when `allowed_models` does not mirror the models-list order.
+  - Both buyer layers were updated (backups `auto_buyer_state.pre_cfb_v52_*.json`, `.pre_nfl_total_v71_*.json`). Old ids stay whitelisted for rows logged before the switch.
+- **Pre-existing failures (also fail at dab60a87, not touched):** `test_model_naming::test_catalog_covers_production_registry`, `test_cfb_structural_v6::test_no_module...v6...`, two `test_model_lifecycle` (NCAAB moneyline "candidate"), and two `tests/sports/nfl` end-to-end tests that expect v5.
+
 ## 2026-11-22 — Background footprint; forever warmer hung exit and leaked out of tests (quick-261122-mjo, quick-261122-w6z)
 
 Operator: "optimize the entire project so it can run in the background and won't interfere with my normal process", then "check and investigate more, and clean up documentation".

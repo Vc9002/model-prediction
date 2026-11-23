@@ -73,7 +73,8 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     # NCAAF: cfb-structural-v5 promoted 2026-11-13 (operator directive, Direct Model
     # Wiring policy). v4 no longer produces rows; it is not blacklisted. v5.2 (promoted
     # 2026-11-23) serves all three markets: v5 with totals shrunk to ~50%; v5 stays listed
-    # so its open rows from before the switch can still be bought until they start.
+    # for rows logged before the switch. The drawdown circuit breaker is keyed by model id,
+    # so v5.2 starts with no quarantine history even though its spread/moneyline equal v5's.
     "cfb-structural-v5",
     "cfb-structural-v5.2",
     # WNBA (Dormant off-season)

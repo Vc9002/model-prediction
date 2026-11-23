@@ -48,8 +48,9 @@ are switched off, not deleted:
 - In `config/production.yaml` their 40 registry entries carry
   `enabled: false` and their `champions:` / `challengers:` routes are
   removed; `model_lifecycle.SUPPORTED_MARKETS` lists only the six sports.
-  `tests/test_production_registry.py` pins 92 entries, 52 available, 40
-  disabled-by-scope with a contract that still resolves.
+  `tests/test_production_registry.py` pins the entry counts (97 entries, 57
+  available, 40 disabled-by-scope with a contract that still resolves, as of
+  2026-11-23).
 - **Re-enabling esports, KBO, or NPB needs a backfill first.** Their Elo
   ratings refresh only inside the daily forecast block (14-day incremental
   merge), so while they are off the ratings and match history go stale. Run

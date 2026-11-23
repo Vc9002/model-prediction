@@ -544,3 +544,33 @@ def test_nfl_serving_follows_the_real_champion_map() -> None:
     assert _nfl_serving_model_version("total") == "nfl-total-structural-v7.1"
     # The spread fit clipped at s = 1.0 (a no-op), so no spread v7.1 was registered.
     assert _nfl_serving_model_version("spread") == "nfl-spread-structural-v7"
+
+
+def test_ncaaf_model_yaml_serving_version_matches_the_champion_map() -> None:
+    """_forecast_cfb_sport prices models.NCAAF.active_production_version, not the champion map, and
+    model_promotion never edits model.yaml: pin the two together so a promote or rollback that
+    forgets model.yaml fails here instead of silently labelling rows with the wrong model."""
+    import yaml
+
+    registry = ProductionModelRegistry.load(REPO)
+    champions = {registry.champion("NCAAF", m).model_id for m in ("moneyline", "spread", "total")}
+    assert len(champions) == 1
+    ncaaf = yaml.safe_load((REPO / "config" / "model.yaml").read_text(encoding="utf-8"))["models"]["NCAAF"]
+    (champion,) = champions
+    assert ncaaf["active_production_version"] == champion
+    assert ncaaf["production_artifact"] == registry.entries[champion].artifact
+
+
+def test_promoted_champions_are_on_the_paper_buyer_whitelist() -> None:
+    """A champion missing from the whitelist has every row rejected_not_whitelisted, silently."""
+    from model_prediction.portfolio.auto_executor import DEFAULT_WHITELIST_MODELS
+
+    registry = ProductionModelRegistry.load(REPO)
+    for sport, market in (
+        ("NCAAF", "moneyline"),
+        ("NCAAF", "spread"),
+        ("NCAAF", "total"),
+        ("NFL", "spread"),
+        ("NFL", "total"),
+    ):
+        assert registry.champion(sport, market).model_id in DEFAULT_WHITELIST_MODELS, (sport, market)
