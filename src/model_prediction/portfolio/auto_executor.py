@@ -67,6 +67,9 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     # active whitelisted champion -- nfl-elo-trend-lr-v4 is blacklisted below)
     "nfl-spread-structural-v7",
     "nfl-total-structural-v7",
+    # nfl-total-structural-v7.1 (promoted 2026-11-23): v7 with the over probability shrunk
+    # (logit slope 0.522); v7 stays listed so its open rows can still be bought.
+    "nfl-total-structural-v7.1",
     # NCAAF: cfb-structural-v5 promoted 2026-11-13 (operator directive, Direct Model
     # Wiring policy). v4 no longer produces rows; it is not blacklisted. v5.2 (promoted
     # 2026-11-23) serves all three markets: v5 with totals shrunk to ~50%; v5 stays listed

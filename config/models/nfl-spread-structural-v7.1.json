@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "4f343e4a77ee4fe268ee8f6b35fd798bb253bc7c49214d640d264dbca317451a",
+  "artifact_hash": "0985fe15046af3efcb22692695d803b79d21a9c747e80fbccb41f0deeac46c7e",
   "edsr_weight": 4.0,
   "home_field_advantage_points": 1.35,
   "key_number_weight": 0.2,
@@ -41,6 +41,8 @@
   },
   "qualification": {
     "framework": "nfl_v7_opponent_adjusted_inputs",
+    "inherited_from": "nfl-spread-structural-v7",
+    "inherited_note": "qualified and replay are inherited from the parent: the engine is unchanged and only the final probability is shrunk; replay figures describe the parent's unshrunk output",
     "locked_holdout": true,
     "model_version": "nfl-spread-structural-v7.1",
     "note": "Point-in-time walk-forward validated with opponent-adjusted EPA and recency decay.",

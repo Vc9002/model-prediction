@@ -345,6 +345,20 @@ def test_v7_snapshot_from_the_pre_slope_engine_still_replays() -> None:
     assert replay_snapshot(old)["home"] == fc.prob_home_cover
 
 
+def test_historical_engine_hashes_are_the_ones_live_v7_rows_carry() -> None:
+    """Pinned as literals: these are the engine hashes stamped on the live ledger's v7 snapshots
+    before the slope edit (204 spread / 225 total rows, checked 2026-11-23). Reading them back
+    from the set under test would let a wrong value pass."""
+    assert (
+        "8f70fc04043dc227654db817935c45cbae5436dcb5bc50c994a4e76f847f38c3"
+        in (HISTORICAL_ENGINE_HASHES["nfl_spread_structural_v7_engine"])
+    )
+    assert (
+        "1d4b488a711ddc68328e06848fa6b95f7617d269b13c008ba5189056f7fa05da"
+        in (HISTORICAL_ENGINE_HASHES["nfl_total_structural_v7_engine"])
+    )
+
+
 def test_moneyline_challenger_accepts_v71_parent_with_unchanged_win_probability() -> None:
     v7 = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7"))
     v71 = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7.1"))

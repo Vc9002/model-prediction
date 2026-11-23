@@ -391,10 +391,20 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/nfl-total-structural-v7.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: nfl-total-structural-v6
+  - model_id: nfl-total-structural-v7.1
+    sport: NFL
+    market: total
+    implementation: json_artifact
+    artifact: config/models/nfl-total-structural-v7.1.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: nfl-total-structural-v7
   - model_id: nfl-total-structural-v6
     sport: NFL
     market: total
@@ -1044,7 +1054,7 @@ prediction_service:
     NFL:
       moneyline: nfl-elo-trend-lr-v4
       spread: nfl-spread-structural-v7
-      total: nfl-total-structural-v7
+      total: nfl-total-structural-v7.1
     NCAAF:
       moneyline: cfb-structural-v5.2
       spread: cfb-structural-v5.2
@@ -1234,6 +1244,7 @@ prediction_service:
   - nfl-spread-structural-v6
   - nfl-spread-structural-v5
   - nfl-total-structural-v7
+  - nfl-total-structural-v7.1
   - nfl-total-structural-v6
   - nfl-total-structural-v5
   - soccer-poisson-dc-v3
@@ -1329,6 +1340,7 @@ prediction_service:
     nfl-spread-structural-v6: config/models/nfl-spread-structural-v6.json
     nfl-spread-structural-v5: config/models/nfl-spread-structural-v5.json
     nfl-total-structural-v7: config/models/nfl-total-structural-v7.json
+    nfl-total-structural-v7.1: config/models/nfl-total-structural-v7.1.json
     nfl-total-structural-v6: config/models/nfl-total-structural-v6.json
     nfl-total-structural-v5: config/models/nfl-total-structural-v5.json
     cfb-structural-v5: config/models/cfb-structural-v5.json

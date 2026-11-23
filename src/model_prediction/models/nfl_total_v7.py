@@ -39,7 +39,7 @@ def _normal_cdf(x: float, mean: float, sd: float) -> float:
 def _logit_shrink(p: float, slope: float) -> float:
     """sigmoid(slope * logit(p)) with intercept 0: pulls p toward 50% without moving its side.
 
-    Duplicated in nfl_total_v7.py on purpose: scalar_artifact_replay hashes each engine
+    Duplicated in nfl_spread_v7.py on purpose: scalar_artifact_replay hashes each engine
     file on its own, so each must carry the transform it replays. slope == 1.0 returns p
     untouched (sigmoid(logit(p)) is not bit-exact), so an artifact without
     probability_logit_slope prices exactly as before the field existed.

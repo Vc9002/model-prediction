@@ -429,6 +429,7 @@ models:
     - nfl-total-structural-v6
     - nfl-spread-structural-v7
     - nfl-total-structural-v7
+    - nfl-total-structural-v7.1
   NCAAF:
     family: cfb_structural_v5_calibrated_bivariate_engine
     enabled: true

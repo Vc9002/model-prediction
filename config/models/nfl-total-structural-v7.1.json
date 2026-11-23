@@ -1,5 +1,5 @@
 {
-  "artifact_hash": "47e8e08a997d2a52988d9bac3fde404910f345841f8d5166e384188cabd67b73",
+  "artifact_hash": "af3b7121b3d377205bd3b53dbf4e6817cbb60402e3ac879e8af8cd7f4dff4278",
   "bias": 0.8,
   "dome_boost": 0.8,
   "explosive_weight": 10.0,
@@ -42,6 +42,8 @@
   },
   "qualification": {
     "framework": "nfl_v7_multiplicative_inputs",
+    "inherited_from": "nfl-total-structural-v7",
+    "inherited_note": "qualified and replay are inherited from the parent: the engine is unchanged and only the final probability is shrunk; replay figures describe the parent's unshrunk output",
     "locked_holdout": true,
     "model_version": "nfl-total-structural-v7.1",
     "note": "Point-in-time walk-forward validated on modern NFL holdout games.",

@@ -393,7 +393,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def write_artifacts(report: dict[str, Any], fit_sha256: str) -> list[Path]:
+def write_artifacts(report: dict[str, Any], fit_sha256: str, force: bool = False) -> list[Path]:
     split = report["split"]
     written: list[Path] = []
     for market, block in report["markets"].items():
@@ -441,6 +441,13 @@ def write_artifacts(report: dict[str, Any], fit_sha256: str) -> list[Path]:
         }
         qualification = dict(parent.get("qualification") or {})
         qualification["model_version"] = block["v71_model_version"]
+        # The flag and the replay block are the parent's, earned by its unshrunk output; say so in
+        # the artifact rather than let them read as v7.1's own qualification (review 2026-11-23).
+        qualification["inherited_from"] = parent["model_version"]
+        qualification["inherited_note"] = (
+            "qualified and replay are inherited from the parent: the engine is unchanged and only "
+            "the final probability is shrunk; replay figures describe the parent's unshrunk output"
+        )
         qualification["probability_shrink_locked_holdout"] = {
             "n": hold["raw"]["n"],
             "start": hold["start"],
@@ -453,6 +460,10 @@ def write_artifacts(report: dict[str, Any], fit_sha256: str) -> list[Path]:
         artifact["qualification"] = qualification
         artifact["artifact_hash"] = compute_artifact_hash(artifact)
         path = REPO / "config" / "models" / f"{block['v71_model_version']}.json"
+        # config/models is protected once shipped (docs/AGENTS.md): a rerun on a grown cohort would
+        # silently change what this id means, so refuse unless explicitly forced.
+        if path.exists() and not force:
+            raise SystemExit(f"{path} exists; use a new version id or pass --force")
         path.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         written.append(path)
     return written
@@ -467,6 +478,7 @@ def main() -> None:
         help="read-only data root holding processed/nfl and availability/nfl (e.g. E:/MP/data)",
     )
     ap.add_argument("--write-artifacts", action="store_true", help="also write the two v7.1 artifacts")
+    ap.add_argument("--force", action="store_true", help="overwrite existing v7.1 artifacts")
     args = ap.parse_args()
     if not (args.data_root / "processed" / "nfl" / "games.jsonl").is_file():
         raise SystemExit(f"no processed/nfl/games.jsonl under {args.data_root}")
@@ -511,7 +523,7 @@ def main() -> None:
     print("reproduction:", json.dumps(reproduction))
     print("wrote", OUT_JSON, "sha256", fit_sha256)
     if args.write_artifacts:
-        for path in write_artifacts(report, fit_sha256):
+        for path in write_artifacts(report, fit_sha256, force=args.force):
             print("wrote", path)
 
 
