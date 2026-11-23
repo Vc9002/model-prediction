@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,32 @@ def _clear_runtime_root_env(monkeypatch: pytest.MonkeyPatch) -> None:
     path-mismatch failures.
     """
     monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
+
+
+@pytest.fixture(scope="session")
+def _dashboard_live_file_sink(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """One shared directory per session for the redirected dashboard log/snapshot."""
+    return tmp_path_factory.mktemp("dashboard-live-guard")
+
+
+@pytest.fixture(autouse=True)
+def _dashboard_live_files_redirected(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every test off the live dashboard/server.log and cache_snapshot.pkl.
+
+    On 2026-11-22 a test's leaked forever warmer appended to the live server.log
+    and overwrote the live cache_snapshot.pkl. `_log` and the snapshot helpers
+    read these two names from common's globals at call time, so redirecting them
+    there covers any test that reaches them without its own patch. Tests that
+    inspect log or snapshot content patch their own tmp_path through patch_dash,
+    which overrides this (same monkeypatch instance, undone LIFO). Never imports
+    the dashboard package, so non-dashboard tests pay nothing.
+    """
+    common = sys.modules.get("model_prediction.dashboard.common")
+    if common is None:
+        return
+    sink = request.getfixturevalue("_dashboard_live_file_sink")
+    monkeypatch.setattr(common, "LOG_FILE", sink / "server.log")
+    monkeypatch.setattr(common, "_SNAPSHOT_FILE", sink / "cache_snapshot.pkl")
 
 
 @pytest.fixture

@@ -109,11 +109,49 @@ def test_main_stops_cleanly_on_keyboard_interrupt(monkeypatch, capsys, tmp_path:
     # main() writes/unlinks the pidfile; never touch the live dashboard's
     # ownership evidence (P0-3: launchctl/lsof/server.pid must agree).
     patch_dash("PID_FILE", tmp_path / "server.pid")
+    # main() is the real server entry point: before these stubs it left a forever
+    # warmer thread and server-mode state behind, wrote the live server.log and
+    # cache_snapshot.pkl, loaded the live jobs.json, lowered the pytest process
+    # priority, and hung pytest at exit.
+    patch_dash("LOG_FILE", tmp_path / "server.log")
+    patch_dash("_SNAPSHOT_FILE", tmp_path / "cache_snapshot.pkl")
+    patch_dash("_cache_snapshot_load", lambda: 0)
+    hydrate_jobs = Mock()
+    patch_dash("_hydrate_jobs", hydrate_jobs)
+    background_priority = Mock(return_value=True)
+    patch_dash("enable_background_priority", background_priority)
+    warm_calls: list[bool] = []
+    warm_started = threading.Event()
+
+    def _recording_warm(forever: bool = False) -> None:
+        warm_calls.append(forever)
+        warm_started.set()
+
+    monkeypatch.setattr(dashboard_server, "_warm_caches", _recording_warm)
+    monkeypatch.setitem(dashboard_server._SWR, "on", False)
+    monkeypatch.setitem(dashboard_server._WARMING, "on", False)
+    patch_dash("_CACHE", {})
+    patch_dash("_TTL_OVERRIDE", {})
 
     dashboard_server.main()
 
     assert "dashboard stopped" in capsys.readouterr().out
     server.server_close.assert_called_once_with()
+    assert warm_started.wait(5)
+    assert warm_calls == [True]
+    hydrate_jobs.assert_called_once_with()
+    background_priority.assert_called_once_with()
+    assert "cache snapshot: loaded 0 entries" in (tmp_path / "server.log").read_text(encoding="utf-8")
+    assert dashboard_server._SWR["on"] is True
+
+
+def test_dashboard_live_files_never_resolve_to_the_repo_dashboard_dir() -> None:
+    from model_prediction.dashboard import common
+
+    # Pins the autouse conftest guard: a test that reaches _log or the snapshot
+    # helpers must not write the live dashboard's files.
+    assert common.LOG_FILE.resolve().parent != common.DASH_DIR.resolve()
+    assert common._SNAPSHOT_FILE.resolve().parent != common.DASH_DIR.resolve()
 
 
 def test_live_model_link_carries_dashboard_execution_context(monkeypatch, patch_dash) -> None:
