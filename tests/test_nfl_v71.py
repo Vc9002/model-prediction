@@ -418,3 +418,131 @@ def test_nfl_slate_falls_back_when_the_registry_will_not_load(monkeypatch) -> No
 
     monkeypatch.setattr(cli_forecast.ProductionModelRegistry, "load", classmethod(_boom))
     assert cli_forecast._nfl_serving_model_version("spread") == "nfl-spread-structural-v7"
+
+
+def _total_slate_fixture(tmp_path: Path, monkeypatch) -> dict:
+    """The tests/sports/nfl/total end-to-end fixture: one KC @ BUF total quote at 46.5."""
+    from model_prediction.data_sources.espn import ESPNClient
+
+    game_date, event_start = "2026-10-25", "2026-10-25T17:00:00Z"
+    odds_dir = tmp_path / "odds" / "nfl" / game_date
+    odds_dir.mkdir(parents=True, exist_ok=True)
+    snap_row = {
+        "event_id": "99901",
+        "event_slug": "nfl-kc-buf-2026-10-25",
+        "event_start_utc": event_start,
+        "event_title": "KC Chiefs vs. BUF Bills",
+        "league": "NFL",
+        "line": 46.5,
+        "long": {"ask": 0.46, "bid": 0.45, "price": 0.46},
+        "short": {"ask": 0.54, "bid": 0.53, "price": 0.54},
+        "market_id": "m999",
+        "market_slug": "tsc-nfl-kc-buf-2026-10-25-total-46pt5",
+        "market_state": "MARKET_STATE_OPEN",
+        "market_type": "total",
+        "observed_at_utc": "2026-10-25T11:59:00Z",
+        "provider": "polymarket_us",
+        "reconstructed": False,
+        "team": "Kansas City Chiefs",
+        "timestamp_valid": True,
+        "usage": "prospective_executable_bbo",
+    }
+    (odds_dir / "polymarket_snapshots.jsonl").write_text(json.dumps(snap_row) + "\n", encoding="utf-8")
+    competitors = [
+        {"homeAway": "home", "team": {"displayName": "Buffalo Bills", "name": "Bills"}},
+        {"homeAway": "away", "team": {"displayName": "Kansas City Chiefs", "name": "Chiefs"}},
+    ]
+    scoreboard = {
+        "events": [{"id": "99901", "date": event_start, "competitions": [{"competitors": competitors}]}]
+    }
+    monkeypatch.setattr(ESPNClient, "scoreboard", lambda self, league, date: scoreboard)
+
+    # The worktree has no nflverse frames; a fixed matchup with a real pass edge gives a priced row.
+    from model_prediction.features.nfl_efficiency import NFLEfficiencyMatchup
+
+    matchup = NFLEfficiencyMatchup(
+        home_team="Buffalo Bills",
+        away_team="Kansas City Chiefs",
+        home_off_epa=0.1,
+        home_def_epa=0.05,
+        away_off_epa=0.1,
+        away_def_epa=0.05,
+        home_qb_tier_adj=0.0,
+        away_qb_tier_adj=0.0,
+        home_prior_games=6,
+        away_prior_games=6,
+        home_pass_epa=0.25,
+        away_pass_epa=0.20,
+        home_def_pass_epa=0.10,
+        away_def_pass_epa=0.10,
+    )
+    store = SimpleNamespace(
+        source_manifest={},
+        get_matchup_efficiency=lambda **kwargs: matchup,
+        covers_last_game=lambda team, last: True,
+    )
+    monkeypatch.setattr(cli_forecast.NFLEfficiencyStore, "get_default", lambda *a, **k: store)
+    return {"game_date": game_date}
+
+
+def test_total_slate_serves_and_validates_the_v71_shrink_end_to_end(tmp_path, monkeypatch) -> None:
+    """A real slate run under v7.1: the row logs, request.validate() replays it, and it is the shrink of v7."""
+    from datetime import UTC, datetime
+
+    from model_prediction.config import load_config
+
+    fixture = _total_slate_fixture(tmp_path, monkeypatch)
+
+    class _Ledger:
+        def __init__(self) -> None:
+            self.appended: list = []
+
+        def append_evaluated(self, request, eligibility, now=None):
+            self.appended.append((request, eligibility))
+
+        def exposure(self, *args, **kwargs):
+            return SimpleNamespace(exposure=0.0)
+
+    class _Entities:
+        def resolve(self, league, team, date):
+            return SimpleNamespace(canonical_team_id=team)
+
+    monkeypatch.setattr(cli_forecast, "_is_registered_serving_model", lambda *a, **k: True)
+    served: dict[str, tuple[dict, list]] = {}
+    for model_id in ("nfl-total-structural-v7", "nfl-total-structural-v7.1"):
+        monkeypatch.setattr(cli_forecast, "_nfl_serving_model_version", lambda market, _m=model_id: _m)
+        flat = _Ledger()
+        result = cli_forecast._forecast_nfl_total_sport(
+            data_root=tmp_path,
+            args_date=fixture["game_date"],
+            config=load_config(),
+            registry=_Entities(),
+            bans=SimpleNamespace(check=lambda *a: (None, False)),
+            main_ledger=_Ledger(),
+            flat_ledger=flat,
+            observed_at=datetime(2026, 10, 25, 12, 0, tzinfo=UTC),
+        )
+        assert result["model_version"] == model_id
+        assert not [s for s in result["skipped"] if "scalar_replay" in str(s.get("reason"))]
+        assert len(flat.appended) == 1, (
+            result.get("skipped"),
+            result.get("unmatched"),
+            result.get("market_candidates"),
+        )
+        served[model_id] = (result["priced_contracts"][0], flat.appended)
+    v7_row, _ = served["nfl-total-structural-v7"]
+    v71_row, v71_flat = served["nfl-total-structural-v7.1"]
+    request = v71_flat[0][0]
+    assert request.model_version == "nfl-total-structural-v7.1"
+    slope = _artifact("nfl-total-structural-v7.1")["probability_logit_slope"]
+    p7_over = (
+        v7_row["model_probability"] if v7_row["selection"] == "over" else 1 - v7_row["model_probability"]
+    )
+    p71_over = (
+        v71_row["model_probability"] if v71_row["selection"] == "over" else 1 - v71_row["model_probability"]
+    )
+    assert abs(p71_over - p7_over) > 1e-3  # the fixture really exercises the shrink
+    assert p71_over == pytest.approx(_sigmoid_shrink(p7_over, slope), abs=1e-6)
+    assert request.model_probability == v71_row["model_probability"]
+    # no live calibrator exists for the new id, so served == engine output (post-shrink)
+    assert v71_row["model_probability_raw"] == v71_row["model_probability"]
