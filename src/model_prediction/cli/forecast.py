@@ -135,6 +135,17 @@ from .state import (
 
 logger = logging.getLogger("model_prediction.cli")
 
+# NCAAF model ids whose rows may reach the gated and Main ledgers (the champion line and its rollbacks). Every other
+# NCAAF id (v6.2, v7, v7.1, v5.1 challengers) is research/Flat only. quick-261123-6q5 adds the v7.2 champion.
+NCAAF_MAIN_VERSIONS = (
+    "cfb-structural-v7.2",
+    "cfb-structural-v5.2",
+    "cfb-structural-v5",
+    "cfb-structural-v4",
+    "cfb-structural-v3",
+    "cfb-structural-v2",
+)
+
 
 def _load_exact_artifact_contract(model_version: str) -> tuple[dict[str, Any] | None, str | None]:
     """Load only the artifact whose own identity exactly matches the model.
@@ -5835,6 +5846,13 @@ def _forecast_cfb_sport(
                     observed_at_utc=contract_obs,
                     artifact_hash=str(contract.get("model_artifact_hash") or ""),
                 )
+                # contract_snapshot_json is best-effort (returns None on bad inputs). For a champion row the
+                # feature capture is the only input record, so fail this contract closed, as an NB champion row
+                # whose replay snapshot cannot be built does (review 2026-11-23).
+                if cfb_snapshot_json is None and m_version in NCAAF_MAIN_VERSIONS:
+                    raise ValueError(
+                        f"NCAAF champion contract without a feature-capture snapshot ({m_version})"
+                    )
             contract_sportsbook = str(contract.get("sportsbook") or "espn_consensus")
             contract_slug = str(contract.get("market_slug") or "")
             # A challenger contract (cfb-structural-v6.2) carries its own artifact hash; champion rows keep v5's.
@@ -5866,10 +5884,12 @@ def _forecast_cfb_sport(
                 model_enabled=model_enabled(model_config),
                 observed_at_utc=contract_obs,
                 model_artifact_hash=contract_artifact_hash,
-                calibration_method="cfb_key_number_engine",
+                # A v7.2 champion contract names its own schema and calibration (quick-261123-6q5); NB rows keep
+                # the engine's.
+                calibration_method=str(contract.get("calibration_method") or "cfb_key_number_engine"),
                 calibration_version=m_version,
                 calibration_artifact_hash=contract_artifact_hash,
-                feature_schema_version="cfb-v1",
+                feature_schema_version=str(contract.get("feature_schema_version") or "cfb-v1"),
                 code_revision=contract_code_revision,
                 model_input_snapshot_json=cfb_snapshot_json,
                 **(contract.get("market_lineage") or {}),
@@ -5953,14 +5973,7 @@ def _forecast_cfb_sport(
                 is_qualified_call = (
                     genuinely_eligible
                     and not eligibility.reason_code.startswith("PAPER_CALL_")
-                    and m_version
-                    in (
-                        "cfb-structural-v5.2",
-                        "cfb-structural-v5",
-                        "cfb-structural-v4",
-                        "cfb-structural-v3",
-                        "cfb-structural-v2",
-                    )
+                    and m_version in NCAAF_MAIN_VERSIONS
                 )
                 if (
                     research_ledger is not None

@@ -47,6 +47,8 @@ from .cfb_structural_v5 import (
     CFBStructuralV5Model,
     CFBStructuralV52Model,
 )
+from .cfb_structural_v7 import CHAMPION_VERSIONS as V7_CHAMPION_VERSIONS
+from .cfb_structural_v7 import CFBStructuralV7Model
 
 MODEL_VERSION = "cfb-structural-v4"
 CFB_SPREAD_MODEL_VERSION = "cfb-structural-v4"
@@ -143,16 +145,21 @@ _SERVING_CLASSES: dict[str, type[CFBStructuralV4Model]] = {
 }
 
 
-def cfb_model_for_artifact(artifact: Mapping[str, Any]) -> CFBStructuralV4Model:
-    """The serving class for an NCAAF artifact, parameterised from that artifact (fail-closed)."""
+def cfb_model_for_artifact(artifact: Mapping[str, Any]) -> CFBStructuralV4Model | CFBStructuralV7Model:
+    """The serving class for an NCAAF artifact, parameterised from that artifact (fail-closed).
+
+    quick-261123-6q5: a v7-family champion (v7.2 only) is served by ``CFBStructuralV7Model``, which verifies the
+    artifact hash itself; v7 and v7.1 stay research challengers and are refused like any unknown version."""
     version = str(artifact.get("model_version") or "")
+    if version in V7_CHAMPION_VERSIONS:
+        return CFBStructuralV7Model(artifact)
     cls = _SERVING_CLASSES.get(version)
     if cls is None:
         raise ValueError(f"no NCAAF serving class for artifact model_version {version!r}")
     return cls.from_artifact(artifact)
 
 
-def cfb_model() -> CFBStructuralV4Model:
+def cfb_model() -> CFBStructuralV4Model | CFBStructuralV7Model:
     """The NCAAF champion named by config/production.yaml, built from its own artifact.
 
     Serving follows the champion map rather than a class default so a promotion cannot
@@ -788,7 +795,7 @@ def build_cfb_slate(
     game_date: str,
     client: Any | None = None,
     observed_at: datetime | None = None,
-    model: CFBStructuralV4Model | None = None,
+    model: CFBStructuralV4Model | CFBStructuralV7Model | None = None,
     polymarket_events: list[dict[str, Any]] | None = None,
     price_challenger: bool | None = None,
 ) -> dict[str, Any]:
@@ -804,6 +811,11 @@ def build_cfb_slate(
 
     ``price_challenger`` (default: production only, i.e. ``client`` is None) also prices the routed NCAAF
     challenger (cfb-structural-v6.2) and appends its contracts after the champion's.
+
+    A v7-family champion (cfb-structural-v7.2, quick-261123-6q5) makes no NB-engine prediction: every event goes
+    to the v7 seam (``cfb_structural_v7_challenger.price_challenger_slate``, ``role="champion"``) against the
+    captured Polymarket books only, quote time at or before ``observed_at``. A game the seam no-calls gets no
+    contract at all (no v5.2 fallback); ``champion_pricing`` counts every no-call by reason.
     """
     from ..data_sources.espn import ESPNClient
     from ..features.cfb_qb_availability import (
@@ -1150,6 +1162,9 @@ def build_cfb_slate(
         )
 
         challenger_games[event_id] = upcoming
+        if isinstance(model, CFBStructuralV7Model):
+            # The v7 champion prices the whole slate through its seam after this loop; no NB contracts.
+            continue
         preds = model.predict_matchup(history, upcoming, project_missing_lines=True)
         schedule_context = {
             "espn_season_type": ev_season_type,
@@ -1381,9 +1396,43 @@ def build_cfb_slate(
             )
 
     code_hash = cfb_serving_code_hash()
+    served_version = MODEL_VERSION
+    champion_pricing: dict[str, Any] | None = None
+    if isinstance(model, CFBStructuralV7Model):
+        import logging
+
+        from .cfb_structural_v7_challenger import price_challenger_slate as price_v7_champion
+        from .cfb_structural_v7_challenger import v7_serving_code_hash
+
+        code_hash = v7_serving_code_hash()
+        served_version = model.version
+        # Fail closed (operator OD-3, 2026-11-23): a seam error prices no champion contract and never falls back
+        # to v5.2; the Flat challengers below still run.
+        try:
+            champion_contracts, champion_pricing = price_v7_champion(
+                root,
+                obs,
+                challenger_events,
+                markets=("moneyline", "spread", "total"),
+                model=model,
+                model_id=model.version,
+                role="champion",
+            )
+        except Exception as exc:
+            logging.getLogger(__name__).warning("NCAAF v7 champion pricing failed", exc_info=True)
+            champion_contracts = []
+            champion_pricing = {
+                "status": "error",
+                "model_version": model.version,
+                "reason": f"{type(exc).__name__}: {exc}",
+            }
+        priced_contracts.extend(champion_contracts)
 
     candidate_capture: dict[str, Any] = {"status": "not_requested"}
-    if client is None:
+    if client is None and isinstance(model, CFBStructuralV7Model):
+        # The candidate packet replays NB-engine inference inputs, which a v7 champion does not produce.
+        candidate_capture = {"status": "not_supported_v7_family"}
+    elif client is None and not isinstance(model, CFBStructuralV7Model):
         try:
             from ..cfb_replay import replay_inputs
             from ..college_contract_evidence import build_candidate_evidence, save_candidate_evidence
@@ -1575,12 +1624,12 @@ def build_cfb_slate(
             if challenger_id == "cfb-structural-v6.2":
                 challenger_pricing = summary
 
-    return {
+    slate: dict[str, Any] = {
         "game_date": iso_date,
         "sport": "ncaaf",
         "league": "NCAAF",
         "status": "research",
-        "model_version": MODEL_VERSION,
+        "model_version": served_version,
         "model_code_hash": code_hash,
         "challenger_pricing": challenger_pricing,
         "challenger_pricing_by_model": challenger_pricing_by_model,
@@ -1590,3 +1639,6 @@ def build_cfb_slate(
         "history_games": len(history),
         "candidate_quote_coverage": candidate_capture,
     }
+    if champion_pricing is not None:
+        slate["champion_pricing"] = champion_pricing
+    return slate
