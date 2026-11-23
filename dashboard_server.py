@@ -406,8 +406,9 @@ def _warm_caches(forever: bool = False) -> None:
     # never return, so running them in a pool hung every exit of main() (Ctrl-C, a
     # serve_forever error, pytest), and builders that submit to their own executors
     # logged "cannot schedule new futures after interpreter shutdown" every 30 s.
-    # Plain daemon threads are abandoned at shutdown instead. One-pass mode
-    # returns, so it keeps the pool.
+    # Plain daemon threads are abandoned at shutdown instead (a builder's own
+    # pool still finishes its in-flight items, so exit can wait for one build and
+    # may log that line once). One-pass mode returns, so it keeps the pool.
     if forever:
         threads = [
             _threading.Thread(target=_warm, args=(item,), daemon=True, name=f"cache-warmer:{item[0]}")

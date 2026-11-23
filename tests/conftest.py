@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 
 import pytest
@@ -37,30 +36,25 @@ def _clear_runtime_root_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
 
 
-@pytest.fixture(scope="session")
-def _dashboard_live_file_sink(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """One shared directory per session for the redirected dashboard log/snapshot."""
-    return tmp_path_factory.mktemp("dashboard-live-guard")
-
-
-@pytest.fixture(autouse=True)
-def _dashboard_live_files_redirected(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep every test off the live dashboard/server.log and cache_snapshot.pkl.
+@pytest.fixture(scope="session", autouse=True)
+def _dashboard_live_files_redirected(tmp_path_factory: pytest.TempPathFactory) -> None:
+    """Keep the whole test session off the live dashboard/server.log and cache_snapshot.pkl.
 
     On 2026-11-22 a test's leaked forever warmer appended to the live server.log
-    and overwrote the live cache_snapshot.pkl. `_log` and the snapshot helpers
-    read these two names from common's globals at call time, so redirecting them
-    there covers any test that reaches them without its own patch. Tests that
-    inspect log or snapshot content patch their own tmp_path through patch_dash,
-    which overrides this (same monkeypatch instance, undone LIFO). Never imports
-    the dashboard package, so non-dashboard tests pay nothing.
+    and overwrote the live cache_snapshot.pkl. A leak like that is a thread that
+    outlives its test, so a per-test patch is not enough: it is undone at
+    teardown and the thread writes the live files again. `_log` and the snapshot
+    helpers read these two names from common's globals at call time, so the
+    redirect is set once for the session and deliberately never undone (leaked
+    daemon threads keep running through interpreter shutdown). Imported here,
+    not looked up in sys.modules, so a test that imports the dashboard lazily is
+    covered too. Per-test patches (patch_dash, monkeypatch) restore to the sink.
     """
-    common = sys.modules.get("model_prediction.dashboard.common")
-    if common is None:
-        return
-    sink = request.getfixturevalue("_dashboard_live_file_sink")
-    monkeypatch.setattr(common, "LOG_FILE", sink / "server.log")
-    monkeypatch.setattr(common, "_SNAPSHOT_FILE", sink / "cache_snapshot.pkl")
+    from model_prediction.dashboard import common
+
+    sink = tmp_path_factory.mktemp("dashboard-live-guard")
+    common.LOG_FILE = sink / "server.log"
+    common._SNAPSHOT_FILE = sink / "cache_snapshot.pkl"
 
 
 @pytest.fixture
