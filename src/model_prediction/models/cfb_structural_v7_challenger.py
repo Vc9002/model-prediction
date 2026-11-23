@@ -72,6 +72,8 @@ _V7_SERVING_SOURCES = (
     _HERE.parents[1] / "features" / "cfb_pbp_rows.py",
     # v7.2's total shrink (shrink_total_probabilities) runs on the serving path.
     _HERE.parents[1] / "cfb_replay.py",
+    # The quote selectors (_match_cfb_*) and the champion wiring a v7 row is priced through (review 2026-11-23).
+    _HERE.parent / "college_football.py",
 )
 
 SlatePricer = Callable[..., tuple[list[dict[str, Any]], dict[str, Any]]]

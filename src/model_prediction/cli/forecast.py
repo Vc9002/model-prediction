@@ -5846,6 +5846,13 @@ def _forecast_cfb_sport(
                     observed_at_utc=contract_obs,
                     artifact_hash=str(contract.get("model_artifact_hash") or ""),
                 )
+                # contract_snapshot_json is best-effort (returns None on bad inputs). For a champion row the
+                # feature capture is the only input record, so fail this contract closed, as an NB champion row
+                # whose replay snapshot cannot be built does (review 2026-11-23).
+                if cfb_snapshot_json is None and m_version in NCAAF_MAIN_VERSIONS:
+                    raise ValueError(
+                        f"NCAAF champion contract without a feature-capture snapshot ({m_version})"
+                    )
             contract_sportsbook = str(contract.get("sportsbook") or "espn_consensus")
             contract_slug = str(contract.get("market_slug") or "")
             # A challenger contract (cfb-structural-v6.2) carries its own artifact hash; champion rows keep v5's.

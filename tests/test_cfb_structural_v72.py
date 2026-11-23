@@ -604,6 +604,62 @@ def test_v72_reaches_main_through_v52_gates_and_totals_stay_off_main(
         assert row["calibration_method"] == CHAMPION_CALIBRATION_METHOD
 
 
+def test_a_v72_contract_whose_snapshot_cannot_be_built_never_reaches_any_ledger(
+    tmp_path, monkeypatch, v72, v72_artifact
+) -> None:
+    """contract_snapshot_json is best-effort; a champion row without its only input record must fail closed."""
+    from model_prediction.cli import forecast
+    from model_prediction.ledger import PickLedger
+    from model_prediction.models import college_football
+
+    events = [_eq("e1", ml=(0.60, 0.42), spread=(-7.5, 0.51, 0.51))]
+    contracts, _summary = price_challenger_slate(
+        PROJECT_ROOT,
+        DECISION,
+        events,
+        markets=ALL_MARKETS,
+        model=v72,
+        model_id=V72,
+        role="champion",
+        slate_pricer=_seam({"e1": {**_E1, "home_win": 0.65, "away_win": 0.35}}),
+    )
+    assert contracts
+    original = forecast._load_exact_artifact_contract
+    monkeypatch.setattr(
+        forecast,
+        "_load_exact_artifact_contract",
+        lambda version: (v72_artifact, None) if version == V72 else original(version),
+    )
+    slate = {"status": "research", "model_code_hash": "unused", "priced_contracts": contracts}
+    monkeypatch.setattr(college_football, "build_cfb_slate", lambda **_kwargs: slate)
+    monkeypatch.setattr(forecast, "utc_now", lambda: DECISION)
+    monkeypatch.setattr(forecast, "contract_snapshot_json", lambda *_a, **_k: None)
+    ledgers = {
+        tier: PickLedger(
+            tmp_path / f"{tier}.xlsx", audit_path=tmp_path / f"{tier}.jsonl", tier=tier, sport="ncaaf"
+        )
+        for tier in ("research", "gated", "flat", "main")
+    }
+    result = forecast._forecast_cfb_sport(
+        data_root=tmp_path,
+        args_date="2023-11-11",
+        config={
+            "models": {
+                "NCAAF": {"min_edge": 0.005, "status": "shadow_qualified", "active_production_version": V72}
+            },
+            "project": {"maximum_data_age_hours": 24},
+            "bankroll": {},
+        },
+        research_ledger=ledgers["research"],
+        gated_ledger=ledgers["gated"],
+        flat_ledger=ledgers["flat"],
+        main_ledger=ledgers["main"],
+    )
+    assert all(not ledgers[t].rows() for t in ledgers)
+    assert len(result["errors"]) == len(contracts)
+    assert all("feature-capture snapshot" in str(e) for e in result["errors"])
+
+
 def test_nb_rows_keep_the_engine_schema_and_calibration(tmp_path, monkeypatch) -> None:
     """A contract that names no schema (every NB and v5.x row) keeps "cfb-v1" / "cfb_key_number_engine"."""
     from tests.test_cfb_multi_challenger import _run_forecast, _v5_row
