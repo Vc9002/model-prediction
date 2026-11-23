@@ -20,6 +20,7 @@ from test_nba_serving_plumbing import (
     AVAILABILITY,
     CLIPPERS,
     HISTORY,
+    NOW,
     SPURS,
     TIP_ESPN,
     _client,
@@ -86,9 +87,12 @@ def test_v9_and_v7_serving_match_the_pre_v92_capture(live_capture, model_id):
     assert strip_volatile(live_capture[model_id]) == strip_volatile(golden)
 
 
-def test_existing_v9_total_snapshot_still_replays():
-    snapshot = _load(GOLDEN)["nba-total-margin-v9"]["slate"]["priced_contracts"][0]["model_input_snapshot"]
+def test_v9_total_snapshot_still_replays_under_total_normal():
+    """v9 keeps the basketball.py-hashed total_normal replay (built live: the stored fixture's
+    raw-byte engine hash depends on the checkout's line endings)."""
+    snapshot = run_slate("total", "nba-total-margin-v9")["priced_contracts"][0]["model_input_snapshot"]
     assert snapshot["artifact"]["method"] == "total_normal"
+    assert snapshot["engine_source_sha256"] == engine_hash("total_normal")
     assert replay_snapshot(snapshot)["over"] == pytest.approx(0.747109, abs=1e-6)
 
 
@@ -341,3 +345,91 @@ def test_v92_flat_and_main_logging_read_the_shrunk_probability(monkeypatch, tmp_
     assert [ledger for ledger, _ in requests] == [flat]
     assert requests[0][1].model_probability == contracts[0]["model_probability"]
     assert requests[0][1].model_version == NBA_TOTAL_V92_VERSION
+
+
+def test_v92_row_through_the_real_validate_eligibility_and_ledgers(monkeypatch, tmp_path):
+    """Unstubbed PickRequest.validate (replays the snapshot against the row), real eligibility and
+    sizing, real Flat/Main ledgers: the stored row carries the shrunk price, and its ~2.8% edge at a
+    50% ask is sized on Flat but stays off Main (5% minimum)."""
+    from model_prediction.config import load_config
+    from model_prediction.domain import League
+    from model_prediction.entities import CanonicalTeam
+    from model_prediction.main_ledgers import MultiSportPickLedger
+
+    monkeypatch.setenv("MODEL_PREDICTION_LEDGER_MIRROR", "0")
+    contracts = [
+        {**c, "market_lineage": {}} for c in run_slate("total", NBA_TOTAL_V92_VERSION)["priced_contracts"]
+    ]
+    monkeypatch.setattr(
+        forecast_cli, "_forecast_nba_total_slate", lambda *args: {"priced_contracts": contracts}
+    )
+    monkeypatch.setattr(forecast_cli, "_is_registered_serving_model", lambda *args: True)
+    teams = {
+        name: CanonicalTeam(f"nba-{i}", League.NBA, name, name, True, None, None, ())
+        for i, name in enumerate((CLIPPERS, SPURS))
+    }
+    registry = SimpleNamespace(resolve=lambda league, team, start: teams[team])
+    bans = SimpleNamespace(check=lambda league, team_id: (None, False))
+    monkeypatch.setattr(forecast_cli, "utc_now", lambda: NOW)
+    flat = MultiSportPickLedger(tmp_path / "flat", flat=True)
+    main = MultiSportPickLedger(tmp_path / "main", flat=False)
+    result = forecast_cli._forecast_nba_total_sport(
+        data_root=tmp_path,
+        args_date="2026-11-19",
+        config=load_config(),
+        registry=registry,
+        bans=bans,
+        flat_ledger=flat,
+        main_ledger=main,
+    )
+    assert result["skipped"] == [], result["skipped"]
+    flat_rows = flat.rows()
+    assert len(flat_rows) == 1
+    row = flat_rows[0]
+    assert row["model_version"] == NBA_TOTAL_V92_VERSION
+    assert float(row["model_probability"]) == contracts[0]["model_probability"]
+    assert float(row["units"]) > 0.0
+    assert main.rows() == []
+
+
+def test_real_registry_serves_v92_once_registered_and_routed(monkeypatch, tmp_path):
+    """The shipped production.yaml plus, in memory only, the entry and champion route the
+    orchestrator would add: the real registry validates the artifact and the slate serves it."""
+    import yaml
+
+    from model_prediction.production_registry import ProductionModelRegistry
+
+    config = yaml.safe_load((REPO / "config" / "production.yaml").read_text(encoding="utf-8"))
+    svc = config["prediction_service"]
+    svc["models"].append(
+        {
+            "model_id": NBA_TOTAL_V92_VERSION,
+            "sport": "NBA",
+            "market": "total",
+            "implementation": "json_artifact",
+            "artifact": "config/models/nba-total-margin-v9.2.json",
+            "enabled": True,
+            "serving_status": "production",
+            "evidence_status": "predictively_qualified",
+            "replacement_priority": "low",
+            "rollback_model": "nba-total-margin-v9",
+        }
+    )
+    if "allowed_models" in svc:
+        svc["allowed_models"].append(NBA_TOTAL_V92_VERSION)
+    if "artifact_map" in svc:
+        svc["artifact_map"][NBA_TOTAL_V92_VERSION] = "config/models/nba-total-margin-v9.2.json"
+    svc["champions"]["NBA"]["total"] = NBA_TOTAL_V92_VERSION
+    registry = ProductionModelRegistry.from_config(config, repo_root=REPO)
+    champion = registry.champion("NBA", "total")
+    assert champion is not None and champion.available, champion and champion.load_error
+    assert champion.model_id == NBA_TOTAL_V92_VERSION
+    assert champion.artifact_hash == _load(V92_PATH)["artifact_hash"]
+
+    events = [_event("401", CLIPPERS, SPURS)]
+    _patch_slate(monkeypatch, market="total", rows=[_total_row()], events=events)
+    monkeypatch.setattr(forecast_cli.ProductionModelRegistry, "load", lambda root: registry)
+    result = forecast_cli._forecast_nba_total_slate(tmp_path, "2026-11-19", _client(events))
+    assert result["model_version"] == NBA_TOTAL_V92_VERSION
+    assert result["model_qualified"] is True
+    assert forecast_cli._is_registered_serving_model(NBA_TOTAL_V92_VERSION, "NBA", "total") is True
