@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import os
+import re
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 import pytest
 
+from model_prediction import run_supervisor
 from model_prediction.filelock import lock_exclusive, unlock
 from model_prediction.run_supervisor import WORKERS, RunSupervisor
 
@@ -300,6 +304,173 @@ def test_fails_closed_without_runtime_env(tmp_path, monkeypatch) -> None:
         RunSupervisor(repo_root=repo)
     assert not (repo / "data" / "runs.db").exists()
     assert not (repo / "data" / "ledgers" / "ledgers.db").exists()
+
+
+# Python source run as `python -c`, so this module never touches ctypes.WinDLL at import time
+# and non-Windows collection is unaffected. Prints the process's own memory priority and class.
+_PRIORITY_PROBE = """
+import ctypes
+
+k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+k32.GetCurrentProcess.restype = ctypes.c_void_p
+k32.GetProcessInformation.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_ulong]
+k32.GetProcessInformation.restype = ctypes.c_int
+k32.GetPriorityClass.argtypes = [ctypes.c_void_p]
+k32.GetPriorityClass.restype = ctypes.c_uint32
+
+
+class MemoryPriorityInformation(ctypes.Structure):
+    _fields_ = [("MemoryPriority", ctypes.c_ulong)]
+
+
+info = MemoryPriorityInformation()
+handle = k32.GetCurrentProcess()
+if not k32.GetProcessInformation(handle, 0, ctypes.byref(info), ctypes.sizeof(info)):
+    print("PRIORITY error=%d" % ctypes.get_last_error(), flush=True)
+else:
+    print("PRIORITY mem=%d class=0x%x" % (info.MemoryPriority, k32.GetPriorityClass(handle)), flush=True)
+"""
+
+# Stubs RunSupervisor (a real one would resolve the live runtime root and copy multi-GB legacy
+# DBs) and drives main() the way `python -m model_prediction.run_supervisor run <worker>` does.
+# The probe source arrives as sys.argv[1]; the stub's run_worker launches it as a grandchild and
+# relays its output.
+_SUPERVISOR_DRIVER = """
+import subprocess
+import sys
+
+import model_prediction.run_supervisor as rs
+
+
+class _StubSupervisor:
+    def __init__(self) -> None:
+        pass
+
+    def run_worker(self, worker: str) -> int:
+        child = subprocess.run(
+            [sys.executable, "-c", sys.argv[1]], check=False, capture_output=True, text=True
+        )
+        # Relay instead of inheriting the handle: with the real import chain loaded the
+        # grandchild's inherited stdout never reached the test's pipe.
+        sys.stdout.write(child.stdout)
+        sys.stdout.flush()
+        return child.returncode
+
+    def close(self) -> None:
+        pass
+
+
+rs.RunSupervisor = _StubSupervisor
+sys.exit(rs.main(["run", "probe"]))
+"""
+
+_PRIORITY_LINE = re.compile(r"PRIORITY mem=(\d+) class=0x([0-9a-f]+)")
+
+
+def _child_env(repo_root: Path) -> dict[str, str]:
+    """Child env that can never reach the live runtime root or the operator's .env."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("MODEL_PREDICTION_")}
+    # Guard against a future import that loads .env (runtime root, Polymarket credentials).
+    env["MODEL_PREDICTION_SKIP_DOTENV"] = "1"
+    # A single entry, so _worker_env's ":"-joined form (not the Windows separator) is not needed.
+    env["PYTHONPATH"] = str(repo_root / "src")
+    return env
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows process priority inheritance")
+def test_main_run_worker_tree_inherits_low_priority() -> None:
+    """The scheduled path is `python -m model_prediction.run_supervisor run <worker>`; the operator
+    approved low memory priority for every worker tree on 2026-11-23 (quick-261123-oy5). A python
+    grandchild of main()'s worker launch must be born BELOW_NORMAL with memory priority 2."""
+    repo_root = Path(__file__).resolve().parents[1]
+    env = _child_env(repo_root)
+
+    baseline = subprocess.run(
+        [sys.executable, "-c", _PRIORITY_PROBE],
+        env=env,
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    base = _PRIORITY_LINE.search(baseline.stdout)
+    if base is None or (int(base.group(1)), int(base.group(2), 16)) != (5, 0x20):
+        pytest.skip(
+            "pytest's children are already demoted (baseline "
+            f"{baseline.stdout.strip()!r}); inheritance would mask a missing demotion in main()"
+        )
+
+    result = subprocess.run(
+        [sys.executable, "-c", _SUPERVISOR_DRIVER, _PRIORITY_PROBE],
+        env=env,
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    detail = f"stdout={result.stdout!r} stderr={result.stderr!r}"
+    assert result.returncode == 0, detail
+    matches = _PRIORITY_LINE.findall(result.stdout)
+    assert len(matches) == 1, detail
+    mem, cls = int(matches[0][0]), int(matches[0][1], 16)
+    assert mem == 2, detail
+    assert cls == 0x4000, detail
+
+
+class _StubSupervisor:
+    """Stands in for RunSupervisor so main() never touches a runtime root."""
+
+    events: list[str]
+
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
+    def run_worker(self, worker, **kwargs) -> int:
+        type(self).events.append(f"run_worker:{worker}")
+        return 0
+
+    def latest_runs(self, worker=None, limit=20) -> list[dict]:
+        return []
+
+    def close(self) -> None:
+        pass
+
+
+@pytest.fixture
+def _stubbed_main(monkeypatch) -> list[str]:
+    events: list[str] = []
+
+    class Stub(_StubSupervisor):
+        pass
+
+    Stub.events = events
+
+    def _background() -> bool:
+        events.append("background")
+        return True
+
+    monkeypatch.setattr(run_supervisor, "enable_background_priority", _background)
+    monkeypatch.setattr(run_supervisor, "RunSupervisor", Stub)
+    return events
+
+
+def test_main_run_demotes_once_before_the_worker(_stubbed_main) -> None:
+    assert run_supervisor.main(["run", "w"]) == 0
+    assert _stubbed_main == ["background", "run_worker:w"]
+
+
+def test_main_status_runs_and_usage_never_demote(_stubbed_main) -> None:
+    assert run_supervisor.main(["status"]) == 1
+    assert run_supervisor.main(["status", "daily"]) == 1
+    assert run_supervisor.main(["runs"]) == 0
+    assert run_supervisor.main(["runs", "5"]) == 0
+    # The usage error must return before the demotion, pinning the call after the check.
+    assert run_supervisor.main(["run"]) == 2
+    assert run_supervisor.main([]) == 2
+    assert "background" not in _stubbed_main
+    assert not any(e.startswith("run_worker:") for e in _stubbed_main)
 
 
 def test_notify_operator_disabled_by_default(monkeypatch) -> None:

@@ -38,6 +38,7 @@ from model_prediction.filelock import lock_exclusive, unlock
 
 from .config import PROJECT_ROOT
 from .runtime_paths import RuntimePaths, migrate_legacy_state
+from .stealth_runtime import enable_background_priority
 
 # Interpreter and launcher paths differ per OS: the venv puts python under
 # Scripts on Windows and bin/ elsewhere; scheduled daily/rebuild jobs are
@@ -460,6 +461,12 @@ def main(argv: list[str] | None = None) -> int:
             if len(args) < 2:
                 print("usage: run <worker>", file=sys.stderr)
                 return 2
+            # Demote before the worker launches so the whole tree (run_daily.ps1's powershell and
+            # python steps included) inherits BELOW_NORMAL and low memory priority from birth; Windows
+            # then trims worker standby pages before a foreground app's. The operator approved it
+            # 2026-11-23 knowing a daily run may slow under memory pressure. Lives in main(), not
+            # run_worker, so in-process callers (tests, burn-in) are never demoted.
+            enable_background_priority()
             return supervisor.run_worker(args[1])
         if cmd == "status":
             worker = args[1] if len(args) > 1 else None
