@@ -42,6 +42,8 @@ from model_prediction.production_registry import (
 )
 
 V5, V62, V7, V51 = "cfb-structural-v5", CFB_V62_MODEL_VERSION, CFB_V7_MODEL_VERSION, "cfb-structural-v5.1"
+# The NCAAF champion since 2026-11-23 (quick-261123-2w2): v5 with totals shrunk to ~50%.
+V52 = "cfb-structural-v5.2"
 V71 = "cfb-structural-v7.1"  # quick-261122-v71: routed in v7's place; v7 stays registered, unrouted
 PARITY = PROJECT_ROOT / "outputs" / "ncaaf" / "cfb_v7_parity_fixture.json"
 # Parity fixture case: home 130 vs away 259, 2023 season, the 2023-11-11 morning decision (fair margin +26.46).
@@ -74,8 +76,8 @@ def test_ncaaf_routes_v62_then_v7_and_v62_stays_the_primary() -> None:
         assert [e.model_id for e in registry.challengers_for("NCAAF", market)] == [V62, V71, V51]
         assert registry.challenger("NCAAF", market).model_id == V62
         contract = registry.lifecycle_contract("NCAAF", market)
-        assert contract.champion_model_id == V5 and contract.challenger_model_id == V62
-        assert registry.champion("NCAAF", market).model_id == V5
+        assert contract.champion_model_id == V52 and contract.challenger_model_id == V62
+        assert registry.champion("NCAAF", market).model_id == V52
     assert not [p for p in registry.challenger_problems if "NCAAF" in p]
 
 
@@ -98,7 +100,7 @@ def test_each_broken_challenger_fails_closed_on_its_own() -> None:
         V7,
         7,  # not an id
         V7,  # listed twice
-        V5,  # the champion
+        V52,  # the champion
         "nba-elo-trend-lr-v5",  # another sport's contract
     ]
     registry = _registry(config)
@@ -112,12 +114,12 @@ def test_each_broken_challenger_fails_closed_on_its_own() -> None:
         f"'{V62}': unavailable",
         "got 7",
         f"'{V7}': listed twice",
-        f"'{V5}': is the champion",
+        f"'{V52}': is the champion",
         "'nba-elo-trend-lr-v5': contract is NBA",
     ):
         assert fragment in problems, fragment
     for market in ("moneyline", "spread", "total"):
-        assert registry.champion("NCAAF", market).model_id == V5
+        assert registry.champion("NCAAF", market).model_id == V52
 
 
 def test_a_broken_v7_leaves_v62_routed_and_primary() -> None:

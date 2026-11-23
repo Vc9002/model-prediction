@@ -166,9 +166,11 @@ def test_artifact_loads_fail_closed_consumes_every_parameter_and_is_the_champion
     with pytest.raises(ValueError, match="never reads"):
         CFBStructuralV5Model.from_artifact({**artifact, "surprise": 1})
     reg = ProductionModelRegistry.load(PROJECT_ROOT)
+    # 2026-11-23 (quick-261123-2w2): v5.2 (v5 with totals shrunk) took over; v5 is its rollback.
     for market in ("moneyline", "spread", "total"):
-        assert reg.champion("NCAAF", market).model_id == CFB_V5_MODEL_VERSION
-        assert reg.lifecycle_contract("NCAAF", market).rollback_model_id == "cfb-structural-v4"
+        assert reg.champion("NCAAF", market).model_id == "cfb-structural-v5.2"
+        assert reg.lifecycle_contract("NCAAF", market).rollback_model_id == CFB_V5_MODEL_VERSION
+    assert reg.entries[CFB_V5_MODEL_VERSION].rollback_model == "cfb-structural-v4"
     tampered = dict(artifact)
     tampered["total_sd"] = 99.0
     tmp = PROJECT_ROOT / "outputs" / "_tampered_cfb_v5.json"

@@ -540,7 +540,7 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/cfb-structural-v5.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: historical_only
     replacement_priority: low
     rollback_model: cfb-structural-v4
@@ -643,6 +643,16 @@ prediction_service:
     evidence_status: unverified
     replacement_priority: low
     rollback_model: null
+  - model_id: cfb-structural-v5.2
+    sport: NCAAF
+    market: multi
+    implementation: json_artifact
+    artifact: config/models/cfb-structural-v5.2.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: cfb-structural-v5
   - model_id: cs2-tiered-elo-v6
     sport: CS2
     market: moneyline
@@ -1036,9 +1046,9 @@ prediction_service:
       spread: nfl-spread-structural-v7
       total: nfl-total-structural-v7
     NCAAF:
-      moneyline: cfb-structural-v5
-      spread: cfb-structural-v5
-      total: cfb-structural-v5
+      moneyline: cfb-structural-v5.2
+      spread: cfb-structural-v5.2
+      total: cfb-structural-v5.2
   challengers:
     MLB:
       moneyline: null
@@ -1248,6 +1258,7 @@ prediction_service:
   - cfb-structural-v7
   - cfb-structural-v7.1
   - cfb-structural-v5.1
+  - cfb-structural-v5.2
   - cs2-tiered-elo-v6
   - dota2-tiered-elo-v6
   - lol-tiered-elo-v6
@@ -1330,6 +1341,7 @@ prediction_service:
     cfb-structural-v7: config/models/cfb-structural-v7.json
     cfb-structural-v7.1: config/models/cfb-structural-v7.1.json
     cfb-structural-v5.1: config/models/cfb-structural-v5.1.json
+    cfb-structural-v5.2: config/models/cfb-structural-v5.2.json
     cs2-tiered-elo-v6: config/models/cs2-tiered-elo-v6.json
     dota2-tiered-elo-v6: config/models/dota2-tiered-elo-v6.json
     lol-tiered-elo-v6: config/models/lol-tiered-elo-v6.json

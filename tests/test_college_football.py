@@ -733,7 +733,13 @@ def test_cfb_models_serving_with_degraded_evidence():
     assert all(enabled.values()), f"CFB models must stay enabled: {enabled}"
 
     champions = svc.get("champions", {}).get("NCAAF", {})
-    cfb_champions = ("cfb-structural-v5", "cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2")
+    cfb_champions = (
+        "cfb-structural-v5.2",
+        "cfb-structural-v5",
+        "cfb-structural-v4",
+        "cfb-structural-v3",
+        "cfb-structural-v2",
+    )
     assert champions.get("moneyline") in cfb_champions
     assert champions.get("spread") in cfb_champions
     assert champions.get("total") in cfb_champions

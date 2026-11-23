@@ -68,8 +68,11 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     "nfl-spread-structural-v7",
     "nfl-total-structural-v7",
     # NCAAF: cfb-structural-v5 promoted 2026-11-13 (operator directive, Direct Model
-    # Wiring policy). v4 no longer produces rows; it is not blacklisted.
+    # Wiring policy). v4 no longer produces rows; it is not blacklisted. v5.2 (promoted
+    # 2026-11-23) serves all three markets: v5 with totals shrunk to ~50%; v5 stays listed
+    # so its open rows from before the switch can still be bought until they start.
     "cfb-structural-v5",
+    "cfb-structural-v5.2",
     # WNBA (Dormant off-season)
     "wnba-elo-trend-lr-v4",
     "wnba-total-margin-v2",
