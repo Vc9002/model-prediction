@@ -434,7 +434,7 @@
   "total_shrink_fit": {
     "script": "scripts/fit_cfb_v52_total_shrink.py",
     "fit_output": "outputs/ncaaf/cfb_v52_total_shrink.json",
-    "fit_output_sha256": "8ea2b0d8f50b85510a9b3561cbcb2687f0cc3bbb1901e4abdf37d2e75ed83710",
+    "fit_output_sha256": "9e0506408b3b60d03d72fdb9fd57b9703a2e1cfebb5655059c953f194feb1a9d",
     "base_artifact": "config/models/cfb-structural-v5.json",
     "base_artifact_hash": "449bf27c80d62f7ff690b5800cb1474a2244f716f40b684cb8275d5e04a8a06d",
     "formula": "p_over' = sigmoid(s * logit(p_over / (p_over + p_under))) * (1 - p_push); p_under' = 1 - p_push - p_over'",
@@ -456,7 +456,8 @@
         "observations": 1844
       }
     },
-    "fitted_on": "train only (slope-only logistic, pushes dropped, clipped to [0, 1]); checked on validation; holdout read once",
+    "fit_output_sha256_basis": "sha256 of the fit JSON's bytes with CRLF folded to LF",
+    "fitted_on": "train only (slope-only logistic, pushes dropped, clipped to [0, 1]); checked on validation; holdout scored once by this script, but it and every ESPN lined window were read before (design-informed)",
     "slope_unclipped": 0.009470771239899305,
     "bootstrap_95ci": [
       -0.10144408658249768,
@@ -464,5 +465,5 @@
     ],
     "design_informed": true
   },
-  "artifact_hash": "58567bf06ce7b94b14da16e1be8c59a86d089b1187a7c4c9b869361734762d17"
+  "artifact_hash": "3c8001ca41b823ba82c8c8229d5fcfc508be095a7285af7c335f838d41c87e9b"
 }

@@ -16,13 +16,13 @@ v5.2 = cfb-structural-v5 with only the total market's served P(over)/P(under) mo
 
 ## Raw v5 vs shrunk, per window (no-push over share vs over/under at the ESPN pinned closing total)
 
-| Window | Over rate | Model lean vs line (pts) | Brier raw | Brier shrunk | Log loss raw | Log loss shrunk | Cal. slope raw | Cal. slope shrunk | Slope-only raw | Mean P(over) raw | Mean P(over) shrunk |
+| Window | Over rate | Model lean vs line (pts) | Brier raw | Brier shrunk | Log loss raw | Log loss shrunk | Cal. slope raw | Slope-only raw | Mean P(over) raw | Mean P(over) shrunk | Max abs(P(over) - 50%) shrunk |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| train | 48.4% | +0.10 | 0.26376 | 0.25000 | 0.72285 | 0.69314 | +0.013 | +1.370 | +0.0095 | 50.4% | 50.0% |
-| validation | 51.8% | +1.84 | 0.25647 | 0.24995 | 0.70730 | 0.69305 | +0.179 | +18.827 | +0.2136 | 54.0% | 50.0% |
-| locked_holdout | 50.4% | +1.32 | 0.25865 | 0.24999 | 0.71141 | 0.69313 | +0.028 | +2.914 | +0.0366 | 52.9% | 50.0% |
+| train | 48.4% | +0.10 | 0.26376 | 0.25000 | 0.72285 | 0.69314 | +0.013 | +0.0095 | 50.4% | 50.0% | 0.48% |
+| validation | 51.8% | +1.84 | 0.25647 | 0.24995 | 0.70730 | 0.69305 | +0.179 | +0.2136 | 54.0% | 50.0% | 0.32% |
+| locked_holdout | 50.4% | +1.32 | 0.25865 | 0.24999 | 0.71141 | 0.69313 | +0.028 | +0.0366 | 52.9% | 50.0% | 0.30% |
 
-Calibration slope of the shrunk probability equals the raw slope divided by s (a rescaling of logit), so it is not a separate check; Brier and log loss are.
+The shrunk probability's calibration slope is the raw slope divided by s (a rescaling of logit), so it is not a separate check (it is in the JSON); Brier and log loss are. Validation's own slope-only fit is +0.2136 (date-bootstrap 95% CI [-0.0243, +0.4346]) against the train-fitted s; s was not adjusted after seeing it.
 
 ## Sensitivity: v5's own artifact split
 
@@ -37,9 +37,11 @@ Conditions applied (cli/forecast.py `_forecast_cfb_sport`): 2% <= edge <= 8% (co
 | 50.0% | 382 (306 / 76) | 0 (0 / 0) |
 | 52.4% | 446 (345 / 101) | 0 (0 / 0) |
 
+The zero holds only for asks at or above 50%: no shrunk holdout probability is more than 0.30% from 50%, so a side whose ask is below about 48.3% would still clear on price alone. Raw v5 clears more games at 52.4% than at 50% because the 8% max_edge cap rejects many raw v5 edges at 50%.
+
 ## Reproduction gate
 
-PASS=True: v5's calibrated total matches `outputs/ncaaf/cfb_v7_v5_repro.json` on 1899 holdout events (max abs diff 0.00e+00), the joined ESPN line matches exactly. The brief's join (per_event + cfb_v5_base_rows actual totals, pushes dropped) gives n 1511, calibration slope +0.0116.
+PASS=True: v5's calibrated total matches `outputs/ncaaf/cfb_v7_v5_repro.json` on 1899 holdout events (max abs diff 0.00e+00), the joined ESPN line matches exactly. The brief's join (per_event + cfb_v5_base_rows actual totals, pushes dropped) gives n 1511 (the brief's count), calibration slope +0.0116 against the brief's +0.008 (close, not identical; the brief's exact probability construction is not recorded).
 
 ## Disclosures
 
@@ -53,7 +55,7 @@ PASS=True: v5's calibrated total matches `outputs/ncaaf/cfb_v7_v5_repro.json` on
 |---|---|
 | v5_replay_rows (E:/MP/data/research/ncaaf_v7_work/v5_replay_rows.jsonl) | `68caa21f0fc0f4e39ac2fa9139f3adbc8d332a3836d11e9cb9f910a3313ce74f` |
 | espn_lines (E:/MP/data/research/ncaaf_v6/espn_lines.jsonl) | `2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54` |
-| config/models/cfb-structural-v5.json | `12f7a970fe2cc796ac417da03106a9e709c5643c0b9d4489b5277703c57c6192` |
-| outputs/ncaaf/cfb_v7_v5_repro.json | `76b1801ed58d180390526caa6d15227e49a2a8b348121a37c56220f5f96a04d1` |
-| outputs/ncaaf/cfb_v5_base_rows.jsonl | `39c1cbd61e63b7dc1c029ad39b7c5b759aa1921296957d9070cb977bab2d187e` |
-| scripts/fit_cfb_v52_total_shrink.py | `112b2e12f67574b820aca872e8110defc28aa947d070701ee7b9c3f965aa672a` |
+| config/models/cfb-structural-v5.json | `fbff68717f8c9aff28e227c41b650b5b854404f46d1f4ca2d09ec8fc7cd05f38` |
+| outputs/ncaaf/cfb_v7_v5_repro.json | `2b2cdc254bed0a97035c71da3d5892bc6c9c2c78c774604e6ebf1a816545b8af` |
+| outputs/ncaaf/cfb_v5_base_rows.jsonl | `742a7dfdcaa70da4a194e9bc9f4221699e5e294a98e7b4133f2cab37d0e1a9c3` |
+| scripts/fit_cfb_v52_total_shrink.py | `b268636b1d8fa6e831b61d488be155e77fb2e211fc615601f12c3fa1e0036a53` |

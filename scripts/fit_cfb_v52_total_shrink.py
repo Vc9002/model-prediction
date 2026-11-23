@@ -82,6 +82,12 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def text_sha256(path: Path) -> str:
+    """sha256 of a git-tracked text file with CRLF folded to LF: the same on a Windows (autocrlf) checkout
+    and on an LF checkout, so the artifact's provenance hash verifies wherever the repo is cloned."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def load_lines() -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for ln in ESPN_LINES.read_text(encoding="utf-8").splitlines():
@@ -265,6 +271,7 @@ def window_metrics(rows: list[SimpleNamespace], slope: float) -> dict[str, Any]:
             "calibration_intercept": round(cal["intercept"], 4),
             "slope_only": round(fit_slope_only(x, y), 4),
             "mean_p_over": round(float(np.mean(p)), 4),
+            "max_abs_minus_half": round(float(np.max(np.abs(p - 0.5))), 6),
         }
 
     return {
@@ -371,7 +378,7 @@ def write_markdown(report: dict[str, Any]) -> None:
         "",
         (
             "| Window | Over rate | Model lean vs line (pts) | Brier raw | Brier shrunk | Log loss raw | Log loss shrunk "
-            "| Cal. slope raw | Cal. slope shrunk | Slope-only raw | Mean P(over) raw | Mean P(over) shrunk |"
+            "| Cal. slope raw | Slope-only raw | Mean P(over) raw | Mean P(over) shrunk | Max abs(P(over) - 50%) shrunk |"
         ),
         "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
@@ -381,14 +388,17 @@ def write_markdown(report: dict[str, Any]) -> None:
         lines.append(
             f"| {name} | {w['over_rate']:.1%} | {w['mean_served_total_minus_line']:+.2f} | {r['brier']:.5f} | "
             f"{s['brier']:.5f} | {r['log_loss']:.5f} | {s['log_loss']:.5f} | {r['calibration_slope']:+.3f} | "
-            f"{s['calibration_slope']:+.3f} | {r['slope_only']:+.4f} | {r['mean_p_over']:.1%} | {s['mean_p_over']:.1%} |"
+            f"{r['slope_only']:+.4f} | {r['mean_p_over']:.1%} | {s['mean_p_over']:.1%} | {s['max_abs_minus_half']:.2%} |"
         )
     sens = report["sensitivity_v5_artifact_split"]
     lines += [
         "",
         (
-            "Calibration slope of the shrunk probability equals the raw slope divided by s (a rescaling of logit), "
-            "so it is not a separate check; Brier and log loss are."
+            "The shrunk probability's calibration slope is the raw slope divided by s (a rescaling of logit), so it "
+            "is not a separate check (it is in the JSON); Brier and log loss are. Validation's own slope-only fit is "
+            f"{report['windows']['validation']['raw']['slope_only']:+.4f} (date-bootstrap 95% CI "
+            f"[{fit['validation_slope_only_bootstrap_95ci'][0]:+.4f}, {fit['validation_slope_only_bootstrap_95ci'][1]:+.4f}]) "
+            "against the train-fitted s; s was not adjusted after seeing it."
         ),
         "",
         "## Sensitivity: v5's own artifact split",
@@ -421,6 +431,16 @@ def write_markdown(report: dict[str, Any]) -> None:
             f"| {key.removeprefix('ask_').replace('pct', '%')} | {a['games']} ({a['over_sides']} / {a['under_sides']}) "
             f"| {b['games']} ({b['over_sides']} / {b['under_sides']}) |"
         )
+    hold_dev = report["windows"]["locked_holdout"]["shrunk"]["max_abs_minus_half"]
+    lines += [
+        "",
+        (
+            f"The zero holds only for asks at or above 50%: no shrunk holdout probability is more than {hold_dev:.2%} "
+            f"from 50%, so a side whose ask is below about {0.5 + hold_dev - report['main_rule']['min_edge']:.1%} "
+            "would still clear on price alone. Raw v5 clears more games at 52.4% than at 50% because the 8% "
+            "max_edge cap rejects many raw v5 edges at 50%."
+        ),
+    ]
     rep = report["reproduction_gate"]
     lines += [
         "",
@@ -430,7 +450,9 @@ def write_markdown(report: dict[str, Any]) -> None:
             f"PASS={rep['pass']}: v5's calibrated total matches `outputs/ncaaf/cfb_v7_v5_repro.json` on "
             f"{rep['matched_events']} holdout events (max abs diff {rep['max_abs_calibrated_total_diff']:.2e}), the joined "
             f"ESPN line matches exactly. The brief's join (per_event + cfb_v5_base_rows actual totals, pushes dropped) "
-            f"gives n {rep['brief_join']['n']}, calibration slope {rep['brief_join']['calibration_slope']:+.4f}."
+            f"gives n {rep['brief_join']['n']} (the brief's count), calibration slope "
+            f"{rep['brief_join']['calibration_slope']:+.4f} against the brief's +0.008 (close, not identical; the "
+            "brief's exact probability construction is not recorded)."
         ),
         "",
         "## Disclosures",
@@ -455,7 +477,7 @@ def write_markdown(report: dict[str, Any]) -> None:
     for name, digest in report["inputs"].items():
         lines.append(f"| {name} | `{digest}` |")
     lines.append("")
-    OUT_MD.write_text("\n".join(lines), encoding="utf-8")
+    OUT_MD.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
 def write_artifact(report: dict[str, Any], fit_sha: str) -> dict[str, Any]:
@@ -489,14 +511,26 @@ def write_artifact(report: dict[str, Any], fit_sha: str) -> dict[str, Any]:
             "validation": report["split"]["validation"],
             "locked_holdout": report["split"]["locked_holdout"],
         },
-        "fitted_on": "train only (slope-only logistic, pushes dropped, clipped to [0, 1]); checked on validation; holdout read once",
+        "fit_output_sha256_basis": "sha256 of the fit JSON's bytes with CRLF folded to LF",
+        "fitted_on": (
+            "train only (slope-only logistic, pushes dropped, clipped to [0, 1]); checked on validation; holdout "
+            "scored once by this script, but it and every ESPN lined window were read before (design-informed)"
+        ),
         "slope_unclipped": report["fit"]["slope_unclipped"],
         "bootstrap_95ci": report["fit"]["bootstrap_95ci"],
         "design_informed": True,
     }
     payload["artifact_hash"] = compute_artifact_hash(payload)
-    ARTIFACT_OUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    ARTIFACT_OUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
     return payload
+
+
+Cohorts = tuple[list[SimpleNamespace], list[SimpleNamespace], list[SimpleNamespace], dict[str, Any]]
+
+
+def split_rows(rows: list[SimpleNamespace], **boundaries: str) -> Cohorts:
+    """validation.chronological_split on these rows; it reads only ``.date`` (complete-date cohorts)."""
+    return chronological_split(rows, **boundaries)  # type: ignore[arg-type,return-value]
 
 
 def main() -> int:
@@ -507,15 +541,14 @@ def main() -> int:
         print(json.dumps(gate, indent=2))
         raise SystemExit("v5 reproduction gate FAILED; nothing written")
 
-    train, validation, holdout, split = chronological_split(rows)  # type: ignore[arg-type]
+    train, validation, holdout, split = split_rows(rows)
     s_raw = fit_slope_only(*xy(train))
     slope = round(min(1.0, max(0.0, s_raw)), SLOPE_DECIMALS)
     ci = bootstrap_slope(train)
+    validation_ci = bootstrap_slope(validation)  # report only: s is never re-fitted on validation
 
-    v5_train, v5_val, v5_hold, _ = chronological_split(
-        rows,  # type: ignore[arg-type]
-        train_end_date=V5_TRAIN_END,
-        validation_end_date=V5_VALIDATION_END,
+    v5_train, v5_val, v5_hold, _ = split_rows(
+        rows, train_end_date=V5_TRAIN_END, validation_end_date=V5_VALIDATION_END
     )
     sensitivity = {
         "slope_unclipped": fit_slope_only(*xy(v5_train)),
@@ -530,10 +563,11 @@ def main() -> int:
         "inputs": {
             "v5_replay_rows (E:/MP/data/research/ncaaf_v7_work/v5_replay_rows.jsonl)": sha256(V5_ROWS),
             "espn_lines (E:/MP/data/research/ncaaf_v6/espn_lines.jsonl)": sha256(ESPN_LINES),
-            "config/models/cfb-structural-v5.json": sha256(CFB_V5_ARTIFACT_PATH),
-            "outputs/ncaaf/cfb_v7_v5_repro.json": sha256(V5_REPRO),
-            "outputs/ncaaf/cfb_v5_base_rows.jsonl": sha256(V5_BASE_ROWS),
-            "scripts/fit_cfb_v52_total_shrink.py": sha256(Path(__file__)),
+            # Tracked repo files: CRLF-folded so the digests match on any checkout.
+            "config/models/cfb-structural-v5.json": text_sha256(CFB_V5_ARTIFACT_PATH),
+            "outputs/ncaaf/cfb_v7_v5_repro.json": text_sha256(V5_REPRO),
+            "outputs/ncaaf/cfb_v5_base_rows.jsonl": text_sha256(V5_BASE_ROWS),
+            "scripts/fit_cfb_v52_total_shrink.py": text_sha256(Path(__file__)),
         },
         "rows": {"lined_games": len(rows), "pushes": sum(r.push for r in rows)},
         "reproduction_gate": gate,
@@ -544,6 +578,8 @@ def main() -> int:
             "slope": slope,
             "bootstrap_95ci": ci,
             "bootstrap": f"{N_BOOT} resamples of train kickoff dates, seed {BOOT_SEED}",
+            "validation_slope_only_bootstrap_95ci": validation_ci,
+            "adjusted_after_validation": False,
         },
         "windows": {
             "train": window_metrics(train, slope),
@@ -560,9 +596,9 @@ def main() -> int:
             "Main-rule count assumes asks at the closing line; weather verification and eligibility caps not evaluated.",
         ],
     }
-    OUT_JSON.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    OUT_JSON.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     write_markdown(report)
-    payload = write_artifact(report, sha256(OUT_JSON))
+    payload = write_artifact(report, text_sha256(OUT_JSON))
     print(
         json.dumps(
             {
@@ -571,7 +607,7 @@ def main() -> int:
                 "ci": ci,
                 "split": split,
                 "artifact_hash": payload["artifact_hash"],
-                "fit_sha": sha256(OUT_JSON),
+                "fit_sha": text_sha256(OUT_JSON),
                 "holdout_main_rule": report["holdout_main_rule"],
                 "gate": gate,
             },
