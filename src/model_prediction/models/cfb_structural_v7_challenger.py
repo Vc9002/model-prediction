@@ -8,6 +8,9 @@ feature-capture-v1 snapshot (v7 rows stored none).
 ``models/college_football.build_cfb_slate`` calls ``price_challenger_slate`` after the champion's contracts and
 after v6.2's, with the same per-event Polymarket quotes v6.2 receives. ``cli/forecast._forecast_cfb_sport`` sends
 any version outside v2-v5 to the research and Flat tiers only, so v7 rows carry zero Main units.
+quick-261123-6q5: the same functions also price the v7.2 champion (``role="champion"``, ``CHAMPION_VERSIONS``
+only): ``build_cfb_slate`` calls ``price_challenger_slate`` with the serving model before the challengers, and
+``cli/forecast.NCAAF_MAIN_VERSIONS`` lets v7.2 rows reach Main through v5.2's copied gates.
 
 Pricing follows v6.2's operator rules (2026-11-21): only a captured Polymarket book (``polymarket_us``) whose own
 ``market_quote_observed_at_utc`` is at or before the decision; the max-edge side; a market is emitted only when
@@ -41,6 +44,7 @@ from ..domain import parse_utc
 from ..features import cfb_features_v7 as core
 from .cfb_structural_v7 import (
     CFB_V7_MODEL_VERSION,
+    CHAMPION_VERSIONS,
     V7_FAMILY,
     CFBStructuralV7Model,
     V7Pricing,
@@ -53,6 +57,10 @@ NO_CALL_NO_RESULT = "NO_CALL_V7_NO_RESULT"
 # The same rule v6.2 applies (operator decision 2026-11-21): only a captured executable Polymarket book.
 CAPTURED_BOOK = "polymarket_us"
 _ROUTABLE_MARKETS = ("moneyline", "spread", "total")
+ROLES = ("challenger", "champion")
+# quick-261123-6q5: what a v7.2 champion row records instead of v5's "cfb-v1" / "cfb_key_number_engine".
+CHAMPION_FEATURE_SCHEMA = "cfb-v7-pit-ratings-v1"
+CHAMPION_CALIBRATION_METHOD = "cfb_v7_keyed_margin_pmf"
 _HERE = Path(__file__).resolve()
 _V7_SERVING_SOURCES = (
     _HERE,
@@ -62,6 +70,8 @@ _V7_SERVING_SOURCES = (
     # The live-data modules (quick-261121-v7l), hashed once they exist.
     _HERE.parents[1] / "data_sources" / "cfb_pbp_live.py",
     _HERE.parents[1] / "features" / "cfb_pbp_rows.py",
+    # v7.2's total shrink (shrink_total_probabilities) runs on the serving path.
+    _HERE.parents[1] / "cfb_replay.py",
 )
 
 SlatePricer = Callable[..., tuple[list[dict[str, Any]], dict[str, Any]]]
@@ -117,6 +127,19 @@ def _priceable_markets(quotes: EventQuotes, markets: Sequence[str], decision_tim
     return [m for m in markets if _quote_time(getattr(quotes, m), decision_time) is not None]
 
 
+def _check_role(model: CFBStructuralV7Model, role: str) -> None:
+    """A champion row reaches Main and the buyer, so the role must match the version (fail closed both ways): only
+    ``CHAMPION_VERSIONS`` price as champion, and a champion version never prices as a challenger (its rows would
+    carry a Main-eligible id under a challenger label)."""
+    if role not in ROLES:
+        raise ValueError(f"unknown cfb v7 pricing role {role!r}")
+    if (role == "champion") != (model.version in CHAMPION_VERSIONS):
+        raise ValueError(f"cfb {model.version} cannot price as {role}")
+    if role == "champion" and not model.feature_capture:
+        # Champion rows have no NB replay inputs; the feature-capture snapshot is their only input record.
+        raise ValueError(f"cfb {model.version} champion artifact must set serving.feature_capture")
+
+
 def build_contracts(
     model: CFBStructuralV7Model,
     quotes: EventQuotes,
@@ -127,16 +150,21 @@ def build_contracts(
     markets: Sequence[str],
     data_stats: Mapping[str, Any] | None = None,
     model_inputs: Mapping[str, Any] | None = None,
+    role: str = "challenger",
 ) -> list[dict[str, Any]]:
     """Max-edge v7 contracts against the captured books; a market is emitted only when its best edge is above 0.
 
     ``model_inputs`` (v7.1) is the seam's per-game input snapshot (fit time, expected metric values per side,
-    games played, classes, CFBD z-scores); it goes into ``feature_basis`` and the ledger's feature snapshot."""
+    games played, classes, CFBD z-scores); it goes into ``feature_basis`` and the ledger's feature snapshot.
+    ``role="champion"`` (v7.2 only) drops ``challenger_of``, labels the rationale "champion" and records the v7
+    feature schema and calibration method on the contract; the pricing and side selection are the same."""
+    _check_role(model, role)
+    champion = role == "champion"
     pr = pricing.probabilities
     code_revision = v7_serving_code_hash()
     label = model.version.removeprefix("cfb-structural-")
-    basis_common: dict[str, Any] = {
-        "challenger_of": "cfb-structural-v5",
+    basis_common: dict[str, Any] = {} if champion else {"challenger_of": "cfb-structural-v5"}
+    basis_common |= {
         "season": season,
         "projected_margin_home": round(pricing.mu_margin, 4),
         "projected_total": round(pricing.mu_total, 4),
@@ -159,40 +187,42 @@ def build_contracts(
         # A slug without a hyphen ("None", a bare side) names no contract: it could never settle or close.
         if edge <= 0 or observed is None or "-" not in slug:
             return
-        contracts.append(
-            {
-                "event_id": quotes.event_id,
-                "event_start_utc": quotes.event_start_utc,
-                "away_team": quotes.away_team,
-                "home_team": quotes.home_team,
-                "market_type": market,
-                "selection": selection,
-                "line": line,
-                "model_probability": round(prob, 6),
-                "model_uncertainty": 0.0,
-                "weather_inputs_verified": None,
-                "model_version": model.version,
-                "model_artifact_hash": model.artifact_hash,
-                "feature_basis": basis_common,
-                "inference_inputs": None,
-                # No parenthesised token: settlement takes the first hyphenated one for the slug.
-                "rationale": (
-                    f"CFB {label} challenger: fair margin {pricing.mu_margin:+.2f}, total {pricing.mu_total:.2f}, "
-                    f"SD {pricing.margin_sd:.2f}/{pricing.total_sd:.2f}. Max-edge side {selection} at "
-                    f"{100 * prob:.1f}% vs ask {100 * ask:.1f}%. market_slug={slug}."
-                ),
-                "market_slug": slug,
-                "executable_ask": float(ask),
-                "observed_at_utc": observed,
-                "timestamp_valid": True,
-                "code_revision": code_revision,
-                "edge_vs_executable_ask": round(edge, 6),
-                "sportsbook": CAPTURED_BOOK,
-                "market_lineage": q.get("lineage") or {},
-                # The forecast writer stores feature_basis as a feature-capture-v1 snapshot for these rows.
-                "feature_capture": bool(model.feature_capture),
-            }
-        )
+        contract: dict[str, Any] = {
+            "event_id": quotes.event_id,
+            "event_start_utc": quotes.event_start_utc,
+            "away_team": quotes.away_team,
+            "home_team": quotes.home_team,
+            "market_type": market,
+            "selection": selection,
+            "line": line,
+            "model_probability": round(prob, 6),
+            "model_uncertainty": 0.0,
+            "weather_inputs_verified": None,
+            "model_version": model.version,
+            "model_artifact_hash": model.artifact_hash,
+            "feature_basis": basis_common,
+            "inference_inputs": None,
+            # No parenthesised token: settlement takes the first hyphenated one for the slug.
+            "rationale": (
+                f"CFB {label} {role}: fair margin {pricing.mu_margin:+.2f}, total {pricing.mu_total:.2f}, "
+                f"SD {pricing.margin_sd:.2f}/{pricing.total_sd:.2f}. Max-edge side {selection} at "
+                f"{100 * prob:.1f}% vs ask {100 * ask:.1f}%. market_slug={slug}."
+            ),
+            "market_slug": slug,
+            "executable_ask": float(ask),
+            "observed_at_utc": observed,
+            "timestamp_valid": True,
+            "code_revision": code_revision,
+            "edge_vs_executable_ask": round(edge, 6),
+            "sportsbook": CAPTURED_BOOK,
+            "market_lineage": q.get("lineage") or {},
+            # The forecast writer stores feature_basis as a feature-capture-v1 snapshot for these rows.
+            "feature_capture": bool(model.feature_capture),
+        }
+        if champion:
+            contract["feature_schema_version"] = CHAMPION_FEATURE_SCHEMA
+            contract["calibration_method"] = CHAMPION_CALIBRATION_METHOD
+        contracts.append(contract)
 
     if "moneyline" in markets and quotes.moneyline is not None:
         q = quotes.moneyline
@@ -247,6 +277,7 @@ def price_challenger_slate(
     slate_pricer: SlatePricer | None = None,
     expected_artifact_hash: str | None = None,
     model_id: str = CFB_V7_MODEL_VERSION,
+    role: str = "challenger",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """v7-family contracts for one slate plus a summary. Fails closed slate-wide and per game; never raises
     V7NoCall.
@@ -254,6 +285,9 @@ def price_challenger_slate(
     Only events with a priceable captured book in a routed market and both ESPN team ids reach the seam.
     ``expected_artifact_hash`` is the registry entry's hash; a model whose artifact differs is refused before
     anything is priced, and so is a model whose version is not ``model_id``.
+
+    ``role="champion"`` (quick-261123-6q5) prices the NCAAF champion (``CHAMPION_VERSIONS`` only) through the same
+    seam and quote rule; ``build_cfb_slate`` calls it with all three markets and the serving model.
     """
     if decision_time.tzinfo is None:
         raise ValueError("decision_time must be timezone-aware")
@@ -268,6 +302,9 @@ def price_challenger_slate(
     model = model or cfb_structural_v7_model(model_id)
     if model.version != model_id:
         raise ValueError(f"cfb v7 model {model.version} is not the routed {model_id}")
+    _check_role(model, role)
+    if role == "champion":
+        summary["role"] = role
     if expected_artifact_hash is not None and model.artifact_hash != expected_artifact_hash:
         raise ValueError(
             f"cfb v7 model artifact {model.artifact_hash[:12]} is not the registered {expected_artifact_hash[:12]}"
@@ -327,6 +364,7 @@ def price_challenger_slate(
                 markets=ev_markets,
                 data_stats=seam_summary.get("data"),
                 model_inputs=result.get("inputs") if model.feature_capture else None,
+                role=role,
             )
         )
     summary.update(

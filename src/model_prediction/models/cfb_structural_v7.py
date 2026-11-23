@@ -10,7 +10,9 @@ analytic (no RNG). ``cfb-structural-v7.1`` (quick-261122-v71, ``scripts/cfb_v71_
 the 2026-11-22 bug-hunt fixes switched on by its artifact: a neutral-site margin intercept, FBS-only CFBD
 covariates, each game fit at min(run clock, its research decision time), points-only rows only for games ESPN will
 never cover, and a model-input snapshot per result. v7.1 is routed after v6.2 in ``challengers.NCAAF``; v7 stays
-registered, unrouted, and prices exactly as before.
+registered, unrouted, and prices exactly as before. ``cfb-structural-v7.2`` (quick-261123-6q5) is v7.1's artifact
+plus ``total_probability_logit_slope`` (totals shrunk toward 50% by ``cfb_replay.shrink_total_probabilities``) and
+v5.2's ``gates`` block; it is the only version in ``CHAMPION_VERSIONS``, the one that may serve Main.
 
 Serving fails closed (``V7NoCall`` with a ``NO_CALL_*`` reason) when a team has no rating history, when a team id is
 unknown, when the artifact's prior uses CFBD and no covariates were supplied, or when a completed current-season game of either team has no play-by-play row yet (the crawl is behind),
@@ -36,6 +38,7 @@ from typing import Any
 import numpy as np
 from scipy.special import ndtr
 
+from ..cfb_replay import TOTAL_SLOPE_KEY, shrink_total_probabilities, validate_total_slope
 from ..config import PROJECT_ROOT
 from ..data_sources import cfb_pbp_live as live
 from ..domain import parse_utc
@@ -47,7 +50,12 @@ CFB_V7_ARTIFACT_PATH = PROJECT_ROOT / "config" / "models" / f"{CFB_V7_MODEL_VERS
 # quick-261122-v71: v7 refit with the 2026-11-22 bug-hunt fixes. Same code, switched on by artifact fields.
 CFB_V71_MODEL_VERSION = "cfb-structural-v7.1"
 CFB_V71_ARTIFACT_PATH = PROJECT_ROOT / "config" / "models" / f"{CFB_V71_MODEL_VERSION}.json"
-V7_FAMILY = (CFB_V7_MODEL_VERSION, CFB_V71_MODEL_VERSION)
+# quick-261123-6q5: v7.1's artifact plus a train-fitted total shrink and v5.2's Main gates, the NCAAF champion
+# candidate. Moneyline and spread price exactly as v7.1; only P(over)/P(under) move toward 50%.
+CFB_V72_MODEL_VERSION = "cfb-structural-v7.2"
+V7_FAMILY = (CFB_V7_MODEL_VERSION, CFB_V71_MODEL_VERSION, CFB_V72_MODEL_VERSION)
+# The v7-family versions that may serve as the NCAAF champion (Main and the buyer); v7 and v7.1 never do.
+CHAMPION_VERSIONS = (CFB_V72_MODEL_VERSION,)
 NO_CALL_PBP_MISSING = "NO_CALL_V7_PBP_MISSING"
 NO_CALL_NO_CFBD = "NO_CALL_V7_NO_CFBD_PRIOR"
 NO_CALL_NO_CLASS = "NO_CALL_V7_NO_CLASS_LABEL"
@@ -90,6 +98,8 @@ class V7Pricing:
     early: bool
     is_fbs_vs_fcs: bool
     probabilities: dict[str, float]
+    # v7.2 only: the pmf's over/under before the total shrink (None when the artifact sets no slope).
+    raw_total: dict[str, float] | None = None
 
 
 class CFBStructuralV7Model:
@@ -172,6 +182,13 @@ class CFBStructuralV7Model:
         self.total_grid = np.arange(0, int(td["support"]) + 1, dtype=float)
         self.total_buckets = [(float(lo), float(hi)) for lo, hi in td["buckets"]]
         self.total_bucket_sds = [float(s) for s in td["bucket_sds"]]
+        # v7.2: v7.1's totals carry no information against the close, so the artifact's train-fitted logit slope
+        # shrinks P(over)/P(under) toward 50% with v5.2's helper. A champion version must set it (fail closed);
+        # v7 and v7.1 carry no slope and price exactly as before.
+        slope = artifact.get(TOTAL_SLOPE_KEY)
+        if slope is None and self.version in CHAMPION_VERSIONS:
+            raise ValueError(f"cfb {self.version} artifact must set {TOTAL_SLOPE_KEY}")
+        self.total_probability_logit_slope = None if slope is None else validate_total_slope(slope)
         self.artifact_hash = str(artifact["artifact_hash"])
 
     # ---------------------------------------------------------------- means
@@ -258,6 +275,7 @@ class CFBStructuralV7Model:
                 push_spread=float(pm[grid == thr].sum()),
                 away_cover=float(pm[grid < thr].sum()),
             )
+        raw_total = None
         if total_line is not None:
             tg, line = self.total_grid, float(total_line)
             out.update(
@@ -265,7 +283,12 @@ class CFBStructuralV7Model:
                 push_total=float(pt[tg == line].sum()),
                 under=float(pt[tg < line].sum()),
             )
-        return V7Pricing(mu, tot, sd_m, sd_t, early, feat.is_fbs_vs_fcs, out)
+            if self.total_probability_logit_slope is not None:
+                raw_total = {"over": out["over"], "under": out["under"]}
+                out["over"], out["under"] = shrink_total_probabilities(
+                    out["over"], out["under"], out["push_total"], self.total_probability_logit_slope
+                )
+        return V7Pricing(mu, tot, sd_m, sd_t, early, feat.is_fbs_vs_fcs, out, raw_total)
 
 
 def cfb_structural_v7_model(model_version: str = CFB_V7_MODEL_VERSION) -> CFBStructuralV7Model:
@@ -274,6 +297,11 @@ def cfb_structural_v7_model(model_version: str = CFB_V7_MODEL_VERSION) -> CFBStr
 
 def cfb_structural_v71_model() -> CFBStructuralV7Model:
     return cfb_structural_v7_model(CFB_V71_MODEL_VERSION)
+
+
+def cfb_structural_v72_model() -> CFBStructuralV7Model:
+    """The v7.2 champion from its own hash-verified artifact; a missing or altered file raises (fail closed)."""
+    return cfb_structural_v7_model(CFB_V72_MODEL_VERSION)
 
 
 def fit_decision(model: CFBStructuralV7Model, run_decision: datetime, kickoff: datetime | None) -> datetime:
@@ -644,6 +672,12 @@ def price_v7_slate(
                     "home_cfbd_z": {k: round(v, 6) for k, v in cov.get(h, {}).items()},
                     "away_cfbd_z": {k: round(v, 6) for k, v in cov.get(a, {}).items()},
                 }
+                if model.total_probability_logit_slope is not None:
+                    # v7.2: the shrink and the pmf's own over/under, so a row's total can be re-derived.
+                    out["inputs"][TOTAL_SLOPE_KEY] = model.total_probability_logit_slope
+                    if pricing.raw_total is not None:
+                        out["inputs"]["raw_over"] = pricing.raw_total["over"]
+                        out["inputs"]["raw_under"] = pricing.raw_total["under"]
         results.append(out)
     summary = {
         "model_version": model.version,
