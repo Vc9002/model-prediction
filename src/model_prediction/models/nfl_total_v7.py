@@ -36,6 +36,30 @@ def _normal_cdf(x: float, mean: float, sd: float) -> float:
     return max(0.0001, min(0.9999, raw))
 
 
+def _logit_shrink(p: float, slope: float) -> float:
+    """sigmoid(slope * logit(p)) with intercept 0: pulls p toward 50% without moving its side.
+
+    Duplicated in nfl_total_v7.py on purpose: scalar_artifact_replay hashes each engine
+    file on its own, so each must carry the transform it replays. slope == 1.0 returns p
+    untouched (sigmoid(logit(p)) is not bit-exact), so an artifact without
+    probability_logit_slope prices exactly as before the field existed.
+    """
+    if slope == 1.0:
+        return p
+    if not 0.0 < p < 1.0:
+        raise ValueError(f"probability outside (0, 1) passed to _logit_shrink: {p}")
+    if slope == 0.0:
+        return 0.5
+    return 1.0 / (1.0 + math.exp(-slope * math.log(p / (1.0 - p))))
+
+
+def _validated_logit_slope(value: Any) -> float:
+    slope = float(value)
+    if not math.isfinite(slope) or not 0.0 <= slope <= 1.0:
+        raise ValueError(f"probability_logit_slope must be in [0, 1], got {value!r}")
+    return slope
+
+
 @dataclass(frozen=True)
 class NFLTotalForecast:
     home_team: str
@@ -71,6 +95,7 @@ class NFLTotalModelV7:
         bias: float = 0.80,
         ngsp_weight: float = 0.35,
         use_scoring_simulation: bool = False,
+        probability_logit_slope: float = 1.0,
     ) -> None:
         self.total_sd = total_sd
         self.league_avg_total = league_avg_total
@@ -86,6 +111,9 @@ class NFLTotalModelV7:
         self.bias = bias
         self.ngsp_weight = ngsp_weight
         self.use_scoring_simulation = use_scoring_simulation
+        # v7.1 (2026-11-23): the replay's holdout calibration slope was 0.13, so the served
+        # over probability is shrunk toward 50%. projected_total and effective_sd are untouched.
+        self.probability_logit_slope = _validated_logit_slope(probability_logit_slope)
         self.sport = "nfl"
         self.league = "NFL"
 
@@ -106,6 +134,7 @@ class NFLTotalModelV7:
             bias=float(artifact.get("bias", 0.80)),
             ngsp_weight=float(artifact.get("ngsp_weight", 0.35)),
             use_scoring_simulation=bool(artifact.get("use_scoring_simulation", False)),
+            probability_logit_slope=artifact.get("probability_logit_slope", 1.0),
         )
 
     def forecast_total(
@@ -229,6 +258,10 @@ class NFLTotalModelV7:
             p_over = 0.70 * p_over + 0.30 * sim.prob_over
             p_over = max(self.min_total_prob, min(self.max_total_prob, p_over))
             p_under = 1.0 - p_over
+
+        # Last step, after every clamp: scalar_artifact_replay applies it in the same place.
+        p_over = _logit_shrink(p_over, self.probability_logit_slope)
+        p_under = 1.0 - p_over
 
         return NFLTotalForecast(
             home_team=home_team,

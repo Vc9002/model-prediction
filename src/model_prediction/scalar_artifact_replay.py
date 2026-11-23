@@ -44,6 +44,14 @@ HISTORICAL_ENGINE_HASHES: dict[str, set[str]] = {
     "half_inning_logistic": {
         "e616f074b8082063684bb6db8c43d3a182f629455165dcc0074d32df98459a47",
     },
+    # The v7 engine files before probability_logit_slope (2026-11-23). Snapshots captured
+    # with them replay unchanged: their artifacts carry no slope, so the replay is the same.
+    "nfl_spread_structural_v7_engine": {
+        "8f70fc04043dc227654db817935c45cbae5436dcb5bc50c994a4e76f847f38c3",
+    },
+    "nfl_total_structural_v7_engine": {
+        "1d4b488a711ddc68328e06848fa6b95f7617d269b13c008ba5189056f7fa05da",
+    },
 }
 
 
@@ -175,6 +183,8 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
     if method == "nfl_spread_structural_v7_engine":
         from .models.nfl_spread_v7 import (
             NFL_KEY_MARGIN_FREQUENCIES,
+            _logit_shrink,
+            _validated_logit_slope,
         )
         from .models.nfl_spread_v7 import (
             _normal_cdf as _nfl_cdf,
@@ -215,6 +225,9 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
             p_home_cover = (1.0 - sim_weight) * p_home_cover + sim_weight * sim.prob_home_cover
             p_home_cover = max(min_cover_prob, min(max_cover_prob, p_home_cover))
 
+        p_home_cover = _logit_shrink(
+            p_home_cover, _validated_logit_slope(artifact.get("probability_logit_slope", 1.0))
+        )
         p_away_cover = 1.0 - p_home_cover
         return {"away": round(p_away_cover, 6), "home": round(p_home_cover, 6)}
     if method in ("nfl_total_structural_v6_engine", "nfl_total_structural_v7_engine"):
@@ -236,6 +249,12 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
             p_over = 0.70 * p_over + 0.30 * sim.prob_over
             p_over = max(min_total_prob, min(max_total_prob, p_over))
 
+        if method == "nfl_total_structural_v7_engine":
+            from .models.nfl_total_v7 import _logit_shrink, _validated_logit_slope
+
+            p_over = _logit_shrink(
+                p_over, _validated_logit_slope(artifact.get("probability_logit_slope", 1.0))
+            )
         p_under = 1.0 - p_over
         return {"under": round(p_under, 6), "over": round(p_over, 6)}
 
