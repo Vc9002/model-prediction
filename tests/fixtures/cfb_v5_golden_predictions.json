@@ -1,0 +1,236 @@
+{
+ "games": [
+  {
+   "away_team": "Duke Blue Devils",
+   "event_id": "golden-half",
+   "event_start_utc": "2026-11-14T20:00:00Z",
+   "home_team": "Miami Hurricanes",
+   "spread_home_line": -3.5,
+   "total_line": 50.5
+  },
+  {
+   "away_team": "Navy Midshipmen",
+   "event_id": "golden-int",
+   "event_start_utc": "2026-11-14T23:00:00Z",
+   "home_team": "Army Black Knights",
+   "spread_home_line": 3.0,
+   "total_line": 41.0
+  }
+ ],
+ "predictions": [
+  {
+   "event_id": "golden-half",
+   "inference_inputs": {
+    "engine_source_sha256": "58f764481291ae9d67cfdd4733e95a5dad8752e1b3f5f64dac772e29ba3a99d7",
+    "mu_away": 25.377454999999994,
+    "mu_home": 28.260404999999995,
+    "parameters": {
+     "distribution_type": "negative_binomial",
+     "margin_sd": 17.125,
+     "n_simulations": 200000,
+     "nb_dispersion": 12.0,
+     "score_correlation": 0.2,
+     "total_sd": 17.288
+    },
+    "rng_state_before": {
+     "bit_generator": "PCG64",
+     "has_uint32": 0,
+     "state": {
+      "inc": 332724090758049132448979897138935081983,
+      "state": 274674114334540486603088602300644985544
+     },
+     "uinteger": 0
+    },
+    "spread_home_line": -3.5,
+    "total_line": 50.5
+   },
+   "line": null,
+   "market_type": "moneyline",
+   "model_version": "cfb-structural-v5",
+   "probabilities": {
+    "away": 0.426397,
+    "home": 0.573603
+   },
+   "rationale": "CFB Structural v5: proj Duke Blue Devils 25.4 @ Miami Hurricanes 28.3 (Margin +2.9). Total 53.6. Weather adj: +0.0 pts. Eff margin SD: 17.1."
+  },
+  {
+   "event_id": "golden-half",
+   "inference_inputs": {
+    "engine_source_sha256": "58f764481291ae9d67cfdd4733e95a5dad8752e1b3f5f64dac772e29ba3a99d7",
+    "mu_away": 25.377454999999994,
+    "mu_home": 28.260404999999995,
+    "parameters": {
+     "distribution_type": "negative_binomial",
+     "margin_sd": 17.125,
+     "n_simulations": 200000,
+     "nb_dispersion": 12.0,
+     "score_correlation": 0.2,
+     "total_sd": 17.288
+    },
+    "rng_state_before": {
+     "bit_generator": "PCG64",
+     "has_uint32": 0,
+     "state": {
+      "inc": 332724090758049132448979897138935081983,
+      "state": 274674114334540486603088602300644985544
+     },
+     "uinteger": 0
+    },
+    "spread_home_line": -3.5,
+    "total_line": 50.5
+   },
+   "line": 3.5,
+   "market_type": "spread",
+   "model_version": "cfb-structural-v5",
+   "probabilities": {
+    "away": 0.513315,
+    "home": 0.486685,
+    "push": 0.0
+   },
+   "rationale": "CFB Structural v5 Spread: Home -3.5 / Away +3.5 (P(Home cover)=0.4867, P(Away cover)=0.5133, P(Push)=0.0000). Calibrated margin SD: 17.1."
+  },
+  {
+   "event_id": "golden-half",
+   "inference_inputs": {
+    "engine_source_sha256": "58f764481291ae9d67cfdd4733e95a5dad8752e1b3f5f64dac772e29ba3a99d7",
+    "mu_away": 25.377454999999994,
+    "mu_home": 28.260404999999995,
+    "parameters": {
+     "distribution_type": "negative_binomial",
+     "margin_sd": 17.125,
+     "n_simulations": 200000,
+     "nb_dispersion": 12.0,
+     "score_correlation": 0.2,
+     "total_sd": 17.288
+    },
+    "rng_state_before": {
+     "bit_generator": "PCG64",
+     "has_uint32": 0,
+     "state": {
+      "inc": 332724090758049132448979897138935081983,
+      "state": 274674114334540486603088602300644985544
+     },
+     "uinteger": 0
+    },
+    "spread_home_line": -3.5,
+    "total_line": 50.5
+   },
+   "line": 50.5,
+   "market_type": "total",
+   "model_version": "cfb-structural-v5",
+   "probabilities": {
+    "over": 0.572014,
+    "push": 0.0,
+    "under": 0.427986
+   },
+   "rationale": "CFB Structural v5 Total: line 50.5 (P(Over)=0.5720, P(Under)=0.4280, P(Push)=0.0000). Eff total SD: 17.3."
+  },
+  {
+   "event_id": "golden-int",
+   "inference_inputs": {
+    "engine_source_sha256": "58f764481291ae9d67cfdd4733e95a5dad8752e1b3f5f64dac772e29ba3a99d7",
+    "mu_away": 23.229139999999994,
+    "mu_home": 26.112089999999995,
+    "parameters": {
+     "distribution_type": "negative_binomial",
+     "margin_sd": 17.125,
+     "n_simulations": 200000,
+     "nb_dispersion": 12.0,
+     "score_correlation": 0.2,
+     "total_sd": 17.435
+    },
+    "rng_state_before": {
+     "bit_generator": "PCG64",
+     "has_uint32": 0,
+     "state": {
+      "inc": 332724090758049132448979897138935081983,
+      "state": 115666286091327781849528642427146852181
+     },
+     "uinteger": 0
+    },
+    "spread_home_line": 3.0,
+    "total_line": 41.0
+   },
+   "line": null,
+   "market_type": "moneyline",
+   "model_version": "cfb-structural-v5",
+   "probabilities": {
+    "away": 0.424132,
+    "home": 0.575868
+   },
+   "rationale": "CFB Structural v5: proj Navy Midshipmen 23.2 @ Army Black Knights 26.1 (Margin +2.9). Total 49.3. Weather adj: +0.0 pts. Eff margin SD: 17.1."
+  },
+  {
+   "event_id": "golden-int",
+   "inference_inputs": {
+    "engine_source_sha256": "58f764481291ae9d67cfdd4733e95a5dad8752e1b3f5f64dac772e29ba3a99d7",
+    "mu_away": 23.229139999999994,
+    "mu_home": 26.112089999999995,
+    "parameters": {
+     "distribution_type": "negative_binomial",
+     "margin_sd": 17.125,
+     "n_simulations": 200000,
+     "nb_dispersion": 12.0,
+     "score_correlation": 0.2,
+     "total_sd": 17.435
+    },
+    "rng_state_before": {
+     "bit_generator": "PCG64",
+     "has_uint32": 0,
+     "state": {
+      "inc": 332724090758049132448979897138935081983,
+      "state": 115666286091327781849528642427146852181
+     },
+     "uinteger": 0
+    },
+    "spread_home_line": 3.0,
+    "total_line": 41.0
+   },
+   "line": -3.0,
+   "market_type": "spread",
+   "model_version": "cfb-structural-v5",
+   "probabilities": {
+    "away": 0.340895,
+    "home": 0.636,
+    "push": 0.023105
+   },
+   "rationale": "CFB Structural v5 Spread: Home +3.0 / Away -3.0 (P(Home cover)=0.6360, P(Away cover)=0.3409, P(Push)=0.0231). Calibrated margin SD: 17.1."
+  },
+  {
+   "event_id": "golden-int",
+   "inference_inputs": {
+    "engine_source_sha256": "58f764481291ae9d67cfdd4733e95a5dad8752e1b3f5f64dac772e29ba3a99d7",
+    "mu_away": 23.229139999999994,
+    "mu_home": 26.112089999999995,
+    "parameters": {
+     "distribution_type": "negative_binomial",
+     "margin_sd": 17.125,
+     "n_simulations": 200000,
+     "nb_dispersion": 12.0,
+     "score_correlation": 0.2,
+     "total_sd": 17.435
+    },
+    "rng_state_before": {
+     "bit_generator": "PCG64",
+     "has_uint32": 0,
+     "state": {
+      "inc": 332724090758049132448979897138935081983,
+      "state": 115666286091327781849528642427146852181
+     },
+     "uinteger": 0
+    },
+    "spread_home_line": 3.0,
+    "total_line": 41.0
+   },
+   "line": 41.0,
+   "market_type": "total",
+   "model_version": "cfb-structural-v5",
+   "probabilities": {
+    "over": 0.673551,
+    "push": 0.020405,
+    "under": 0.306044
+   },
+   "rationale": "CFB Structural v5 Total: line 41.0 (P(Over)=0.6736, P(Under)=0.3060, P(Push)=0.0204). Eff total SD: 17.4."
+  }
+ ]
+}
