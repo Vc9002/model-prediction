@@ -335,9 +335,12 @@ def _event(eid: str, home: tuple[str, str], away: tuple[str, str]) -> dict:
     }
 
 
-def _champion_slate(tmp_path: Path, monkeypatch, model, pricer, routes: dict) -> dict:
+def _champion_slate(
+    tmp_path: Path, monkeypatch, model, pricer, routes: dict, *, production: bool = False
+) -> dict:
     """build_cfb_slate with the v7.2 champion over two ESPN events with captured books: v72e1 (Alabama @ Georgia,
-    all three markets) and v72e2 (Oklahoma @ Texas, moneyline only)."""
+    all three markets) and v72e2 (Oklahoma @ Texas, moneyline only). ``production`` takes the ``client=None``
+    path the daily run takes (ESPN client faked, an empty Polymarket event list so nothing is fetched)."""
     from model_prediction.models import cfb_structural_v7_challenger, cfb_structural_v62, college_football
 
     path = tmp_path / "odds" / "ncaaf" / "2023-11-11" / "polymarket_snapshots.jsonl"
@@ -372,6 +375,17 @@ def _champion_slate(tmp_path: Path, monkeypatch, model, pricer, routes: dict) ->
         lambda *_a: ([{"model_version": V62, "event_id": "v72e1", "market_type": "total"}], {"status": "ok"}),
     )
     monkeypatch.setattr(cfb_structural_v7_challenger, "default_slate_pricer", lambda: pricer)
+    if production:
+        monkeypatch.setattr("model_prediction.data_sources.espn.ESPNClient", lambda *_a, **_k: client)
+
+        def no_packet(*_a, **_k):
+            raise AssertionError("a v7 champion has no NB inputs to build a candidate packet from")
+
+        monkeypatch.setattr("model_prediction.college_contract_evidence.save_candidate_evidence", no_packet)
+        monkeypatch.setattr("model_prediction.college_contract_evidence.build_candidate_evidence", no_packet)
+        return college_football.build_cfb_slate(
+            tmp_path, "2023-11-11", observed_at=DECISION, model=model, polymarket_events=[]
+        )
     return college_football.build_cfb_slate(
         tmp_path, "2023-11-11", client=client, observed_at=DECISION, model=model, price_challenger=True
     )
@@ -424,6 +438,20 @@ def test_the_champion_slate_prices_through_the_v7_seam_before_the_challengers(
     assert summary["role"] == "champion" and summary["priced"] == 1
     assert summary["no_calls"] == {NO_CALL_PBP_MISSING: 1}
     assert slate["candidate_quote_coverage"] == {"status": "not_requested"}
+
+
+def test_the_production_path_skips_the_candidate_packet_and_still_prices_the_champion(
+    tmp_path, monkeypatch, v72
+) -> None:
+    """client=None (the daily run): challengers priced by default, no NB candidate packet for a v7 champion."""
+    routes = {V62: (list(ALL_MARKETS), None), V71: (list(ALL_MARKETS), None)}
+    pricer = _seam({"v72e1": dict(_E1), "v72e2": NO_CALL_PBP_MISSING})
+    slate = _champion_slate(tmp_path, monkeypatch, v72, pricer, routes, production=True)
+    assert slate["candidate_quote_coverage"] == {"status": "not_supported_v7_family"}
+    versions = [c["model_version"] for c in slate["priced_contracts"]]
+    assert versions.count(V72) == 3 and versions[:3] == [V72] * 3
+    assert V62 in versions and V71 in versions
+    assert slate["champion_pricing"]["no_calls"] == {NO_CALL_PBP_MISSING: 1}
 
 
 def test_a_champion_seam_failure_prices_nothing_and_never_falls_back(tmp_path, monkeypatch, v72) -> None:
@@ -571,3 +599,28 @@ def test_v72_reaches_main_through_v52_gates_and_totals_stay_off_main(
         )
         assert _extract_market_slug(row["rationale"], row) == slug
         assert ncaaf_settlement_slug(_extract_market_slug(row["rationale"], row), row["rationale"]) == slug
+        # The row records the v7 schema and calibration the contract names, not the NB engine's.
+        assert row["feature_schema_version"] == CHAMPION_FEATURE_SCHEMA
+        assert row["calibration_method"] == CHAMPION_CALIBRATION_METHOD
+
+
+def test_nb_rows_keep_the_engine_schema_and_calibration(tmp_path, monkeypatch) -> None:
+    """A contract that names no schema (every NB and v5.x row) keeps "cfb-v1" / "cfb_key_number_engine"."""
+    from tests.test_cfb_multi_challenger import _run_forecast, _v5_row
+
+    result, ledgers = _run_forecast(tmp_path, monkeypatch, [_v5_row()])
+    assert result["errors"] == []
+    for tier in ("flat", "main"):
+        (row,) = ledgers[tier].rows()
+        assert row["feature_schema_version"] == "cfb-v1", tier
+        assert row["calibration_method"] == "cfb_key_number_engine", tier
+
+
+def test_v72_has_a_catalog_entry_and_aliases() -> None:
+    from model_prediction.sports.naming import canonical_model_id, display_model_name, get_model_descriptor
+
+    for alias in ("cfb-v7.2", "cfb-multi-structural-v7.2", "cfb-total-structural-v7.2", V72):
+        assert canonical_model_id(alias) == V72, alias
+    assert display_model_name("cfb-v7.2") == "NCAAF Unified (CFB Structural v7.2)"
+    desc = get_model_descriptor(V72)
+    assert desc is not None and desc.sport == "NCAAF" and desc.market == "multi"
