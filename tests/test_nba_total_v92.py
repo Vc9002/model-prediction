@@ -392,46 +392,26 @@ def test_v92_row_through_the_real_validate_eligibility_and_ledgers(monkeypatch, 
     assert main.rows() == []
 
 
-def test_real_registry_serves_v92_once_registered_and_routed(monkeypatch, tmp_path):
-    """The shipped production.yaml plus, in memory only, the entry and champion route the
-    orchestrator would add: the real registry validates the artifact and the slate serves it."""
-    import yaml
-
+def test_real_registry_serves_v92_as_the_nba_total_champion(monkeypatch, tmp_path):
+    """The shipped production.yaml (v9.2 promoted 2026-11-23, quick-261123-h40): the real registry
+    validates the artifact and the slate serves it. Its evidence_status is historical_only (G1 failed),
+    so the slate reports it as not predictively qualified."""
     from model_prediction.production_registry import ProductionModelRegistry
 
-    config = yaml.safe_load((REPO / "config" / "production.yaml").read_text(encoding="utf-8"))
-    svc = config["prediction_service"]
-    svc["models"].append(
-        {
-            "model_id": NBA_TOTAL_V92_VERSION,
-            "sport": "NBA",
-            "market": "total",
-            "implementation": "json_artifact",
-            "artifact": "config/models/nba-total-margin-v9.2.json",
-            "enabled": True,
-            "serving_status": "production",
-            "evidence_status": "predictively_qualified",
-            "replacement_priority": "low",
-            "rollback_model": "nba-total-margin-v9",
-        }
-    )
-    if "allowed_models" in svc:
-        svc["allowed_models"].append(NBA_TOTAL_V92_VERSION)
-    if "artifact_map" in svc:
-        svc["artifact_map"][NBA_TOTAL_V92_VERSION] = "config/models/nba-total-margin-v9.2.json"
-    svc["champions"]["NBA"]["total"] = NBA_TOTAL_V92_VERSION
-    registry = ProductionModelRegistry.from_config(config, repo_root=REPO)
+    registry = ProductionModelRegistry.load(REPO)
     champion = registry.champion("NBA", "total")
     assert champion is not None and champion.available, champion and champion.load_error
     assert champion.model_id == NBA_TOTAL_V92_VERSION
+    assert champion.rollback_model == "nba-total-margin-v9"
     assert champion.artifact_hash == _load(V92_PATH)["artifact_hash"]
 
     events = [_event("401", CLIPPERS, SPURS)]
     _patch_slate(monkeypatch, market="total", rows=[_total_row()], events=events)
+    # _patch_slate stubs the registry; put the real, loaded one back.
     monkeypatch.setattr(forecast_cli.ProductionModelRegistry, "load", lambda root: registry)
     result = forecast_cli._forecast_nba_total_slate(tmp_path, "2026-11-19", _client(events))
     assert result["model_version"] == NBA_TOTAL_V92_VERSION
-    assert result["model_qualified"] is True
+    assert result["model_qualified"] is False
     assert forecast_cli._is_registered_serving_model(NBA_TOTAL_V92_VERSION, "NBA", "total") is True
 
 

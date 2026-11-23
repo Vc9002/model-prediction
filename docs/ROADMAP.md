@@ -65,7 +65,7 @@ All sports, leagues, and market types are directly hooked to their latest active
 | Sport / Domain | Markets Supported | Active Production Champion (`config/production.yaml` `champions:`) | Auto-Buyer Whitelist (`DEFAULT_WHITELIST_MODELS`) |
 |---|---|---|---|
 | **MLB** | Moneyline, Spread, Total, NRFI | `mlb-moneyline-v9-residual`, `mlb-structural-runline-v4`, `mlb-structural-v10-frozen`, `mlb-nrfi-v4` | Yes except `mlb-structural-v10-frozen` (blacklisted 2026-09-02); dormant off-season |
-| **NBA** | Moneyline, Spread, Total | `nba-elo-trend-lr-v5` (ML champion since 2026-11-13, `ec3210a2`; v4 is rollback), `nba-spread-margin-v9`, `nba-total-margin-v9` | Spread and total v9 yes. `nba-moneyline-v9` is still listed but no longer serves; v4 moneyline is not whitelisted |
+| **NBA** | Moneyline, Spread, Total | `nba-elo-trend-lr-v5` (ML champion since 2026-11-13, `ec3210a2`; v4 is rollback), `nba-spread-margin-v9`, `nba-total-margin-v9.2` (bias-fixed v9.1 engine with an honest shrink, promoted 2026-11-23; v9 rollback) | Spread and total v9 yes. `nba-moneyline-v9` is still listed but no longer serves; v4 moneyline is not whitelisted |
 | **WNBA** | Moneyline, Spread, Total | `wnba-elo-trend-lr-v4`, `wnba-spread-margin-v2`, `wnba-total-margin-v2` | Yes; dormant off-season |
 | **NCAAB** | Moneyline, Spread, Total | `ncaab-spread-v6` (moneyline + spread), `ncaab-total-v6` | No. Decommissioned from the auto-buyer 2026-11-09. Exception: guarded live bucket for `ncaab-spread-v6` spread at 5.0% <= saved edge < 8.0% (`39625934`), plus an isolated paper trial (`40f60dc4`, `bb73addf`). Main totals paused (`93aa093c`) |
 | **EuroLeague / NBL** | Moneyline, Spread, Total | `eurolg-tempo-v2`, `nbl-tempo-v2` | No (decommissioned 2026-11-09) |

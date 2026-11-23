@@ -281,10 +281,20 @@ prediction_service:
     implementation: json_artifact
     artifact: config/models/nba-total-margin-v9.json
     enabled: true
-    serving_status: production
+    serving_status: rollback
     evidence_status: predictively_qualified
     replacement_priority: low
     rollback_model: nba-total-margin-v7
+  - model_id: nba-total-margin-v9.2
+    sport: NBA
+    market: total
+    implementation: json_artifact
+    artifact: config/models/nba-total-margin-v9.2.json
+    enabled: true
+    serving_status: production
+    evidence_status: historical_only
+    replacement_priority: low
+    rollback_model: nba-total-margin-v9
   - model_id: nba-total-margin-v7
     sport: NBA
     market: total
@@ -1060,7 +1070,7 @@ prediction_service:
     NBA:
       moneyline: nba-elo-trend-lr-v5
       spread: nba-spread-margin-v9
-      total: nba-total-margin-v9
+      total: nba-total-margin-v9.2
     NFL:
       moneyline: nfl-elo-trend-lr-v4
       spread: nfl-spread-structural-v7.2
@@ -1243,6 +1253,7 @@ prediction_service:
   - nba-spread-margin-v3
   - nba-spread-margin-v2
   - nba-total-margin-v9
+  - nba-total-margin-v9.2
   - nba-total-margin-v7
   - nba-total-margin-v6
   - nba-total-margin-v5
@@ -1340,6 +1351,7 @@ prediction_service:
     nba-spread-margin-v3: config/models/nba-spread-margin-v3.json
     nba-spread-margin-v2: config/models/nba-spread-margin-v2.json
     nba-total-margin-v9: config/models/nba-total-margin-v9.json
+    nba-total-margin-v9.2: config/models/nba-total-margin-v9.2.json
     nba-total-margin-v7: config/models/nba-total-margin-v7.json
     nba-total-margin-v6: config/models/nba-total-margin-v6.json
     nba-total-margin-v5: config/models/nba-total-margin-v5.json
