@@ -1,0 +1,420 @@
+"""nfl-spread-structural-v7.1 / nfl-total-structural-v7.1: the v7 engines plus probability_logit_slope.
+
+The shrink is p' = sigmoid(s * logit(p)) with intercept 0 on the final cover/over probability
+(quick-261123-2w2). These pin: no field => v7 bit-for-bit; the formula; the artifacts; and the
+scalar replay, which re-checks every served probability at log, request and settlement time.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from model_prediction.cli import forecast as cli_forecast
+from model_prediction.cli.forecast_nfl_moneyline_shadow import moneyline_shadow_input
+from model_prediction.learned_replay import snapshot_hash
+from model_prediction.models.nfl_spread_v7 import NFLSpreadModelV7
+from model_prediction.models.nfl_spread_v7 import _logit_shrink as spread_logit_shrink
+from model_prediction.models.nfl_total_v7 import NFLTotalModelV7
+from model_prediction.models.nfl_total_v7 import _logit_shrink as total_logit_shrink
+from model_prediction.production_registry import compute_artifact_hash
+from model_prediction.scalar_artifact_replay import (
+    HISTORICAL_ENGINE_HASHES,
+    build_snapshot,
+    replay_snapshot,
+    validate_decision_snapshot,
+)
+
+REPO = Path(__file__).resolve().parents[1]
+MODELS = REPO / "config" / "models"
+
+SPREAD_CASES = [
+    {
+        "home_pass_epa": 0.15,
+        "away_pass_epa": -0.05,
+        "home_rush_epa": 0.02,
+        "away_rush_epa": -0.01,
+        "home_def_pass_epa": -0.03,
+        "away_def_pass_epa": 0.04,
+        "home_qb_tier_adj": 1.0,
+        "spread_home_line": -3.5,
+    },
+    {
+        "home_pass_epa": -0.10,
+        "away_pass_epa": 0.20,
+        "spread_home_line": 9.5,
+        "home_first_down_rate": 0.27,
+        "away_first_down_rate": 0.33,
+    },
+    {"spread_home_line": -7.0, "is_neutral_site": True, "home_turnover_luck": 1.5},
+]
+TOTAL_CASES = [
+    {
+        "total_pass_epa": 0.25,
+        "total_rush_epa": 0.05,
+        "total_line": 44.5,
+        "wind_mph": 8.0,
+        "temperature_f": 50.0,
+    },
+    {"total_pass_epa": -0.3, "total_line": 49.5, "is_dome": True, "home_explosive_rate": 0.11},
+    {"total_line": 38.5, "wind_mph": 20.0, "temperature_f": 20.0},
+]
+# Captured from the engines BEFORE probability_logit_slope existed (HEAD dab60a87).
+V7_SPREAD_GOLDEN = [
+    (0.506738, 0.493262, 0.665, 13.8, 4.02),
+    (0.528974, 0.471026, 0.190825, 17.25, -8.47),
+    (0.426621, 0.573379, 0.695768, 13.8, 4.85),
+]
+V7_TOTAL_GOLDEN = [(0.534647, 0.465353, 45.7), (0.502891, 0.497109, 49.6), (0.416777, 0.583223, 35.6)]
+
+
+def _artifact(name: str) -> dict:
+    return json.loads((MODELS / f"{name}.json").read_text(encoding="utf-8"))
+
+
+def _sigmoid_shrink(p: float, s: float) -> float:
+    return 1.0 / (1.0 + math.exp(-s * math.log(p / (1.0 - p))))
+
+
+def test_field_absent_is_bit_identical_to_pre_slope_v7() -> None:
+    spread = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7"))
+    total = NFLTotalModelV7.from_artifact(_artifact("nfl-total-structural-v7"))
+    assert spread.probability_logit_slope == 1.0 and total.probability_logit_slope == 1.0
+    for case, golden in zip(SPREAD_CASES, V7_SPREAD_GOLDEN, strict=True):
+        fc = spread.forecast_spread("H", "A", **case)
+        got = (fc.prob_home_cover, fc.prob_away_cover, fc.prob_home_win, fc.effective_sd)
+        assert got + (fc.projected_margin_home,) == golden
+    for case, golden in zip(TOTAL_CASES, V7_TOTAL_GOLDEN, strict=True):
+        fc = total.forecast_total("H", "A", **case)
+        assert (fc.prob_over, fc.prob_under, fc.projected_total) == golden
+
+
+def test_explicit_slope_one_equals_absent_field() -> None:
+    for name, cls, cases, method in (
+        ("nfl-spread-structural-v7", NFLSpreadModelV7, SPREAD_CASES, "forecast_spread"),
+        ("nfl-total-structural-v7", NFLTotalModelV7, TOTAL_CASES, "forecast_total"),
+    ):
+        base = cls.from_artifact(_artifact(name))
+        explicit = cls.from_artifact({**_artifact(name), "probability_logit_slope": 1.0})
+        for case in cases:
+            assert getattr(base, method)("H", "A", **case) == getattr(explicit, method)("H", "A", **case)
+
+
+def test_slope_zero_serves_exactly_half() -> None:
+    spread = NFLSpreadModelV7.from_artifact(
+        {**_artifact("nfl-spread-structural-v7"), "probability_logit_slope": 0}
+    )
+    total = NFLTotalModelV7.from_artifact(
+        {**_artifact("nfl-total-structural-v7"), "probability_logit_slope": 0}
+    )
+    for case in SPREAD_CASES:
+        fc = spread.forecast_spread("H", "A", **case)
+        assert fc.prob_home_cover == 0.5 and fc.prob_away_cover == 0.5
+    for case in TOTAL_CASES:
+        fc = total.forecast_total("H", "A", **case)
+        assert fc.prob_over == 0.5 and fc.prob_under == 0.5
+
+
+def test_slope_quarter_matches_formula() -> None:
+    for p in (0.35, 0.4123, 0.5, 0.57, 0.65):
+        assert spread_logit_shrink(p, 0.25) == pytest.approx(_sigmoid_shrink(p, 0.25), abs=1e-15)
+        assert total_logit_shrink(p, 0.25) == pytest.approx(_sigmoid_shrink(p, 0.25), abs=1e-15)
+    raw_sp = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7"))
+    raw_tot = NFLTotalModelV7.from_artifact(_artifact("nfl-total-structural-v7"))
+    q_sp = NFLSpreadModelV7.from_artifact(
+        {**_artifact("nfl-spread-structural-v7"), "probability_logit_slope": 0.25}
+    )
+    q_tot = NFLTotalModelV7.from_artifact(
+        {**_artifact("nfl-total-structural-v7"), "probability_logit_slope": 0.25}
+    )
+    for case in SPREAD_CASES:
+        raw, shrunk = raw_sp.forecast_spread("H", "A", **case), q_sp.forecast_spread("H", "A", **case)
+        # raw is rounded to 6 dp, so the formula on it agrees to ~1e-7, not bit-for-bit
+        assert shrunk.prob_home_cover == pytest.approx(_sigmoid_shrink(raw.prob_home_cover, 0.25), abs=1e-6)
+        assert shrunk.prob_home_cover + shrunk.prob_away_cover == pytest.approx(1.0, abs=1e-12)
+        # only the cover price moves: margin, win probability and the replay sd are v7's
+        assert (shrunk.projected_margin_home, shrunk.prob_home_win, shrunk.effective_sd) == (
+            raw.projected_margin_home,
+            raw.prob_home_win,
+            raw.effective_sd,
+        )
+    for case in TOTAL_CASES:
+        raw, shrunk = raw_tot.forecast_total("H", "A", **case), q_tot.forecast_total("H", "A", **case)
+        assert shrunk.prob_over == pytest.approx(_sigmoid_shrink(raw.prob_over, 0.25), abs=1e-6)
+        assert (shrunk.projected_total, shrunk.effective_sd) == (raw.projected_total, raw.effective_sd)
+
+
+@pytest.mark.parametrize("bad", [1.5, -0.1, float("nan"), float("inf")])
+def test_from_artifact_reads_and_bounds_the_slope(bad: float) -> None:
+    art = {**_artifact("nfl-spread-structural-v7"), "probability_logit_slope": 0.37}
+    assert NFLSpreadModelV7.from_artifact(art).probability_logit_slope == 0.37
+    art_tot = {**_artifact("nfl-total-structural-v7"), "probability_logit_slope": 0.37}
+    assert NFLTotalModelV7.from_artifact(art_tot).probability_logit_slope == 0.37
+    with pytest.raises(ValueError, match="probability_logit_slope"):
+        NFLSpreadModelV7.from_artifact({**art, "probability_logit_slope": bad})
+    with pytest.raises(ValueError, match="probability_logit_slope"):
+        NFLTotalModelV7.from_artifact({**art_tot, "probability_logit_slope": bad})
+
+
+@pytest.mark.parametrize(
+    ("v71", "v7", "cls"),
+    [
+        ("nfl-spread-structural-v7.1", "nfl-spread-structural-v7", NFLSpreadModelV7),
+        ("nfl-total-structural-v7.1", "nfl-total-structural-v7", NFLTotalModelV7),
+    ],
+)
+def test_v71_artifacts_load_and_hash_verifies(v71: str, v7: str, cls: type) -> None:
+    art, parent = _artifact(v71), _artifact(v7)
+    assert art["artifact_hash"] == compute_artifact_hash(art)
+    assert art["model_version"] == v71 and art["qualification"]["model_version"] == v71
+    assert art["parent_model_version"] == v7 and art["parent_artifact_hash"] == parent["artifact_hash"]
+    # Same engine and replay method; every engine parameter is v7's.
+    added = {
+        "probability_logit_slope",
+        "parent_model_version",
+        "parent_artifact_hash",
+        "probability_shrink_provenance",
+    }
+    changed = {"artifact_hash", "model_version", "note", "qualification"}
+    assert set(art) == set(parent) | added
+    assert {k: art[k] for k in parent if k not in changed} == {
+        k: parent[k] for k in parent if k not in changed
+    }
+    slope = art["probability_logit_slope"]
+    assert 0.0 <= slope <= 1.0
+    model = cls.from_artifact(art)
+    assert model.version == v71 and model.probability_logit_slope == slope
+    loaded, error = cli_forecast._load_exact_artifact_contract(v71)
+    assert error is None and loaded == art
+
+
+def _spread_row(art: dict, event_id: str, selection: str, line: float, probability: float) -> dict:
+    return {
+        "model_version": art["model_version"],
+        "model_artifact_hash": art["artifact_hash"],
+        "league": "NFL",
+        "event_id": event_id,
+        "event_start_utc": "2026-11-29T18:00:00Z",
+        "market_type": "spread",
+        "selection": selection,
+        "line": line,
+        "model_probability": probability,
+    }
+
+
+@pytest.mark.parametrize("spread_home_line", [-2.5, 9.5])
+def test_v71_spread_scalar_replay_round_trip(spread_home_line: float) -> None:
+    art = _artifact("nfl-spread-structural-v7.1")
+    model = NFLSpreadModelV7.from_artifact(art)
+    raw_model = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7"))
+    kwargs = {"home_pass_epa": 0.12, "away_pass_epa": -0.04, "spread_home_line": spread_home_line}
+    fc = model.forecast_spread("Buffalo Bills", "Baltimore Ravens", **kwargs)
+    raw = raw_model.forecast_spread("Buffalo Bills", "Baltimore Ravens", **kwargs)
+    # the forecast.py inference_inputs shape, including the 1.25x heavy-line sd
+    snap = build_snapshot(
+        art,
+        {"home_team": "Buffalo Bills", "away_team": "Baltimore Ravens"},
+        {"mean": fc.projected_margin_home, "sd": fc.effective_sd, "line": -spread_home_line},
+        event_id="nfl-v71-1",
+        event_start_utc="2026-11-29T18:00:00Z",
+        observed_at_utc="2026-11-29T12:00:00Z",
+    )
+    replayed = replay_snapshot(snap)
+    assert (replayed["home"], replayed["away"]) == (fc.prob_home_cover, fc.prob_away_cover)
+    row = _spread_row(art, "nfl-v71-1", "home", spread_home_line, fc.prob_home_cover)
+    assert validate_decision_snapshot(snap, row) == fc.prob_home_cover
+    away = _spread_row(art, "nfl-v71-1", "away", -spread_home_line, fc.prob_away_cover)
+    assert validate_decision_snapshot(snap, away) == fc.prob_away_cover
+    if abs(raw.prob_home_cover - fc.prob_home_cover) > 2e-6:
+        # a v7.1 row carrying the unshrunk v7 price is not what the artifact serves
+        with pytest.raises(ValueError, match="scalar_replay_probability_mismatch"):
+            validate_decision_snapshot(snap, {**row, "model_probability": raw.prob_home_cover})
+
+
+def test_v71_total_scalar_replay_round_trip() -> None:
+    art = _artifact("nfl-total-structural-v7.1")
+    model = NFLTotalModelV7.from_artifact(art)
+    fc = model.forecast_total("Buffalo Bills", "Baltimore Ravens", total_pass_epa=0.4, total_line=47.5)
+    snap = build_snapshot(
+        art,
+        {"home_team": "Buffalo Bills", "away_team": "Baltimore Ravens"},
+        {"mean": fc.projected_total, "sd": fc.effective_sd, "line": 47.5},
+        event_id="nfl-v71-2",
+        event_start_utc="2026-11-29T18:00:00Z",
+        observed_at_utc="2026-11-29T12:00:00Z",
+    )
+    replayed = replay_snapshot(snap)
+    assert (replayed["over"], replayed["under"]) == (fc.prob_over, fc.prob_under)
+    row = {
+        "model_version": art["model_version"],
+        "model_artifact_hash": art["artifact_hash"],
+        "league": "NFL",
+        "event_id": "nfl-v71-2",
+        "event_start_utc": "2026-11-29T18:00:00Z",
+        "market_type": "total",
+        "selection": "under",
+        "line": 47.5,
+        "model_probability": fc.prob_under,
+    }
+    assert validate_decision_snapshot(snap, row) == fc.prob_under
+
+
+def _shrunk_artifact(parent: str, slope: float) -> dict:
+    """A re-hashed v7 artifact with a real shrink: the replay must apply it, whatever s v7.1 ships."""
+    art = {**_artifact(parent), "model_version": f"{parent}-test-shrink", "probability_logit_slope": slope}
+    art["artifact_hash"] = compute_artifact_hash(art)
+    return art
+
+
+@pytest.mark.parametrize("spread_home_line", [-2.5, -3.0, 9.5])
+def test_shrunk_spread_artifact_replays_the_shrunk_probability(spread_home_line: float) -> None:
+    art = _shrunk_artifact("nfl-spread-structural-v7", 0.25)
+    model = NFLSpreadModelV7.from_artifact(art)
+    raw = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7"))
+    kwargs = {"home_pass_epa": 0.30, "away_pass_epa": -0.10, "spread_home_line": spread_home_line}
+    fc = model.forecast_spread("Buffalo Bills", "Baltimore Ravens", **kwargs)
+    raw_fc = raw.forecast_spread("Buffalo Bills", "Baltimore Ravens", **kwargs)
+    assert abs(fc.prob_home_cover - raw_fc.prob_home_cover) > 1e-3  # the shrink really moved it
+    snap = build_snapshot(
+        art,
+        {"home_team": "Buffalo Bills", "away_team": "Baltimore Ravens"},
+        {"mean": fc.projected_margin_home, "sd": fc.effective_sd, "line": -spread_home_line},
+        event_id="nfl-shrink-1",
+        event_start_utc="2026-11-29T18:00:00Z",
+        observed_at_utc="2026-11-29T12:00:00Z",
+    )
+    assert replay_snapshot(snap) == {"away": fc.prob_away_cover, "home": fc.prob_home_cover}
+    row = _spread_row(art, "nfl-shrink-1", "home", spread_home_line, fc.prob_home_cover)
+    assert validate_decision_snapshot(snap, row) == fc.prob_home_cover
+    with pytest.raises(ValueError, match="scalar_replay_probability_mismatch"):
+        validate_decision_snapshot(snap, {**row, "model_probability": raw_fc.prob_home_cover})
+
+
+def test_shrunk_total_artifact_replays_the_shrunk_probability() -> None:
+    art = _shrunk_artifact("nfl-total-structural-v7", 0.25)
+    model = NFLTotalModelV7.from_artifact(art)
+    raw = NFLTotalModelV7.from_artifact(_artifact("nfl-total-structural-v7"))
+    fc = model.forecast_total("Buffalo Bills", "Baltimore Ravens", total_pass_epa=1.5, total_line=44.5)
+    raw_fc = raw.forecast_total("Buffalo Bills", "Baltimore Ravens", total_pass_epa=1.5, total_line=44.5)
+    assert abs(fc.prob_over - raw_fc.prob_over) > 1e-3
+    snap = build_snapshot(
+        art,
+        {"home_team": "Buffalo Bills", "away_team": "Baltimore Ravens"},
+        {"mean": fc.projected_total, "sd": fc.effective_sd, "line": 44.5},
+        event_id="nfl-shrink-2",
+        event_start_utc="2026-11-29T18:00:00Z",
+        observed_at_utc="2026-11-29T12:00:00Z",
+    )
+    assert replay_snapshot(snap) == {"under": fc.prob_under, "over": fc.prob_over}
+    row = {
+        "model_version": art["model_version"],
+        "model_artifact_hash": art["artifact_hash"],
+        "league": "NFL",
+        "event_id": "nfl-shrink-2",
+        "event_start_utc": "2026-11-29T18:00:00Z",
+        "market_type": "total",
+        "selection": "over",
+        "line": 44.5,
+        "model_probability": fc.prob_over,
+    }
+    assert validate_decision_snapshot(snap, row) == fc.prob_over
+    with pytest.raises(ValueError, match="scalar_replay_probability_mismatch"):
+        validate_decision_snapshot(snap, {**row, "model_probability": raw_fc.prob_over})
+
+
+def test_v7_snapshot_from_the_pre_slope_engine_still_replays() -> None:
+    """Open v7 picks were logged with the old engine-file hash; editing the file must not orphan them."""
+    art = _artifact("nfl-spread-structural-v7")
+    model = NFLSpreadModelV7.from_artifact(art)
+    fc = model.forecast_spread("Buffalo Bills", "Baltimore Ravens", spread_home_line=-2.5)
+    snap = build_snapshot(
+        art,
+        {"home_team": "Buffalo Bills", "away_team": "Baltimore Ravens"},
+        {"mean": fc.projected_margin_home, "sd": fc.effective_sd, "line": 2.5},
+        event_id="nfl-v7-old",
+        event_start_utc="2026-11-29T18:00:00Z",
+        observed_at_utc="2026-11-29T12:00:00Z",
+    )
+    (old_hash,) = HISTORICAL_ENGINE_HASHES["nfl_spread_structural_v7_engine"]
+    old = {k: v for k, v in snap.items() if k != "snapshot_hash"} | {"engine_source_sha256": old_hash}
+    old["snapshot_hash"] = snapshot_hash(old)
+    assert replay_snapshot(old)["home"] == fc.prob_home_cover
+
+
+def test_moneyline_challenger_accepts_v71_parent_with_unchanged_win_probability() -> None:
+    v7 = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7"))
+    v71 = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7.1"))
+    for case in SPREAD_CASES:
+        a, b = v7.forecast_spread("H", "A", **case), v71.forecast_spread("H", "A", **case)
+        assert (a.prob_home_win, a.projected_margin_home) == (b.prob_home_win, b.projected_margin_home)
+    fc = v71.forecast_spread("H", "A", **SPREAD_CASES[0])
+    kwargs = {
+        "event_id": "1",
+        "event_start_utc": "2026-11-29T18:00:00Z",
+        "home_team": "H",
+        "away_team": "A",
+        "forecast": fc,
+        "spread_home_line": -3.5,
+        "input_qualified": True,
+    }
+    entry = moneyline_shadow_input(parent_model_version="nfl-spread-structural-v7.1", **kwargs)
+    assert entry is not None and entry["prob_home_win"] == fc.prob_home_win
+    assert moneyline_shadow_input(parent_model_version="nfl-spread-structural-v6", **kwargs) is None
+
+
+@pytest.mark.parametrize(
+    ("champion", "market", "expected"),
+    [
+        (
+            SimpleNamespace(model_id="nfl-spread-structural-v7.1", available=True),
+            "spread",
+            "nfl-spread-structural-v7.1",
+        ),
+        (
+            SimpleNamespace(model_id="nfl-total-structural-v7.1", available=True),
+            "total",
+            "nfl-total-structural-v7.1",
+        ),
+        (
+            SimpleNamespace(model_id="nfl-spread-structural-v7", available=True),
+            "spread",
+            "nfl-spread-structural-v7",
+        ),
+        (
+            SimpleNamespace(model_id="nfl-spread-structural-v7.1", available=False),
+            "spread",
+            "nfl-spread-structural-v7",
+        ),
+        (
+            SimpleNamespace(model_id="nfl-spread-structural-v8", available=True),
+            "spread",
+            "nfl-spread-structural-v7",
+        ),
+        (None, "total", "nfl-total-structural-v7"),
+    ],
+)
+def test_nfl_slate_serves_the_champion_it_can_build(monkeypatch, champion, market, expected) -> None:
+    calls: list[tuple[str, str]] = []
+
+    class _Registry:
+        def champion(self, sport: str, mkt: str):
+            calls.append((sport, mkt))
+            return champion
+
+    monkeypatch.setattr(
+        cli_forecast.ProductionModelRegistry, "load", classmethod(lambda cls, root: _Registry())
+    )
+    assert cli_forecast._nfl_serving_model_version(market) == expected
+    assert calls == [("NFL", market)]
+
+
+def test_nfl_slate_falls_back_when_the_registry_will_not_load(monkeypatch) -> None:
+    def _boom(cls, root):
+        raise ValueError("broken registry")
+
+    monkeypatch.setattr(cli_forecast.ProductionModelRegistry, "load", classmethod(_boom))
+    assert cli_forecast._nfl_serving_model_version("spread") == "nfl-spread-structural-v7"
