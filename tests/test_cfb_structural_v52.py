@@ -68,6 +68,16 @@ def _as_golden(p) -> dict:
     )
 
 
+_V5_INIT_PARAMS = {
+    "margin_calibration": {"intercept": 0.8, "slope": 1.1},
+    "total_calibration": {"intercept": -1.0, "slope": 1.02},
+    "margin_sd_table": {"established": 16.8, "thin_sample": 17.5, "fbs_vs_fcs": 19.0},
+    "established_min_sample": 4,
+    "conference_margin_scale": 0.98,
+    "total_sd": 16.9,
+}
+
+
 def _v5(**overrides) -> CFBStructuralV5Model:
     return CFBStructuralV5Model.from_artifact(load_cfb_structural_v5_artifact(), **overrides)
 
@@ -202,6 +212,19 @@ def test_v52_builds_through_cfb_model_for_artifact() -> None:
     without = {k: v for k, v in artifact.items() if k != "total_probability_logit_slope"}
     with pytest.raises(ValueError, match="must set total_probability_logit_slope"):
         CFBStructuralV52Model.from_artifact(without)
+    # A None slope (override, artifact value, or direct construction) never yields a v5.2 model pricing raw totals.
+    for build in (
+        lambda: CFBStructuralV52Model.from_artifact(artifact, total_probability_logit_slope=None),
+        lambda: CFBStructuralV52Model.from_artifact(without, total_probability_logit_slope=None),
+        lambda: CFBStructuralV52Model.from_artifact({**artifact, "total_probability_logit_slope": None}),
+        lambda: CFBStructuralV52Model(**{**_V5_INIT_PARAMS, "total_probability_logit_slope": None}),
+        lambda: CFBStructuralV52Model(**_V5_INIT_PARAMS),
+    ):
+        with pytest.raises(ValueError, match="must set total_probability_logit_slope"):
+            build()
+    assert CFBStructuralV52Model(**_V5_INIT_PARAMS, total_probability_logit_slope=0.5).version == (
+        CFB_V52_MODEL_VERSION
+    )
     with pytest.raises(ValueError, match="never reads"):
         CFBStructuralV52Model.from_artifact({**artifact, "surprise": 1})
     assert all(CFB_V52_MODEL_VERSION in VERSIONS[m] for m in ("moneyline", "spread", "total"))

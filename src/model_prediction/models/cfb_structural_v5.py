@@ -355,11 +355,18 @@ class CFBStructuralV52Model(CFBStructuralV5Model):
 
     version: str = CFB_V52_MODEL_VERSION
 
+    def __init__(self, *, total_probability_logit_slope: float | None = None, **kwargs: Any) -> None:
+        # Checked here, not only in from_artifact, so no construction path (artifact without the key, a None
+        # override, a direct call) can label rows v5.2 while pricing totals unshrunk.
+        if total_probability_logit_slope is None:
+            raise ValueError("cfb v5.2 artifact must set total_probability_logit_slope")
+        super().__init__(total_probability_logit_slope=total_probability_logit_slope, **kwargs)
+
     @classmethod
     def from_artifact(cls, artifact: Mapping[str, Any], **overrides: Any) -> CFBStructuralV5Model:
         if (
-            "total_probability_logit_slope" not in artifact
-            and "total_probability_logit_slope" not in overrides
+            artifact.get("total_probability_logit_slope") is None
+            and overrides.get("total_probability_logit_slope") is None
         ):
             raise ValueError("cfb v5.2 artifact must set total_probability_logit_slope")
         return super().from_artifact(artifact, **overrides)
