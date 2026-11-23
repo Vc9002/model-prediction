@@ -260,20 +260,33 @@ def window_metrics(rows: list[SimpleNamespace], slope: float) -> dict[str, Any]:
         ]
     )
 
-    def scores(p: np.ndarray) -> dict[str, float]:
-        x = np.array([_logit(v) for v in p])
-        cal = calibration_slope(x, y)
+    x_raw = np.array([_logit(v) for v in raw])
+    raw_cal = calibration_slope(x_raw, y)
+    raw_slope_only = fit_slope_only(x_raw, y)
+    # logit(shrunk share) = s * logit(raw share), so the shrunk window's slopes are the raw ones divided by s
+    # (intercept unchanged). Computed analytically: a numeric fit on the compressed logits runs into
+    # fit_slope_only's [-5, 5] search bound (validation's true shrunk MLE is about 22.5).
+    shrunk_cal = (
+        {"slope": raw_cal["slope"] / slope, "intercept": raw_cal["intercept"]}
+        if slope > 0
+        else {"slope": float("nan"), "intercept": float("nan")}
+    )
+    shrunk_slope_only = raw_slope_only / slope if slope > 0 else float("nan")
+
+    def scores(p: np.ndarray, cal: dict[str, float], slope_only: float) -> dict[str, Any]:
         pc = np.clip(p, 1e-12, 1 - 1e-12)
         return {
             "brier": round(float(np.mean((p - y) ** 2)), 6),
             "log_loss": round(float(-np.mean(y * np.log(pc) + (1 - y) * np.log(1 - pc))), 6),
             "calibration_slope": round(cal["slope"], 4),
             "calibration_intercept": round(cal["intercept"], 4),
-            "slope_only": round(fit_slope_only(x, y), 4),
+            "slope_only": round(slope_only, 4),
             "mean_p_over": round(float(np.mean(p)), 4),
             "max_abs_minus_half": round(float(np.max(np.abs(p - 0.5))), 6),
         }
 
+    shrunk_scores = scores(shrunk, shrunk_cal, shrunk_slope_only)
+    shrunk_scores["slopes_basis"] = "analytic: raw slope / s, raw intercept"
     return {
         "start": rows[0].date,
         "end": rows[-1].date,
@@ -282,8 +295,8 @@ def window_metrics(rows: list[SimpleNamespace], slope: float) -> dict[str, Any]:
         "games_scored": len(d),
         "over_rate": round(float(np.mean(y)), 4),
         "mean_served_total_minus_line": round(float(np.mean([r.served_total - r.line for r in d])), 3),
-        "raw": scores(raw),
-        "shrunk": scores(shrunk),
+        "raw": scores(raw, raw_cal, raw_slope_only),
+        "shrunk": shrunk_scores,
     }
 
 

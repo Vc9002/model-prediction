@@ -434,7 +434,7 @@
   "total_shrink_fit": {
     "script": "scripts/fit_cfb_v52_total_shrink.py",
     "fit_output": "outputs/ncaaf/cfb_v52_total_shrink.json",
-    "fit_output_sha256": "9e0506408b3b60d03d72fdb9fd57b9703a2e1cfebb5655059c953f194feb1a9d",
+    "fit_output_sha256": "1d334fed69b79e392852076ccdf30a888ff2017db232c52a6a435e3522dc8b5c",
     "base_artifact": "config/models/cfb-structural-v5.json",
     "base_artifact_hash": "449bf27c80d62f7ff690b5800cb1474a2244f716f40b684cb8275d5e04a8a06d",
     "formula": "p_over' = sigmoid(s * logit(p_over / (p_over + p_under))) * (1 - p_push); p_under' = 1 - p_push - p_over'",
@@ -465,5 +465,5 @@
     ],
     "design_informed": true
   },
-  "artifact_hash": "3c8001ca41b823ba82c8c8229d5fcfc508be095a7285af7c335f838d41c87e9b"
+  "artifact_hash": "3389a15af7d677b054b06a4759120a1c6ccaf511476be9aa4ffcd1a171f0106b"
 }

@@ -58,4 +58,4 @@ PASS=True: v5's calibrated total matches `outputs/ncaaf/cfb_v7_v5_repro.json` on
 | config/models/cfb-structural-v5.json | `fbff68717f8c9aff28e227c41b650b5b854404f46d1f4ca2d09ec8fc7cd05f38` |
 | outputs/ncaaf/cfb_v7_v5_repro.json | `2b2cdc254bed0a97035c71da3d5892bc6c9c2c78c774604e6ebf1a816545b8af` |
 | outputs/ncaaf/cfb_v5_base_rows.jsonl | `742a7dfdcaa70da4a194e9bc9f4221699e5e294a98e7b4133f2cab37d0e1a9c3` |
-| scripts/fit_cfb_v52_total_shrink.py | `b268636b1d8fa6e831b61d488be155e77fb2e211fc615601f12c3fa1e0036a53` |
+| scripts/fit_cfb_v52_total_shrink.py | `d7844a8a0b51fb1b7c20a71654460cf61f80caa7155731773c787bf28da11164` |
