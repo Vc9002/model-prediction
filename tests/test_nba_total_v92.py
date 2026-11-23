@@ -433,3 +433,17 @@ def test_real_registry_serves_v92_once_registered_and_routed(monkeypatch, tmp_pa
     assert result["model_version"] == NBA_TOTAL_V92_VERSION
     assert result["model_qualified"] is True
     assert forecast_cli._is_registered_serving_model(NBA_TOTAL_V92_VERSION, "NBA", "total") is True
+
+
+def test_v92_engine_hash_is_pinned() -> None:
+    """Stored v9.2 snapshots validate against the LF-normalised hash of nba_v91.py. That file is still
+    edited for v10 research: when it changes, move this value into HISTORICAL_ENGINE_HASHES
+    ["nba_total_structural_v92_engine"] (as the NFL v7 entries were) and pin the new one here, or every
+    stored v9.2 row stops replaying (review 2026-11-23)."""
+    from model_prediction.scalar_artifact_replay import HISTORICAL_ENGINE_HASHES, engine_hash
+
+    current = engine_hash("nba_total_structural_v92_engine")
+    pinned = "eb6f2ee8aa8ebee3b4c11af5de0c4da7fcf20e4d9713a4ef55585a4dbfbe4f6e"
+    assert current == pinned or pinned in HISTORICAL_ENGINE_HASHES.get(
+        "nba_total_structural_v92_engine", set()
+    )
