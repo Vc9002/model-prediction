@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-23T04:41:36.527Z"
+last_updated: "2026-11-23T23:21:00.171Z"
 last_activity: 2026-11-22
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 3efd5d05c766161082a1ea9ccd228d978a360303
+state_head: a3c454d9d3d428ec9685e73faa1f20dd97adf995
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-22 - Completed quick task 261122-w6z: Stop dashboard cache warmer hanging process exit and leaking out of tests
+Last activity: 2026-11-23 - Completed quick task 261123-oy5: Scheduled workers inherit BELOW_NORMAL + low memory priority from run_supervisor main()
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -143,6 +143,7 @@ None yet.
 | 261123-2w2 | Shrink overconfident NCAAF totals (cfb-structural-v5.2) and NFL totals (nfl-total-structural-v7.1) toward 50%; promoted; NFL spread fit was a no-op | 2026-11-23 | 9e9e27e4 | [261123-2w2-ncaaf-nfl-calibration-shrink-and-ncaaf-v](./quick/261123-2w2-ncaaf-nfl-calibration-shrink-and-ncaaf-v/) |
 | 261123-6q6 | NFL spread v7.2: cover probability shrink fitted on validation (operator exception), promoted | 2026-11-23 | (this commit) | [261123-6q6-nfl-spread-v72-validation-shrink](./quick/261123-6q6-nfl-spread-v72-validation-shrink/) |
 | 261123-h40 | NBA total v9.2: bias-fixed v9.1 engine + honest shrink (s 0.105), promoted; NBA total Main picks stop | 2026-11-23 | (this commit) | [261123-h40-nba-total-v91-serving-shrink](./quick/261123-h40-nba-total-v91-serving-shrink/) |
+| 261123-oy5 | Scheduled workers inherit BELOW_NORMAL + low memory priority from run_supervisor main() | 2026-11-23 | a3c454d9 | [261123-oy5-give-supervised-scheduled-workers-low-me](./quick/261123-oy5-give-supervised-scheduled-workers-low-me/) |
 
 ## Milestone History
 
