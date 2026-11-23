@@ -106,14 +106,14 @@ def test_cfb_structural_v4_artifact_and_registry_wiring():
 
     prod_cfg = yaml.safe_load((PROJECT_ROOT / "config/production.yaml").read_text(encoding="utf-8"))
     reg = ProductionModelRegistry.from_config(prod_cfg, repo_root=PROJECT_ROOT)
-    # v4 is the rollback pointer behind the v5 champion (promoted 2026-11-13).
+    # v4 is the rollback pointer behind v5 (promoted 2026-11-13). Since 2026-11-23 v5 is itself the rollback
+    # behind later champions (v5.2, quick-261123-2w2), so pin v4's place in the chain, not the champion id.
     v4_entry = reg.entries[CFB_V4_MODEL_VERSION]
     assert v4_entry.available and v4_entry.serving_status == "rollback"
+    assert reg.entries["cfb-structural-v5"].rollback_model == CFB_V4_MODEL_VERSION
     for market in ["moneyline", "spread", "total"]:
         champ = reg.champion("NCAAF", market)
-        assert champ is not None
-        assert champ.model_id == "cfb-structural-v5"
-        assert reg.lifecycle_contract("NCAAF", market).rollback_model_id == CFB_V4_MODEL_VERSION
+        assert champ is not None and champ.available
 
 
 def test_cfb_slate_spread_total_interaction(tmp_path):
