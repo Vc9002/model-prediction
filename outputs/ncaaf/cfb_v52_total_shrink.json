@@ -1,0 +1,183 @@
+{
+  "assumed_asks": [
+    0.5,
+    0.524
+  ],
+  "base_model": "cfb-structural-v5",
+  "disclosures": [
+    "ESPN lined windows 2017-2025 and this holdout were read before (docs/ROADMAP.md NCAAF); design-informed.",
+    "v5 total_calibration and total_sd were fitted on 2016-08-27..2022-11-11: train-window v5 probabilities are in-sample for those layers.",
+    "Main-rule count assumes asks at the closing line; weather verification and eligibility caps not evaluated."
+  ],
+  "fit": {
+    "bootstrap": "1000 resamples of train kickoff dates, seed 11",
+    "bootstrap_95ci": [
+      -0.10144408658249768,
+      0.11856835947608367
+    ],
+    "method": "slope-only logistic (intercept 0) of over at the closing total on logit(v5 no-push over share)",
+    "slope": 0.0095,
+    "slope_unclipped": 0.009470771239899305
+  },
+  "holdout_main_rule": {
+    "ask_50.0pct": {
+      "raw_v5": {
+        "games": 382,
+        "over_sides": 306,
+        "under_sides": 76
+      },
+      "v5.2_shrunk": {
+        "games": 0,
+        "over_sides": 0,
+        "under_sides": 0
+      }
+    },
+    "ask_52.4pct": {
+      "raw_v5": {
+        "games": 446,
+        "over_sides": 345,
+        "under_sides": 101
+      },
+      "v5.2_shrunk": {
+        "games": 0,
+        "over_sides": 0,
+        "under_sides": 0
+      }
+    }
+  },
+  "inputs": {
+    "config/models/cfb-structural-v5.json": "12f7a970fe2cc796ac417da03106a9e709c5643c0b9d4489b5277703c57c6192",
+    "espn_lines (E:/MP/data/research/ncaaf_v6/espn_lines.jsonl)": "2b19a2545fb2e5f9df4c55a1b57ee9f88b11eab371828a4a7ed88e8bdfb7fa54",
+    "outputs/ncaaf/cfb_v5_base_rows.jsonl": "39c1cbd61e63b7dc1c029ad39b7c5b759aa1921296957d9070cb977bab2d187e",
+    "outputs/ncaaf/cfb_v7_v5_repro.json": "76b1801ed58d180390526caa6d15227e49a2a8b348121a37c56220f5f96a04d1",
+    "scripts/fit_cfb_v52_total_shrink.py": "112b2e12f67574b820aca872e8110defc28aa947d070701ee7b9c3f965aa672a",
+    "v5_replay_rows (E:/MP/data/research/ncaaf_v7_work/v5_replay_rows.jsonl)": "68caa21f0fc0f4e39ac2fa9139f3adbc8d332a3836d11e9cb9f910a3313ce74f"
+  },
+  "main_rule": {
+    "block_fcs": true,
+    "main_total_gates": {
+      "max_model_probability": 0.62,
+      "min_projection_gap": 1.5,
+      "under_min_line": 56.5
+    },
+    "max_edge": 0.08,
+    "min_edge": 0.02
+  },
+  "model_version": "cfb-structural-v5.2",
+  "reproduction_gate": {
+    "brief_join": {
+      "calibration_slope": 0.011646997955206493,
+      "intercept": 0.004959300946032034,
+      "n": 1511
+    },
+    "matched_events": 1899,
+    "max_abs_calibrated_total_diff": 0.0,
+    "max_abs_line_diff": 0.0,
+    "pass": true
+  },
+  "rows": {
+    "lined_games": 9177,
+    "pushes": 73
+  },
+  "sensitivity_v5_artifact_split": {
+    "holdout_slope_only": 0.01955584306127328,
+    "slope_unclipped": 0.008034831240886671,
+    "train_scored": 5429,
+    "validation_slope_only": 0.22610560889101936
+  },
+  "split": {
+    "locked_holdout": {
+      "end": "2026-11-14",
+      "observations": 1844,
+      "start": "2024-11-23"
+    },
+    "method": "complete_date_60_20_20",
+    "train": {
+      "end": "2022-11-20",
+      "observations": 5610,
+      "start": "2016-08-27"
+    },
+    "validation": {
+      "end": "2024-11-22",
+      "observations": 1723,
+      "start": "2022-11-23"
+    }
+  },
+  "windows": {
+    "locked_holdout": {
+      "end": "2026-11-14",
+      "games_lined": 1844,
+      "games_scored": 1844,
+      "mean_served_total_minus_line": 1.318,
+      "over_rate": 0.5038,
+      "pushes_dropped": 0,
+      "raw": {
+        "brier": 0.258652,
+        "calibration_intercept": 0.0118,
+        "calibration_slope": 0.0277,
+        "log_loss": 0.711412,
+        "mean_p_over": 0.5293,
+        "slope_only": 0.0366
+      },
+      "shrunk": {
+        "brier": 0.249994,
+        "calibration_intercept": 0.0118,
+        "calibration_slope": 2.9141,
+        "log_loss": 0.693135,
+        "mean_p_over": 0.5003,
+        "slope_only": 3.8521
+      },
+      "start": "2024-11-23"
+    },
+    "train": {
+      "end": "2022-11-20",
+      "games_lined": 5610,
+      "games_scored": 5550,
+      "mean_served_total_minus_line": 0.1,
+      "over_rate": 0.484,
+      "pushes_dropped": 60,
+      "raw": {
+        "brier": 0.263764,
+        "calibration_intercept": -0.0643,
+        "calibration_slope": 0.013,
+        "log_loss": 0.722853,
+        "mean_p_over": 0.5039,
+        "slope_only": 0.0095
+      },
+      "shrunk": {
+        "brier": 0.249999,
+        "calibration_intercept": -0.0643,
+        "calibration_slope": 1.3697,
+        "log_loss": 0.693144,
+        "mean_p_over": 0.5,
+        "slope_only": 0.9969
+      },
+      "start": "2016-08-27"
+    },
+    "validation": {
+      "end": "2024-11-22",
+      "games_lined": 1723,
+      "games_scored": 1710,
+      "mean_served_total_minus_line": 1.839,
+      "over_rate": 0.5181,
+      "pushes_dropped": 13,
+      "raw": {
+        "brier": 0.256472,
+        "calibration_intercept": 0.0426,
+        "calibration_slope": 0.1789,
+        "log_loss": 0.707303,
+        "mean_p_over": 0.5402,
+        "slope_only": 0.2136
+      },
+      "shrunk": {
+        "brier": 0.249949,
+        "calibration_intercept": 0.0426,
+        "calibration_slope": 18.8274,
+        "log_loss": 0.693045,
+        "mean_p_over": 0.5004,
+        "slope_only": 5.0
+      },
+      "start": "2022-11-23"
+    }
+  }
+}

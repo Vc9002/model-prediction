@@ -41,7 +41,12 @@ from .cfb_structural_v4 import (
     CFB_V4_N_SIMULATIONS,
     CFBStructuralV4Model,
 )
-from .cfb_structural_v5 import CFB_V5_MODEL_VERSION, CFBStructuralV5Model
+from .cfb_structural_v5 import (
+    CFB_V5_MODEL_VERSION,
+    CFB_V52_MODEL_VERSION,
+    CFBStructuralV5Model,
+    CFBStructuralV52Model,
+)
 
 MODEL_VERSION = "cfb-structural-v4"
 CFB_SPREAD_MODEL_VERSION = "cfb-structural-v4"
@@ -134,6 +139,7 @@ class CollegeFootballModel(CFBStructuralV4Model):
 _SERVING_CLASSES: dict[str, type[CFBStructuralV4Model]] = {
     MODEL_VERSION: CollegeFootballModel,
     CFB_V5_MODEL_VERSION: CFBStructuralV5Model,
+    CFB_V52_MODEL_VERSION: CFBStructuralV52Model,
 }
 
 
@@ -194,6 +200,8 @@ def cfb_serving_code_hash() -> str:
     digest.update((here.parent / "features" / "cfb_team_identity.py").read_bytes())
     digest.update((here.parent / "features" / "cfb_features_v6.py").read_bytes())  # TeamResolver
     digest.update((here.parent / "features" / "cfb_qb_availability.py").read_bytes())
+    # v5.2's total shrink is computed by cfb_replay.shrink_total_probabilities on the serving path.
+    digest.update((here.parent / "cfb_replay.py").read_bytes())
     return digest.hexdigest()[:16]
 
 
@@ -1509,7 +1517,9 @@ def build_cfb_slate(
     # Challengers (quick-261121-v62; several per market since quick-261121-v7r): each model routed in
     # challengers.NCAAF appends its own contracts AFTER the champion's and after the candidate evidence, in
     # route order (v6.2, v7, then v5.1), so v5's contracts and evidence are untouched; _forecast_cfb_sport sends any
-    # version outside v2-v5 to the research and Flat tiers only. Each challenger runs in its own try/except:
+    # version outside v2-v5 and v5.2 to the research and Flat tiers only. v5.2 is a champion (it prices through
+    # ``model`` above, never through a challenger route); routed as a challenger it would price nothing (no_pricer).
+    # Each challenger runs in its own try/except:
     # one failing blocks neither the champion nor the other challengers. ``challenger_pricing`` stays v6.2's
     # summary; ``challenger_pricing_by_model`` has every routed challenger's.
     challenger_pricing: dict[str, Any] = {"status": "not_requested"}

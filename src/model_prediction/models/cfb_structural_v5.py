@@ -18,6 +18,9 @@ chosen on the walk-forward train split of the 2026-11-12 replay evidence
    are carried over from v4 unchanged: no historical lines exist to evaluate them.
 
 Challenger only: not registered as a champion; promotion is a separate governance step.
+
+An optional ``total_probability_logit_slope`` artifact field (absent on v5) shrinks the total market's
+served probability toward 50%; ``cfb-structural-v5.2`` at the bottom of this file is v5 with that field.
 """
 
 from __future__ import annotations
@@ -59,10 +62,12 @@ _METADATA_KEYS = frozenset(
         "calibration",
         "training",
         "base_model",
+        "total_shrink_fit",
     }
 )
 _PARAMETER_KEYS = frozenset(
     {
+        "total_probability_logit_slope",
         "distribution",
         "home_advantage_points",
         "margin_calibration",
@@ -106,7 +111,10 @@ class CFBStructuralV5Model(CFBStructuralV4Model):
         distribution_type: CFBDistributionType = CFBDistributionType.NEGATIVE_BINOMIAL,
         n_simulations: int = CFB_V4_N_SIMULATIONS,
         random_seed: int = 42,
+        total_probability_logit_slope: float | None = None,
     ) -> None:
+        from ..cfb_replay import validate_total_slope
+
         missing = [k for k in MARGIN_SD_SLICES if k not in margin_sd_table]
         if missing:
             raise ValueError(f"margin_sd_table missing slices: {missing}")
@@ -137,6 +145,12 @@ class CFBStructuralV5Model(CFBStructuralV4Model):
         self.margin_sd_table = {k: float(margin_sd_table[k]) for k in MARGIN_SD_SLICES}
         self.established_min_sample = int(established_min_sample)
         self.conference_margin_scale = float(conference_margin_scale)
+        # None (the field absent) skips the shrink entirely: v5 prices and records exactly as before.
+        self.total_probability_logit_slope = (
+            None
+            if total_probability_logit_slope is None
+            else validate_total_slope(total_probability_logit_slope)
+        )
 
     @classmethod
     def from_artifact(cls, artifact: Mapping[str, Any], **overrides: Any) -> CFBStructuralV5Model:
@@ -161,6 +175,8 @@ class CFBStructuralV5Model(CFBStructuralV4Model):
             "conference_margin_scale": float(artifact["conference_margin_scale"]),
             "total_sd": float(artifact["total_sd"]),
         }
+        if "total_probability_logit_slope" in artifact:
+            params["total_probability_logit_slope"] = float(artifact["total_probability_logit_slope"])
         params.update(overrides)
         return cls(**params)
 
@@ -245,7 +261,7 @@ class CFBStructuralV5Model(CFBStructuralV4Model):
         spread_home_line: float,
         total_line: float,
     ) -> CFBStructuralForecastV4:
-        from ..cfb_replay import capture_inputs
+        from ..cfb_replay import capture_inputs, shrink_total_probabilities
 
         margin, total = self.calibrate_means(
             matchup_features.projected_margin_home, matchup_features.projected_total
@@ -267,11 +283,21 @@ class CFBStructuralV5Model(CFBStructuralV4Model):
         )
         engine.rng = self.distribution_engine.rng
         inference_inputs = capture_inputs(
-            engine, mu_home=mu_home, mu_away=mu_away, spread_home_line=spread_home_line, total_line=total_line
+            engine,
+            mu_home=mu_home,
+            mu_away=mu_away,
+            spread_home_line=spread_home_line,
+            total_line=total_line,
+            total_probability_logit_slope=self.total_probability_logit_slope,
         )
         joint = engine.compute_market_probabilities(
             mu_away=mu_away, mu_home=mu_home, spread_home_line=spread_home_line, total_line=total_line
         )
+        p_over, p_under = joint.p_over, joint.p_under
+        if self.total_probability_logit_slope is not None:
+            p_over, p_under = shrink_total_probabilities(
+                p_over, p_under, joint.p_push_total, self.total_probability_logit_slope
+            )
         return CFBStructuralForecastV4(
             home_expected_points=round(mu_home, 2),
             away_expected_points=round(mu_away, 2),
@@ -284,8 +310,8 @@ class CFBStructuralV5Model(CFBStructuralV4Model):
             prob_away_cover=round(joint.p_away_cover, 6),
             prob_push_spread=round(joint.p_push_spread, 6),
             total_line=total_line,
-            prob_over=round(joint.p_over, 6),
-            prob_under=round(joint.p_under, 6),
+            prob_over=round(p_over, 6),
+            prob_under=round(p_under, 6),
             prob_push_total=round(joint.p_push_total, 6),
             home_qb_uncertainty=round(matchup_features.home_qb_value_adjustment, 3),
             away_qb_uncertainty=round(matchup_features.away_qb_value_adjustment, 3),
@@ -303,3 +329,41 @@ class CFBStructuralV5Model(CFBStructuralV4Model):
 
 def cfb_structural_v5_model() -> CFBStructuralV5Model:
     return CFBStructuralV5Model.from_artifact(load_cfb_structural_v5_artifact())
+
+
+# cfb-structural-v5.2 (quick-261123-2w2): v5 with only the total market's probability shrunk toward 50%.
+# v5's totals carried no information against the close (holdout calibration slope about 0.01), so the
+# artifact's fitted ``total_probability_logit_slope`` is applied to P(over)/P(under); spread and moneyline
+# are v5's arithmetic on the same RNG stream, bit for bit. A subclass only so every row is labelled
+# v5.2 (v4's __init__ copies the class ``version`` into spread_version / total_version).
+CFB_V52_MODEL_VERSION = "cfb-structural-v5.2"
+CFB_V52_ARTIFACT_PATH = PROJECT_ROOT / "config" / "models" / f"{CFB_V52_MODEL_VERSION}.json"
+
+
+def load_cfb_structural_v52_artifact(path: str | Path | None = None) -> dict[str, Any]:
+    artifact_path = Path(path) if path is not None else CFB_V52_ARTIFACT_PATH
+    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    if payload.get("model_version") != CFB_V52_MODEL_VERSION:
+        raise ValueError(f"cfb v5.2 artifact model_version mismatch: {payload.get('model_version')!r}")
+    if payload.get("artifact_hash") != compute_artifact_hash(payload):
+        raise ValueError(f"cfb v5.2 artifact_hash mismatch for {artifact_path}")
+    return payload
+
+
+class CFBStructuralV52Model(CFBStructuralV5Model):
+    """v5 with the fitted total-probability logit shrink (required, unlike on v5)."""
+
+    version: str = CFB_V52_MODEL_VERSION
+
+    @classmethod
+    def from_artifact(cls, artifact: Mapping[str, Any], **overrides: Any) -> CFBStructuralV5Model:
+        if (
+            "total_probability_logit_slope" not in artifact
+            and "total_probability_logit_slope" not in overrides
+        ):
+            raise ValueError("cfb v5.2 artifact must set total_probability_logit_slope")
+        return super().from_artifact(artifact, **overrides)
+
+
+def cfb_structural_v52_model() -> CFBStructuralV5Model:
+    return CFBStructuralV52Model.from_artifact(load_cfb_structural_v52_artifact())

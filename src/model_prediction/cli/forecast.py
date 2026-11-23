@@ -5930,7 +5930,13 @@ def _forecast_cfb_sport(
                     genuinely_eligible
                     and not eligibility.reason_code.startswith("PAPER_CALL_")
                     and m_version
-                    in ("cfb-structural-v5", "cfb-structural-v4", "cfb-structural-v3", "cfb-structural-v2")
+                    in (
+                        "cfb-structural-v5.2",
+                        "cfb-structural-v5",
+                        "cfb-structural-v4",
+                        "cfb-structural-v3",
+                        "cfb-structural-v2",
+                    )
                 )
                 if (
                     research_ledger is not None

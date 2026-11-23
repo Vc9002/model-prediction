@@ -19,6 +19,7 @@ from .models.cfb_distribution import CFBDistributionType, CFBJointDistributionEn
 SCHEMA = "cfb-joint-replay-v1"
 VERSIONS = {
     "moneyline": (
+        "cfb-structural-v5.2",
         "cfb-structural-v5",
         "cfb-structural-v4",
         "cfb-structural-v3",
@@ -26,6 +27,7 @@ VERSIONS = {
         "college-football-v1",
     ),
     "spread": (
+        "cfb-structural-v5.2",
         "cfb-structural-v5",
         "cfb-structural-v4",
         "cfb-structural-v3",
@@ -33,6 +35,7 @@ VERSIONS = {
         "cfb-spread-v1",
     ),
     "total": (
+        "cfb-structural-v5.2",
         "cfb-structural-v5",
         "cfb-structural-v4",
         "cfb-structural-v3",
@@ -89,6 +92,45 @@ class _MemoizedReplayEngine(CFBJointDistributionEngine):
         return home_scores, away_scores
 
 
+# cfb-structural-v5.2's total-market shrink, recorded in inference_inputs only when the artifact sets it
+# (so v2-v5 snapshots keep their exact key set). Kept here, not in models/cfb_distribution.py, whose bytes
+# are every stored snapshot's engine identity; serving and replay call the one helper below on the same
+# unrounded engine output, so a v5.2 row replays to its served probability bit for bit.
+TOTAL_SLOPE_KEY = "total_probability_logit_slope"
+
+
+def validate_total_slope(slope: Any) -> float:
+    value = float(slope)
+    if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+        raise ValueError("cfb_replay_invalid_total_slope")
+    return value
+
+
+def shrink_total_probabilities(
+    p_over: float, p_under: float, p_push: float, slope: float
+) -> tuple[float, float]:
+    """(P(over), P(under)) with the no-push over share moved to ``sigmoid(slope * logit(share))``.
+
+    Intercept 0, so no over/under direction is introduced. The push mass is left as the engine
+    priced it (it is 0 on half-point lines, where the pair stays exactly complementary and
+    ``slope = 0`` gives exactly 0.5 / 0.5); on integer lines the pair sums to ``1 - p_push``.
+    """
+    slope = validate_total_slope(slope)
+    decided = 1.0 - p_push
+    total = p_over + p_under
+    if total <= 0.0 or decided <= 0.0:
+        return p_over, p_under
+    share = p_over / total
+    if slope == 0.0:
+        shrunk = 0.5
+    elif share <= 0.0 or share >= 1.0:
+        shrunk = share
+    else:
+        shrunk = 1.0 / (1.0 + math.exp(-slope * math.log(share / (1.0 - share))))
+    over = shrunk * decided
+    return over, decided - over
+
+
 def engine_hash() -> str:
     return hashlib.sha256(
         Path(__file__).with_name("models").joinpath("cfb_distribution.py").read_bytes()
@@ -102,10 +144,17 @@ def capture_inputs(
     mu_away: float,
     spread_home_line: float,
     total_line: float,
+    total_probability_logit_slope: float | None = None,
 ) -> dict[str, Any]:
+    shrink = (
+        {}
+        if total_probability_logit_slope is None
+        else {TOTAL_SLOPE_KEY: validate_total_slope(total_probability_logit_slope)}
+    )
     return json.loads(
         json.dumps(
             {
+                **shrink,
                 "engine_source_sha256": engine_hash(),
                 "parameters": {
                     "distribution_type": engine.distribution_type.value,
@@ -146,12 +195,18 @@ def replay_inputs(inputs: dict[str, Any], market: str) -> dict[str, float]:
         spread_home_line=inputs["spread_home_line"],
         total_line=inputs["total_line"],
     )
+    p_over, p_under = result.p_over, result.p_under
+    if TOTAL_SLOPE_KEY in inputs:
+        # Validated for every market so a damaged slope fails closed wherever it is replayed.
+        slope = validate_total_slope(inputs[TOTAL_SLOPE_KEY])
+        if market == "total":
+            p_over, p_under = shrink_total_probabilities(p_over, p_under, result.p_push_total, slope)
     values = (
         {"home": result.p_home_win, "away": result.p_away_win}
         if market == "moneyline"
         else {"home": result.p_home_cover, "away": result.p_away_cover, "push": result.p_push_spread}
         if market == "spread"
-        else {"over": result.p_over, "under": result.p_under, "push": result.p_push_total}
+        else {"over": p_over, "under": p_under, "push": result.p_push_total}
     )
     return {key: round(value, 6) for key, value in values.items()}
 
