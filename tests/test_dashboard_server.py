@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
+import textwrap
 import threading
 from pathlib import Path
 from unittest.mock import Mock
@@ -2495,6 +2498,92 @@ def test_fingerprint_signal_fails_soft_without_ledger(monkeypatch, tmp_path):
 
     monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT")
     assert dashboard_server._canonical_ledger_signal() == -1
+
+
+_FOREVER_WARMER_CHILD = textwrap.dedent(
+    """
+    import sys
+    import threading
+    import time
+    from pathlib import Path
+
+    tmp = Path(sys.argv[1])
+    import dashboard_server as d
+    from model_prediction.dashboard import common
+
+    common.LOG_FILE = tmp / "server.log"
+    common._SNAPSHOT_FILE = tmp / "cache_snapshot.pkl"
+    d.LOG_FILE = common.LOG_FILE
+    for name in (
+        "status",
+        "matrix",
+        "production_evidence",
+        "model_ledger_comparison",
+        "dashboard_picks",
+        "read_flat_picks",
+        "performance_for_sport",
+    ):
+        setattr(d, name, lambda *args, **kwargs: {})
+    d.read_picks = list
+    d._load_archive = lambda: {"pick_ids": []}
+    d._warm_fingerprint = lambda: ("w6z-fixed",)
+
+    threading.Thread(
+        target=d._warm_caches, kwargs={"forever": True}, daemon=True, name="cache-warmer"
+    ).start()
+
+    keys = (
+        "status",
+        "matrix",
+        "production-evidence",
+        "model-ledgers",
+        "picks",
+        "flat-picks",
+        "performance:all",
+    )
+    deadline = time.monotonic() + 20
+    while not all(key in d._CACHE for key in keys):
+        if time.monotonic() > deadline:
+            sys.stderr.write("warmer never filled the cache\\n")
+            sys.exit(3)
+        time.sleep(0.05)
+    print("WARMED", flush=True)
+    """
+)
+
+
+def test_forever_warmer_does_not_block_interpreter_exit(tmp_path: Path) -> None:
+    # The hang only shows at interpreter shutdown (concurrent.futures joins its
+    # executor workers in an atexit hook), so this must be a subprocess with a
+    # timeout. A hung pytest run is never an acceptable red.
+    root = Path(dashboard_server.__file__).resolve().parent
+    env = {key: value for key, value in os.environ.items() if not key.startswith("MODEL_PREDICTION_")}
+    # Keep RuntimePaths off the repo .env (live runtime root and credentials), as
+    # conftest does for this process.
+    env["MODEL_PREDICTION_SKIP_DOTENV"] = "1"
+    # pytest's pythonpath setting does not reach a child process.
+    env["PYTHONPATH"] = os.pathsep.join([str(root), str(root / "src")])
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", _FOREVER_WARMER_CHILD, str(tmp_path)],
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        pytest.fail(
+            "child hung at interpreter exit (a forever warm loop was joined at shutdown)\n"
+            f"stdout: {exc.stdout!r}\nstderr: {exc.stderr!r}"
+        )
+
+    assert result.returncode == 0, f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+    assert "WARMED" in result.stdout
+    log = tmp_path / "server.log"
+    if log.exists():
+        assert "failed" not in log.read_text(encoding="utf-8")
 
 
 def test_warm_fingerprint_changes_when_canonical_ledger_appends(monkeypatch, tmp_path):
