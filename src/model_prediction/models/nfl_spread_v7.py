@@ -118,8 +118,8 @@ class NFLSpreadModelV7:
         self.rho = rho
         self.simulation_weight = simulation_weight
         self.version = version
-        # v7.1 (2026-11-23): the replay's holdout calibration slope was 0.24, so the served
-        # cover probability is shrunk toward 50%. Only the cover price moves; the margin,
+        # Optional shrink of the served cover probability toward 50% (artifact field, v7.1+;
+        # fitted by scripts/fit_nfl_v71_shrink.py). Only the cover price moves; the margin,
         # effective_sd and win probability stay the v7 engine's.
         self.probability_logit_slope = _validated_logit_slope(probability_logit_slope)
         self.sport = "nfl"

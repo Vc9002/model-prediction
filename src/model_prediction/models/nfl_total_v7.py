@@ -111,8 +111,8 @@ class NFLTotalModelV7:
         self.bias = bias
         self.ngsp_weight = ngsp_weight
         self.use_scoring_simulation = use_scoring_simulation
-        # v7.1 (2026-11-23): the replay's holdout calibration slope was 0.13, so the served
-        # over probability is shrunk toward 50%. projected_total and effective_sd are untouched.
+        # Optional shrink of the served over probability toward 50% (artifact field, v7.1+;
+        # fitted by scripts/fit_nfl_v71_shrink.py). projected_total and effective_sd are untouched.
         self.probability_logit_slope = _validated_logit_slope(probability_logit_slope)
         self.sport = "nfl"
         self.league = "NFL"
