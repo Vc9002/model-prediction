@@ -28,7 +28,7 @@ Versions and the full dependency list live in `pyproject.toml`; only the non-obv
 - SQLite is the canonical store (`runs.db`, `ledgers/ledgers.db`, `production/production.db`); XLSX via `openpyxl` is a disposable export.
 - Config: `config/production.yaml` (schema v3: model registry + champions), `config/model.yaml` (artifact mappings, features), `config/models/*.json` (frozen promoted artifacts), `.env` (ignored; Polymarket credentials).
 - Env vars: `MODEL_PREDICTION_RUNTIME_ROOT` (mutable state location; required by operational entry points, fail-closed) and `MODEL_PREDICTION_LEDGER_AUTHORITY` (`sqlite` default since 2026-08-16, or `xlsx`).
-- Scheduler: macOS launchd (`ops/launchd/*.plist`); the daily job fires 4x/day.
+- Scheduler: Windows Task Scheduler (`scripts/register_windows_tasks.ps1`, tasks run S4U at BelowNormal priority through `run_supervisor`): daily 11x/day (00:30, then every 90 min 07:00-21:00 ET), production every 3 h, calibrate 4x/day, auto-buyer every 15 min, NBA pre-tip and NCAAF pre-kickoff capture every 10 min. `ops/launchd/*.plist` is the older macOS setup.
 - External services: Polymarket US (`gateway.polymarket.us`, `api.polymarket.us`), ESPN (`site.api.espn.com`), API-Football (`v3.football.api-sports.io`, API key required).
 - CI: `.github/workflows/ci.yml` (ruff + pytest); pre-commit has ruff, mypy, and pytest hooks. `tests/test_validation.py::test_train_serve_parity_for_v9_features` pins training/serving feature parity.
 
@@ -90,9 +90,9 @@ Dependency order is strictly acyclic: CLI → Features/Models → Data sources �
 
 ### Entry Points
 
-- Scheduled (launchd → supervisor): `com.modelprediction.daily` → `run_supervisor run daily` → `cli/daily.py`; `com.modelprediction.production` → `run_supervisor run production` → `cli_production.py`; `com.modelprediction.rebuild-shadow` → `run_supervisor run rebuild-shadow`
+- Scheduled (Task Scheduler → `scripts/run_silent.vbs` → `run_supervisor run <worker>`): `ModelPrediction-Daily` → `cli/daily.py`; `ModelPrediction-Production` → `cli_production.py`; also `calibrate`, `auto-buyer`, `nba-pretip-capture`, `ncaaf-prekickoff-capture`. `ModelPrediction-RebuildShadow` is disabled (see root CLAUDE.md Scope). `run_supervisor._worker_env` sets `OPENBLAS_NUM_THREADS=1` for every worker.
 - CLI: `python -m model_prediction forecast|settle|validate ...`
-- Dashboard: `python dashboard_server.py` (Flask, port 8765); routes `/picks`, `/orders`, `/portfolio`, `/execute` (real-money, token-gated)
+- Dashboard: `python dashboard_server.py` (stdlib `ThreadingHTTPServer`, port 8765; task `ModelPredictionDashboard`); routes `/picks`, `/orders`, `/portfolio`, `/execute` (real-money, token-gated)
 - Rebuild: `python -m model_prediction.rebuild cli run ...` (separate entry point, no production writes)
 
 ### Constraints
@@ -112,7 +112,7 @@ Dependency order is strictly acyclic: CLI → Features/Models → Data sources �
 
 ### Logging and Auth
 
-- Logs: `data/logs/daily_<date>.log` (INFO), `data/logs/supervisor/<run_id>.log`; dashboard logs to stderr/stdout only. Structured audit events go to `audit.json` per ledger tier.
+- Logs: `data/logs/daily_<date>.log` (INFO), `data/logs/supervisor/<run_id>.log`; the dashboard's own events (warmer failures, snapshot load/save) go to `dashboard/server.log` via `dashboard/common._log`, and its stdout/stderr to `dashboard/launchd.{out,err}.log` (tests redirect `_log` and the snapshot to a session temp dir in `tests/conftest.py`). Structured audit events go to `audit.json` per ledger tier.
 - Validation: config at load (`config.py::validate_config`), ledger rows on write (`_validate_pick_row`), features via `features/base.py::FeatureStore` (raise on missing data instead of guessing).
 - Dashboard real-money endpoint uses a per-session UUID token. Polymarket requests are ED25519-signed with credentials from env vars (`.env` or launchd); API-Football uses header keys; ESPN and the MLB Stats API are public.
 

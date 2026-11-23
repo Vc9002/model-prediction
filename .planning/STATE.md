@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-22T21:47:44.105Z"
-last_activity: 2026-11-13
+last_updated: "2026-11-23T04:41:36.527Z"
+last_activity: 2026-11-22
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 5325a2691b79620ca16c4d2145961acda45175f9
+state_head: 3efd5d05c766161082a1ea9ccd228d978a360303
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-22 - Completed quick task 261122-mjo: Reduce background footprint (OpenBLAS thread cap, dashboard_cache freshness-first refresh, serialized/fingerprinted dashboard warmer, low memory priority)
+Last activity: 2026-11-22 - Completed quick task 261122-w6z: Stop dashboard cache warmer hanging process exit and leaking out of tests
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -139,6 +139,7 @@ None yet.
 | 261121-xbn | NBA v7/v9 market-blend sign (B4) and v9 artifact key drift log + pinned test | 2026-11-22 | 75706abc | [261121-xbn-nba-v7-v9-blend-sign-and-v9-artifact-key](./quick/261121-xbn-nba-v7-v9-blend-sign-and-v9-artifact-key/) |
 | 261121-wnd | Behavior-preserving helper dedupe in data_sources (5 commits on simplify/helpers-2026-11-21) | 2026-11-21 | 2c805adc | [261121-wnd-behavior-preserving-helper-dedupe-in-dat](./quick/261121-wnd-behavior-preserving-helper-dedupe-in-dat/) |
 | 261122-mjo | Reduce background footprint: OpenBLAS thread cap, dashboard_cache freshness-first refresh, serialized/fingerprinted dashboard warmer, low memory priority | 2026-11-22 | 5325a269 | [261122-mjo-reduce-background-footprint-openblas-thr](./quick/261122-mjo-reduce-background-footprint-openblas-thr/) |
+| 261122-w6z | Stop dashboard cache warmer hanging process exit and leaking out of tests (daemon-thread forever loops, session-wide live-file guard, subprocess regression test) | 2026-11-22 | 3efd5d05 | [261122-w6z-stop-dashboard-cache-warmer-hanging-proc](./quick/261122-w6z-stop-dashboard-cache-warmer-hanging-proc/) |
 
 ## Milestone History
 

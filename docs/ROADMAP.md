@@ -340,12 +340,21 @@ Detail and commit ids: `DEBUG.md` (2026-11-22). Open operator decisions:
 - **Exit 75 escalation (done 2026-11-22).** One skip degrades; a worker with N consecutive skips spanning T hours goes DOWN (`system_health._SKIP_ESCALATION`).
 - **Protected-file note.** `docs/AGENTS.md` lists the NBA model as protected; `nba_v7.py` and `nba_v9.py` were edited on an explicit operator request and are output-identical at weight 0.
 
-## 2026-11-22 — Background footprint (quick-261122-mjo)
+## 2026-11-22 — Background footprint (quick-261122-mjo, quick-261122-w6z)
 
-Dashboard on the live host: 1.0-1.65 GB working set and 1.5-2.1 GB private before (with snapshot-save `MemoryError` at 02:28 UTC); about 0.43-0.61 GB working set and 0.6 GB private after, idle at about 1-2 s CPU per minute once warm. The OpenBLAS cap (about 740 MB of commit per numpy+scipy process) now covers every supervised worker. Open follow-ups:
+Dashboard memory on the live host:
+- Before: 1.0-1.65 GB working set and 1.5-2.1 GB private, with snapshot-save `MemoryError` at 02:28 UTC.
+- After: 0.43-0.61 GB working set in the first 12 minutes; 0.70-0.73 GB working set and 0.77-0.78 GB private at 6-7 hours.
+- CPU: about 0.3 s per minute idle, about 4.3 s per minute averaged.
+
+The OpenBLAS cap (about 740 MB of commit per numpy+scipy process) covers every supervised worker. The forever warmer no longer hangs process exit (w6z), and tests can no longer write the live `dashboard/server.log` or `cache_snapshot.pkl`. Trace in `docs/DEBUG.md`. Open follow-ups:
+
+- **Restart the dashboard to pick up w6z.** PID 5340 still runs pre-w6z code, so Ctrl-C on it can hang until it is restarted. This only matters at exit.
+- **Worker memory priority.** Only the dashboard and the auto-buyer call `enable_background_priority`. The daily (15-30 min, 11 times a day), production, calibrate and capture workers get BelowNormal CPU from Task Scheduler priority 7 but keep normal memory priority. Calling `stealth_runtime._set_low_memory_priority()` from `run_supervisor`'s worker start would cover them all. This needs an operator decision: it could slow a daily run when the foreground is under memory pressure.
+- **Dashboard memory growth.** It rose about 150 MB over the first 7 hours (619 to 783 MB private). Re-sample after 24 hours to see whether it plateaus.
 
 - **Evidence off xlsx.** `production_evidence` still parses every xlsx ledger export with openpyxl (about 43 s, about 1 GB transient). Read the canonical SQLite store instead after a column-parity check of `_read_evidence_ledger` consumers and a before/after diff of `production_evidence()` on live data.
 - **Warm "flat-picks" builder.** The warmer builds it with `read_flat_picks`, while the route uses `_flat_picks_decorated`, so the warmed entry has no quote/order/buy_ready fields (pre-existing).
 - **`scripts/dedup_ncaaf_settled_picks.py`** issues a raw `UPDATE ledger_records` with no `ledger_events` row, so neither DashboardCache nor the warm fingerprint sees it (pre-existing).
 - **Startup peak.** One restart peaked at 1.3 GB working set within its first 14 s, likely a browser request's stale-while-revalidate rebuild overlapping the warm pass (the request path is outside `_WARM_BUILD_LOCK`).
-- **Verify the worker cap.** Confirm that the next daily run's duration in `runs.db` did not regress under `OPENBLAS_NUM_THREADS=1`.
+- ~~**Verify the worker cap.**~~ Done 2026-11-22. Three daily runs on the capped code took 961, 808 and 914 s, against 647-1,952 s before, so there is no regression. The speed-up cannot be credited to the cap, because quick-261122-spd landed in the same commits.

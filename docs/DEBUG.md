@@ -1,5 +1,46 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-22 — Background footprint; forever warmer hung exit and leaked out of tests (quick-261122-mjo, quick-261122-w6z)
+
+Operator: "optimize the entire project so it can run in the background and won't interfere with my normal process", then "check and investigate more, and clean up documentation".
+
+- **Dashboard memory (mjo, f4528438..5325a269).** The dashboard held 1.0-1.65 GB working set and 1.5-2.1 GB private. It logged snapshot-save `MemoryError` at 02:28 and 02:30 UTC. Causes:
+  - OpenBLAS per-thread pools sized to 12 cores, about 740 MB commit per numpy+scipy process. A probe measured 903 MB, and 160 MB with `OPENBLAS_NUM_THREADS=1`.
+  - `DashboardCache` built every tier before checking freshness, about 11 s CPU per no-op refresh.
+  - 7 warm builds ran concurrently and rebuilt every 300 s regardless of change. `status` took about 59 s and `production_evidence` about 43 s, with about 1 GB transient on an 8-thread openpyxl parse.
+
+  Fixes:
+  - `OPENBLAS_NUM_THREADS=1` via setdefault in `dashboard_server.py` and in `run_supervisor._worker_env` (OMP is not capped).
+  - Low memory priority in `stealth_runtime.enable_background_priority` (dashboard and auto-buyer only).
+  - Freshness is checked first.
+  - `_WARM_BUILD_LOCK` serialises warm builds.
+  - The fingerprint includes `MAX(rowid)` of `ledger_events` (read-only).
+  - Per-key age: 300 s for picks, flat-picks and status; 1800 s for the rest.
+  - The evidence pool has 2 threads.
+
+  Measured on PID 5340: 433-612 MB working set in the first 12 min; 698-728 MB working set and 768-783 MB private at 6-7 h; about 0.3 s/min CPU idle and about 4.3 s/min averaged.
+
+  The three daily runs after the cap took 961, 808 and 914 s. That shows no regression, but it is not evidence of a speed-up, because quick-261122-spd landed in the same commits.
+- **Exit hang (w6z, dec50ef6..3efd5d05).** `_warm_caches(forever=True)` ran its 7 never-returning `_warm` loops in a `ThreadPoolExecutor`. concurrent.futures' atexit hook (`threading._register_atexit`) joins executor workers, so any process whose `main()` returned (Ctrl-C, a `serve_forever` error, pytest) never exited.
+  - While hung, builders that submit to their own pools logged `RuntimeError('cannot schedule new futures after interpreter shutdown')` every 30 s. `dashboard/server.log` has 13,701 such lines since 2026-10-07.
+  - Repro: `pytest tests/test_dashboard_server.py -k test_main_stops_cleanly -o addopts='' -q` printed `1 passed in 2.63s`, then hung until a 150 s timeout killed it.
+  - Fix: the forever branch runs one daemon `threading.Thread` per loop (`cache-warmer:<key>`). The one-pass pool path is unchanged.
+  - Regression test: `test_forever_warmer_does_not_block_interpreter_exit` runs a subprocess with a 30 s timeout. It fails on ba1e1ff9 ("child hung at interpreter exit", 30.85 s) and passes in 1.4 s.
+- **Test leak into live files (w6z, same root).** `test_main_stops_cleanly_on_keyboard_interrupt` called the real `main()`. That loaded the live `cache_snapshot.pkl`, wrote the live `server.log` and set `_SWR`/`_WARMING`. It also started the forever warmer, which ran under later tests' monkeypatches and saved the live snapshot.
+  - Every odd `server.log` line has this one cause: `ValueError ... not in the subpath of ...test_promotion_allowed_reflect0` (a later test's patched ROOT), `TypeError ... test_sell_still_allowed_before_the_game_starts.<locals>.<lambda>()` (a later test's patched builder), and the shutdown spam.
+  - Fix: the test stubs the warmer, snapshot load, jobs hydrate and priority, and restores the shared dicts. A session-scoped autouse fixture in `tests/conftest.py` redirects `common.LOG_FILE` and `common._SNAPSHOT_FILE` to a temp dir for the whole session and never undoes it, so leaked threads also hit the sink.
+  - Pin test: `test_dashboard_live_files_never_resolve_to_the_repo_dashboard_dir` fails under `--noconftest`.
+- **Not bugs:**
+  - The auto-buyer run at 02:00 UTC took 926 s because it waits for the daily lock by design (`test_auto_buyer_worker_pair` pins a wait of 600-1500 s).
+  - Daily runs 11x/day (00:30, then every 90 min 07:00-21:00 ET).
+  - Scheduled workers run S4U at Task Scheduler priority 7 (BelowNormal CPU). Their command lines and handles are not readable from an interactive session, so check them through `runs.db`, not a process probe.
+- **Open (ROADMAP "Background footprint"):**
+  - The daily, production, calibrate and capture workers do not lower their memory priority.
+  - The dashboard still runs pre-w6z code until its next restart.
+  - Dashboard memory grew about 150 MB over 7 h; whether it plateaus is unconfirmed.
+  - Evidence still reads xlsx.
+  - SWR request rebuilds run outside `_WARM_BUILD_LOCK`.
+
 ## 2026-11-22 — Placeholder rungs priced as the main line; MLB single-inning totals (quick-261122-l17)
 
 - **Bug:** NBA/WNBA/NFL main-line selectors ranked rungs by |long ask − 0.5| only. A rung with no real bid (2¢ / 49¢) beat a real market and its other side was priced at 1 − bid = 98–99¢. Reproduced: BKN@MEM 2026-11-14 05:35Z (real 227.5 at 35¢/47¢ lost to 229.5 at 2¢/49¢, under at 98¢), UTA@LAL 11-18 (whole ladder 1¢/51¢), PHI@DET 11-04 (+19.5 at 94¢). The NFL 11-12 band checked the long side only. Size: NBA 26 of ~2,400 checkable spread/total rows (23 superseded, 3 settled, ~+0.01u), NFL 2 (before 11-12), WNBA 16.
