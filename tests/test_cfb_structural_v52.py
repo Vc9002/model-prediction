@@ -18,6 +18,7 @@ from model_prediction.cfb_replay import (
     TOTAL_SLOPE_KEY,
     VERSIONS,
     build_snapshot,
+    engine_hash,
     replay_inputs,
     shrink_total_probabilities,
     validate_decision_snapshot,
@@ -83,9 +84,20 @@ def _raw_total(inputs: dict) -> tuple[float, float, float]:
     return j.p_over, j.p_under, j.p_push_total
 
 
+def _without_engine_identity(record: dict) -> dict:
+    # engine_source_sha256 hashes cfb_distribution.py's checked-out bytes (CRLF on a Windows autocrlf checkout),
+    # so it is compared with the live engine_hash() rather than frozen in the fixture.
+    out = copy.deepcopy(record)
+    out["inference_inputs"].pop("engine_source_sha256")
+    return out
+
+
 def test_field_absent_is_bit_identical_to_the_pre_change_v5_outputs() -> None:
     preds = _predict(_v5())
-    assert [_as_golden(p) for p in preds] == GOLDEN["predictions"]
+    assert [_without_engine_identity(_as_golden(p)) for p in preds] == [
+        _without_engine_identity(g) for g in GOLDEN["predictions"]
+    ]
+    assert {p.inference_inputs["engine_source_sha256"] for p in preds} == {engine_hash()}
     assert all(TOTAL_SLOPE_KEY not in p.inference_inputs for p in preds)
     assert _v5().total_probability_logit_slope is None
 
@@ -162,7 +174,9 @@ def test_artifact_is_v5_plus_the_slope_and_its_hash_verifies(tmp_path) -> None:
     fit = v52["total_shrink_fit"]
     assert fit["base_artifact_hash"] == v5["artifact_hash"]
     fit_output = PROJECT_ROOT / fit["fit_output"]
-    assert hashlib.sha256(fit_output.read_bytes()).hexdigest() == fit["fit_output_sha256"]
+    # CRLF folded to LF (fit_output_sha256_basis), so the hash verifies on any checkout.
+    folded = fit_output.read_bytes().replace(b"\r\n", b"\n")
+    assert hashlib.sha256(folded).hexdigest() == fit["fit_output_sha256"]
     report = json.loads(fit_output.read_text(encoding="utf-8"))
     assert report["fit"]["slope"] == v52["total_probability_logit_slope"]
     assert report["split"]["method"] == "complete_date_60_20_20"
@@ -236,9 +250,10 @@ def test_v52_rows_replay_exactly_to_the_served_shrunk_probability(selection_by_m
             validate_decision_snapshot(damaged, full)
 
 
-def test_v52_slate_contracts_and_candidate_inputs_carry_the_shrink(tmp_path) -> None:
+def test_v52_slate_contracts_carry_the_shrink_and_replay(tmp_path) -> None:
     artifact = load_cfb_structural_v52_artifact()
-    result = _slate(tmp_path, _event(), model=cfb_model_for_artifact(artifact))
+    model = cfb_model_for_artifact(artifact)
+    result = _slate(tmp_path, _event(), model=model)
     contracts = result["priced_contracts"]
     assert contracts and {c["model_version"] for c in contracts} == {CFB_V52_MODEL_VERSION}
     totals = [c for c in contracts if c["market_type"] == "total"]
@@ -249,6 +264,20 @@ def test_v52_slate_contracts_and_candidate_inputs_carry_the_shrink(tmp_path) -> 
         assert snap["probabilities"][c["selection"]] == pytest.approx(c["model_probability"], abs=2e-6)
     for c in totals:
         assert abs(c["model_probability"] - 0.5) < 0.01
+    # The candidate-evidence pass (production only, client=None) re-prices each listed line by copying these
+    # inputs, moving total_line / total_sd and calling replay_inputs: the copied slope shrinks that price too.
+    inputs = copy.deepcopy(totals[0]["inference_inputs"])
+    inputs["total_line"] = float(inputs["total_line"]) + 7.0
+    inputs["parameters"]["total_sd"] = model.total_sd_for_features(
+        totals[0]["feature_basis"], float(inputs["mu_home"]) + float(inputs["mu_away"]), inputs["total_line"]
+    )
+    raw_over, raw_under, raw_push = _raw_total(inputs)
+    shrunk = replay_inputs(inputs, "total")
+    expected_over, _ = shrink_total_probabilities(
+        raw_over, raw_under, raw_push, artifact["total_probability_logit_slope"]
+    )
+    assert shrunk["over"] == round(expected_over, 6)
+    assert abs(shrunk["over"] - 0.5) < abs(raw_over - 0.5)
 
 
 def test_v52_is_a_main_eligible_ncaaf_version(tmp_path, monkeypatch) -> None:
