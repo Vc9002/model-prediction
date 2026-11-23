@@ -44,6 +44,30 @@ def _normal_cdf(x: float, mean: float, sd: float) -> float:
     return max(0.0001, min(0.9999, raw))
 
 
+def _logit_shrink(p: float, slope: float) -> float:
+    """sigmoid(slope * logit(p)) with intercept 0: pulls p toward 50% without moving its side.
+
+    Duplicated in nfl_total_v7.py on purpose: scalar_artifact_replay hashes each engine
+    file on its own, so each must carry the transform it replays. slope == 1.0 returns p
+    untouched (sigmoid(logit(p)) is not bit-exact), so an artifact without
+    probability_logit_slope prices exactly as before the field existed.
+    """
+    if slope == 1.0:
+        return p
+    if not 0.0 < p < 1.0:
+        raise ValueError(f"probability outside (0, 1) passed to _logit_shrink: {p}")
+    if slope == 0.0:
+        return 0.5
+    return 1.0 / (1.0 + math.exp(-slope * math.log(p / (1.0 - p))))
+
+
+def _validated_logit_slope(value: Any) -> float:
+    slope = float(value)
+    if not math.isfinite(slope) or not 0.0 <= slope <= 1.0:
+        raise ValueError(f"probability_logit_slope must be in [0, 1], got {value!r}")
+    return slope
+
+
 @dataclass(frozen=True)
 class NFLSpreadForecast:
     home_team: str
@@ -78,6 +102,7 @@ class NFLSpreadModelV7:
         rho: float = 0.08,
         simulation_weight: float = 0.20,
         version: str = NFL_SPREAD_V7_VERSION,
+        probability_logit_slope: float = 1.0,
     ) -> None:
         self.margin_sd = margin_sd
         self.home_field_advantage = home_field_advantage
@@ -93,6 +118,10 @@ class NFLSpreadModelV7:
         self.rho = rho
         self.simulation_weight = simulation_weight
         self.version = version
+        # Optional shrink of the served cover probability toward 50% (artifact field, v7.1+;
+        # fitted by scripts/fit_nfl_v71_shrink.py). Only the cover price moves; the margin,
+        # effective_sd and win probability stay the v7 engine's.
+        self.probability_logit_slope = _validated_logit_slope(probability_logit_slope)
         self.sport = "nfl"
         self.league = "NFL"
 
@@ -113,6 +142,7 @@ class NFLSpreadModelV7:
             rho=float(artifact.get("rho", 0.08)),
             simulation_weight=float(artifact.get("simulation_weight", 0.20)),
             version=str(artifact.get("model_version", NFL_SPREAD_V7_VERSION)),
+            probability_logit_slope=artifact.get("probability_logit_slope", 1.0),
         )
 
     def forecast_spread(
@@ -252,6 +282,10 @@ class NFLSpreadModelV7:
             ) * p_home_cover + self.simulation_weight * sim.prob_home_cover
             p_home_cover = max(self.min_cover_prob, min(self.max_cover_prob, p_home_cover))
             p_away_cover = 1.0 - p_home_cover
+
+        # Last step, after every clamp: scalar_artifact_replay applies it in the same place.
+        p_home_cover = _logit_shrink(p_home_cover, self.probability_logit_slope)
+        p_away_cover = 1.0 - p_home_cover
 
         return NFLSpreadForecast(
             home_team=home_team,

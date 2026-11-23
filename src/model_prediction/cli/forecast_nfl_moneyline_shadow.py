@@ -28,6 +28,7 @@ from ..eligibility import evaluate_eligibility
 from ..entities import EntityResolutionError
 from ..learned_forward import match_executable_quote
 from ..ledger import DuplicatePickError
+from .forecast_nfl_support import NFL_SPREAD_V7_FAMILY
 
 _logger = logging.getLogger(__name__)
 
@@ -35,6 +36,10 @@ NFL_MARGIN_MONEYLINE_MODEL = (
     "nfl-moneyline-margin-v1"  # challenger id; rows carrying it never gate other picks
 )
 NFL_MARGIN_MONEYLINE_PARENT = "nfl-spread-structural-v7"  # the only engine whose win probability was replayed
+# Spread ids whose slate may feed this challenger. v7.1 shrinks only the cover price; its
+# margin and prob_home_win are bit-identical to v7 (tests/test_nfl_v71.py pins that), so
+# the replayed evidence still holds. The parent-hash check below stays bound to v7.
+NFL_MARGIN_MONEYLINE_PARENTS = NFL_SPREAD_V7_FAMILY
 
 
 def without_moneyline_shadow_rows(rows: list[Any]) -> list[Any]:
@@ -64,7 +69,7 @@ def moneyline_shadow_input(
 ) -> dict[str, Any] | None:
     """Capture one game's margin-derived win probability from the spread slate, or None."""
     prob_home_win = getattr(forecast, "prob_home_win", None)
-    if parent_model_version != NFL_MARGIN_MONEYLINE_PARENT or prob_home_win is None:
+    if parent_model_version not in NFL_MARGIN_MONEYLINE_PARENTS or prob_home_win is None:
         return None
     return {
         "event_id": event_id,

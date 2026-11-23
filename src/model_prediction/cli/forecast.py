@@ -105,7 +105,11 @@ from .forecast_nfl_moneyline_shadow import (
     without_moneyline_shadow_rows,
 )
 from .forecast_nfl_support import (  # noqa: F401 -- re-exported: tests and callers import these from forecast
+    NFL_DEFAULT_SERVING_VERSION,
     NFL_DIVISIONS,
+    NFL_SERVABLE_MODEL_VERSIONS,
+    NFL_SPREAD_V7_FAMILY,
+    NFL_TOTAL_V7_FAMILY,
     STANDARD_LAY_ASK,
     _apply_serving_calibrator,
     _espn_spread_no_vig_ask,
@@ -161,6 +165,26 @@ def _is_registered_serving_model(model_version: str, sport: str, market: str) ->
     except (FileNotFoundError, OSError, TypeError, ValueError):
         return False
     return champion is not None and champion.available and champion.model_id == model_version
+
+
+def _nfl_serving_model_version(market: str) -> str:
+    """The NFL champion for `market` when a slate engine exists for it, else the v7 default.
+
+    Serving follows the champion map (the NBA/NCAAB precedent), so `model_promotion`
+    promote/rollback alone moves the slate between v7 and v7.1; a hardcoded id would keep
+    pricing the old model after promotion and _is_registered_serving_model would then drop
+    every pick off Main. A registry that will not load, or a champion with no engine here,
+    falls back to the default, which that same check keeps off Main unless it is champion.
+    """
+    default = NFL_DEFAULT_SERVING_VERSION[market]
+    try:
+        champion = ProductionModelRegistry.load(PROJECT_ROOT).champion("NFL", market)
+    except (FileNotFoundError, OSError, KeyError, TypeError, ValueError):
+        return default
+    if champion is None or not champion.available:
+        return default
+    model_id = str(champion.model_id)
+    return model_id if model_id in NFL_SERVABLE_MODEL_VERSIONS[market] else default
 
 
 def _is_predictively_qualified_serving_model(model_version: str, sport: str, market: str) -> bool:
@@ -2885,7 +2909,7 @@ def _forecast_nfl_spread_slate(
 
     observed_at = observed_at or utc_now()
     injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
-    model_version = "nfl-spread-structural-v7"
+    model_version = _nfl_serving_model_version("spread")
     serving_calibrator = _nfl_serving_calibrator(model_version, "spread", data_root)
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
@@ -3067,7 +3091,7 @@ def _forecast_nfl_spread_slate(
         )
 
         fc: Any
-        if model_version == "nfl-spread-structural-v7":
+        if model_version in NFL_SPREAD_V7_FAMILY:
             from ..models.nfl_spread_v7 import NFLSpreadModelV7
 
             spread_v7 = NFLSpreadModelV7.from_artifact(artifact)
@@ -3510,7 +3534,7 @@ def _forecast_nfl_total_slate(
 
     observed_at = observed_at or utc_now()
     injury_entries, injury_source = _load_nfl_injuries_known_at(data_root, observed_at)
-    model_version = "nfl-total-structural-v7"
+    model_version = _nfl_serving_model_version("total")
     serving_calibrator = _nfl_serving_calibrator(model_version, "total", data_root)
     artifact, artifact_error = _load_exact_artifact_contract(model_version)
     if artifact is None:
@@ -3703,7 +3727,7 @@ def _forecast_nfl_total_slate(
         )
 
         fc: Any
-        if model_version == "nfl-total-structural-v7":
+        if model_version in NFL_TOTAL_V7_FAMILY:
             from ..models.nfl_total_v7 import NFLTotalModelV7
 
             total_v7 = NFLTotalModelV7.from_artifact(artifact)

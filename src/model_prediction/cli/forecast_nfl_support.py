@@ -21,6 +21,18 @@ logger = logging.getLogger("model_prediction.cli")
 
 STANDARD_LAY_ASK = round(implied_probability(-110), 6)
 
+# The v7.1 ids are the v7 engines plus a probability_logit_slope in the artifact: same
+# class, same replay method, same margin and total; only the served cover/over price moves.
+NFL_SPREAD_V7_FAMILY = ("nfl-spread-structural-v7", "nfl-spread-structural-v7.1")
+NFL_TOTAL_V7_FAMILY = ("nfl-total-structural-v7", "nfl-total-structural-v7.1")
+# Every id the NFL slates have an engine branch for. The slate serves the champion when
+# it is one of these and NFL_DEFAULT_SERVING_VERSION otherwise.
+NFL_SERVABLE_MODEL_VERSIONS: dict[str, tuple[str, ...]] = {
+    "spread": (*NFL_SPREAD_V7_FAMILY, "nfl-spread-structural-v6", "nfl-spread-structural-v5"),
+    "total": (*NFL_TOTAL_V7_FAMILY, "nfl-total-structural-v6", "nfl-total-structural-v5"),
+}
+NFL_DEFAULT_SERVING_VERSION = {"spread": "nfl-spread-structural-v7", "total": "nfl-total-structural-v7"}
+
 
 def _main_call_eligible(eligibility: Any, *, edge: float, min_edge: float, max_edge: float) -> bool:
     """Main-ledger admission predicate for the NFL spread/total paths.

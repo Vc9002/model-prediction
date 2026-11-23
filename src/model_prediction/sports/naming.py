@@ -523,6 +523,22 @@ MODEL_CATALOG: dict[str, ModelDescriptor] = {
         display_name="NFL Total (Structural v7)",
         description="Production champion NFL Total structural neutral game script pace, explosive play, red zone TD rate, weather adjustment, and key total model v7.",
     ),
+    "nfl-spread-structural-v7.1": ModelDescriptor(
+        model_id="nfl-spread-structural-v7.1",
+        sport="NFL",
+        market="spread",
+        standard_name="nfl-spread-structural-v7.1",
+        display_name="NFL Spread (Structural v7.1)",
+        description="NFL Spread structural v7 engine plus a probability_logit_slope fitted on the point-in-time replay (the train-window fit clipped at 1.0, so it prices as v7).",
+    ),
+    "nfl-total-structural-v7.1": ModelDescriptor(
+        model_id="nfl-total-structural-v7.1",
+        sport="NFL",
+        market="total",
+        standard_name="nfl-total-structural-v7.1",
+        display_name="NFL Total (Structural v7.1)",
+        description="NFL Total structural v7 engine with its over probability shrunk toward 50% (probability_logit_slope fitted on the point-in-time replay).",
+    ),
     # ── SOCCER ──
     "soccer-poisson-dc-v3": ModelDescriptor(
         model_id="soccer-poisson-dc-v3",
