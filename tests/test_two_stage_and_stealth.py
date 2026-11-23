@@ -62,6 +62,27 @@ def test_low_memory_priority_failure_is_soft(monkeypatch):
     assert isinstance(enable_background_priority(), bool)
 
 
+def test_posix_nice_is_raised_to_the_target_not_stacked(monkeypatch):
+    # run_supervisor main() demotes the supervisor and the auto-buyer worker demotes itself again;
+    # os.nice adds to the current value, so a naive second call would push 10 to 19.
+    from model_prediction import stealth_runtime
+
+    state = {"nice": 0}
+
+    def _fake_nice(increment: int) -> int:
+        state["nice"] = min(19, state["nice"] + increment)
+        return state["nice"]
+
+    monkeypatch.setattr(stealth_runtime.sys, "platform", "linux")
+    monkeypatch.setattr(stealth_runtime.os, "nice", _fake_nice, raising=False)
+
+    assert enable_background_priority() is True
+    assert enable_background_priority() is True
+    assert state["nice"] == 10
+    assert enable_background_priority(idle_only=True) is True
+    assert state["nice"] == 19
+
+
 def test_two_stage_separation_and_hard_edge_gate():
     with tempfile.TemporaryDirectory() as tmp_dir:
         cache_path = Path(tmp_dir) / "stage1.json"

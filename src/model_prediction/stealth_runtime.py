@@ -109,7 +109,9 @@ def enable_background_priority(idle_only: bool = False) -> bool:
     if hasattr(os, "nice"):
         try:
             target_nice = 19 if idle_only else 10
-            os.nice(target_nice)
+            # os.nice adds to the current value, and a process may be demoted twice (run_supervisor
+            # main() and then the auto-buyer's own call), so raise only up to the target.
+            os.nice(max(0, target_nice - os.nice(0)))
             logger.info("Enabled background nice priority (%d) on POSIX", target_nice)
             return True
         except (OSError, RuntimeError, ValueError) as exc:

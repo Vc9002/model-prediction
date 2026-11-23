@@ -395,7 +395,9 @@ def test_main_run_worker_tree_inherits_low_priority() -> None:
         check=False,
     )
     base = _PRIORITY_LINE.search(baseline.stdout)
-    if base is None or (int(base.group(1)), int(base.group(2), 16)) != (5, 0x20):
+    # A broken probe must fail, not hide behind the skip below.
+    assert base is not None, f"priority probe failed: stdout={baseline.stdout!r} stderr={baseline.stderr!r}"
+    if (int(base.group(1)), int(base.group(2), 16)) != (5, 0x20):
         pytest.skip(
             "pytest's children are already demoted (baseline "
             f"{baseline.stdout.strip()!r}); inheritance would mask a missing demotion in main()"
