@@ -31,10 +31,20 @@ def engine_hash(method: str) -> str:
         "nfl_total_structural_v6_engine": "nfl_total_v6.py",
         "nfl_spread_structural_v7_engine": "nfl_spread_v7.py",
         "nfl_total_structural_v7_engine": "nfl_total_v7.py",
+        "nba_total_structural_v92_engine": "nba_v91.py",
     }.get(method)
     if name is None:
         raise ValueError("unsupported_scalar_replay_method")
-    return hashlib.sha256((Path(__file__).parent / "models" / name).read_bytes()).hexdigest()
+    source = (Path(__file__).parent / "models" / name).read_bytes()
+    if method in _LF_NORMALISED_ENGINE_HASH_METHODS:
+        # Hash the committed blob content: a raw-byte hash differs between an autocrlf checkout and
+        # an LF one, which would refuse a snapshot replayed from a different checkout. Older methods
+        # keep raw bytes, or every snapshot already stored under them would stop validating.
+        source = source.replace(b"\r\n", b"\n")
+    return hashlib.sha256(source).hexdigest()
+
+
+_LF_NORMALISED_ENGINE_HASH_METHODS = frozenset({"nba_total_structural_v92_engine"})
 
 
 HISTORICAL_ENGINE_HASHES: dict[str, set[str]] = {
@@ -258,6 +268,18 @@ def replay_snapshot(payload: dict[str, Any]) -> dict[str, float]:
         p_under = 1.0 - p_over
         return {"under": round(p_under, 6), "over": round(p_over, 6)}
 
+    if method == "nba_total_structural_v92_engine":
+        from .models.nba_v91 import _total_probabilities, _validated_logit_slope
+
+        # The engine's total sd is the artifact constant unless pace_sd_scaling is on, which
+        # NBATotalModelV92 refuses; any other sd means the snapshot was not produced by this artifact.
+        if artifact.get("pace_sd_scaling") or sd != float(artifact["total_sd"]):
+            raise ValueError("scalar_replay_artifact_parameter_mismatch")
+        p_over, p_under = _total_probabilities(
+            line, mean, sd, _validated_logit_slope(artifact["probability_logit_slope"])
+        )
+        return {"under": round(p_under, 6), "over": round(p_over, 6)}
+
     is_margin = method == "margin_normal"
     expected_sd = float(artifact["margin_sd" if is_margin else "total_sd"])
     if is_margin and artifact.get("dynamic_volatility"):
@@ -333,6 +355,7 @@ def validate_decision_snapshot(payload: dict[str, Any], row: dict[str, Any]) -> 
         "nfl_spread_structural_v7_engine": "spread",
         "nfl_total_structural_v6_engine": "total",
         "nfl_total_structural_v7_engine": "total",
+        "nba_total_structural_v92_engine": "total",
     }[method]
     if (
         row.get("model_version") != artifact["model_version"]

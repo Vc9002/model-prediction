@@ -19,6 +19,9 @@ by ``tests/test_nba_v91.py``). v9 itself is protected and is not edited.
   totals like the regular season and ran 13 points high).
 - B4: the market-blend hook uses ``spread_away_line`` as the home-margin line (v9 negated it).
   The weight stays 0 in every research artifact; anchoring lives in ``nba_anchor_v10``.
+- ``probability_logit_slope`` (v9.2, quick-261123-h40): the final P(over) is served as
+  sigmoid(s * logit(p)), intercept 0. Absent (1.0) on the research artifacts, which price as before.
+  ``NBATotalModelV92`` is the serving wrapper for ``nba-total-margin-v9.2``.
 
 Every fitted constant comes from the artifact; the defaults are v9's behaviour.
 """
@@ -27,6 +30,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import replace
 from typing import Any, cast
 
 from ..domain import parse_utc
@@ -40,9 +44,48 @@ from .nba_v9 import NBAStructuralV9Engine, _normal_cdf
 NBA_SPREAD_V91_VERSION = "nba-spread-margin-v9-1"
 NBA_TOTAL_V91_VERSION = "nba-total-margin-v9-1"
 NBA_MONEYLINE_V91_VERSION = "nba-moneyline-v9-1"
+NBA_TOTAL_V92_VERSION = "nba-total-margin-v9.2"
 
 POSTSEASON_TYPES = frozenset({"post-season", "playoffs"})
 _ISOLATED_TYPES = frozenset({"post-season", "playoffs", "play-in-season"})
+
+
+def _logit_shrink(p: float, slope: float) -> float:
+    """sigmoid(slope * logit(p)) with intercept 0: pulls p toward 50% without moving its side.
+
+    The same transform as models/nfl_total_v7.py, duplicated on purpose: scalar_artifact_replay
+    hashes each engine file on its own, so this file must carry the transform it replays. slope ==
+    1.0 returns p untouched (sigmoid(logit(p)) is not bit-exact), so an artifact without
+    probability_logit_slope prices exactly as before the field existed.
+    """
+    if slope == 1.0:
+        return p
+    if not 0.0 < p < 1.0:
+        raise ValueError(f"probability outside (0, 1) passed to _logit_shrink: {p}")
+    if slope == 0.0:
+        return 0.5
+    return 1.0 / (1.0 + math.exp(-slope * math.log(p / (1.0 - p))))
+
+
+def _validated_logit_slope(value: Any) -> float:
+    slope = float(value)
+    if not math.isfinite(slope) or not 0.0 <= slope <= 1.0:
+        raise ValueError(f"probability_logit_slope must be in [0, 1], got {value!r}")
+    return slope
+
+
+def _total_probabilities(line: float, mean: float, sd: float, slope: float) -> tuple[float, float]:
+    """Served (P(over), P(under)): the normal-CDF price, then the logit shrink. Shared with the replay.
+
+    At slope 1.0 both values are computed exactly as before the shrink existed (under is the CDF
+    itself, not 1 - over), so the research artifacts stay bit-identical.
+    """
+    under_prob = _normal_cdf(line, mean, sd)
+    over_prob = 1.0 - under_prob
+    if slope != 1.0:
+        over_prob = _logit_shrink(over_prob, slope)
+        under_prob = 1.0 - over_prob
+    return over_prob, under_prob
 
 
 class RollingBaselineTrendEngine(TrendEngine):
@@ -126,6 +169,7 @@ class NBAStructuralV91Engine(NBAStructuralV9Engine):
         three_in_four_offense_penalty: float = 0.0,
         three_in_four_defense_penalty: float = 0.0,
         playoff_total_offset: float = 0.0,
+        probability_logit_slope: float = 1.0,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -140,6 +184,7 @@ class NBAStructuralV91Engine(NBAStructuralV9Engine):
         self.three_in_four_offense_penalty = float(three_in_four_offense_penalty)
         self.three_in_four_defense_penalty = float(three_in_four_defense_penalty)
         self.playoff_total_offset = float(playoff_total_offset)
+        self.probability_logit_slope = _validated_logit_slope(probability_logit_slope)
 
     @classmethod
     def from_artifact(cls, artifact: dict[str, Any]) -> NBAStructuralV91Engine:
@@ -155,7 +200,16 @@ class NBAStructuralV91Engine(NBAStructuralV9Engine):
         engine.three_in_four_offense_penalty = float(artifact.get("three_in_four_offense_penalty", 0.0))
         engine.three_in_four_defense_penalty = float(artifact.get("three_in_four_defense_penalty", 0.0))
         engine.playoff_total_offset = float(artifact.get("playoff_total_offset", 0.0))
+        engine.probability_logit_slope = _validated_logit_slope(artifact.get("probability_logit_slope", 1.0))
         return engine
+
+    @property
+    def _total_label(self) -> str:
+        return (
+            "v9.1"
+            if self.probability_logit_slope == 1.0
+            else f"v9.2 (shrunk, s={self.probability_logit_slope})"
+        )
 
     def _trend(self, history: Sequence[GameRecord]) -> TrendEngine:
         if self.rolling_baseline_games > 0:
@@ -450,8 +504,9 @@ class NBAStructuralV91Engine(NBAStructuralV9Engine):
                 )
 
             if game.total_line is not None:
-                under_prob = _normal_cdf(game.total_line, expected_total, effective_total_sd)
-                over_prob = 1.0 - under_prob
+                over_prob, under_prob = _total_probabilities(
+                    game.total_line, expected_total, effective_total_sd, self.probability_logit_slope
+                )
                 total_base: GamePredictionBase = {
                     "event_id": game.event_id,
                     "event_start_utc": game.event_start_utc,
@@ -468,6 +523,12 @@ class NBAStructuralV91Engine(NBAStructuralV9Engine):
                         "current_season_games_min": current_season_games_min,
                     },
                 }
+                if self.probability_logit_slope != 1.0:
+                    # Audit only (the replay recomputes from the inference inputs): the unshrunk price.
+                    total_base["feature_basis"]["probability_logit_slope"] = self.probability_logit_slope
+                    total_base["feature_basis"]["over_probability_unshrunk"] = round(
+                        1.0 - _normal_cdf(game.total_line, expected_total, effective_total_sd), 6
+                    )
                 predictions.append(
                     GamePrediction(
                         market_type="total",
@@ -482,11 +543,57 @@ class NBAStructuralV91Engine(NBAStructuralV9Engine):
                             "under": round(under_prob, 6),
                         },
                         rationale=(
-                            f"NBA v9.1 total {expected_total:.1f} vs line {game.total_line:.1f} "
-                            f"(over {over_prob * 100:.1f}%, under {under_prob * 100:.1f}%)."
+                            f"NBA {self._total_label} total {expected_total:.1f} vs line "
+                            f"{game.total_line:.1f} (over {over_prob * 100:.1f}%, under {under_prob * 100:.1f}%)."
                         ),
                         **total_base,
                     )
                 )
 
         return predictions
+
+
+class NBATotalModelV92:
+    """Serving wrapper for ``nba-total-margin-v9.2``: the v9.1 total engine with the shrunk P(over).
+
+    Player availability (B9) is never applied: v9.1 never fitted it, and the served heuristic raised
+    live margin MAE 11.78 -> 12.51 in the 2026-11-19 tests. Any availability on the inputs is zeroed
+    here, so the guarantee does not depend on the caller.
+    """
+
+    def __init__(self, engine: NBAStructuralV91Engine) -> None:
+        self.engine = engine
+        self.version = engine.total_version
+        self.sport = "nba"
+        self.league = "NBA"
+
+    @classmethod
+    def from_artifact(cls, artifact: dict[str, Any]) -> NBATotalModelV92:
+        if artifact.get("model_version") != NBA_TOTAL_V92_VERSION:
+            raise ValueError(f"not a {NBA_TOTAL_V92_VERSION} artifact: {artifact.get('model_version')!r}")
+        if "probability_logit_slope" not in artifact:
+            raise ValueError(f"{NBA_TOTAL_V92_VERSION} artifact must set probability_logit_slope")
+        if artifact.get("pace_sd_scaling"):
+            # The scalar replay checks the stored sd against total_sd; a pace-scaled sd cannot replay.
+            raise ValueError(f"{NBA_TOTAL_V92_VERSION} requires pace_sd_scaling false")
+        engine = NBAStructuralV91Engine.from_artifact(artifact)
+        if engine.total_version != NBA_TOTAL_V92_VERSION:
+            raise ValueError(f"{NBA_TOTAL_V92_VERSION} artifact must set total_version to its own id")
+        return cls(engine)
+
+    def predict_totals(
+        self,
+        history: Sequence[GameRecord],
+        upcoming: Sequence[UpcomingGame],
+        season_types: Mapping[str, str] | None = None,
+    ) -> list[GamePrediction]:
+        no_availability = [
+            replace(game, availability_points_gap=0.0, availability_total_loss=0.0) for game in upcoming
+        ]
+        return [
+            p
+            for p in self.engine.predict_games(history, no_availability, season_types=season_types)
+            if p.market_type == "total"
+        ]
+
+    predict_games = predict_totals
