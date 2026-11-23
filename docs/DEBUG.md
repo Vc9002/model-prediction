@@ -22,6 +22,7 @@ Operator: "find out whether it's a bias or general overconfidence ... go ahead",
   - `model_promotion promote` rewrites production.yaml with yaml.dump and drops comments. Restore the commented copy and hand-apply the champion lines.
   - It refuses when `allowed_models` does not mirror the models-list order.
   - Both buyer layers were updated (backups `auto_buyer_state.pre_cfb_v52_*.json`, `.pre_nfl_total_v71_*.json`). Old ids stay whitelisted for rows logged before the switch.
+- **NFL spread v7.2 (quick-261123-6q6, operator exception).** The spread slope is fitted on the validation window (s 0.378, SE 1.08, n 282) because the train fit clipped at 1.0. Holdout Brier 0.2502 -> 0.2499 and slope 0.38 -> 1.00 (design-informed). Main spread clears 1-4 -> 0 per season. Promoted; v7 is rollback.
 - **Pre-existing failures (also fail at dab60a87, not touched):** `test_model_naming::test_catalog_covers_production_registry`, `test_cfb_structural_v6::test_no_module...v6...`, two `test_model_lifecycle` (NCAAB moneyline "candidate"), and two `tests/sports/nfl` end-to-end tests that expect v5.
 
 ## 2026-11-22 — Background footprint; forever warmer hung exit and leaked out of tests (quick-261122-mjo, quick-261122-w6z)

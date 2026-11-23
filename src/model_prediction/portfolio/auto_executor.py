@@ -66,6 +66,9 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     # NFL (Latest Generation v7 Champions; NFL moneyline currently has no
     # active whitelisted champion -- nfl-elo-trend-lr-v4 is blacklisted below)
     "nfl-spread-structural-v7",
+    # nfl-spread-structural-v7.2 (promoted 2026-11-23): v7 with the cover probability shrunk
+    # (logit slope 0.378, fitted on validation by operator exception); v7 kept for older rows.
+    "nfl-spread-structural-v7.2",
     "nfl-total-structural-v7",
     # nfl-total-structural-v7.1 (promoted 2026-11-23): v7 with the over probability shrunk
     # (logit slope 0.522); v7 stays listed so its open rows can still be bought.

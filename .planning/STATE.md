@@ -141,6 +141,7 @@ None yet.
 | 261122-mjo | Reduce background footprint: OpenBLAS thread cap, dashboard_cache freshness-first refresh, serialized/fingerprinted dashboard warmer, low memory priority | 2026-11-22 | 5325a269 | [261122-mjo-reduce-background-footprint-openblas-thr](./quick/261122-mjo-reduce-background-footprint-openblas-thr/) |
 | 261122-w6z | Stop dashboard cache warmer hanging process exit and leaking out of tests (daemon-thread forever loops, session-wide live-file guard, subprocess regression test) | 2026-11-22 | 3efd5d05 | [261122-w6z-stop-dashboard-cache-warmer-hanging-proc](./quick/261122-w6z-stop-dashboard-cache-warmer-hanging-proc/) |
 | 261123-2w2 | Shrink overconfident NCAAF totals (cfb-structural-v5.2) and NFL totals (nfl-total-structural-v7.1) toward 50%; promoted; NFL spread fit was a no-op | 2026-11-23 | 9e9e27e4 | [261123-2w2-ncaaf-nfl-calibration-shrink-and-ncaaf-v](./quick/261123-2w2-ncaaf-nfl-calibration-shrink-and-ncaaf-v/) |
+| 261123-6q6 | NFL spread v7.2: cover probability shrink fitted on validation (operator exception), promoted | 2026-11-23 | (this commit) | [261123-6q6-nfl-spread-v72-validation-shrink](./quick/261123-6q6-nfl-spread-v72-validation-shrink/) |
 
 ## Milestone History
 

@@ -23,7 +23,11 @@ STANDARD_LAY_ASK = round(implied_probability(-110), 6)
 
 # The v7.1 ids are the v7 engines plus a probability_logit_slope in the artifact: same
 # class, same replay method, same margin and total; only the served cover/over price moves.
-NFL_SPREAD_V7_FAMILY = ("nfl-spread-structural-v7", "nfl-spread-structural-v7.1")
+NFL_SPREAD_V7_FAMILY = (
+    "nfl-spread-structural-v7",
+    "nfl-spread-structural-v7.1",
+    "nfl-spread-structural-v7.2",
+)
 NFL_TOTAL_V7_FAMILY = ("nfl-total-structural-v7", "nfl-total-structural-v7.1")
 # Every id the NFL slates have an engine branch for. The slate serves the champion when
 # it is one of these and NFL_DEFAULT_SERVING_VERSION otherwise.

@@ -1,0 +1,142 @@
+{
+  "cohort": {
+    "failures": [],
+    "games_priced": 1489
+  },
+  "data_root": "E:\\MP\\data",
+  "fit_window": "validation (operator-approved protocol exception, 2026-11-23)",
+  "generated_at_utc": "2026-11-23T10:01:17.922113+00:00",
+  "main_rule": {
+    "ask": 0.52381,
+    "heavy_spread_or_high_over_extra": 0.02,
+    "max_edge": 0.1,
+    "min_edge": 0.05,
+    "not_modelled": "eligibility CALL/qualified (input freshness, registration); edge only",
+    "source": "src/model_prediction/cli/forecast.py _forecast_nfl_{spread,total}_sport + cli/forecast_nfl_support.py _main_call_eligible; config/model.yaml"
+  },
+  "main_rule_clears_by_season": {
+    "2021": {
+      "games": 285,
+      "main_raw": 3,
+      "main_shrunk": 0
+    },
+    "2022": {
+      "games": 284,
+      "main_raw": 2,
+      "main_shrunk": 0
+    },
+    "2023": {
+      "games": 285,
+      "main_raw": 1,
+      "main_shrunk": 0
+    },
+    "2024": {
+      "games": 285,
+      "main_raw": 4,
+      "main_shrunk": 0
+    },
+    "2025": {
+      "games": 285,
+      "main_raw": 3,
+      "main_shrunk": 0
+    },
+    "2026": {
+      "games": 65,
+      "main_raw": 1,
+      "main_shrunk": 0
+    }
+  },
+  "slope_fit_validation": {
+    "clipped": 0.3781478075920562,
+    "mle": 0.3781478075920562,
+    "n_validation": 282,
+    "standard_error": 1.078031323439545,
+    "stored_probability_logit_slope": 0.378
+  },
+  "split": {
+    "locked_holdout": {
+      "end": "2026-10-08",
+      "observations": 301,
+      "start": "2025-09-28"
+    },
+    "method": "complete_date_60_20_20",
+    "train": {
+      "end": "2024-09-26",
+      "observations": 903,
+      "start": "2021-09-09"
+    },
+    "validation": {
+      "end": "2025-09-25",
+      "observations": 285,
+      "start": "2024-09-29"
+    }
+  },
+  "windows": {
+    "locked_holdout": {
+      "end": "2026-10-08",
+      "raw": {
+        "brier": 0.25024933094618984,
+        "calibration_intercept": 0.052023890356157294,
+        "calibration_slope": 0.37892305734169907,
+        "ece": 0.02095338983050845,
+        "log_loss": 0.6936747139049195,
+        "mean_abs_distance_from_50": 0.02213,
+        "n": 295
+      },
+      "shrunk": {
+        "brier": 0.24991827429871075,
+        "calibration_intercept": 0.052023890356157336,
+        "calibration_slope": 1.0024419506394158,
+        "ece": 0.03060124893020437,
+        "log_loss": 0.6929850415898459,
+        "mean_abs_distance_from_50": 0.00838,
+        "n": 295
+      },
+      "start": "2025-09-28"
+    },
+    "train": {
+      "end": "2024-09-26",
+      "raw": {
+        "brier": 0.24921349576829635,
+        "calibration_intercept": -0.021514552775932696,
+        "calibration_slope": 1.071560950034398,
+        "ece": 0.007077419908466848,
+        "log_loss": 0.6915725502173333,
+        "mean_abs_distance_from_50": 0.0197,
+        "n": 874
+      },
+      "shrunk": {
+        "brier": 0.2495502148737119,
+        "calibration_intercept": -0.02151455277593272,
+        "calibration_slope": 2.834817328133325,
+        "ece": 0.011991405336033423,
+        "log_loss": 0.6922473021733607,
+        "mean_abs_distance_from_50": 0.00746,
+        "n": 874
+      },
+      "start": "2021-09-09"
+    },
+    "validation": {
+      "end": "2025-09-25",
+      "raw": {
+        "brier": 0.2501736609651667,
+        "calibration_intercept": 0.09155187461739815,
+        "calibration_slope": 0.47823688881114335,
+        "ece": 0.024576117021276628,
+        "log_loss": 0.6935176693930238,
+        "mean_abs_distance_from_50": 0.02174,
+        "n": 282
+      },
+      "shrunk": {
+        "brier": 0.24989033308059325,
+        "calibration_intercept": 0.09155187461739818,
+        "calibration_slope": 1.2651769545268408,
+        "ece": 0.030775139327884816,
+        "log_loss": 0.692928875857295,
+        "mean_abs_distance_from_50": 0.00823,
+        "n": 282
+      },
+      "start": "2024-09-29"
+    }
+  }
+}

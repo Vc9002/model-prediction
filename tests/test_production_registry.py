@@ -107,11 +107,12 @@ def test_real_production_yaml_resolves_every_model() -> None:
     # 2026-11-22 (quick-261122-v51): +1 enabled entry, cfb-structural-v5.1, the third NCAAF challenger.
     # 2026-11-23 (quick-261123-2w2): +1 enabled entry, cfb-structural-v5.2, promoted NCAAF champion.
     # 2026-11-23 (quick-261123-2w2): +1 enabled entry, nfl-total-structural-v7.1, promoted NFL total champion.
-    assert len(registry.entries) == 97
+    # 2026-11-23 (quick-261123-6q6): +1 enabled entry, nfl-spread-structural-v7.2, promoted NFL spread champion.
+    assert len(registry.entries) == 98
     # Scope 2026-11-13: the 40 entries for switched-off sports are enabled: false and
     # therefore unavailable by decision, not by a failed contract. Every in-scope entry
     # must still resolve, so a healthy registry has zero *failed* entries.
-    assert len(registry.available_entries()) == 57
+    assert len(registry.available_entries()) == 58
     problems = registry.problem_entries()
     assert len(problems) == 40
     assert all(not e.enabled and e.load_error is None for e in problems)
@@ -138,8 +139,8 @@ def test_real_production_yaml_resolves_every_model() -> None:
     assert registry.champion("NBA", "spread").rollback_model == "nba-spread-margin-v7"
     assert registry.champion("NBA", "total").model_id == "nba-total-margin-v9"
     assert registry.champion("NBA", "total").rollback_model == "nba-total-margin-v7"
-    assert registry.champion("NFL", "spread").model_id == "nfl-spread-structural-v7"
-    assert registry.champion("NFL", "spread").rollback_model == "nfl-spread-structural-v6"
+    assert registry.champion("NFL", "spread").model_id == "nfl-spread-structural-v7.2"
+    assert registry.champion("NFL", "spread").rollback_model == "nfl-spread-structural-v7"
     # 2026-11-23 (quick-261123-2w2): v7.1 = v7 with the over probability shrunk (slope 0.522).
     assert registry.champion("NFL", "total").model_id == "nfl-total-structural-v7.1"
     assert registry.champion("NFL", "total").rollback_model == "nfl-total-structural-v7"
@@ -542,8 +543,9 @@ def test_nfl_serving_follows_the_real_champion_map() -> None:
     from model_prediction.cli.forecast import _nfl_serving_model_version
 
     assert _nfl_serving_model_version("total") == "nfl-total-structural-v7.1"
-    # The spread fit clipped at s = 1.0 (a no-op), so no spread v7.1 was registered.
-    assert _nfl_serving_model_version("spread") == "nfl-spread-structural-v7"
+    # The train-window spread fit clipped at 1.0, so v7.1 spread is unregistered; v7.2 (slope fitted on
+    # validation by operator exception, quick-261123-6q6) serves instead.
+    assert _nfl_serving_model_version("spread") == "nfl-spread-structural-v7.2"
 
 
 def test_ncaaf_model_yaml_serving_version_matches_the_champion_map() -> None:

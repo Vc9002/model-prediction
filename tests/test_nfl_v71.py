@@ -165,6 +165,8 @@ def test_from_artifact_reads_and_bounds_the_slope(bad: float) -> None:
     [
         ("nfl-spread-structural-v7.1", "nfl-spread-structural-v7", NFLSpreadModelV7),
         ("nfl-total-structural-v7.1", "nfl-total-structural-v7", NFLTotalModelV7),
+        # v7.2 (quick-261123-6q6): the spread slope fitted on validation by operator exception.
+        ("nfl-spread-structural-v7.2", "nfl-spread-structural-v7", NFLSpreadModelV7),
     ],
 )
 def test_v71_artifacts_load_and_hash_verifies(v71: str, v7: str, cls: type) -> None:
@@ -206,9 +208,10 @@ def _spread_row(art: dict, event_id: str, selection: str, line: float, probabili
     }
 
 
+@pytest.mark.parametrize("model_id", ["nfl-spread-structural-v7.1", "nfl-spread-structural-v7.2"])
 @pytest.mark.parametrize("spread_home_line", [-2.5, 9.5])
-def test_v71_spread_scalar_replay_round_trip(spread_home_line: float) -> None:
-    art = _artifact("nfl-spread-structural-v7.1")
+def test_v71_spread_scalar_replay_round_trip(spread_home_line: float, model_id: str) -> None:
+    art = _artifact(model_id)
     model = NFLSpreadModelV7.from_artifact(art)
     raw_model = NFLSpreadModelV7.from_artifact(_artifact("nfl-spread-structural-v7"))
     kwargs = {"home_pass_epa": 0.12, "away_pass_epa": -0.04, "spread_home_line": spread_home_line}
