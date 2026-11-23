@@ -63,11 +63,17 @@ Operator: "optimize the entire project so it can run in the background and won't
   - Daily runs 11x/day (00:30, then every 90 min 07:00-21:00 ET).
   - Scheduled workers run S4U at Task Scheduler priority 7 (BelowNormal CPU). Their command lines and handles are not readable from an interactive session, so check them through `runs.db`, not a process probe.
 - **Open (ROADMAP "Background footprint"):**
-  - The daily, production, calibrate and capture workers do not lower their memory priority.
-  - The dashboard still runs pre-w6z code until its next restart.
+  - ~~The daily, production, calibrate and capture workers do not lower their memory priority.~~ Resolved 2026-11-23 (quick-261123-oy5, 09cf9ceb).
+  - ~~The dashboard still runs pre-w6z code until its next restart.~~ Resolved 2026-11-23: restarted 17:57 ET, PID 27916, HTTP 200 on :8765.
   - Dashboard memory grew about 150 MB over 7 h; whether it plateaus is unconfirmed.
   - Evidence still reads xlsx.
   - SWR request rebuilds run outside `_WARM_BUILD_LOCK`.
+- **2026-11-23 follow-up: worker memory priority (quick-261123-oy5, 09cf9ceb).**
+  - Operator approved it 2026-11-23, accepting that a daily run may slow under heavy memory pressure.
+  - Host probe: after SetProcessInformation(ProcessMemoryPriority=2) plus SetPriorityClass(BELOW_NORMAL) in a parent, a python child, a python grandchild, and a python grandchild launched through `powershell -Command` all report mem=2, class=0x4000, so the whole tree inherits both from birth.
+  - Fix: one `enable_background_priority()` call in `run_supervisor.main()`'s run branch. Not in `run_worker`, so in-process callers (tests, burn-in, system_health) stay undemoted.
+  - `test_main_run_worker_tree_inherits_low_priority` failed before the call (`AssertionError: stdout='PRIORITY mem=5 class=0x20\n' stderr=''`, `assert 5 == 2`) and passes after (mem=2 class=0x4000).
+  - The test skips with "already demoted" when pytest's own children are born demoted, e.g. after `tests/test_two_stage_and_stealth.py` has demoted the pytest process in the same session.
 
 ## 2026-11-22 — Placeholder rungs priced as the main line; MLB single-inning totals (quick-261122-l17)
 

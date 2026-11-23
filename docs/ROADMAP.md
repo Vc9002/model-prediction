@@ -349,8 +349,8 @@ Dashboard memory on the live host:
 
 The OpenBLAS cap (about 740 MB of commit per numpy+scipy process) covers every supervised worker. The forever warmer no longer hangs process exit (w6z), and tests can no longer write the live `dashboard/server.log` or `cache_snapshot.pkl`. Trace in `docs/DEBUG.md`. Open follow-ups:
 
-- **Restart the dashboard to pick up w6z.** PID 5340 still runs pre-w6z code, so Ctrl-C on it can hang until it is restarted. This only matters at exit.
-- **Worker memory priority.** Only the dashboard and the auto-buyer call `enable_background_priority`. The daily (15-30 min, 11 times a day), production, calibrate and capture workers get BelowNormal CPU from Task Scheduler priority 7 but keep normal memory priority. Calling `stealth_runtime._set_low_memory_priority()` from `run_supervisor`'s worker start would cover them all. This needs an operator decision: it could slow a daily run when the foreground is under memory pressure.
+- ~~**Restart the dashboard to pick up w6z.**~~ Done 2026-11-23: restarted at 17:57 ET onto w6z code, new PID 27916, HTTP 200 on :8765.
+- ~~**Worker memory priority.**~~ Done 2026-11-23 (operator approved, quick-261123-oy5, 09cf9ceb). `run_supervisor.main()` calls `stealth_runtime.enable_background_priority()` before `run <worker>`, so every supervised worker tree (daily including run_daily.ps1's python steps, production, calibrate, manual-bet-sync, the two capture workers) inherits BELOW_NORMAL and low memory priority from birth. In-process `run_worker` callers (tests, burn-in) are not demoted. Accepted cost: a daily run may slow under heavy memory pressure.
 - **Dashboard memory growth.** It rose about 150 MB over the first 7 hours (619 to 783 MB private). Re-sample after 24 hours to see whether it plateaus.
 
 - **Evidence off xlsx.** `production_evidence` still parses every xlsx ledger export with openpyxl (about 43 s, about 1 GB transient). Read the canonical SQLite store instead after a column-parity check of `_read_evidence_ledger` consumers and a before/after diff of `production_evidence()` on live data.

@@ -90,7 +90,7 @@ Dependency order is strictly acyclic: CLI → Features/Models → Data sources �
 
 ### Entry Points
 
-- Scheduled (Task Scheduler → `scripts/run_silent.vbs` → `run_supervisor run <worker>`): `ModelPrediction-Daily` → `cli/daily.py`; `ModelPrediction-Production` → `cli_production.py`; also `calibrate`, `auto-buyer`, `nba-pretip-capture`, `ncaaf-prekickoff-capture`. `ModelPrediction-RebuildShadow` is disabled (see root CLAUDE.md Scope). `run_supervisor._worker_env` sets `OPENBLAS_NUM_THREADS=1` for every worker.
+- Scheduled (Task Scheduler → `scripts/run_silent.vbs` → `run_supervisor run <worker>`): `ModelPrediction-Daily` → `cli/daily.py`; `ModelPrediction-Production` → `cli_production.py`; also `calibrate`, `auto-buyer`, `nba-pretip-capture`, `ncaaf-prekickoff-capture`. `ModelPrediction-RebuildShadow` is disabled (see root CLAUDE.md Scope). `run_supervisor._worker_env` sets `OPENBLAS_NUM_THREADS=1` for every worker. `run_supervisor.main()` demotes itself (BELOW_NORMAL + low memory priority) before `run <worker>`, so every worker tree inherits it.
 - CLI: `python -m model_prediction forecast|settle|validate ...`
 - Dashboard: `python dashboard_server.py` (stdlib `ThreadingHTTPServer`, port 8765; task `ModelPredictionDashboard`); routes `/picks`, `/orders`, `/portfolio`, `/execute` (real-money, token-gated)
 - Rebuild: `python -m model_prediction.rebuild cli run ...` (separate entry point, no production writes)
