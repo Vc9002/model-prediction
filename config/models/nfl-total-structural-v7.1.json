@@ -1,0 +1,87 @@
+{
+  "artifact_hash": "47e8e08a997d2a52988d9bac3fde404910f345841f8d5166e384188cabd67b73",
+  "bias": 0.8,
+  "dome_boost": 0.8,
+  "explosive_weight": 10.0,
+  "league": "NFL",
+  "league_avg_total": 45.5,
+  "max_total_prob": 0.65,
+  "method": "nfl_total_structural_v7_engine",
+  "min_total_prob": 0.35,
+  "model_version": "nfl-total-structural-v7.1",
+  "ngsp_weight": 0.35,
+  "note": "nfl-total-structural-v7 engine unchanged; the final total probability is served as sigmoid(0.522 * logit(p)), intercept 0, so no side is favoured. Train-window fit MLE 0.522 (SE 0.364). Operator-approved 2026-11-23 (quick-261123-2w2) after the point-in-time replay showed the v7 engines overconfident.",
+  "pace_weight": 0.15,
+  "parent_artifact_hash": "f1031f97ae162f29d103a1a1763e073495a7dd87f94ca53c65e61b8f7f88fbd7",
+  "parent_model_version": "nfl-total-structural-v7",
+  "pass_weight": 1.5,
+  "positive_class": "over",
+  "probability_logit_slope": 0.522,
+  "probability_shrink_provenance": {
+    "fit_output": "outputs/nfl/nfl_v71_shrink.json",
+    "fit_output_sha256": "26c87dbb9de4f631a31ee578bbfe6b0123891f77f1607370402bd245ce413362",
+    "fit_output_sha256_of": "LF-normalised file bytes (the committed git blob content)",
+    "fit_script": "scripts/fit_nfl_v71_shrink.py",
+    "fitted_on": "p_over_b",
+    "holdout_design_informed": true,
+    "locked_holdout": [
+      "2025-09-28",
+      "2026-10-08"
+    ],
+    "split": "model_prediction.validation.chronological_split 60/20/20 on complete ET dates",
+    "train": [
+      "2021-09-09",
+      "2024-09-26"
+    ],
+    "train_mle": 0.521604,
+    "train_standard_error": 0.364151,
+    "validation": [
+      "2024-09-29",
+      "2025-09-25"
+    ]
+  },
+  "qualification": {
+    "framework": "nfl_v7_multiplicative_inputs",
+    "locked_holdout": true,
+    "model_version": "nfl-total-structural-v7.1",
+    "note": "Point-in-time walk-forward validated on modern NFL holdout games.",
+    "probability_shrink_locked_holdout": {
+      "brier_raw": 0.25097578647264784,
+      "brier_shrunk": 0.25005251908745985,
+      "log_loss_raw": 0.6951522623746472,
+      "log_loss_shrunk": 0.6932573929614954,
+      "n": 301,
+      "note": "design-informed: this window was read by the 2026-11-12 replay before the fit",
+      "start": "2025-09-28"
+    },
+    "qualified": true,
+    "replay": {
+      "brier": 0.25059647965067955,
+      "calibration_intercept": -0.07434881246312419,
+      "calibration_slope": 0.42836194108670367,
+      "cohort": "games.jsonl completed games with nflverse closing lines, 2021 -> today; point-in-time inputs; scripts/replay_nfl_v7_all_settled.py",
+      "generated_at_utc": "2026-11-12T04:44:44.456260+00:00",
+      "locked_holdout": {
+        "brier_score": 0.2508661637538311,
+        "calibration_intercept": 0.0890116133016035,
+        "calibration_slope": 0.1259446330346926,
+        "expected_calibration_error": 0.016653277027027024,
+        "log_loss": 0.694930411199233,
+        "n": 296,
+        "start": "2025-09-28T13:00:00+00:00"
+      },
+      "log_loss": 0.6943582237285263,
+      "market_brier_at_closing_line": 0.25,
+      "n": 1476,
+      "serving_calibrator": "identity"
+    },
+    "sample_size": 197,
+    "status": "qualified"
+  },
+  "red_zone_weight": 3.0,
+  "rush_weight": 0.5,
+  "schema_version": "2",
+  "sport": "nfl",
+  "total_sd": 13.8,
+  "use_scoring_simulation": false
+}

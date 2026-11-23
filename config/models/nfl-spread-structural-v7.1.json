@@ -1,0 +1,87 @@
+{
+  "artifact_hash": "4f343e4a77ee4fe268ee8f6b35fd798bb253bc7c49214d640d264dbca317451a",
+  "edsr_weight": 4.0,
+  "home_field_advantage_points": 1.35,
+  "key_number_weight": 0.2,
+  "league": "NFL",
+  "logistic_scale": 13.5,
+  "margin_sd": 13.8,
+  "market_weight": 0.8,
+  "max_cover_prob": 0.65,
+  "method": "nfl_spread_structural_v7_engine",
+  "min_cover_prob": 0.35,
+  "model_version": "nfl-spread-structural-v7.1",
+  "note": "nfl-spread-structural-v7 engine unchanged and NO shrink: the train-window fit (MLE 1.110, SE 0.668) clipped at 1.0, so this artifact prices identically to nfl-spread-structural-v7. Built for the operator-approved v7.1 shrink (2026-11-23, quick-261123-2w2); see outputs/nfl/nfl_v71_shrink.md for why the honest fit did not shrink.",
+  "parent_artifact_hash": "856efa81fbe3cfafd7ffbc8bab2f0c76ec0982ca2c019e838af76dae9156c2c5",
+  "parent_model_version": "nfl-spread-structural-v7",
+  "positive_class": "away_cover",
+  "probability_logit_slope": 1.0,
+  "probability_shrink_provenance": {
+    "fit_output": "outputs/nfl/nfl_v71_shrink.json",
+    "fit_output_sha256": "26c87dbb9de4f631a31ee578bbfe6b0123891f77f1607370402bd245ce413362",
+    "fit_output_sha256_of": "LF-normalised file bytes (the committed git blob content)",
+    "fit_script": "scripts/fit_nfl_v71_shrink.py",
+    "fitted_on": "p_home_cover",
+    "holdout_design_informed": true,
+    "locked_holdout": [
+      "2025-09-28",
+      "2026-10-08"
+    ],
+    "split": "model_prediction.validation.chronological_split 60/20/20 on complete ET dates",
+    "train": [
+      "2021-09-09",
+      "2024-09-26"
+    ],
+    "train_mle": 1.109791,
+    "train_standard_error": 0.667751,
+    "validation": [
+      "2024-09-29",
+      "2025-09-25"
+    ]
+  },
+  "qualification": {
+    "framework": "nfl_v7_opponent_adjusted_inputs",
+    "locked_holdout": true,
+    "model_version": "nfl-spread-structural-v7.1",
+    "note": "Point-in-time walk-forward validated with opponent-adjusted EPA and recency decay.",
+    "probability_shrink_locked_holdout": {
+      "brier_raw": 0.25022061876125423,
+      "brier_shrunk": 0.25022061876125423,
+      "log_loss_raw": 0.6936172664549891,
+      "log_loss_shrunk": 0.6936172664549891,
+      "n": 295,
+      "note": "design-informed: this window was read by the 2026-11-12 replay before the fit",
+      "start": "2025-09-28"
+    },
+    "qualified": true,
+    "replay": {
+      "brier": 0.24962139794669747,
+      "calibration_intercept": 0.01408783497397008,
+      "calibration_slope": 0.7891317029651002,
+      "cohort": "games.jsonl completed games with nflverse closing lines, 2021 -> today; point-in-time inputs; scripts/replay_nfl_v7_all_settled.py",
+      "generated_at_utc": "2026-11-12T04:44:44.456260+00:00",
+      "locked_holdout": {
+        "brier_score": 0.2504430498342302,
+        "calibration_intercept": 0.03722331636511858,
+        "calibration_slope": 0.24041156327755336,
+        "expected_calibration_error": 0.0180377697594502,
+        "log_loss": 0.694062616987653,
+        "n": 291,
+        "start": "2025-09-28T13:00:00+00:00"
+      },
+      "log_loss": 0.6923992859566794,
+      "market_brier_at_closing_line": 0.25,
+      "n": 1451,
+      "serving_calibrator": "identity"
+    },
+    "sample_size": 197,
+    "status": "qualified"
+  },
+  "rho": 0.08,
+  "schema_version": "2",
+  "simulation_weight": 0.2,
+  "sport": "nfl",
+  "turnover_luck_weight": 0.5,
+  "use_logistic_moneyline": true,
+  "use_scoring_simulation": true
+}

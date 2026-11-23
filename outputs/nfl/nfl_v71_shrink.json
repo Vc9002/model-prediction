@@ -1,0 +1,352 @@
+{
+  "cohort": {
+    "failures": [],
+    "games_priced": 1489,
+    "seasons": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ]
+  },
+  "data_root": "E:\\MP\\data",
+  "generated_at_utc": "2026-11-23T07:43:58.459571+00:00",
+  "main_rule": {
+    "ask": 0.52381,
+    "heavy_spread_or_high_over_extra": 0.02,
+    "max_edge": 0.1,
+    "min_edge": 0.05,
+    "not_modelled": "eligibility CALL/qualified (input freshness, registration); edge only",
+    "source": "src/model_prediction/cli/forecast.py _forecast_nfl_{spread,total}_sport + cli/forecast_nfl_support.py _main_call_eligible; config/model.yaml"
+  },
+  "markets": {
+    "spread": {
+      "main_rule_clears_by_season": {
+        "2021": {
+          "games": 285,
+          "main_raw": 3,
+          "main_shrunk": 3
+        },
+        "2022": {
+          "games": 284,
+          "main_raw": 2,
+          "main_shrunk": 2
+        },
+        "2023": {
+          "games": 285,
+          "main_raw": 1,
+          "main_shrunk": 1
+        },
+        "2024": {
+          "games": 285,
+          "main_raw": 4,
+          "main_shrunk": 4
+        },
+        "2025": {
+          "games": 285,
+          "main_raw": 3,
+          "main_shrunk": 3
+        },
+        "2026": {
+          "games": 65,
+          "main_raw": 1,
+          "main_shrunk": 1
+        }
+      },
+      "probability_key": "p_home_cover",
+      "served_probability_range_after_shrink": [
+        0.35,
+        0.65
+      ],
+      "slope_fit_train": {
+        "clipped": 1.0,
+        "mle": 1.1097911870412764,
+        "n_train": 874,
+        "standard_error": 0.6677506237316162,
+        "stored_probability_logit_slope": 1.0
+      },
+      "v71_model_version": "nfl-spread-structural-v7.1",
+      "v7_model_version": "nfl-spread-structural-v7",
+      "windows": {
+        "all": {
+          "end": "2026-10-08",
+          "raw": {
+            "brier": 0.24960485887542244,
+            "calibration_intercept": 0.014301313558208106,
+            "calibration_slope": 0.8017505752596489,
+            "ece": 0.008295498277050325,
+            "log_loss": 0.692366288947625,
+            "mean_abs_distance_from_50": 0.0206,
+            "n": 1451
+          },
+          "shrunk": {
+            "brier": 0.24960485887542244,
+            "calibration_intercept": 0.014301313558208106,
+            "calibration_slope": 0.8017505752596489,
+            "ece": 0.008295498277050325,
+            "log_loss": 0.692366288947625,
+            "mean_abs_distance_from_50": 0.0206,
+            "n": 1451
+          },
+          "start": "2021-09-09"
+        },
+        "locked_holdout": {
+          "end": "2026-10-08",
+          "raw": {
+            "brier": 0.25022061876125423,
+            "calibration_intercept": 0.052199897019943715,
+            "calibration_slope": 0.397340436111125,
+            "ece": 0.02092410847457627,
+            "log_loss": 0.6936172664549891,
+            "mean_abs_distance_from_50": 0.02216,
+            "n": 295
+          },
+          "shrunk": {
+            "brier": 0.25022061876125423,
+            "calibration_intercept": 0.052199897019943715,
+            "calibration_slope": 0.397340436111125,
+            "ece": 0.02092410847457627,
+            "log_loss": 0.6936172664549891,
+            "mean_abs_distance_from_50": 0.02216,
+            "n": 295
+          },
+          "start": "2025-09-28"
+        },
+        "train": {
+          "end": "2024-09-26",
+          "raw": {
+            "brier": 0.24921349576829635,
+            "calibration_intercept": -0.021514552775932696,
+            "calibration_slope": 1.071560950034398,
+            "ece": 0.007077419908466848,
+            "log_loss": 0.6915725502173333,
+            "mean_abs_distance_from_50": 0.0197,
+            "n": 874
+          },
+          "shrunk": {
+            "brier": 0.24921349576829635,
+            "calibration_intercept": -0.021514552775932696,
+            "calibration_slope": 1.071560950034398,
+            "ece": 0.007077419908466848,
+            "log_loss": 0.6915725502173333,
+            "mean_abs_distance_from_50": 0.0197,
+            "n": 874
+          },
+          "start": "2021-09-09"
+        },
+        "validation": {
+          "end": "2025-09-25",
+          "raw": {
+            "brier": 0.2501736609651667,
+            "calibration_intercept": 0.09155187461739815,
+            "calibration_slope": 0.47823688881114335,
+            "ece": 0.024576117021276628,
+            "log_loss": 0.6935176693930238,
+            "mean_abs_distance_from_50": 0.02174,
+            "n": 282
+          },
+          "shrunk": {
+            "brier": 0.2501736609651667,
+            "calibration_intercept": 0.09155187461739815,
+            "calibration_slope": 0.47823688881114335,
+            "ece": 0.024576117021276628,
+            "log_loss": 0.6935176693930238,
+            "mean_abs_distance_from_50": 0.02174,
+            "n": 282
+          },
+          "start": "2024-09-29"
+        }
+      }
+    },
+    "total": {
+      "main_rule_clears_by_season": {
+        "2021": {
+          "games": 285,
+          "main_raw": 25,
+          "main_shrunk": 1
+        },
+        "2022": {
+          "games": 284,
+          "main_raw": 17,
+          "main_shrunk": 1
+        },
+        "2023": {
+          "games": 285,
+          "main_raw": 20,
+          "main_shrunk": 0
+        },
+        "2024": {
+          "games": 285,
+          "main_raw": 18,
+          "main_shrunk": 0
+        },
+        "2025": {
+          "games": 285,
+          "main_raw": 25,
+          "main_shrunk": 0
+        },
+        "2026": {
+          "games": 65,
+          "main_raw": 6,
+          "main_shrunk": 0
+        }
+      },
+      "probability_key": "p_over_b",
+      "served_probability_range_after_shrink": [
+        0.419911,
+        0.580089
+      ],
+      "slope_fit_train": {
+        "clipped": 0.5216040120763767,
+        "mle": 0.5216040120763767,
+        "n_train": 893,
+        "standard_error": 0.36415116147430393,
+        "stored_probability_logit_slope": 0.522
+      },
+      "v71_model_version": "nfl-total-structural-v7.1",
+      "v7_model_version": "nfl-total-structural-v7",
+      "windows": {
+        "all": {
+          "end": "2026-10-08",
+          "raw": {
+            "brier": 0.250610262601252,
+            "calibration_intercept": -0.07420765696936713,
+            "calibration_slope": 0.42470546506097967,
+            "ece": 0.031300237127371296,
+            "log_loss": 0.6943856927729926,
+            "mean_abs_distance_from_50": 0.03656,
+            "n": 1476
+          },
+          "shrunk": {
+            "brier": 0.24981855287052712,
+            "calibration_intercept": -0.07420765696936711,
+            "calibration_slope": 0.8136120020325285,
+            "ece": 0.019347799947041104,
+            "log_loss": 0.692783917780415,
+            "mean_abs_distance_from_50": 0.01915,
+            "n": 1476
+          },
+          "start": "2021-09-09"
+        },
+        "all_variant_a_no_weather": {
+          "raw": {
+            "brier": 0.25170356716291736,
+            "calibration_intercept": -0.07056196817697871,
+            "calibration_slope": 0.19330186890100512,
+            "ece": 0.03301457317073162,
+            "log_loss": 0.6966056365244591,
+            "mean_abs_distance_from_50": 0.03655,
+            "n": 1476
+          },
+          "shrunk": {
+            "brier": 0.2503999003531466,
+            "calibration_intercept": -0.07056196817697873,
+            "calibration_slope": 0.3703100936800872,
+            "ece": 0.022255953864826292,
+            "log_loss": 0.6939516139473875,
+            "mean_abs_distance_from_50": 0.01915,
+            "n": 1476
+          }
+        },
+        "locked_holdout": {
+          "end": "2026-10-08",
+          "raw": {
+            "brier": 0.25097578647264784,
+            "calibration_intercept": 0.09570454630437882,
+            "calibration_slope": 0.08916332394484114,
+            "ece": 0.01999749169435216,
+            "log_loss": 0.6951522623746472,
+            "mean_abs_distance_from_50": 0.03495,
+            "n": 301
+          },
+          "shrunk": {
+            "brier": 0.25005251908745985,
+            "calibration_intercept": 0.09570454630437876,
+            "calibration_slope": 0.17081096541157506,
+            "ece": 0.018993967796344612,
+            "log_loss": 0.6932573929614954,
+            "mean_abs_distance_from_50": 0.01831,
+            "n": 301
+          },
+          "start": "2025-09-28"
+        },
+        "train": {
+          "end": "2024-09-26",
+          "raw": {
+            "brier": 0.24990301646793392,
+            "calibration_intercept": -0.20782999588948334,
+            "calibration_slope": 0.6747591410594069,
+            "ece": 0.053542305711086244,
+            "log_loss": 0.6929565207045322,
+            "mean_abs_distance_from_50": 0.03721,
+            "n": 893
+          },
+          "shrunk": {
+            "brier": 0.24942520458220846,
+            "calibration_intercept": -0.20782999588948334,
+            "calibration_slope": 1.292642032680856,
+            "ece": 0.05070881474519422,
+            "log_loss": 0.6919947448162935,
+            "mean_abs_distance_from_50": 0.0195,
+            "n": 893
+          },
+          "start": "2021-09-09"
+        },
+        "validation": {
+          "end": "2025-09-25",
+          "raw": {
+            "brier": 0.2524597239904823,
+            "calibration_intercept": 0.21394773369755132,
+            "calibration_slope": -0.5287182312112884,
+            "ece": 0.056741063829787206,
+            "log_loss": 0.6980931864149681,
+            "mean_abs_distance_from_50": 0.03622,
+            "n": 282
+          },
+          "shrunk": {
+            "brier": 0.25081442588532077,
+            "calibration_intercept": 0.2139477336975513,
+            "calibration_slope": -1.012870174734269,
+            "ece": 0.03903700191108496,
+            "log_loss": 0.6947775895089803,
+            "mean_abs_distance_from_50": 0.01897,
+            "n": 282
+          },
+          "start": "2024-09-29"
+        }
+      }
+    }
+  },
+  "reproduction": {
+    "replay_2026_11_12": {
+      "spread_brier": 0.24962,
+      "spread_n": 1451,
+      "total_brier": 0.2506,
+      "total_n": 1476
+    },
+    "spread_brier_all": 0.24960485887542244,
+    "spread_n": 1451,
+    "total_brier_all_variant_b": 0.250610262601252,
+    "total_n": 1476
+  },
+  "split": {
+    "locked_holdout": {
+      "end": "2026-10-08",
+      "observations": 301,
+      "start": "2025-09-28"
+    },
+    "method": "complete_date_60_20_20",
+    "train": {
+      "end": "2024-09-26",
+      "observations": 903,
+      "start": "2021-09-09"
+    },
+    "validation": {
+      "end": "2025-09-25",
+      "observations": 285,
+      "start": "2024-09-29"
+    }
+  }
+}
