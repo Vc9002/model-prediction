@@ -98,11 +98,17 @@ def main(argv: list[str] | None = None) -> int:
         # os.execvpe is not reliable on Windows; use subprocess so the parent
         # holds the lock while the child runs and we propagate its exit code.
         creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        # With CREATE_NO_WINDOW (also forced by the package's Popen patch) and no std handle given,
+        # Windows hands the child a hidden console of its own, so everything it printed vanished
+        # and the supervisor's daily log stayed 0 bytes. Giving any handle makes subprocess pass
+        # all three explicitly: stdout and stderr become this process's own (the supervisor log).
+        # stdin is the null device; a scheduled run never reads it.
         result = subprocess.run(
             command,
             env=os.environ,
             check=False,
             creationflags=creationflags,
+            stdin=subprocess.DEVNULL,
         )
         release_lock(handle)
         return result.returncode
