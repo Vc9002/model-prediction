@@ -608,9 +608,12 @@ def _row_in_cohort(row: dict[str, Any], cohort: BuyCohort) -> bool:
     if str(row.get("status") or "").lower() != "open":
         return False
     provenance = str(row.get("market_quote_provenance") or "")
-    if provenance not in {"archived_two_sided_bbo", "indicative_slate"}:
+    # "decision_time_executable_quote" is the forecast's own timestamped Polymarket quote
+    # (cli/forecast.py; NBA rows carry it), held to the same evidence as an archived BBO. A
+    # sportsbook decision quote is not executable evidence and is refused.
+    if provenance not in {"archived_two_sided_bbo", "decision_time_executable_quote", "indicative_slate"}:
         return False
-    if provenance == "archived_two_sided_bbo":
+    if provenance != "indicative_slate":
         if str(row.get("market_quote_timestamp_valid") or "").lower() not in {"true", "1"}:
             return False
         if not all(

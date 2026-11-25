@@ -965,3 +965,25 @@ def test_fallback_buyer_from_governed_live_state_is_paper(monkeypatch, tmp_path)
     assert buyer.config.execute_live is False
     assert buyer.config.mode == "paper"
     assert buyer.config.cohorts == ()
+
+
+def test_decision_time_executable_quote_counts_as_quote_evidence():
+    # Real NBA spread v9 Flat rows carry the forecast's own Polymarket decision-time quote
+    # (cli/forecast.py), not the NCAAB archive provenance; checked on live Flat rows 2026-11-25.
+    nba = _row(
+        NBA_SPREAD,
+        pick_id="nba",
+        event="n1",
+        league="nba",
+        edge="0.13",
+        market_quote_provenance="decision_time_executable_quote",
+    )
+    assert _row_in_cohort(nba, NBA_V9_PAPER)
+    for change in (
+        {"market_quote_timestamp_valid": "False"},
+        {"market_snapshot_hash": None},
+        {"market_snapshot_archive_path": None},
+        {"market_quote_observed_at_utc": None},
+        {"market_quote_provenance": "decision_time_sportsbook_quote"},
+    ):
+        assert not _row_in_cohort({**nba, **change}, NBA_V9_PAPER), change
