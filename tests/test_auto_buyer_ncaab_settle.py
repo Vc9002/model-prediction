@@ -123,6 +123,7 @@ def _reversed_neutral_site_board():
         "events": [
             {
                 "id": "401900001",
+                "date": "2026-11-25T21:00Z",
                 "competitions": [
                     {
                         "status": {"type": {"completed": True}},
@@ -216,3 +217,75 @@ def test_spread_side_is_graded_in_the_ledgers_orientation_when_espn_is_reversed(
     by_order = {c["order_id"]: c["to_result"] for c in res["changes"]}
     # Liberty +3.5 lost by 7 -> loss; Princeton -3.5 won by 7 -> win.
     assert by_order == {"LIVE-rev-away": "loss", "LIVE-rev-home": "win"}
+
+
+def _game(event_id, date, away, away_score, home, home_score, completed=True):
+    return {
+        "id": event_id,
+        "date": date,
+        "competitions": [
+            {
+                "status": {"type": {"completed": completed}},
+                "competitors": [
+                    {"homeAway": "away", "team": {"displayName": away}, "score": away_score},
+                    {"homeAway": "home", "team": {"displayName": home}, "score": home_score},
+                ],
+            }
+        ],
+    }
+
+
+def _boards_by_date(boards):
+    espn = MagicMock()
+    espn.scoreboard.side_effect = lambda league, day: {"events": boards.get(day, [])}
+    return espn
+
+
+def test_yesterdays_reversed_meeting_never_settles_todays_game(tmp_path: Path, monkeypatch):
+    # Home-and-home on consecutive days: yesterday Princeton @ Liberty is final, today's
+    # Liberty @ Princeton (the row) is still in progress. Yesterday's final must not settle it.
+    _no_exchange(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    row = _liberty_princeton_row(
+        market_slug="test-rematch-total", market_type="total", line=137.5, selection="over", token_side="long"
+    )
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    espn = _boards_by_date(
+        {
+            "20261124": [_game("d1", "2026-11-24T21:00Z", "Princeton Tigers", "79", "Liberty Flames", "72")],
+            "20261125": [
+                _game(
+                    "d2",
+                    "2026-11-25T21:00Z",
+                    "Liberty Flames",
+                    "30",
+                    "Princeton Tigers",
+                    "28",
+                    completed=False,
+                )
+            ],
+        }
+    )
+    res = settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)
+    assert res["newly_settled"] == 0
+    assert json.loads(path.read_text(encoding="utf-8").splitlines()[0])["status"] == "open"
+
+
+def test_both_meetings_final_settles_on_the_rows_own_game(tmp_path: Path, monkeypatch):
+    _no_exchange(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    row = _liberty_princeton_row(
+        market_slug="test-rematch-final", market_type="total", line=137.5, selection="over", token_side="long"
+    )
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    espn = _boards_by_date(
+        {
+            "20261124": [_game("d1", "2026-11-24T21:00Z", "Princeton Tigers", "79", "Liberty Flames", "72")],
+            "20261125": [_game("d2", "2026-11-25T21:00Z", "Liberty Flames", "60", "Princeton Tigers", "70")],
+        }
+    )
+    res = settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)
+    assert res["newly_settled"] == 1
+    assert res["changes"][0]["to_result"] == "loss"  # today's 60 + 70 = 130 < 137.5
+    settled = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    assert (settled["away_score"], settled["home_score"]) == (60, 70)

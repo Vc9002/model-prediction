@@ -177,6 +177,26 @@ def _scoreboard_team_key(name: str, league: str) -> str:
     return next(iter(candidates)) if len(candidates) == 1 else normalized
 
 
+# How far an ESPN event's own tip time may sit from a ledger row's start for a reversed-orientation
+# match to count as the same game. Tips move by minutes, not days; a rematch is a day or more apart.
+_ESPN_REVERSED_MATCH_WINDOW = timedelta(hours=12)
+
+
+def _espn_event_near_start(event: dict[str, Any], start_dt: datetime) -> bool:
+    """True when the ESPN event's own date is within the window of ``start_dt``. Missing or
+    unparseable dates are False: a reversed pairing without a time cannot be told from a rematch."""
+    raw = str(event.get("date") or "").strip()
+    if not raw:
+        return False
+    try:
+        event_dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return False
+    if event_dt.tzinfo is None or start_dt.tzinfo is None:
+        return False
+    return abs(event_dt - start_dt) <= _ESPN_REVERSED_MATCH_WINDOW
+
+
 def _is_settled_auto_buyer_record(record: dict[str, Any]) -> bool:
     return (
         str(record.get("status") or "").lower() == "settled"
@@ -2324,6 +2344,7 @@ def settle_auto_buyer_ledger(
                 away_key = _scoreboard_team_key(away, espn_lg.upper())
                 home_key = _scoreboard_team_key(home, espn_lg.upper())
                 candidates: dict[str, tuple[float, float]] = {}
+                reversed_candidates: dict[str, tuple[float, float]] = {}
                 for d_check in (game_day, prev_day, next_day):
                     sb = _get_scoreboard(espn_lg, d_check)
                     for ev in sb.get("events", []):
@@ -2346,12 +2367,21 @@ def settle_auto_buyer_ledger(
                         event_key = str(ev.get("id") or f"{a_team}:{h_team}")
                         if espn_away == away_key and espn_home == home_key:
                             candidates[event_key] = (float(a_c["score"]), float(h_c["score"]))
-                        elif espn_away == home_key and espn_home == away_key:
+                        elif (
+                            espn_away == home_key
+                            and espn_home == away_key
+                            and _espn_event_near_start(ev, start_dt)
+                        ):
                             # Neutral-site games often carry the opposite designation on ESPN
                             # (2026-11-25: ledger Liberty @ Princeton, ESPN Princeton @ Liberty),
                             # which left them unsettled. Scores are swapped back into the
                             # ledger's own orientation so spread sides grade against the right team.
-                            candidates[event_key] = (float(h_c["score"]), float(a_c["score"]))
+                            # Only the event at this row's own tip time counts: in a home-and-home
+                            # on consecutive days the other meeting is also a reversed pairing, and
+                            # a final from yesterday must never settle today's game.
+                            reversed_candidates[event_key] = (float(h_c["score"]), float(a_c["score"]))
+                if not candidates:
+                    candidates = reversed_candidates
                 if len(candidates) == 1:
                     a_sc, h_sc = next(iter(candidates.values()))
                     away_score = int(a_sc)
