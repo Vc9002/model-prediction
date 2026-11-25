@@ -10,19 +10,27 @@ move it to `docs/DEBUG.md` instead of leaving it here.
 
 A multi-sport quantitative prediction, research, ledger, and local-dashboard
 system with Polymarket US CLOB integration. It is **both** of these, by
-operator decision (2026-11-13), and this paragraph is the single place that
-decision is recorded:
+operator decision (2026-11-13, amended 2026-11-25 for live auto-buyer
+cohorts), and this paragraph is the single place that decision is recorded:
 
 - **Paper trading is the operating mode.** Every scheduled run writes to
   simulated ledgers with full market fidelity: real Polymarket executable asks,
   Kelly/edge-scaled unit sizing (1.0U–2.0U), daily bankroll loss caps,
-  mark-to-market settlement, and closing-line-value PnL accounting. The paper
-  auto-buyer is the only thing that ever buys unattended.
+  mark-to-market settlement, and closing-line-value PnL accounting. The
+  scheduled auto-buyer buys paper for everything except cohorts the operator
+  explicitly sets to `mode: live` in the runtime `auto_buyer_state.json`
+  `cohorts` list (2026-11-25: `ncaab-spread-v7` saved and live-ask edge 5-12%,
+  `ncaab-total-v6` 5-8%; $5 per unit, $25 per game across both, $500 spend and
+  $250 loss per day). Whenever that list exists the legacy whitelist buys
+  paper only; code defaults are never live.
 - **A real-money execution path exists and stays gated.** Order submission to
   Polymarket (`portfolio/`, `polymarket_execute.py`, the dashboard BUY/SELL
-  endpoint) runs only on an explicit per-request operator instruction with
-  confirmation, never from the scheduler, and is held to real-money care:
-  quote freshness, market state, game-not-started, idempotent audit.
+  endpoint) runs on an explicit per-request operator instruction with
+  confirmation, or from the scheduled auto-buyer for an operator-set live
+  cohort only, and is held to real-money care: quote freshness, market state,
+  game-not-started, idempotent audit, per-book daily caps, a per-game cap
+  shared across a game's markets, and the drawdown breaker. `enabled: false`
+  in the state file is the kill switch.
 
 All models are wired directly to the current champion per sport and market
 (moneyline, spread, total, NRFI). There are no shadow-qualification hurdles
