@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-24T18:00:40.243Z"
+last_updated: "2026-11-25T07:28:13.036Z"
 last_activity: 2026-11-23
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: 127dbde82a5d80912861d3dca276e9ff1c5b3f35
+state_head: f5efea7fc24b27e4bd70e7bb8c28468044a864bf
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-23 - Completed quick task 261123-oy5: Scheduled workers inherit BELOW_NORMAL + low memory priority from run_supervisor main()
+Last activity: 2026-11-25 - Completed quick task 261125-1bw: moneylines and NCAAF Overs sized by edge; one stake rule for every Main/Flat tier
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -145,6 +145,7 @@ None yet.
 | 261123-h40 | NBA total v9.2: bias-fixed v9.1 engine + honest shrink (s 0.105), promoted; NBA total Main picks stop | 2026-11-23 | (this commit) | [261123-h40-nba-total-v91-serving-shrink](./quick/261123-h40-nba-total-v91-serving-shrink/) |
 | 261123-oy5 | Scheduled workers inherit BELOW_NORMAL + low memory priority from run_supervisor main() | 2026-11-23 | a3c454d9 | [261123-oy5-give-supervised-scheduled-workers-low-me](./quick/261123-oy5-give-supervised-scheduled-workers-low-me/) |
 | 60 | daily_lock passes explicit std handles so supervisor daily logs are no longer empty | 2026-11-24 | 127dbde8 | — |
+| 261125-1bw | Moneylines and NCAAF Overs sized by edge; one stake rule for Flat, qualified and downgraded Main | 2026-11-25 | f5efea7f | [261125-1bw-remove-the-1u-cap-so-moneylines-and-ncaa](./quick/261125-1bw-remove-the-1u-cap-so-moneylines-and-ncaa/) |
 
 ## Milestone History
 
