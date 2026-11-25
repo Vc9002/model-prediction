@@ -4,10 +4,10 @@ current_phase: 1
 current_phase_name: Portfolio Circuit Breaker
 status: planning
 stopped_at: ROADMAP.md and STATE.md written; REQUIREMENTS.md traceability updated to 4-phase structure
-last_updated: "2026-11-25T07:28:13.036Z"
-last_activity: 2026-11-23
+last_updated: "2026-11-25T17:38:20.062Z"
+last_activity: 2026-11-25
 last_activity_desc: ROADMAP.md and STATE.md created from REQUIREMENTS.md and research/SUMMARY.md
-state_head: f5efea7fc24b27e4bd70e7bb8c28468044a864bf
+state_head: 7ffe43a4101bbdfcfd35e0b406a68b1c06b81beb
 progress:
   total_phases: 4
   completed_phases: 0
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-25 - Completed quick task 261125-1bw: moneylines and NCAAF Overs sized by edge; one stake rule for every Main/Flat tier
+Last activity: 2026-11-25 - Completed quick task 261125-31d: auto-buyer per-model cohorts (2 live, 2 paper), enabled
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -146,6 +146,7 @@ None yet.
 | 261123-oy5 | Scheduled workers inherit BELOW_NORMAL + low memory priority from run_supervisor main() | 2026-11-23 | a3c454d9 | [261123-oy5-give-supervised-scheduled-workers-low-me](./quick/261123-oy5-give-supervised-scheduled-workers-low-me/) |
 | 60 | daily_lock passes explicit std handles so supervisor daily logs are no longer empty | 2026-11-24 | 127dbde8 | — |
 | 261125-1bw | Moneylines and NCAAF Overs sized by edge; one stake rule for Flat, qualified and downgraded Main | 2026-11-25 | f5efea7f | [261125-1bw-remove-the-1u-cap-so-moneylines-and-ncaa](./quick/261125-1bw-remove-the-1u-cap-so-moneylines-and-ncaa/) |
+| 261125-31d | Auto-buyer per-model cohorts: live ncaab spread v7 + total v6 5-12%, paper ML v7m and NBA spread v9 12%+ | 2026-11-25 | 7ffe43a4 | [261125-31d-auto-buyer-per-model-cohorts-paper-ml-v7](./quick/261125-31d-auto-buyer-per-model-cohorts-paper-ml-v7/) |
 
 ## Milestone History
 
