@@ -607,7 +607,7 @@ Each mutation was a break, then a run of the named test, then a restore by bytes
 ### Verify (MODEL_PREDICTION_* unset, `-o addopts='' -q`)
 
 - **Files.** The plan's list (cancel_worker, drawdown, dashboard_html, dual_auto_buyer_dashboard, resting_lifecycle, live_order_safety, auto_buyer_cohorts), plus auto_polymarket_buyer, mode_boundary, state_versioning, run_supervisor, system_health, nba_pretip_capture, ncaaf_prekickoff_capture, auto_buyer_worker_pair, dashboard_server, execution_gate and auto_buyer_ncaab_settle.
-- **Worktree on base 1e49d24c: 615 passed, 4 failed.** All 4 fail identically at base in a worktree:
+- **Worktree, rebased onto d6152144 (the settlement fix): 620 passed, 4 failed** (615 passed on 1e49d24c before the rebase and the self-review test). All 4 fail identically at base in a worktree:
   - `test_run_supervisor.py::test_worker_registry_commands_exist_on_disk`
   - the 3 known `test_dashboard_server` worktree-only failures
 - **Checks.**
@@ -634,8 +634,8 @@ Each mutation was a break, then a run of the named test, then a restore by bytes
    - `renderOverview` and the "Run main buyer check" confirm used the legacy `mode` with a truthy `enabled`.
 4. **`live_trading_active` also covers the legacy ungoverned `mode: live`** (no `cohorts` key), so a legacy live buyer still shows LIVE.
 5. **The drawdown output adds `rows`, `open`, `open_cost_usd` and `approval_filter`.** An unparseable non-date approval keeps every row (`approval_filter: "none"`) rather than hiding them.
-7. **[Rule 1] The plan's unknown-row procedure named `remove_open_rows`, which cannot act on the auto-buyer JSONL** (it is a `PickLedger` method). DEBUG.md instead gives a backed-up hand edit under `daily.lock`: void a primary unknown that never filled, or restate it from the exchange.
 6. **`_SKIP_ESCALATION` entry for the new worker.** `system_health` reports a worker that has never run as degraded, so it shows degraded until Task 4 registers the task.
+7. **[Rule 1] The plan's unknown-row procedure named `remove_open_rows`, which cannot act on the auto-buyer JSONL** (it is a `PickLedger` method). DEBUG.md instead gives a backed-up hand edit under `daily.lock`: void a primary unknown that never filled, or restate it from the exchange.
 
 ### Open items for the orchestrator (Task 4)
 
