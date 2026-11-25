@@ -314,7 +314,21 @@ def _resolve_spread_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> 
     market_line = snapshot.get("line")
     if market_team is None or market_line is None:
         raise ExecutionGateError("REFUSED: live spread market has no team/line to verify against.")
-    is_market_team = _participant_matches(pick_row, selected_team, str(market_team))
+    # The market team must be exactly one of the row's two teams (same rule as 894f9542 in
+    # dashboard/backtests.py::_spread_side_for_row). Real-money bug 2026-11-25: Polymarket's "UCA"
+    # matched neither "Central Arkansas" nor "Jacksonville", so it was taken for the opponent and a
+    # "Central Arkansas -3.5" pick resolved to the short side, Jacksonville -3.5. A team matching
+    # both ("Louisiana" vs "Louisiana-Monroe") is the same hazard.
+    market_is_away = _participant_matches(pick_row, str(pick_row.get("away_team") or ""), str(market_team))
+    market_is_home = _participant_matches(pick_row, str(pick_row.get("home_team") or ""), str(market_team))
+    if market_is_away == market_is_home:
+        raise ExecutionGateError(
+            f"REFUSED: live spread market team {market_team!r} matches "
+            f"{'both' if market_is_away else 'neither'} of the row's teams "
+            f"({pick_row.get('away_team')!r} @ {pick_row.get('home_team')!r}); cannot tell long from short."
+        )
+    selection = str(pick_row.get("selection") or "").casefold()
+    is_market_team = market_is_home if selection == "home" else market_is_away
     if is_market_team and _lines_match(row_line, float(market_line)):
         return "long"
     if not is_market_team and _lines_match(row_line, -float(market_line)):
