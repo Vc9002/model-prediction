@@ -80,6 +80,8 @@ class FakeExecutor:
 
     constructed: ClassVar[int] = 0
     executed: ClassVar[list[Any]] = []
+    rest_only: ClassVar[bool] = False  # IOC fills nothing; the whole ticket rests as a fallback
+    rest_state: ClassVar[str] = "ORDER_STATE_PARTIALLY_FILLED"
 
     def __init__(self, **_kwargs: Any) -> None:
         FakeExecutor.constructed += 1
@@ -89,6 +91,18 @@ class FakeExecutor:
 
     def execute(self, ticket: Any, pick_row: dict[str, Any], **_kwargs: Any) -> dict[str, Any]:
         FakeExecutor.executed.append((ticket, dict(pick_row)))
+        if FakeExecutor.rest_only:
+            return {
+                "status": "submitted",
+                "order_id": f"sim-{ticket.pick_id}",
+                "order_ids": [f"sim-{ticket.pick_id}"],
+                "order_state": FakeExecutor.rest_state,
+                "filled_size_shares": 0.0,
+                "estimated_filled_cost_usd": 0.0,
+                "fallback_order_id": f"fb-{ticket.pick_id}",
+                "fallback_status": "resting",
+                "fallback_resting_shares": ticket.size_shares,
+            }
         return {
             "status": "submitted",
             "order_id": f"sim-{ticket.pick_id}",
@@ -108,6 +122,8 @@ class _NoExchange:
 def _isolate(monkeypatch):
     FakeExecutor.constructed = 0
     FakeExecutor.executed = []
+    FakeExecutor.rest_only = False
+    FakeExecutor.rest_state = "ORDER_STATE_PARTIALLY_FILLED"
     monkeypatch.delenv("POLYMARKET_KEY_ID", raising=False)
     monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", lambda *_a, **_k: (0.0, 0.0))
     monkeypatch.setattr(
@@ -422,14 +438,25 @@ def _cycle_harness(monkeypatch, tmp_path, state: dict[str, Any], rows: list[dict
         auto_executor, "AUTO_BUYER_CYCLE_HISTORY_PATH", tmp_path / "logs" / "auto_buyer_cycle_history.jsonl"
     )
     monkeypatch.setattr(auto_executor, "load_auto_buyer_state", lambda: dict(state))
-    calls: dict[str, list[Any]] = {"saved": [], "history": [], "reconciled": [], "settled": [], "configs": []}
+    calls: dict[str, list[Any]] = {
+        "saved": [],
+        "history": [],
+        "reconciled": [],
+        "settled": [],
+        "configs": [],
+        "cohort_reads": [],
+    }
     monkeypatch.setattr(auto_executor, "save_auto_buyer_state", lambda s: calls["saved"].append(s))
     monkeypatch.setattr(
         auto_executor,
         "_append_auto_buyer_cycle_history",
         lambda summary, history_path=None: calls["history"].append((summary, history_path)),
     )
-    monkeypatch.setattr(auto_executor, "_read_cohort_candidate_picks", lambda: [dict(r) for r in rows])
+    monkeypatch.setattr(
+        auto_executor,
+        "_read_cohort_candidate_picks",
+        lambda: calls["cohort_reads"].append(1) or [dict(r) for r in rows],
+    )
     monkeypatch.setattr(
         "model_prediction.dashboard.picks.read_picks", lambda *a, **k: [dict(r) for r in rows]
     )
@@ -504,7 +531,7 @@ def test_cycle_kill_switch_and_override_never_execute_cohorts(monkeypatch, tmp_p
     assert FakeExecutor.constructed == 0
     assert all(c.execute_live is False for c in calls["configs"])
     assert calls["reconciled"] == []
-    assert summary["cohort_passes"]["live"]["mode"] == "LIVE_DRY_RUN"
+    assert summary["cohort_passes"]["live"]["mode"] == ("LIVE_DRY_RUN" if enabled else "LIVE_DISABLED")
 
 
 def test_cycle_malformed_cohorts_still_force_global_paper(monkeypatch, tmp_path):
@@ -736,7 +763,7 @@ def test_cycle_disabled_four_cohorts_does_nothing(monkeypatch, tmp_path):
     assert FakeExecutor.constructed == 0
     assert not (tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl").exists()
     assert not (tmp_path / "auto_buyer_ledger.jsonl").exists()
-    assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_DRY_RUN"
+    assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_DISABLED"
 
 
 def test_live_per_game_cap_is_shared_across_spread_and_total(tmp_path, decorate):
@@ -987,3 +1014,266 @@ def test_decision_time_executable_quote_counts_as_quote_evidence():
         {"market_quote_provenance": "decision_time_sportsbook_quote"},
     ):
         assert not _row_in_cohort({**nba, **change}, NBA_V9_PAPER), change
+
+
+# ---------------------------------------------------------------- review cycle 1
+
+
+def _pending_fallback_row() -> dict[str, Any]:
+    return {
+        "pick_id": "resting",
+        "event_id": "old-game",
+        "selection": "home",
+        "market_type": "spread",
+        "status": "open",
+        "cost_usd": 0.0,
+        "shares": 0.0,
+        "entry_price": 0.5,
+        "fallback_order_id": "fb-1",
+        "fallback_reconciled": False,
+        "fallback_resting_shares": 50.0,
+        "executed_at_utc": iso_utc(utc_now()),
+        "market_slug": "asc-cbb-old-game-2026-11-25-neg-3pt5",
+        "token_side": "long",
+    }
+
+
+@pytest.mark.parametrize("raw", ["false", "true", 1, "yes"])
+def test_enabled_must_be_the_boolean_true(monkeypatch, tmp_path, raw):
+    calls = _cycle_harness(monkeypatch, tmp_path, _state([_entry()], enabled=raw), _mixed_rows())
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert FakeExecutor.executed == []
+    assert FakeExecutor.constructed == 0
+    assert all(c.execute_live is False for c in calls["configs"])
+    assert summary["cohort_passes"]["live"]["mode"] == "LIVE_DISABLED"
+
+
+def test_ungoverned_string_enabled_never_executes_legacy_live(monkeypatch, tmp_path):
+    state = {**_state([], enabled="true"), "mode": "live"}
+    state.pop("cohorts")
+    calls = _cycle_harness(monkeypatch, tmp_path, state, _mixed_rows())
+    auto_executor.run_auto_buyer_cycle()
+    assert FakeExecutor.executed == []
+    assert calls["reconciled"] == []
+    assert all(c.execute_live is False for c in calls["configs"])
+    monkeypatch.setattr(auto_executor, "load_auto_buyer_state", lambda: dict(state))
+    assert AutoPolymarketBuyer(data_root=tmp_path).config.execute_live is False
+
+
+def test_toggle_stores_a_real_bool_and_refuses_ambiguous_payloads(monkeypatch, tmp_path):
+    import json
+
+    state_file = tmp_path / "auto_buyer_state.json"
+    monkeypatch.setattr(auto_executor, "AUTO_BUYER_STATE_FILE", state_file)
+    state_file.write_text(json.dumps({"enabled": "false", "mode": "paper"}), encoding="utf-8")
+    for bad in ("false", "true", 1, 0, "yes"):
+        with pytest.raises(ValueError):
+            auto_executor.toggle_auto_buyer(bad)
+    # A bare toggle of a non-boolean value fails safe to off, never on.
+    assert auto_executor.toggle_auto_buyer()["enabled"] is False
+    assert auto_executor.toggle_auto_buyer(True)["enabled"] is True
+    assert json.loads(state_file.read_text(encoding="utf-8"))["enabled"] is True
+    assert auto_executor.toggle_auto_buyer(False)["enabled"] is False
+
+
+@pytest.mark.parametrize("rest_state", ["ORDER_STATE_PARTIALLY_FILLED", "ORDER_STATE_CANCELED"])
+def test_daily_cap_counts_resting_fallbacks_within_a_cycle(tmp_path, decorate, rest_state):
+    FakeExecutor.rest_only = True
+    FakeExecutor.rest_state = rest_state
+    rows = [
+        _row(SPREAD_V7, pick_id=f"r{i:02d}", event=f"g{i:02d}", model_probability=0.60, ask=0.51, units=5.0)
+        for i in range(30)
+    ]
+    result = _live_buyer(tmp_path, max_daily_spend_usd=500.0).evaluate_and_execute(rows)
+    assert len(FakeExecutor.executed) == 20
+    assert result.rejected_budget == 10
+    assert result.total_spend_usd <= 500.0
+    # What the real recorder wrote must carry the exposure into the next cycle.
+    ledger = _ledger_rows(tmp_path / "auto_buyer_ledger.jsonl")
+    assert len(ledger) == 20
+    assert _REAL_TODAY_TOTALS(tmp_path)[0] == pytest.approx(500.0, abs=0.5)
+    assert auto_executor._live_book_has_pending_orders(tmp_path / "auto_buyer_ledger.jsonl")
+    exposure = _live_buyer(tmp_path)._build_bought_index()["game_exposure"]
+    assert len(exposure) == 20
+    assert all(sum(picks.values()) == pytest.approx(25.0, abs=0.05) for picks in exposure.values())
+    # The next cycle's per-game cap sees the resting $25 on g00 (a total on the same game).
+    more = _row(TOTAL_V6, pick_id="t00", event="g00", market="total", model_probability=0.57, ask=0.51)
+    FakeExecutor.executed = []
+    later = _live_buyer(tmp_path, cohorts=(SPREAD_V7_LIVE, TOTAL_V6_LIVE)).evaluate_and_execute([more])
+    assert FakeExecutor.executed == []
+    assert later.rejected_budget == 1
+
+
+def test_daily_totals_count_unreconciled_resting_exposure(tmp_path):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            _pending_fallback_row(),
+            {**_pending_fallback_row(), "pick_id": "done", "cost_usd": 10.0, "fallback_reconciled": True},
+        ],
+    )
+    spend, _pnl = _REAL_TODAY_TOTALS(tmp_path)
+    assert spend == pytest.approx(35.0)
+
+
+@pytest.mark.parametrize(
+    ("enabled", "cohorts"),
+    [(True, [_entry(enabled=False)]), (True, "not-a-list"), (False, [_entry()]), (False, [])],
+)
+def test_governed_live_book_is_reconciled_whenever_it_has_resting_orders(
+    monkeypatch, tmp_path, enabled, cohorts
+):
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_pending_fallback_row()])
+    calls = _cycle_harness(monkeypatch, tmp_path, _state(cohorts, enabled=enabled), _mixed_rows())
+    auto_executor.run_auto_buyer_cycle()
+    assert calls["reconciled"] == [1]
+    assert None in calls["settled"]
+    assert FakeExecutor.executed == []
+
+
+def test_governed_live_book_without_resting_orders_is_left_alone(monkeypatch, tmp_path):
+    calls = _cycle_harness(monkeypatch, tmp_path, _state([_entry()], enabled=False), _mixed_rows())
+    auto_executor.run_auto_buyer_cycle()
+    assert calls["reconciled"] == []
+
+
+def test_reconcile_failure_without_live_buying_does_not_stop_the_cycle(monkeypatch, tmp_path):
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_pending_fallback_row()])
+    _cycle_harness(monkeypatch, tmp_path, _state([_entry()], enabled=False), _mixed_rows())
+    monkeypatch.setattr(
+        auto_buyer_ledger,
+        "reconcile_pending_auto_buyer_fallbacks",
+        lambda: (_ for _ in ()).throw(OSError("exchange unavailable")),
+    )
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert summary["reconciliation"]["status"] == "error"
+    _cycle_harness(monkeypatch, tmp_path, _state([_entry()], enabled=True), _mixed_rows())
+    monkeypatch.setattr(
+        auto_buyer_ledger,
+        "reconcile_pending_auto_buyer_fallbacks",
+        lambda: (_ for _ in ()).throw(OSError("exchange unavailable")),
+    )
+    with pytest.raises(RuntimeError, match="pre-cycle reconciliation failed"):
+        auto_executor.run_auto_buyer_cycle()
+    assert FakeExecutor.executed == []
+
+
+@pytest.mark.parametrize(
+    ("state", "pending", "decoupled", "expected"),
+    [
+        ({"enabled": False, "mode": "paper", "cohorts": []}, True, False, False),
+        ({"enabled": False, "mode": "paper", "cohorts": []}, True, True, True),
+        ({"enabled": True, "mode": "paper"}, True, False, False),
+        ({"enabled": True, "mode": "paper", "cohorts": []}, True, False, True),
+        ({"enabled": True, "mode": "live"}, False, False, True),
+        ({"enabled": "true", "mode": "live"}, False, False, False),
+    ],
+)
+def test_daily_defers_live_reconcile_only_to_a_cycle_that_does_it(
+    monkeypatch, tmp_path, state, pending, decoupled, expected
+):
+    from model_prediction.cli import daily
+
+    if pending:
+        _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_pending_fallback_row()])
+    monkeypatch.setattr(auto_executor, "DATA", tmp_path)
+    monkeypatch.setattr(auto_executor, "load_auto_buyer_state", lambda: dict(state))
+    monkeypatch.setattr(daily, "_auto_buyer_is_decoupled", lambda: decoupled)
+    monkeypatch.setattr(daily, "_skip_auto_buyer_for_verification", lambda: False)
+    assert daily._auto_buyer_cycle_owns_live_reconcile() is expected
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        _entry(sport="ncaaf"),
+        _entry(sport="nhl"),
+        _entry(model_id="mlb-moneyline-v9-residual", sport="mlb", market="moneyline"),
+        _entry(model_id="nba-total-margin-v9", sport="nba", market="total", mode="paper"),
+        _entry(max_saved_edge_exclusive=0.30),
+        _entry(min_saved_edge=0.25, max_saved_edge_exclusive=None, mode="paper"),
+    ],
+)
+def test_parse_rejects_blocked_sports_markets_and_wide_windows(bad):
+    parsed = _parse_cohorts({"cohorts": [bad]})
+    assert parsed.active == ()
+    assert len(parsed.errors) == 1
+
+
+def test_hand_built_cohort_cannot_reach_a_blocked_sport_or_skip_the_edge_ceiling(tmp_path, decorate):
+    ncaaf = BuyCohort("cfb-structural-v5.2", "ncaaf", "spread", 0.05, 0.12, "live")
+    row = _row("cfb-structural-v5.2", pick_id="cfb", event="c1", league="ncaaf")
+    assert not _row_in_cohort(row, ncaaf)
+    wide = BuyCohort(SPREAD_V7, "ncaab", "spread", 0.05, 0.60, "live")
+    phantom = _row(SPREAD_V7, pick_id="ph", event="g1", edge="0.30", model_probability=0.81, ask=0.51)
+    result = _live_buyer(tmp_path, cohorts=(wide,)).evaluate_and_execute([phantom])
+    assert FakeExecutor.executed == []
+    assert result.rejected_unrealistic_edge == 1
+
+
+def test_paper_cohort_pass_never_quarantines_live_pass_does(monkeypatch, tmp_path):
+    calls = _cycle_harness(
+        monkeypatch, tmp_path, _state(OPERATOR_COHORTS_FINAL, enabled=True), _mixed_four_rows()
+    )
+    auto_executor.run_auto_buyer_cycle()
+    by_mode = {c.mode: c for c in calls["configs"] if c.cohorts}
+    assert by_mode["paper"].auto_quarantine_underperforming is False
+    assert by_mode["live"].auto_quarantine_underperforming is True
+
+
+def test_disabled_cycle_runs_no_cohort_buy_pass(monkeypatch, tmp_path):
+    captures: list[Any] = []
+    calls = _cycle_harness(
+        monkeypatch, tmp_path, _state(OPERATOR_COHORTS_FINAL, enabled=False), _mixed_four_rows()
+    )
+    monkeypatch.setattr(
+        auto_executor, "_capture_missing_active_snapshot_slates", lambda *a, **k: captures.append(k) or []
+    )
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert calls["cohort_reads"] == []
+    assert [c for c in calls["configs"] if c.cohorts] == []
+    assert all(not k["config"].cohorts for k in captures)
+    assert summary["cohort_passes"]["live"]["mode"] == "LIVE_DISABLED"
+    assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_DISABLED"
+
+
+def test_dashboard_manual_run_refuses_while_the_writer_lock_is_held(monkeypatch, tmp_path):
+    import json
+    from io import BytesIO
+    from unittest.mock import Mock
+
+    from model_prediction.daily_lock import acquire_lock
+    from model_prediction.dashboard import routes
+    from model_prediction.dashboard.common import _DASHBOARD_TOKEN
+
+    lock_path = tmp_path / "locks" / "daily.lock"
+    monkeypatch.setattr(routes, "_auto_buyer_run_lock_path", lambda: lock_path)
+    ran: list[Any] = []
+    monkeypatch.setattr(routes, "run_auto_buyer_cycle", lambda **k: ran.append(k) or {"status": "ran"})
+
+    def post() -> tuple[int, dict[str, Any]]:
+        payload = json.dumps({"confirm": True}).encode("utf-8")
+        handler = routes.Handler.__new__(routes.Handler)
+        handler.path = "/api/auto-buyer/run"
+        handler.headers = {"Content-Length": str(len(payload)), "X-Dashboard-Token": _DASHBOARD_TOKEN}
+        handler.rfile = BytesIO(payload)
+        handler.wfile = BytesIO()
+        handler.send_response = Mock()
+        handler.send_header = Mock()
+        handler.end_headers = Mock()
+        handler.do_POST()
+        return handler.send_response.call_args[0][0], json.loads(handler.wfile.getvalue().decode("utf-8"))
+
+    held = acquire_lock(lock_path)
+    assert held is not None
+    try:
+        code, body = post()
+    finally:
+        held.close()
+    assert code == 409
+    assert body["status"] == "refused"
+    assert ran == []
+    code, body = post()
+    assert code == 200
+    assert body == {"status": "ran"}
+    assert ran == [{"force": True}]

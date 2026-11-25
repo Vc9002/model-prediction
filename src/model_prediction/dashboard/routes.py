@@ -25,6 +25,7 @@ except ImportError:  # pragma: no cover
 from http.server import BaseHTTPRequestHandler
 
 from model_prediction.config import load_config, polymarket_edge_enabled
+from model_prediction.daily_lock import acquire_lock
 from model_prediction.dashboard.backtests import (
     backtests,
     market_snapshots,
@@ -118,7 +119,7 @@ from model_prediction.portfolio.manual_bet_ledger import (
     sync_manual_bets_from_polymarket,
 )
 from model_prediction.portfolio.polymarket_scanner import PolymarketSlateScanner
-from model_prediction.runtime_paths import rerouted_data_root
+from model_prediction.runtime_paths import RuntimePaths, rerouted_data_root
 
 
 def _edge_feature_enabled(component: str) -> bool:
@@ -142,6 +143,11 @@ def _read_paper_auto_buyer_ledger() -> list[dict]:
     if not path.exists():
         return []
     return read_auto_buyer_ledger(jsonl_path=path)
+
+
+def _auto_buyer_run_lock_path() -> Path:
+    """The writer lock the scheduled auto-buyer worker and the daily run hold."""
+    return RuntimePaths.resolve(require_external_runtime=False).daily_lock
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -713,7 +719,22 @@ class Handler(BaseHTTPRequestHandler):
             except (OSError, RuntimeError, TypeError, ValueError) as error:
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/run":
-            self._send(run_auto_buyer_cycle(force=True))
+            # Same writer lock as the scheduled worker and the daily run, non-blocking: a manual
+            # cycle racing a scheduled one could read the same daily totals and pass the caps twice.
+            lock = acquire_lock(_auto_buyer_run_lock_path())
+            if lock is None:
+                self._send(
+                    {
+                        "status": "refused",
+                        "error": "a scheduled auto-buyer or daily run holds the writer lock; retry shortly",
+                    },
+                    code=409,
+                )
+            else:
+                try:
+                    self._send(run_auto_buyer_cycle(force=True))
+                finally:
+                    lock.close()
         elif parsed.path == "/api/auto-buyer/ncaab-paper/toggle":
             from model_prediction.portfolio.ncaab_paper_trial import set_paper_trial_enabled
 

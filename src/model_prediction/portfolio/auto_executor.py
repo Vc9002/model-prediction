@@ -259,10 +259,16 @@ COHORT_REQUIRED_KEYS = frozenset(
     {"model_id", "sport", "market", "min_saved_edge", "max_saved_edge_exclusive", "mode", "enabled"}
 )
 COHORT_OPTIONAL_KEYS = frozenset({"note", "approved_by", "approved_at_utc"})
-# Phantom-edge guard for open-ended windows (no upper bound): a live-ask edge above 25% is far more
-# often a bad quote than a mispriced market. Same value as the NCAAB paper trial's sanity ceiling;
-# the measured ML v7m cohort's largest saved edge is 19.6%, so it drops none of the measured rows.
-COHORT_OPEN_ENDED_EXECUTION_EDGE_CEILING = 0.25
+# Phantom-edge guard for every cohort: a live-ask edge above 25% is far more often a bad quote than
+# a mispriced market, and no window may reach above it. Same value as the NCAAB paper trial's sanity
+# ceiling; the measured ML v7m cohort's largest saved edge is 19.6%, so it drops none of those rows.
+COHORT_EXECUTION_EDGE_CEILING = 0.25
+# Sports a cohort may name: the production six minus NCAAF, which every auto-buyer path dropped on
+# 2026-11-24 (operator directive). The code-level always-off sports stay off for cohorts too.
+COHORT_SPORTS = frozenset({"nba", "ncaab", "nfl", "mlb", "wnba"})
+# Code-level categorical blocks a cohort can never lift (state-file blocks it can): MLB moneylines
+# (pulled 2026-09-02) and NBA totals (operator 2026-11-13: must not reach the paper ledger).
+COHORT_BLOCKED_SPORT_MARKETS = frozenset({("mlb", "moneyline"), ("nba", "total")})
 
 
 @dataclass(frozen=True)
@@ -319,23 +325,29 @@ def _parse_one_cohort(entry: Any) -> tuple[BuyCohort | None, str | None]:
     if not isinstance(model_id, str) or not model_id.strip():
         return None, "model_id must be a non-empty string"
     sport = entry["sport"]
-    if not isinstance(sport, str) or not sport.strip():
-        return None, "sport must be a non-empty string"
+    if not isinstance(sport, str) or sport.strip().lower() not in COHORT_SPORTS:
+        return None, f"sport must be one of {sorted(COHORT_SPORTS)}, got {sport!r}"
     market = entry["market"]
     if not isinstance(market, str) or market not in COHORT_MARKETS:
         return None, f"market must be one of {sorted(COHORT_MARKETS)}, got {market!r}"
+    if (sport.strip().lower(), market) in COHORT_BLOCKED_SPORT_MARKETS:
+        return None, f"{sport}:{market} is blocked in code for every auto-buyer path"
     mode = entry["mode"]
     if not isinstance(mode, str) or mode not in COHORT_MODES:
         return None, f"mode must be exactly 'paper' or 'live', got {mode!r}"
     minimum = _cohort_edge(entry["min_saved_edge"])
-    if minimum is None or not 0 <= minimum < 1:
-        return None, f"min_saved_edge must be a finite number in [0, 1), got {entry['min_saved_edge']!r}"
+    ceiling = COHORT_EXECUTION_EDGE_CEILING
+    if minimum is None or not 0 <= minimum < ceiling:
+        return (
+            None,
+            f"min_saved_edge must be a finite number in [0, {ceiling:g}), got {entry['min_saved_edge']!r}",
+        )
     raw_max = entry["max_saved_edge_exclusive"]
     maximum: float | None = None
     if raw_max is not None:
         maximum = _cohort_edge(raw_max)
-        if maximum is None or not minimum < maximum <= 1:
-            return None, f"max_saved_edge_exclusive must be null or in (min, 1], got {raw_max!r}"
+        if maximum is None or not minimum < maximum <= ceiling:
+            return None, f"max_saved_edge_exclusive must be null or in (min, {ceiling:g}], got {raw_max!r}"
     if mode == "live" and maximum is None:
         return None, "a live cohort needs a finite max_saved_edge_exclusive (no open-ended real money)"
     if not enabled:
@@ -601,6 +613,8 @@ def _game_key(row: dict[str, Any]) -> str:
 
 def _row_in_cohort(row: dict[str, Any], cohort: BuyCohort) -> bool:
     """True when a saved pick row belongs to ``cohort``, with decision-time quote evidence."""
+    if cohort.sport not in COHORT_SPORTS or (cohort.sport, cohort.market) in COHORT_BLOCKED_SPORT_MARKETS:
+        return False
     if str(row.get("model_id") or row.get("model_version") or "") != cohort.model_id:
         return False
     if _auto_buyer_sport_market(row) != (cohort.sport, cohort.market):
@@ -873,6 +887,33 @@ def _append_auto_buyer_cycle_history(
         logger.warning("Failed to append auto_buyer_cycle_history.jsonl: %s", exc)
 
 
+def _resting_fallback_cost(row: dict[str, Any]) -> float:
+    """Dollars still resting on the book for an unreconciled IOC fallback (0 once reconciled)."""
+    if not row.get("fallback_order_id") or row.get("fallback_reconciled"):
+        return 0.0
+    try:
+        cost = float(row.get("fallback_resting_shares") or 0.0) * float(row.get("entry_price") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    return cost if math.isfinite(cost) and cost > 0 else 0.0
+
+
+def _live_book_has_pending_orders(ledger_path: Path) -> bool:
+    """Same selection as ``reconcile_pending_auto_buyer_fallbacks``: an unreconciled resting fallback,
+    or an open row whose fill is unknown. An unreadable ledger counts as pending (manage the book)."""
+    from model_prediction.portfolio.auto_buyer_ledger import read_auto_buyer_ledger
+
+    try:
+        rows = read_auto_buyer_ledger(jsonl_path=ledger_path)
+    except (OSError, ValueError):
+        return True
+    return any(
+        (row.get("fallback_order_id") and not row.get("fallback_reconciled"))
+        or (str(row.get("status", "")).lower() == "open" and row.get("fill_known") is False)
+        for row in rows
+    )
+
+
 def _today_auto_buyer_totals(data_root: Path | str = DATA) -> tuple[float, float]:
     """Sum today's (ET calendar day) already-executed spend and realized P&L.
 
@@ -892,7 +933,7 @@ def _today_auto_buyer_totals(data_root: Path | str = DATA) -> tuple[float, float
         if executed_raw and not row.get("manual"):
             try:
                 if parse_utc(str(executed_raw)).astimezone(EASTERN).date() == today:
-                    spend += float(row.get("cost_usd") or 0.0)
+                    spend += float(row.get("cost_usd") or 0.0) + _resting_fallback_cost(row)
             except (TypeError, ValueError):
                 pass
 
@@ -1131,11 +1172,15 @@ def save_auto_buyer_state(state: dict[str, Any]) -> None:
 
 def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
     """Toggle Auto-Buyer ON or OFF from the dashboard or API."""
+    # Only the booleans true/false are accepted: bool("false") is True, and this switch gates
+    # scheduled real-money orders. A bare toggle of a non-boolean saved value fails safe to off.
+    if enabled is not None and not isinstance(enabled, bool):
+        raise ValueError(f"Auto-Buyer enabled must be true or false, got {enabled!r}")
     state = load_auto_buyer_state()
     if enabled is None:
-        state["enabled"] = not state.get("enabled", False)
+        state["enabled"] = state.get("enabled") is False
     else:
-        state["enabled"] = bool(enabled)
+        state["enabled"] = enabled
     state["updated_at_utc"] = iso_utc(utc_now())
     save_auto_buyer_state(state)
     return state
@@ -1305,6 +1350,30 @@ def _cohort_pass_config(
     )
 
 
+def _skipped_cohort_pass(label: str, cohorts: tuple[BuyCohort, ...]) -> dict[str, Any]:
+    return {"mode": label, "cohorts": [c.label for c in cohorts], "skipped": "enabled is not true"}
+
+
+def _cycle_manages_live_book(*, governed: bool, buying_live: bool, preview: bool) -> bool:
+    """Whether a cycle reconciles and settles the live book before evaluating picks."""
+    if preview:
+        return False
+    if buying_live:
+        return True
+    return governed and _live_book_has_pending_orders(DATA / "auto_buyer_ledger.jsonl")
+
+
+def auto_buyer_cycle_manages_live_book(state: dict[str, Any]) -> bool:
+    """Whether ``run_auto_buyer_cycle()`` (no override, no preview) on ``state`` reconciles the live
+    book itself. The daily job defers its own reconcile only when this is true."""
+    mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
+    cycle_enabled = state.get("enabled") is True
+    governed = COHORTS_STATE_KEY in state
+    live_cohorts = [c for c in _parse_cohorts(state).active if c.mode == "live"]
+    buying_live = cycle_enabled and ((not governed and mode == "live") or bool(live_cohorts))
+    return _cycle_manages_live_book(governed=governed, buying_live=buying_live, preview=False)
+
+
 def _cohort_pass_summary(
     label: str,
     cohorts: tuple[BuyCohort, ...],
@@ -1403,7 +1472,8 @@ def run_auto_buyer_cycle(
     if mode not in AUTO_BUYER_MODES:
         mode = DEFAULT_AUTO_BUYER_MODE
     state["mode"] = mode
-    cycle_enabled = bool(state.get("enabled", False))
+    # Strict: only the boolean true enables (bool("false") is True).
+    cycle_enabled = state.get("enabled") is True
     # Cohort governance (quick-261125-31d): any `cohorts` key, even an empty or malformed one, puts
     # the legacy whitelist pass on paper, so only an operator-set live cohort can trade real money
     # from the scheduler. A separate local keeps the saved `mode` untouched in the state written back.
@@ -1422,11 +1492,18 @@ def run_auto_buyer_cycle(
         bool(live_cohorts) and cycle_enabled and execute_override is not False and not preview
     )
     record_paper = cycle_enabled and not preview
+    # A disabled cycle runs no cohort buy pass at all (no candidate read, no quote refresh, no slate
+    # capture); the live book below is still managed.
+    run_cohort_passes = cycle_enabled or preview
     pass_overrides = _preview_pass_overrides(preview, preview_lookahead_hours)
+    buying_live = should_execute or cohort_live_execute
+    manage_live_book = _cycle_manages_live_book(governed=governed, buying_live=buying_live, preview=preview)
 
-    # Reconcile resting orders, update fills, and cancel stale/moved orders before evaluating new picks
+    # Reconcile resting orders, update fills, and cancel stale/moved orders before evaluating new picks.
+    # Under cohorts this also runs while nothing buys live (kill switch on, no live cohort parsed):
+    # cancelling a resting fallback at game start or on an adverse move only ever reduces risk.
     reconciliation_summary: dict[str, Any] = {}
-    if should_execute or cohort_live_execute:
+    if manage_live_book:
         try:
             from .auto_buyer_ledger import (
                 reconcile_pending_auto_buyer_fallbacks,
@@ -1437,7 +1514,9 @@ def run_auto_buyer_cycle(
             settle_auto_buyer_ledger()
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
-            raise RuntimeError("Live auto-buyer stopped: pre-cycle reconciliation failed") from exc
+            if buying_live:
+                raise RuntimeError("Live auto-buyer stopped: pre-cycle reconciliation failed") from exc
+            reconciliation_summary = {"status": "error", "error": str(exc)[:200]}
     # Not an elif of the live branch: a live cohort and paper books can run in one cycle.
     if record_paper and (global_mode == "paper" or paper_cohorts):
         try:
@@ -1448,8 +1527,12 @@ def run_auto_buyer_cycle(
             logger.warning("Pre-cycle paper-ledger settlement failed: %s", exc)
 
     cohort_passes: dict[str, Any] = {}
-    cohort_picks = _read_cohort_candidate_picks() if (live_cohorts or paper_cohorts) else []
-    if live_cohorts:
+    cohort_picks = (
+        _read_cohort_candidate_picks() if run_cohort_passes and (live_cohorts or paper_cohorts) else []
+    )
+    if live_cohorts and not run_cohort_passes:
+        cohort_passes["live"] = _skipped_cohort_pass("LIVE_DISABLED", live_cohorts)
+    elif live_cohorts:
         # First, so the live book is evaluated before any paper fill of this cycle exists.
         live_config = _cohort_pass_config(
             state, cohorts=live_cohorts, mode="live", execute_live=cohort_live_execute, **pass_overrides
@@ -1490,10 +1573,18 @@ def run_auto_buyer_cycle(
     if not should_execute and record_paper and global_mode == "paper":
         _record_paper_fills(res.dry_run_orders)
 
-    if paper_cohorts:
-        # After the global pass recorded its paper fills, so this book's dedup sees them.
+    if paper_cohorts and not run_cohort_passes:
+        cohort_passes["paper"] = _skipped_cohort_pass("PAPER_DISABLED", paper_cohorts)
+    elif paper_cohorts:
+        # After the global pass recorded its paper fills, so this book's dedup sees them. The paper
+        # book never quarantines: it exists to measure the cohort, and the rolling-ROI breaker would
+        # silently stop that measurement after the first losing stretch.
         paper_config = _cohort_pass_config(
-            state, cohorts=paper_cohorts, mode="paper", execute_live=False, **pass_overrides
+            state,
+            cohorts=paper_cohorts,
+            mode="paper",
+            execute_live=False,
+            **{**pass_overrides, "auto_quarantine_underperforming": False},
         )
         paper_res = AutoPolymarketBuyer(config=paper_config).evaluate_and_execute(
             [dict(r) for r in cohort_picks]
@@ -1717,7 +1808,7 @@ class AutoPolymarketBuyer:
                 # The fallback never runs cohort passes, and the legacy whitelist never trades
                 # live while cohorts exist.
                 state_mode = "paper"
-            state_should_execute = bool(state.get("enabled", False)) and state_mode == "live"
+            state_should_execute = state.get("enabled") is True and state_mode == "live"
             self.config = AutoExecutionConfig(
                 **_base_auto_execution_kwargs_from_state(state),
                 execute_live=state_should_execute,
@@ -1864,6 +1955,14 @@ class AutoPolymarketBuyer:
                 from .auto_buyer_ledger import read_auto_buyer_ledger
 
                 for r in read_auto_buyer_ledger(auto_ledger_file):
+                    # Per-game exposure before the dead-row filter below: a zero-fill primary whose
+                    # IOC was cancelled can still have its fallback resting on the book.
+                    game = _game_key(r)
+                    exposure = float(r.get("cost_usd") or 0.0) + _resting_fallback_cost(r)
+                    if game and exposure > 0:
+                        by_pick = game_exposure.setdefault(game, {})
+                        pick_key = str(r.get("pick_id") or r.get("order_id") or "")
+                        by_pick[pick_key] = by_pick.get(pick_key, 0.0) + exposure
                     status = str(r.get("status") or "").lower()
                     order_st = str(r.get("order_state") or "").upper()
                     result_st = str(r.get("result") or "").lower()
@@ -1878,15 +1977,6 @@ class AutoPolymarketBuyer:
                         or (result_st == "void" and shares_cnt == 0)
                     ):
                         continue
-
-                    game = _game_key(r)
-                    if game:
-                        exposure = float(r.get("cost_usd") or 0.0) + float(
-                            r.get("fallback_resting_shares") or 0.0
-                        ) * float(r.get("entry_price") or 0.0)
-                        by_pick = game_exposure.setdefault(game, {})
-                        pick_key = str(r.get("pick_id") or r.get("order_id") or "")
-                        by_pick[pick_key] = by_pick.get(pick_key, 0.0) + exposure
 
                     pid = str(r.get("pick_id") or "")
                     slug = str(r.get("market_slug") or "")
@@ -2240,8 +2330,10 @@ class AutoPolymarketBuyer:
                 )
 
         # Seeded from today's already-executed spend so the "daily" cap enforces a
-        # real per-calendar-day ceiling across every cycle, not just this one.
+        # real per-calendar-day ceiling across every cycle, not just this one. The cap reads
+        # committed_spend (fills plus resting fallbacks); total_spend_usd keeps reporting fills.
         current_spend = today_spend_usd
+        committed_spend = today_spend_usd
         bought_index = self._build_bought_index()
         input_flags = _load_pick_input_flags(
             [str(row.get("pick_id") or "") for row in picks if row.get("status") == "open"]
@@ -2590,10 +2682,7 @@ class AutoPolymarketBuyer:
                 if not math.isfinite(edge) or edge < cohort.min_saved_edge:
                     result.rejected_low_edge += 1
                     continue
-                if not cohort.contains(edge) or (
-                    cohort.max_saved_edge_exclusive is None
-                    and edge > COHORT_OPEN_ENDED_EXECUTION_EDGE_CEILING
-                ):
+                if not cohort.contains(edge) or edge > COHORT_EXECUTION_EDGE_CEILING:
                     result.rejected_unrealistic_edge += 1
                     continue
             else:
@@ -2695,7 +2784,7 @@ class AutoPolymarketBuyer:
                     continue
 
             # Daily budget check
-            if current_spend + actual_cost > self.config.max_daily_spend_usd:
+            if committed_spend + actual_cost > self.config.max_daily_spend_usd:
                 result.rejected_budget += 1
                 continue
             if game and game_other_spend + actual_cost > self.config.max_game_stake_usd + 0.10:
@@ -2793,6 +2882,7 @@ class AutoPolymarketBuyer:
                     }
                 )
                 current_spend += actual_cost
+                committed_spend += actual_cost
                 result.total_spend_usd = round(current_spend, 2)
                 continue
 
@@ -2859,6 +2949,13 @@ class AutoPolymarketBuyer:
                         **executed_payload,
                     }
                 )
+                # The daily cap counts committed money: a GTC fallback resting on the book can still
+                # fill after this cycle, so 30 zero-fill IOCs resting $25 each must not read as $0.
+                resting_cost = float(sub.get("fallback_resting_shares") or 0.0) * limit_price
+                committed = round(filled_cost + resting_cost, 2)
+                if not fill_known:
+                    committed = max(committed, actual_cost)
+                committed_spend += committed
                 current_spend += filled_cost
                 result.total_spend_usd = round(current_spend, 2)
 

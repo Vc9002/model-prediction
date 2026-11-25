@@ -261,6 +261,23 @@ def _auto_buyer_is_decoupled() -> bool:
     return os.environ.get("MODEL_PREDICTION_AUTO_BUYER_DECOUPLED") == "1"
 
 
+def _auto_buyer_cycle_owns_live_reconcile() -> bool:
+    """True only when a buyer cycle that will actually run reconciles the live book itself.
+
+    The cycle runs in step 12 when the state is enabled, or every 15 minutes in the decoupled
+    worker. Under cohorts it reconciles resting live orders even while disabled, and without
+    cohorts only when it buys live; in every other case the daily job must reconcile, or resting
+    fallbacks would never be cancelled at game start.
+    """
+    if _skip_auto_buyer_for_verification():
+        return False
+    from ..portfolio.auto_executor import auto_buyer_cycle_manages_live_book, load_auto_buyer_state
+
+    state = load_auto_buyer_state()
+    cycle_runs = _auto_buyer_is_decoupled() or state.get("enabled") is True
+    return cycle_runs and auto_buyer_cycle_manages_live_book(state)
+
+
 def _with_timed_exports(function):
     """Include deferred workbook rebuilding in the reported daily duration."""
 
@@ -1736,9 +1753,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # and defers to step 12's internal pass otherwise.
     from ..portfolio.auto_executor import load_auto_buyer_state
 
-    _auto_buyer_will_run = not _skip_auto_buyer_for_verification() and load_auto_buyer_state().get(
-        "enabled", False
-    )
+    _auto_buyer_will_run = _auto_buyer_cycle_owns_live_reconcile()
 
     auto_buyer_settle_result: dict[str, Any] = (
         {"status": "deferred_to_cycle", "reason": "auto_buyer_cycle_runs_own_reconcile_and_settle"}
@@ -1780,7 +1795,8 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             from ..portfolio.auto_executor import run_auto_buyer_cycle
 
             auto_state = load_auto_buyer_state()
-            if auto_state.get("enabled", False):
+            # Strict: only the boolean true enables (bool("false") is True).
+            if auto_state.get("enabled") is True:
                 logger.info(
                     "Auto-Buyer is ENABLED (mode=%s). Executing automated purchase cycle...",
                     auto_state.get("mode", "paper"),
