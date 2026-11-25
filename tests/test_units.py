@@ -98,12 +98,15 @@ def test_unit_range_is_one_to_two() -> None:
     assert policy.max_pick_units == 2.0
 
 
-def test_hybrid_edge_scaled_units_caps_moneyline():
+def test_edge_scaled_units_sizes_moneyline_like_spread():
+    # Operator directive 2026-11-25: no 1.0U moneyline cap; every market scales by edge.
     policy = UnitPolicy(min_pick_units=1.0, max_pick_units=2.0)
-    # Even with huge model probability and low odds, moneyline must cap at 1.0U
-    assert edge_scaled_units(0.85, 0.0, -110, policy, market_type="moneyline") == 1.0
-    assert edge_scaled_units(0.85, 0.0, -110, policy, market_type="ml") == 1.0
-    assert edge_scaled_units(0.85, 0.0, -110, policy, market_type="Moneyline") == 1.0
+    spread_units = edge_scaled_units(0.85, 0.0, -110, policy, market_type="spread")
+    for market_type in ("moneyline", "ml", "Moneyline"):
+        assert edge_scaled_units(0.85, 0.0, -110, policy, market_type=market_type) == 2.0
+        assert edge_scaled_units(0.85, 0.0, -110, policy, market_type=market_type) == spread_units
+    # A low-edge moneyline still floors at min_pick_units.
+    assert edge_scaled_units(0.53, 0.0, -110, policy, market_type="moneyline") == policy.min_pick_units
 
 
 def test_hybrid_edge_scaled_units_scales_spread_and_total():

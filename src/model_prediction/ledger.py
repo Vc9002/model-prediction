@@ -767,30 +767,22 @@ class PickLedger:
 
         if self.tier == "flat":
             # Operator Directive: Flat ledger calls everything (full coverage, zero shadow picks).
-            # Hybrid edge-scaling: spreads and totals scale dynamically (1.0U-2.0U); moneyline capped at 1.0U.
-            is_moneyline = str(getattr(request, "market_type", "")).strip().lower() in ("moneyline", "ml")
-            is_cfb_over = (
-                str(getattr(request, "league", "")).upper() in ("NCAAF", "CFB")
-                and str(getattr(request, "market_type", "")).lower() == "total"
-                and str(getattr(request, "selection", "")).lower() == "over"
-            )
+            # Every market (moneyline and NCAAF Over included) sizes by edge, 1.0U-2.0U; the
+            # moneyline and NCAAF-Over 1.0U caps were removed by operator directive 2026-11-25.
             market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
             calc_edge = max(0.0, request.model_probability - market_p)
-            if is_moneyline or is_cfb_over:
-                dyn_units = 1.0
-            else:
-                dyn_units = (
-                    eligibility.units
-                    if (eligibility.units > 0 and eligibility.units != 1.0)
-                    else edge_scaled_units(
-                        request.model_probability,
-                        request.model_uncertainty or 0.02,
-                        request.american_odds,
-                        market_type=request.market_type,
-                    )
+            dyn_units = (
+                eligibility.units
+                if (eligibility.units > 0 and eligibility.units != 1.0)
+                else edge_scaled_units(
+                    request.model_probability,
+                    request.model_uncertainty or 0.02,
+                    request.american_odds,
+                    market_type=request.market_type,
                 )
-                if dyn_units <= 1.0 and calc_edge > 0.01:
-                    dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
+            )
+            if dyn_units <= 1.0 and calc_edge > 0.01:
+                dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
             if eligibility.units_cap is not None:
                 dyn_units = min(dyn_units, max(0.0, float(eligibility.units_cap)))
             eligibility = replace(
@@ -812,30 +804,22 @@ class PickLedger:
             eligibility = enforce_universal_paper_call(request, eligibility)
         elif self.tier == "main":
             # Main ledger is the gated ledger. Calls reaching Main as qualified stay qualified.
-            # Hybrid edge-scaling: spreads and totals scale dynamically (1.0U-2.0U); moneyline capped at 1.0U.
-            is_moneyline = str(getattr(request, "market_type", "")).strip().lower() in ("moneyline", "ml")
-            is_cfb_over = (
-                str(getattr(request, "league", "")).upper() in ("NCAAF", "CFB")
-                and str(getattr(request, "market_type", "")).lower() == "total"
-                and str(getattr(request, "selection", "")).lower() == "over"
-            )
+            # Every market (moneyline and NCAAF Over included) sizes by edge, 1.0U-2.0U; the
+            # moneyline and NCAAF-Over 1.0U caps were removed by operator directive 2026-11-25.
             market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
             calc_edge = max(0.0, request.model_probability - market_p)
-            if is_moneyline or is_cfb_over:
-                dyn_units = 1.0
-            else:
-                dyn_units = (
-                    eligibility.units
-                    if (eligibility.units > 0 and eligibility.units != 1.0)
-                    else edge_scaled_units(
-                        request.model_probability,
-                        request.model_uncertainty or 0.02,
-                        request.american_odds,
-                        market_type=request.market_type,
-                    )
+            dyn_units = (
+                eligibility.units
+                if (eligibility.units > 0 and eligibility.units != 1.0)
+                else edge_scaled_units(
+                    request.model_probability,
+                    request.model_uncertainty or 0.02,
+                    request.american_odds,
+                    market_type=request.market_type,
                 )
-                if dyn_units <= 1.0 and calc_edge > 0.01:
-                    dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
+            )
+            if dyn_units <= 1.0 and calc_edge > 0.01:
+                dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
             if eligibility.units_cap is not None:
                 dyn_units = min(dyn_units, max(0.0, float(eligibility.units_cap)))
             eligibility = replace(

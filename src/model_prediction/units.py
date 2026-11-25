@@ -56,17 +56,16 @@ def edge_scaled_units(
 ) -> float:
     """Scale units by real market-relative edge, adjusted for model uncertainty.
 
-    Hybrid market rule:
-    - Spreads & Totals scale dynamically up to max_pick_units (2.0U) based on conservative edge.
-    - Moneyline caps at min_pick_units (1.0U) to protect against fat-tail variance and asymmetric payoff risk.
+    Sizing is market-agnostic: every market, moneyline included, scales from min_pick_units to
+    max_pick_units (2.0U) on the uncertainty-adjusted edge. The moneyline 1.0U cap was removed by
+    operator directive 2026-11-25; market_type is accepted for call-site compatibility and does
+    not change the size.
 
     Higher real edge = more units. Lower edge = fewer units.
     Caps at policy.max_pick_units (2.0U), floors at policy.min_pick_units (1.0U).
     """
     if policy is None:
         policy = UnitPolicy()
-    if market_type is not None and str(market_type).strip().lower() in ("moneyline", "ml"):
-        return policy.min_pick_units
     market_prob = implied_probability(american_odds) if american_odds else 0.5
     unc = max(0.0, model_uncertainty or 0.0)
     adjusted_prob = max(0.0, model_probability - unc)
