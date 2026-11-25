@@ -1,5 +1,68 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-25 — Auto-buyer per-model cohorts, live enable pending operator go (quick-261125-31d)
+
+State: **live enable pending operator go.** Code is in 79250d80 (cohorts, live pass, submission
+guard) and e425053d (paper pass, per-book caps and dedup, shared per-game cap, preview). Decisions
+D-01 to D-04 and the measured cohorts are in `PROJECT_STATUS.md` (same date).
+
+- **Replaces** the hard-coded `ncaab-spread-v6` live bucket with a general cohort list in
+  `auto_buyer_state.json` (`cohorts`). The v6 bucket is now a thin wrapper over the same row
+  predicate (`_row_in_cohort`), so its tests pass unchanged.
+- **Parse is fail-closed** (`_parse_cohorts`): required and allowed key sets (a missing
+  `max_saved_edge_exclusive` is an error, never "open-ended"), `enabled` must be the boolean true,
+  `mode` exactly `paper` or `live`, finite bounds with 0 <= min < max <= 1, a live cohort needs a
+  finite max, and two enabled cohorts of one model/sport/market with overlapping windows are both
+  dropped. Errors are logged and listed in `last_run.cohort_config_errors`. No default `cohorts` key
+  exists, so a wiped state file is paper with no cohorts.
+- **Three passes per cycle, one book each.** Live cohort pass first (whitelist empty, its own
+  ledger), the legacy whitelist pass (paper whenever a `cohorts` key exists, even empty or
+  malformed), then the paper cohort pass. `AutoExecutionConfig.__post_init__` refuses a cohort whose
+  mode differs from the config's, and an explicit if-raise before `PolymarketExecutor` (outside the
+  submission try/except, survives `python -O`) refuses any row in a cohort-carrying config that did
+  not match a live cohort.
+- **Bypassed for cohort rows only:** PAPER_CALL_ reason codes (decision must still be CALL), code and
+  state blacklist, whitelist, disabled sport/market (state list and the hard-coded sport list),
+  moneyline price ceiling, probability floor, sport edge floors (`_effective_min_edge`, including
+  the NBA spread floor) and the global/NCAAF max edge. In their place: 0 < ask < 1, live-ask edge
+  inside the cohort window (below min is `rejected_low_edge`, at or above max is
+  `rejected_unrealistic_edge`), and a 25% live-edge ceiling for open-ended windows.
+- **Kept for cohort rows:** status, quarantine breaker, started and stale-open, lookahead, model
+  age, source-quote age, input-flag gate, unsupported market, both dedup checks, quote mapping,
+  freshness and refresh, market state, sizing, per-game cap, daily cap, daily-loss breaker, and every
+  executor gate.
+- **Per-book dedup.** NCAAB slugs differ per market (`aec-cbb-...` moneyline, `asc-cbb-...-neg-11pt5`
+  spread, `tsc-cbb-...-117pt5` total) but `event_selections` keys on event and home/away across
+  markets; 5 of the 15 ML cohort rows share event and side with a spread cohort row. Cohort passes
+  (`dedup_own_ledger_only`) index only their own book's ledger plus the audit log, dashboard orders,
+  the xlsx ledger and, executing only, exchange positions. The legacy pass still indexes both
+  ledgers. The executor's `order_executed` audit payload carries pick id, slug and side, not event
+  and selection, so a live spread fill does not block the paper ML row on the same game.
+- **Per-game cap is per game in a cohort book** (operator 2026-11-25): live spread and total cohorts
+  on one game share the $25 cap with that book's earlier fills (cost plus resting fallback shares).
+- **Candidates are Flat rows only** (`_read_cohort_candidate_picks`), the rows the cohorts were
+  measured on; a Main copy would otherwise win the merge with its own units and reason code.
+- **Mutation proofs** (each run in a detached worktree of the commit, restored after):
+  (a) cohort-mode check removed from `__post_init__`: `Failed: DID NOT RAISE <class 'ValueError'>`
+  (`test_executing_config_cannot_carry_a_paper_cohort`); (b) submission guard disabled:
+  `Failed: DID NOT RAISE <class 'RuntimeError'>` (`test_submission_guard_refuses_whitelisted_row_in_cohort_config`);
+  (c) global pass on the saved mode while governed: `assert ['ncaab-sprea...ad-margin-v9'] == ['ncaab-spread-v7']`
+  plus three more cycle tests red; (d) paper cohort pass built `mode="live", execute_live=cycle_enabled`:
+  `ValueError: cohort BuyCohort(... mode='paper') does not belong in a mode='live' config`, five cycle
+  tests red; (e) preview allowed to record paper fills: `assert [1, 1] == []`
+  (`test_preview_has_no_side_effects[True]`); (f) `dedup_own_ledger_only=False` on cohort passes:
+  `assert [] == ['spread-g2']` (`test_dedup_is_per_book_for_cohort_passes`); (g) game-room trim
+  removed: `assert 1 == 2` (`test_live_per_game_cap_is_shared_across_spread_and_total`).
+- **Known limits.** The dashboard does not show cohorts; read `last_run.cohort_passes` in the state
+  file. Resting-order reconcile still cancels on the global 3.5-12% band, which contains the live
+  windows. A preview never reads exchange positions, and with a widened lookahead it captures no
+  slates (rows without snapshot contracts show unmapped). The live cohorts accept `indicative_slate`
+  decision quotes (27 of 79 settled spread rows) as the v6 bucket did, protected by the live-ask
+  window. The NCAAB paper trial selected on saved edge only; cohorts require both saved and live-ask
+  edge in window, so some price-drift members of the measured cohort are dropped. A disabled
+  (`enabled: false`) cycle still runs the cohort passes as dry runs, including live quote refreshes
+  for cohort rows (market data only).
+
 ## 2026-11-25 — Moneylines and NCAAF Overs edge-scaled; 1.0U caps removed (quick-261125-1bw)
 
 Operator: "remove the 1U cap so moneylines and NCAAF Overs scale like everything else" / "no units should be 1u flat, everything should be edge scaled". Paper ledgers only; no real-money execution code changed.

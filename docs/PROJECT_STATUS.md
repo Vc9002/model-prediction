@@ -1,5 +1,60 @@
 # Project status and source of truth
 
+## 2026-11-25 — Auto-buyer per-model cohorts; first scheduled live cohorts pending (quick-261125-31d)
+
+**Status: code shipped (79250d80, e425053d); live state change pending the operator's go (Task 4).**
+Until then the runtime `auto_buyer_state.json` has no `cohorts` key, `enabled` is false, and nothing
+about live or paper buying has changed.
+
+Operator decisions (Vincent, 2026-11-25), verbatim where quoted:
+
+- **D-01** "Moneyline v7m, 12%+ move to paper auto buy": `ncaab-moneyline-v7m`, saved edge 12% or
+  more, PAPER.
+- **D-02** "Spread v7 5-12%, move to live auto buy": `ncaab-spread-v7`, saved edge 5% to under 12%,
+  LIVE real-money orders from the scheduled auto-buyer. Risks the operator was shown and accepted:
+  4 days of data, negative closing-line value on executable quotes, $5 per unit real money with no
+  per-order confirmation, and that it contradicts the root CLAUDE.md rule that real orders never
+  come from the scheduler. He chose live twice.
+- **D-03** "Total v6 5-8% ... paper auto buy": `ncaab-total-v6`, saved edge 5% to under 8%. Later the
+  same day the operator changed this cohort to **LIVE** (relayed by the orchestrator).
+- **D-04** (later the same day, relayed by the orchestrator): `nba-spread-margin-v9`, saved edge 12% or
+  more, PAPER, and the legacy whitelist emptied so NBA spread v9 buys only through this cohort.
+- **Daily spend cap** (same relay): live daily spend $500 (100 units at $5), daily loss breaker stays
+  $250, per-game cap stays $25 (5 units). State values only; code defaults unchanged.
+
+Measured cohorts (read-only, Flat ledger, rows created since 2026-11-21, CALL / FLAT_CALL only):
+
+| Cohort | Settled (all) | Settled, units above 0 | Open at measurement |
+|---|---|---|---|
+| ML v7m, saved edge 12%+ | 13, 9-4, +5.26U | 13, 9-4 | 2 |
+| Spread v7, 5-12% | 79, 47-32, +21.78U | 70, 42-28 | 17 |
+| Total v6, 5-8% | 23, 18-5, +18.72U | 21, 16-5 | 1 |
+
+The global filters would have dropped the ML cohort entirely: the 12% `max_edge` drops 13 of 13
+settled and 2 of 2 open rows; the 65% moneyline price ceiling drops 1 settled row (a loss, on the
+saved price). Cohort rows therefore use their own window instead of `max_edge`, the sport edge
+floors, the probability floor and the moneyline price ceiling.
+
+**Design.** A cohort is a state-file entry (`model_id`, `sport`, `market`, `min_saved_edge`,
+`max_saved_edge_exclusive`, `mode` paper or live, `enabled`). One cycle runs up to three passes, each
+its own book with its own ledger, caps and dedup: the live cohort pass (first), the legacy whitelist
+pass (forced to paper whenever a `cohorts` key exists, so the old global `mode: live` cannot trade
+anything), and the paper cohort pass. A row must have saved edge AND live-ask edge inside its
+cohort's window, units above 0, and decision-time quote provenance. Every other buyer and executor
+guard stays in force: quote freshness 300 s with live refresh, market open, game not started, lookahead
+window, model age, per-game and daily caps, daily loss breaker on the live ledger, and the executor's
+own side/timing, single-order and cost checks. Live cohorts share one book: the $500 daily spend, the
+$250 loss breaker and the $25 per-game cap (spread and total on the same game counted together).
+
+**Kill switch:** `enabled: false` in the state file stops every cohort order, even when a cycle is
+called with an explicit execute override. `run_auto_buyer_cycle(preview=True)` evaluates without
+any side effect.
+
+The NCAAB spread v7 5-8% paper trial (`auto_buyer_ncaab_spread_paper_trial.json`, disabled since
+2026-11-25 03:24Z) is superseded by the live spread cohort and stays disabled: it dedups only against
+the paper ledger and would paper-buy the games the live cohort buys. The NBA ML v6 paper trial is
+untouched.
+
 ## 2026-11-12 — NBA review fixes (`quick-261112-11j`)
 
 Still 100% paper; champions unchanged. The open NBA items of `MODEL_REVIEW_2026-11-11.md`

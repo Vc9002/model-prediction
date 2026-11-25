@@ -242,6 +242,14 @@ Found and left for a decision:
   trigger; the task now fires every 15 minutes, so a waiting cycle swallows the next trigger.
   Harmless today (the result is the same skip), but the comment and the bound are stale.
 
+#### 7. Live auto-buyer cohort reviews (OPEN, quick-261125-31d)
+
+- Review live cohort ncaab-spread-v7 5-12% after 30 settled live orders: realised ROI and CLV on
+  fills vs the Flat cohort (70 settled units>0 rows, 42-28 at 2026-11-25); retire or widen only by
+  operator decision.
+- Same review for live cohort ncaab-total-v6 5-8% after 30 settled live orders (Flat cohort 21
+  settled units>0 rows, 16-5 at 2026-11-25).
+
 ---
 
 ## 5. Document Map & Reference Directory
