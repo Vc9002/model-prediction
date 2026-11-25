@@ -1768,3 +1768,47 @@ def test_topup_merge_carries_the_execution_fields_of_the_topup(tmp_path):
     assert merged["idempotency_key"] == "mp-i-2-p"
     assert merged["fallback_idempotency_key"] == "mp-i-2-f"
     assert "fallback_submit_unknown" not in merged
+
+
+def test_topup_merge_clears_a_resolved_unknown_flag(tmp_path):
+    # Review cycle 2: the operator resolved a held row by setting its fallback_order_id; reconcile
+    # then made it a reconciled partial. A later top-up that fills completely has no fallback leg
+    # (fallback_order_id None), so a stale fallback_submit_unknown=True would re-hold the row:
+    # never settled, pick blocked, and no alarm because "not_authorized" is not an alarm status.
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    row = _brow("tp3", "g1")
+    resolved = _partial_row(row)
+    resolved.update(
+        {
+            "fallback_order_id": "gtd-found-by-operator",
+            "fallback_reconciled": True,
+            "fallback_status": "submit_unknown",
+            "fallback_submit_unknown": True,
+        }
+    )
+    assert not auto_buyer_ledger.is_fallback_submit_unknown(resolved)
+    j_path.write_text(json.dumps(resolved) + "\n")
+    merged = auto_buyer_ledger.record_auto_buy_execution(
+        _payload(
+            pick_id="tp3",
+            market_slug=row["market_slug"],
+            is_topup=True,
+            shares=7.0,
+            cost_usd=3.57,
+            limit_price=0.51,
+            order_ids=["ioc-full"],
+            fallback_order_id=None,
+            fallback_status="not_authorized",
+            fallback_resting_shares=0.0,
+            intent_id="i-3",
+            idempotency_key="mp-i-3-p",
+            requested_shares=7.0,
+            requested_cost_usd=3.57,
+        ),
+        order_id="ioc-full",
+        order_state="ORDER_STATE_FILLED",
+        jsonl_path=j_path,
+    )
+    assert merged["fallback_order_id"] is None
+    assert merged.get("fallback_submit_unknown") is not True
+    assert not auto_buyer_ledger.is_fallback_submit_unknown(merged)

@@ -207,9 +207,11 @@ def is_fallback_submit_unknown(record: dict[str, Any]) -> bool:
 
     The remainder may rest or fill on the exchange, but there is no order id to reconcile it, so the
     row is neither reconciled nor a top-up-eligible partial, and settlement leaves it open. The
-    operator resolves it: find the order and set ``fallback_order_id`` (reconciliation then takes
-    over), or confirm none exists and set ``fallback_submit_unknown`` False. Rows written before the
-    flag existed are recognised by ``fallback_status`` alone.
+    operator resolves it: find the order and set ``fallback_order_id`` with ``fallback_reconciled``
+    False (reconciliation selects only unreconciled rows, then takes over), or confirm none exists
+    and set ``fallback_submit_unknown`` False with ``fallback_reconciled`` True. Rows written before
+    the flag existed are recognised by ``fallback_status`` alone, and carry ``fallback_reconciled``
+    True, so the first path must set it False explicitly. Edit between buyer runs (every 15 min).
     """
     if record.get("fallback_order_id") or str(record.get("status") or "open").lower() != "open":
         return False
@@ -429,8 +431,13 @@ def record_auto_buy_execution(
             for field_name in _EXECUTION_PASSTHROUGH_FIELDS:
                 if order_payload.get(field_name) is not None:
                     rec[field_name] = order_payload[field_name]
+            # Cleared, not just never set: a stale True from an earlier, operator-resolved leg would
+            # re-hold a row whose new top-up has no fallback (fallback_order_id None) -- silently,
+            # since a fully filled top-up raises no alarm.
             if fallback_unknown:
                 rec["fallback_submit_unknown"] = True
+            else:
+                rec.pop("fallback_submit_unknown", None)
 
             target_spend = float(
                 order_payload.get("target_spend") or (float(rec.get("model_units") or 1.0) * unit_val)
