@@ -537,6 +537,33 @@ def _parity_alarm(mirror: RuntimeLedgerStore, message: str) -> None:
         logging.getLogger(__name__).debug("parity alarm write failed", exc_info=True)
 
 
+def _edge_sized_units(request: PickRequest, eligibility: EligibilityResult) -> float:
+    """The one stake rule for Flat, qualified Main and downgraded Main, so a decision sizes the
+    same on every tier. Every market (moneyline and NCAAF Over included) scales 1.0U-2.0U by
+    edge; the 1.0U caps were removed by operator directive 2026-11-25.
+
+    A model's own size (anything but 1.0) is kept; otherwise edge_scaled_units re-sizes it, and
+    a result still at 1.0U or less gets the raw-edge bump. ``units_cap`` always binds last.
+    """
+    market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
+    calc_edge = max(0.0, request.model_probability - market_p)
+    units = (
+        eligibility.units
+        if (eligibility.units > 0 and eligibility.units != 1.0)
+        else edge_scaled_units(
+            request.model_probability,
+            request.model_uncertainty or 0.02,
+            request.american_odds,
+            market_type=request.market_type,
+        )
+    )
+    if units <= 1.0 and calc_edge > 0.01:
+        units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
+    if eligibility.units_cap is not None:
+        units = min(units, max(0.0, float(eligibility.units_cap)))
+    return units
+
+
 class PickLedger:
     def __init__(
         self,
@@ -767,30 +794,12 @@ class PickLedger:
 
         if self.tier == "flat":
             # Operator Directive: Flat ledger calls everything (full coverage, zero shadow picks).
-            # Every market (moneyline and NCAAF Over included) sizes by edge, 1.0U-2.0U; the
-            # moneyline and NCAAF-Over 1.0U caps were removed by operator directive 2026-11-25.
-            market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
-            calc_edge = max(0.0, request.model_probability - market_p)
-            dyn_units = (
-                eligibility.units
-                if (eligibility.units > 0 and eligibility.units != 1.0)
-                else edge_scaled_units(
-                    request.model_probability,
-                    request.model_uncertainty or 0.02,
-                    request.american_odds,
-                    market_type=request.market_type,
-                )
-            )
-            if dyn_units <= 1.0 and calc_edge > 0.01:
-                dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
-            if eligibility.units_cap is not None:
-                dyn_units = min(dyn_units, max(0.0, float(eligibility.units_cap)))
             eligibility = replace(
                 eligibility,
                 qualified=True,
                 decision="CALL",
                 reason_code="QUALIFIED" if eligibility.reason_code == "QUALIFIED" else "FLAT_CALL",
-                units=dyn_units,
+                units=_edge_sized_units(request, eligibility),
             )
         elif self.tier == "main" and not eligibility.qualified:
             # A CALL the forecast path downgraded (PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED,
@@ -801,43 +810,18 @@ class PickLedger:
             # nba-elo-trend-lr-v4 research observation into QUALIFIED /
             # QUALIFIED_SHADOW_CALL on Main on 2026-11-11 while the champion was
             # historical_only (MODEL_REVIEW_2026-11-11 #3, NBA moneyline path).
-            eligibility = enforce_universal_paper_call(request, eligibility)
-            # Same raw-edge bump as Flat and qualified Main: a downgrade arrives sized by
-            # edge_scaled_units, which rounds small uncertainty-adjusted edges down to 1.0U, so
-            # every downgraded NBA moneyline read 1.00U (operator: nothing flat 1U, 2026-11-25).
-            market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
-            calc_edge = max(0.0, request.model_probability - market_p)
-            if 0.0 < eligibility.units <= 1.0 and calc_edge > 0.01:
-                bumped = round(1.0 + min(1.0, calc_edge / 0.08), 2)
-                if eligibility.units_cap is not None:
-                    bumped = min(bumped, max(0.0, float(eligibility.units_cap)))
-                eligibility = replace(eligibility, units=bumped)
+            # Sized exactly like Flat and qualified Main (operator, 2026-11-25: nothing flat 1U);
+            # enforce_universal_paper_call keeps only the reason code and record type.
+            units = _edge_sized_units(request, eligibility)
+            eligibility = replace(enforce_universal_paper_call(request, eligibility), units=units)
         elif self.tier == "main":
             # Main ledger is the gated ledger. Calls reaching Main as qualified stay qualified.
-            # Every market (moneyline and NCAAF Over included) sizes by edge, 1.0U-2.0U; the
-            # moneyline and NCAAF-Over 1.0U caps were removed by operator directive 2026-11-25.
-            market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
-            calc_edge = max(0.0, request.model_probability - market_p)
-            dyn_units = (
-                eligibility.units
-                if (eligibility.units > 0 and eligibility.units != 1.0)
-                else edge_scaled_units(
-                    request.model_probability,
-                    request.model_uncertainty or 0.02,
-                    request.american_odds,
-                    market_type=request.market_type,
-                )
-            )
-            if dyn_units <= 1.0 and calc_edge > 0.01:
-                dyn_units = round(1.0 + min(1.0, calc_edge / 0.08), 2)
-            if eligibility.units_cap is not None:
-                dyn_units = min(dyn_units, max(0.0, float(eligibility.units_cap)))
             eligibility = replace(
                 eligibility,
                 qualified=True,
                 decision="CALL",
                 reason_code="QUALIFIED",
-                units=dyn_units,
+                units=_edge_sized_units(request, eligibility),
             )
         else:
             eligibility = enforce_universal_paper_call(request, eligibility)

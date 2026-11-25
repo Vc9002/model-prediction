@@ -29,7 +29,7 @@ def _request(
     selection: str = "home",
     line: float | None = None,
     probability: float = 0.56,
-    uncertainty: float = 0.05,
+    uncertainty: float | None = 0.05,
     odds: int = 100,  # 50.0% implied price
 ) -> PickRequest:
     return PickRequest(
@@ -160,6 +160,32 @@ def test_downgraded_main_moneyline_with_one_unit_gets_the_edge_bump(tmp_path) ->
         League.NBA, 1.0, qualified=False, reason_code="PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED", units_cap=1.0
     )
     assert float(_stored_row(tmp_path / "capped", "main", request, capped)["units"]) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize(
+    ("probability", "uncertainty"), [(0.56, None), (0.56, 0.05), (0.62, None), (0.53, None)]
+)
+def test_downgraded_main_sizes_like_flat_and_qualified_main(tmp_path, probability, uncertainty) -> None:
+    # Production NBA moneyline requests carry model_uncertainty=None (forecast.py learned path), so
+    # eligibility sizes at 0.05 while the ledger re-sizes at 0.02; every tier must still agree.
+    request = _moneyline(probability=probability, uncertainty=uncertainty)
+    downgraded = _eligibility(
+        League.NBA, 1.0, qualified=False, reason_code="PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED"
+    )
+    main_down = float(_stored_row(tmp_path / "down", "main", request, downgraded)["units"])
+    main_qual = _units(tmp_path / "qual", "main", request)
+    flat = _units(tmp_path / "flat", "flat", request)
+    assert main_down == pytest.approx(flat)
+    assert main_qual == pytest.approx(flat)
+
+
+def test_downgraded_main_honours_a_zero_units_cap(tmp_path) -> None:
+    # The NCAAB placeholder-price cap (0.0) stakes nothing on Flat; Main must not resurrect it.
+    downgraded = _eligibility(
+        League.NBA, 0.0, qualified=False, reason_code="PAPER_CALL_MODEL_UNVALIDATED", units_cap=0.0
+    )
+    row = _stored_row(tmp_path, "main", _moneyline(), downgraded)
+    assert float(row["units"]) == pytest.approx(0.0)
 
 
 def test_flat_moneyline_keeps_flat_call_reason_when_not_qualified(tmp_path) -> None:
