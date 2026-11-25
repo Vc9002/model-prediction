@@ -188,6 +188,16 @@ def test_downgraded_main_honours_a_zero_units_cap(tmp_path) -> None:
     assert float(row["units"]) == pytest.approx(0.0)
 
 
+def test_downgraded_main_applies_units_cap_when_no_bump_fires(tmp_path) -> None:
+    # A model's own size above 1.0U never reaches the raw-edge bump, so a cap applied only inside
+    # the bump (9dddf0d3) let 1.6U through a 1.0U cap. The cap must always bind last.
+    downgraded = _eligibility(
+        League.NBA, 1.6, qualified=False, reason_code="PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED", units_cap=1.0
+    )
+    row = _stored_row(tmp_path, "main", _moneyline(), downgraded)
+    assert float(row["units"]) == pytest.approx(1.0)
+
+
 def test_flat_moneyline_keeps_flat_call_reason_when_not_qualified(tmp_path) -> None:
     # replace() in the Flat branch must still relabel a non-qualified result as FLAT_CALL.
     request = _moneyline()
