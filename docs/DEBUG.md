@@ -1,5 +1,21 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-25 — Moneylines and NCAAF Overs edge-scaled; 1.0U caps removed (quick-261125-1bw)
+
+Operator: "remove the 1U cap so moneylines and NCAAF Overs scale like everything else" / "no units should be 1u flat, everything should be edge scaled". Paper ledgers only; no real-money execution code changed.
+
+- **Evidence.** Rows created on or after 11-18 had every moneyline row at exactly 1.00U whatever its edge (NCAAB v7m 53 of 53 with edge above 3%, plus NCAAF, NBA and NFL, on Main as well as Flat), and NCAAF Overs at 1.00U.
+- **Removed (cc7f00d2).** The moneyline and NCAAF-Over branches in `ledger.append_evaluated` (Flat and qualified Main), from 109e7591 (2026-10-24) and 28143606 (2026-11-01), and the moneyline early return in `units.edge_scaled_units`. The other parts of 28143606 (the context-aware baseline and the Over hurdle of edge 0.04 or more) are kept. The units.py change also reaches Research, Gated and unqualified-Main moneyline sizing through `eligibility.py`. `eligibility.units_cap` still binds.
+- **Still 1.00U by design.**
+  - Raw edge of 1% or less.
+  - NCAAB rows with model probability of 80% or more (`HIGH_PROBABILITY_UNIT_CAP`, every market).
+  - Unqualified Main and Research moneyline rows at the default 0.05 uncertainty below roughly 6.9 points of raw edge over the implied price. Every Main NBA moneyline row since 11-18 (57 rows, mean edge 6.6%) is PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED, so it takes the `enforce_universal_paper_call` path with no raw-edge bump and many will still read 1.00U. Unqualified spreads and totals follow the same rule, so this is not a failed fix.
+- **Non-monotonic curve, not fixed here.** 56% vs a 50.0% implied price sizes 1.75U, but 62% vs 50.0% sizes 1.50U at uncertainty 0.05 (the raw-edge bump only fires at 1.0U or less). Moneylines now inherit that.
+- **Auto-buyer.** The stake reads ledger units (target spend = units x unit value, capped by the per-game cap, then x the edge fraction). Live state on 11-25: `enabled` false, mode live, whitelist `nba-spread-margin-v9` only, $5.00 per unit, $25 per game, NCAAB and MLB moneyline disabled, so moneyline stakes are unaffected today. If a moneyline model is whitelisted and the buyer enabled, the moneyline stake can double (up to 2.0U). The NBA ML v6 paper trial hardcodes 1.0U and is unaffected.
+- **Real-money ceiling.** Dashboard BUY (`dashboard/orders.py`, `authorized_units` for a non-manual row) and `cli execute` (`cmd_execute`, `maximum_units`) use the ledger row's units as the per-order cost cap, so for moneyline rows that cap can now reach 2.0U. Both stay operator-initiated with confirmation; no code was changed there.
+- **Existing rows** were not rewritten and `recompute_research_sizing` was not called; open picks re-size when the next daily forecast replaces them.
+- **Tests.** `tests/test_paper_units_edge_scaling.py` (new) and `tests/test_units.py::test_edge_scaled_units_sizes_moneyline_like_spread` (replaces the old cap pin) were red against src at c784fba1 and green after cc7f00d2.
+
 ## 2026-11-23 — Overconfident NCAAF totals and NFL v7 shrunk toward 50% (quick-261123-2w2)
 
 Operator: "find out whether it's a bias or general overconfidence ... go ahead", then chose: shrink NCAAF v5 totals, shrink both NFL v7 markets, promote NCAAF v7 (deferred, see HANDOFF), do not touch NCAAB.
