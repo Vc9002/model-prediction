@@ -473,6 +473,7 @@ class AutoExecutionResult:
     rejected_min_topup: int = 0
     rejected_daily_loss_breaker: int = 0
     rejected_quarantined_model: int = 0
+    rejected_live_calibration: int = 0
     cohort_matched: int = 0
     quarantined_models: list[str] = field(default_factory=list)
     submitted_orders: list[dict[str, Any]] = field(default_factory=list)
@@ -878,6 +879,11 @@ AUTO_BUYER_CYCLE_HISTORY_PATH = DATA / "logs" / "auto_buyer_cycle_history.jsonl"
 LIVE_FALLBACK_EXPIRY_LEAD_SECONDS = 90
 # B5: a live order is refused when the live ask has moved more than this from the ticket price.
 LIVE_MAX_PRICE_DEVIATION = 0.02
+# D-03 (operator, 2026-11-25): a live cohort buys only a pick whose model timestamp is at most this
+# old. The global max_model_age_minutes (720) still governs paper and legacy passes.
+LIVE_COHORT_MAX_MODEL_AGE_MINUTES = 180.0
+# game_exposure key suffix for a pick's still-pending (unfilled) exposure; see _build_bought_index.
+_PENDING_EXPOSURE_KEY_SUFFIX = "#pending"
 # fallback_status values that need the operator's eye but leave the placed IOC itself intact.
 _FALLBACK_ALARM_STATUSES = frozenset(
     {"rejected", "submit_unknown", "cancelled_unverified_gtd", "unverified_gtd_cancel_failed"}
@@ -916,21 +922,31 @@ def _append_auto_buyer_cycle_history(
         logger.warning("Failed to append auto_buyer_cycle_history.jsonl: %s", exc)
 
 
-def _resting_fallback_cost(row: dict[str, Any]) -> float:
-    """Dollars still resting on the book for an unreconciled IOC fallback (0 once reconciled).
+def _pending_exposure_cost(row: dict[str, Any]) -> float:
+    """Dollars an open order of this row may still add on the exchange, beyond its recorded fill.
 
-    An open unknown submission counts its full requested cost and an unknown fallback leg its
-    remainder: either may exist on the exchange, so the caps must count it.
+    One helper for the daily cap, the per-game cap and the pending-orders check (C6), so none of
+    them double-counts: reconcile folds a resting fallback's partial fill into ``cost_usd`` (and
+    ``fallback_filled_shares``), and an unknown-fill primary's into ``shares``, so only the unfilled
+    remainder is still pending. An open unknown submission counts its full requested cost and an
+    unknown fallback leg its remainder: either may exist on the exchange.
     """
     try:
-        if row.get("submit_unknown") is True and str(row.get("status") or "open").lower() == "open":
+        price = float(row.get("entry_price") or 0.0)
+        resting = float(row.get("fallback_resting_shares") or 0.0)
+        if row.get("submit_unknown") is True:
+            if str(row.get("status") or "open").lower() != "open":
+                return 0.0
             cost = float(row.get("requested_cost_usd") or 0.0)
         elif is_fallback_submit_unknown(row):
-            cost = float(row.get("fallback_resting_shares") or 0.0) * float(row.get("entry_price") or 0.0)
+            cost = resting * price
         elif not row.get("fallback_order_id") or row.get("fallback_reconciled"):
             return 0.0
+        elif str(row.get("fallback_order_id")) == str(row.get("order_id") or ""):
+            # An unknown-fill primary: reconcile restates its fills into ``shares``.
+            cost = max(0.0, resting - float(row.get("shares") or 0.0)) * price
         else:
-            cost = float(row.get("fallback_resting_shares") or 0.0) * float(row.get("entry_price") or 0.0)
+            cost = max(0.0, resting - float(row.get("fallback_filled_shares") or 0.0)) * price
     except (TypeError, ValueError):
         return 0.0
     return cost if math.isfinite(cost) and cost > 0 else 0.0
@@ -972,6 +988,7 @@ def _live_book_has_pending_orders(ledger_path: Path) -> bool:
         (row.get("fallback_order_id") and not row.get("fallback_reconciled"))
         or (str(row.get("status", "")).lower() == "open" and row.get("fill_known") is False)
         or is_fallback_submit_unknown(row)
+        or _pending_exposure_cost(row) > 0
         for row in rows
     )
 
@@ -995,7 +1012,7 @@ def _today_auto_buyer_totals(data_root: Path | str = DATA) -> tuple[float, float
         if executed_raw and not row.get("manual"):
             try:
                 if parse_utc(str(executed_raw)).astimezone(EASTERN).date() == today:
-                    spend += float(row.get("cost_usd") or 0.0) + _resting_fallback_cost(row)
+                    spend += float(row.get("cost_usd") or 0.0) + _pending_exposure_cost(row)
             except (TypeError, ValueError):
                 pass
 
@@ -1245,6 +1262,20 @@ def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
         state["enabled"] = enabled
     state["updated_at_utc"] = iso_utc(utc_now())
     save_auto_buyer_state(state)
+    if state["enabled"] is False:
+        # D-02: turning the buyer off also cancels the live book's resting fallbacks by order id,
+        # right now and best effort, after the save so a failed cancel never blocks or undoes the
+        # kill switch. Cancel-only (no ledger write): this runs in the dashboard process without
+        # daily.lock; every disabled cycle, daily reconcile and the backstop cancel again.
+        try:
+            from .auto_buyer_ledger import cancel_resting_live_fallbacks
+
+            state["kill_switch_cancel"] = cancel_resting_live_fallbacks(
+                data_root=DATA, cancel_all=True, reason="kill_switch"
+            )
+        except Exception as exc:  # reported to the operator, never raised
+            logger.exception("Kill switch saved, but cancelling resting live fallbacks failed")
+            state["kill_switch_cancel"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"[:300]}
     return state
 
 
@@ -1399,6 +1430,10 @@ def _cohort_pass_config(
             **_base_auto_execution_kwargs_from_state(state),
             "whitelisted_models": (),
             "ncaab_spread_v6_live_bucket": None,
+            # D-06 (operator decision 2026-11-25): no cohort book auto-quarantines. The paper book
+            # exists to measure its cohort; the live book gets an advisory drawdown warning instead
+            # of a latch that silently stops an operator-approved cohort.
+            "auto_quarantine_underperforming": False,
             **overrides,
         },
         **_cycle_gate_kwargs(state),
@@ -1575,7 +1610,10 @@ def run_auto_buyer_cycle(
                 settle_auto_buyer_ledger,
             )
 
-            reconciliation_summary = reconcile_pending_auto_buyer_fallbacks()
+            # D-02: while disabled, every cycle cancels the live book's resting fallbacks by id.
+            reconciliation_summary = reconcile_pending_auto_buyer_fallbacks(
+                cancel_all_resting=not cycle_enabled
+            )
             settle_auto_buyer_ledger()
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
@@ -1701,6 +1739,7 @@ def run_auto_buyer_cycle(
         "rejected_min_topup": res.rejected_min_topup,
         "rejected_daily_loss_breaker": res.rejected_daily_loss_breaker,
         "rejected_quarantined_model": res.rejected_quarantined_model,
+        "rejected_live_calibration": res.rejected_live_calibration,
         "quarantined_models": res.quarantined_models,
         "total_spend_usd": res.total_spend_usd,
         "orders_count": len(res.submitted_orders) if should_execute else len(res.dry_run_orders),
@@ -1766,6 +1805,13 @@ def run_auto_buyer_cycle(
     return run_summary
 
 
+def _is_explicit_zero(value: Any) -> bool:
+    try:
+        return float(value) == 0.0
+    except (TypeError, ValueError):
+        return False
+
+
 def _get_quarantined_underperforming_models(
     data_root: Path | str = DATA,
     min_picks: int = 15,
@@ -1794,6 +1840,15 @@ def _get_quarantined_underperforming_models(
         # MANUAL rows are hand-placed and carry no model edge; grouping them made a
         # fake "manual" model that could show up in quarantined_models.
         if is_manual_auto_buyer_record(r):
+            continue
+        # C4: a void zero-fill row (an order that never filled) or an unknown submission is not a
+        # bet; counting it diluted the ROI sample. Only an explicit zero excludes: a row with no
+        # shares key is a recorded bet.
+        if (
+            str(r.get("result") or "").lower() == "void"
+            or r.get("submit_unknown") is True
+            or _is_explicit_zero(r.get("shares"))
+        ):
             continue
         if _is_settled_auto_buyer_record(r):
             m = str(r.get("model_id") or r.get("model_version") or "")
@@ -1914,6 +1969,10 @@ class AutoPolymarketBuyer:
         partially_filled_event_markets: set[tuple[str, str]] = set()
         partially_filled_matchup_markets: set[tuple[str, str, str, str]] = set()
         partially_filled_slugs: set[str] = set()
+        # A partial row is left out of the hard lockouts so its own contract can be topped up, which
+        # also left its game market open to a moved line or the other side. This keeps only the
+        # partial's own (slug, side) buyable in that game market (B4c).
+        partial_contracts: dict[str, set[tuple[str, str]]] = {}
 
         failures: list[tuple[str, str]] = []
         # Orders that may exist on the exchange with no known fill (an unknown submission, or an
@@ -2103,16 +2162,23 @@ class AutoPolymarketBuyer:
                     # Per-game exposure before the dead-row filter below: a zero-fill primary whose
                     # IOC was cancelled can still have its fallback resting on the book.
                     game = _game_key(r)
-                    exposure = float(r.get("cost_usd") or 0.0) + _resting_fallback_cost(r)
-                    if game and exposure > 0:
+                    pending_cost = _pending_exposure_cost(r)
+                    filled_cost_r = float(r.get("cost_usd") or 0.0)
+                    if game and filled_cost_r + pending_cost > 0:
                         by_pick = game_exposure.setdefault(game, {})
                         pick_key = str(r.get("pick_id") or r.get("order_id") or "")
-                        by_pick[pick_key] = by_pick.get(pick_key, 0.0) + exposure
+                        by_pick[pick_key] = by_pick.get(pick_key, 0.0) + filled_cost_r
+                        if pending_cost > 0:
+                            # C7: kept under its own key so the game-room check excludes only the
+                            # pick's own FILLED cost (the top-up math subtracts that); its unfilled
+                            # resting or unknown exposure still counts against the game cap.
+                            pending_key = f"{pick_key}{_PENDING_EXPOSURE_KEY_SUFFIX}"
+                            by_pick[pending_key] = by_pick.get(pending_key, 0.0) + pending_cost
                     status = str(r.get("status") or "").lower()
                     order_st = str(r.get("order_state") or "").upper()
                     result_st = str(r.get("result") or "").lower()
                     shares_cnt = float(r.get("shares") or 0.0)
-                    if (
+                    if pending_cost <= 0 and (
                         status in {"expired", "cancelled", "rejected"}
                         or (
                             order_st
@@ -2121,6 +2187,7 @@ class AutoPolymarketBuyer:
                         )
                         or (result_st == "void" and shares_cnt == 0)
                     ):
+                        # A dead row; one that may still fill (C7) falls through to the lockout.
                         continue
 
                     pid = str(r.get("pick_id") or "")
@@ -2185,6 +2252,10 @@ class AutoPolymarketBuyer:
                             )
                         if slug:
                             partially_filled_slugs.add(slug)
+                            if side:
+                                partial_contracts.setdefault(event_key_from_slug(slug), set()).add(
+                                    (slug, side)
+                                )
                         continue
 
                     if slug:
@@ -2280,6 +2351,7 @@ class AutoPolymarketBuyer:
             "partially_filled_market_sides": partially_filled_market_sides,
             "partially_filled_event_selections": partially_filled_event_selections,
             "partially_filled_slugs": partially_filled_slugs,
+            "partial_contracts": partial_contracts,
             "game_exposure": game_exposure,
         }
 
@@ -2342,6 +2414,10 @@ class AutoPolymarketBuyer:
         # block the other, or a refreshed pick on the opposite line re-enters the game.
         if market_slug and event_key_from_slug(market_slug) in index.get("held_events", set()):
             return True
+        if market_slug and token_side:
+            partial_held = index.get("partial_contracts", {}).get(event_key_from_slug(market_slug))
+            if partial_held and (market_slug, token_side.lower()) not in partial_held:
+                return True
         if event_id and selection and (str(event_id), str(selection).lower()) in index["event_selections"]:
             return True
         if (
@@ -2496,6 +2572,7 @@ class AutoPolymarketBuyer:
         current_spend = today_spend_usd
         committed_spend = today_spend_usd
         bought_index = self._build_bought_index()
+        live_calibration_alarmed: set[str] = set()
         input_flags = _load_pick_input_flags(
             [str(row.get("pick_id") or "") for row in picks if row.get("status") == "open"]
         )
@@ -2629,8 +2706,13 @@ class AutoPolymarketBuyer:
                 model_age_seconds = (now - parse_utc(str(model_timestamp))).total_seconds()
             except (TypeError, ValueError):
                 model_age_seconds = float("inf")
-            if self.config.require_model_timestamp and (
-                model_age_seconds < 0 or model_age_seconds > self.config.max_model_age_minutes * 60
+            live_cohort = cohort is not None and cohort.mode == "live"
+            max_model_age_minutes = self.config.max_model_age_minutes
+            if live_cohort:
+                # D-03: real money buys only a recent model call, whatever the global (paper) limit.
+                max_model_age_minutes = min(max_model_age_minutes, LIVE_COHORT_MAX_MODEL_AGE_MINUTES)
+            if (self.config.require_model_timestamp or live_cohort) and (
+                model_age_seconds < 0 or model_age_seconds > max_model_age_minutes * 60
             ):
                 result.rejected_stale_model += 1
                 continue
@@ -2822,6 +2904,33 @@ class AutoPolymarketBuyer:
                 model_id, market_type, raw_model_prob, data_root=self.data_root
             )
             model_prob = calibration.probability
+            if live_cohort and (
+                calibration.applied
+                or calibration.method != "identity"
+                or calibration.probability != calibration.raw_probability
+            ):
+                # B7: a live cohort's edge window was approved on raw probabilities. A calibrator the
+                # calibrate job writes (4x a day) must never silently move it: fail closed, loudly.
+                result.rejected_live_calibration += 1
+                logger.error(
+                    "Live cohort pick %s (%s %s) refused: served calibration is %s (%s), not identity",
+                    pick_id,
+                    model_id,
+                    market_type,
+                    calibration.method,
+                    calibration.reason,
+                )
+                if model_id not in live_calibration_alarmed:
+                    live_calibration_alarmed.add(model_id)
+                    result.alarms.append(
+                        _alarm(
+                            "live_calibration_not_identity",
+                            pick_id=pick_id,
+                            market_slug=market_slug,
+                            detail=f"{model_id} {market_type}: {calibration.method} ({calibration.reason})",
+                        )
+                    )
+                continue
             row = {
                 **row,
                 "model_probability": model_prob,
@@ -2881,6 +2990,8 @@ class AutoPolymarketBuyer:
             game = _game_key(row) if self.config.cohorts else ""
             game_other_spend = 0.0
             if game:
+                # Everything on the game except this pick's own filled cost, which the top-up math
+                # subtracts below; its own pending (resting or unknown) exposure still counts (C7).
                 game_other_spend = sum(
                     cost
                     for key, cost in bought_index.get("game_exposure", {}).get(game, {}).items()
@@ -2915,6 +3026,12 @@ class AutoPolymarketBuyer:
                 selection=selection,
                 bought_index=bought_index,
             )
+
+            if partial_info is not None and str(partial_info.get("market_slug") or "") != market_slug:
+                # B4c: a top-up only ever adds to the contract already held. A partial found through
+                # event + selection on another line (a moved spread or total) is a held game market.
+                result.rejected_dedup += 1
+                continue
 
             is_topup = False
             filled_cost = 0.0

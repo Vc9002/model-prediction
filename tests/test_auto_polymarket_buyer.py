@@ -57,7 +57,7 @@ def test_live_cycle_stops_when_precycle_reconciliation_fails(monkeypatch):
     )
     monkeypatch.setattr(
         "model_prediction.portfolio.auto_buyer_ledger.reconcile_pending_auto_buyer_fallbacks",
-        lambda: (_ for _ in ()).throw(OSError("exchange unavailable")),
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("exchange unavailable")),
     )
     with pytest.raises(RuntimeError, match="pre-cycle reconciliation failed"):
         run_auto_buyer_cycle()
@@ -2265,11 +2265,11 @@ def test_reconcile_cancels_resting_order_once_event_has_started(tmp_path):
 
     class FakeExecutor:
         def order_snapshots(self, order_ids):
+            # Stateful (C5): once cancelled, the order reads back CANCELED, as the exchange reports it.
+            state = "ORDER_STATE_CANCELED" if "resting-remainder" in cancelled else "ORDER_STATE_NEW"
             return {
                 "status": "live",
-                "orders": [
-                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
-                ],
+                "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
         def cancel(self, order_id, user_command):
@@ -2360,11 +2360,11 @@ def test_reconcile_cancels_resting_order_when_edge_drops_below_min(tmp_path):
 
     class FakeExecutor:
         def order_snapshots(self, order_ids):
+            # Stateful (C5): once cancelled, the order reads back CANCELED, as the exchange reports it.
+            state = "ORDER_STATE_CANCELED" if "resting-remainder" in cancelled else "ORDER_STATE_NEW"
             return {
                 "status": "live",
-                "orders": [
-                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
-                ],
+                "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
         def cancel(self, order_id, user_command, market_slug=None):
@@ -2405,11 +2405,11 @@ def test_reconcile_preserves_resting_order_when_edge_remains_strong(tmp_path):
 
     class FakeExecutor:
         def order_snapshots(self, order_ids):
+            # Stateful (C5): once cancelled, the order reads back CANCELED, as the exchange reports it.
+            state = "ORDER_STATE_CANCELED" if "resting-remainder" in cancelled else "ORDER_STATE_NEW"
             return {
                 "status": "live",
-                "orders": [
-                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
-                ],
+                "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
         def cancel(self, order_id, user_command, market_slug=None):
@@ -2448,11 +2448,11 @@ def test_reconcile_cancels_resting_order_when_market_moves_up_significantly(tmp_
 
     class FakeExecutor:
         def order_snapshots(self, order_ids):
+            # Stateful (C5): once cancelled, the order reads back CANCELED, as the exchange reports it.
+            state = "ORDER_STATE_CANCELED" if "resting-remainder" in cancelled else "ORDER_STATE_NEW"
             return {
                 "status": "live",
-                "orders": [
-                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
-                ],
+                "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
         def cancel(self, order_id, user_command, market_slug=None):
@@ -2485,11 +2485,11 @@ def test_reconcile_cancels_resting_order_when_market_closed(tmp_path):
 
     class FakeExecutor:
         def order_snapshots(self, order_ids):
+            # Stateful (C5): once cancelled, the order reads back CANCELED, as the exchange reports it.
+            state = "ORDER_STATE_CANCELED" if "resting-remainder" in cancelled else "ORDER_STATE_NEW"
             return {
                 "status": "live",
-                "orders": [
-                    {"order_id": "resting-remainder", "order_state": "ORDER_STATE_NEW", "cum_quantity": 0.0}
-                ],
+                "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
         def cancel(self, order_id, user_command, market_slug=None):

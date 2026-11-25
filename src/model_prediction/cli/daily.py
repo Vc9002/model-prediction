@@ -278,6 +278,76 @@ def _auto_buyer_cycle_owns_live_reconcile() -> bool:
     return cycle_runs and auto_buyer_cycle_manages_live_book(state)
 
 
+def _auto_buyer_enabled(state: dict[str, Any]) -> bool:
+    """Strict: only the boolean true enables (bool("false") is True; "true" and 1 do not)."""
+    return state.get("enabled") is True
+
+
+def _daily_cancels_all_resting() -> bool:
+    """D-02: while the buyer is not enabled, daily's own reconcile cancels every resting live
+    fallback by id. An unreadable state loads as defaults (disabled), so it fails toward cancelling."""
+    from ..portfolio.auto_executor import load_auto_buyer_state
+
+    return not _auto_buyer_enabled(load_auto_buyer_state())
+
+
+def _run_auto_buyer_step12(forecast_date: str | None) -> dict[str, Any]:
+    """Step 12: run one buyer cycle when the saved state enables it (C8: tested directly)."""
+    auto_buyer_result: dict[str, Any] = {"status": "skipped"}
+    try:
+        from ..portfolio.auto_executor import load_auto_buyer_state, run_auto_buyer_cycle
+
+        auto_state = load_auto_buyer_state()
+        if _auto_buyer_enabled(auto_state):
+            logger.info(
+                "Auto-Buyer is ENABLED (mode=%s). Executing automated purchase cycle...",
+                auto_state.get("mode", "paper"),
+            )
+            # No execute_override here -- real order placement must be
+            # gated by the persisted enabled+mode state, never forced,
+            # so a scheduled run can never place real orders while the
+            # dashboard is set to paper mode.
+            buyer_run = run_auto_buyer_cycle(forecast_date=forecast_date)
+            # Surface the full rejection breakdown, not just the headline
+            # counts -- without this, `whitelisted_evaluated` looks like
+            # "candidates the buyer had a real shot at" when it actually
+            # includes every already-settled historical row still sitting
+            # in the picks files for a whitelisted model. Investigating
+            # "why did the buyer skip so much" is impossible after the
+            # fact without these per-reason counts on record.
+            auto_buyer_result = {
+                "status": buyer_run.get("status", "executed"),
+                "mode": buyer_run.get("mode"),
+                "orders_count": buyer_run.get("orders_count", 0),
+                "total_spend_usd": buyer_run.get("total_spend_usd", 0.0),
+                "total_evaluated": buyer_run.get("total_evaluated", 0),
+                "rejected_not_open": buyer_run.get("rejected_not_open", 0),
+                "whitelisted_evaluated": buyer_run.get("whitelisted_count", 0),
+                "rejected_not_whitelisted": buyer_run.get("rejected_not_whitelisted", 0),
+                "rejected_not_qualified_decision": buyer_run.get("rejected_not_qualified_decision", 0),
+                "rejected_blacklist": buyer_run.get("rejected_blacklist", 0),
+                "rejected_disabled_sport_market": buyer_run.get("rejected_disabled_sport_market", 0),
+                "rejected_unsupported_market": buyer_run.get("rejected_unsupported_market", 0),
+                "rejected_started": buyer_run.get("rejected_started", 0),
+                "rejected_future_slate": buyer_run.get("rejected_future_slate", 0),
+                "rejected_dedup": buyer_run.get("rejected_dedup", 0),
+                "rejected_min_topup": buyer_run.get("rejected_min_topup", 0),
+                "rejected_unmapped_market": buyer_run.get("rejected_unmapped_market", 0),
+                "rejected_stale_quote": buyer_run.get("rejected_stale_quote", 0),
+                "rejected_closed_market": buyer_run.get("rejected_closed_market", 0),
+                "rejected_low_edge": buyer_run.get("rejected_low_edge", 0),
+                "rejected_unrealistic_edge": buyer_run.get("rejected_unrealistic_edge", 0),
+                "rejected_budget": buyer_run.get("rejected_budget", 0),
+                "reason": buyer_run.get("reason"),
+            }
+        else:
+            auto_buyer_result = {"status": "disabled", "reason": "auto_buyer_disabled"}
+    except Exception:
+        logger.warning("Automated Polymarket buyer cycle failed", exc_info=True)
+        auto_buyer_result = {"status": "error"}
+    return auto_buyer_result
+
+
 def _with_timed_exports(function):
     """Include deferred workbook rebuilding in the reported daily duration."""
 
@@ -1751,8 +1821,6 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
     # benefit. So this step is the *only* reconciliation pass when the buyer
     # cycle won't run this invocation (disabled, or verification override),
     # and defers to step 12's internal pass otherwise.
-    from ..portfolio.auto_executor import load_auto_buyer_state
-
     _auto_buyer_will_run = _auto_buyer_cycle_owns_live_reconcile()
 
     auto_buyer_settle_result: dict[str, Any] = (
@@ -1767,7 +1835,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
                 settle_auto_buyer_ledger,
             )
 
-            reconcile_pending_auto_buyer_fallbacks(data_directory)
+            reconcile_pending_auto_buyer_fallbacks(
+                data_directory, cancel_all_resting=_daily_cancels_all_resting()
+            )
             auto_buyer_settle_result = settle_auto_buyer_ledger(data_directory)
         except Exception:
             logger.warning("Automated Auto-Buyer settlement failed", exc_info=True)
@@ -1790,59 +1860,7 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
             "reason": "verification_override",
         }
     else:
-        auto_buyer_result = {"status": "skipped"}
-        try:
-            from ..portfolio.auto_executor import run_auto_buyer_cycle
-
-            auto_state = load_auto_buyer_state()
-            # Strict: only the boolean true enables (bool("false") is True).
-            if auto_state.get("enabled") is True:
-                logger.info(
-                    "Auto-Buyer is ENABLED (mode=%s). Executing automated purchase cycle...",
-                    auto_state.get("mode", "paper"),
-                )
-                # No execute_override here -- real order placement must be
-                # gated by the persisted enabled+mode state, never forced,
-                # so a scheduled run can never place real orders while the
-                # dashboard is set to paper mode.
-                buyer_run = run_auto_buyer_cycle(forecast_date=args.date)
-                # Surface the full rejection breakdown, not just the headline
-                # counts -- without this, `whitelisted_evaluated` looks like
-                # "candidates the buyer had a real shot at" when it actually
-                # includes every already-settled historical row still sitting
-                # in the picks files for a whitelisted model. Investigating
-                # "why did the buyer skip so much" is impossible after the
-                # fact without these per-reason counts on record.
-                auto_buyer_result = {
-                    "status": buyer_run.get("status", "executed"),
-                    "mode": buyer_run.get("mode"),
-                    "orders_count": buyer_run.get("orders_count", 0),
-                    "total_spend_usd": buyer_run.get("total_spend_usd", 0.0),
-                    "total_evaluated": buyer_run.get("total_evaluated", 0),
-                    "rejected_not_open": buyer_run.get("rejected_not_open", 0),
-                    "whitelisted_evaluated": buyer_run.get("whitelisted_count", 0),
-                    "rejected_not_whitelisted": buyer_run.get("rejected_not_whitelisted", 0),
-                    "rejected_not_qualified_decision": buyer_run.get("rejected_not_qualified_decision", 0),
-                    "rejected_blacklist": buyer_run.get("rejected_blacklist", 0),
-                    "rejected_disabled_sport_market": buyer_run.get("rejected_disabled_sport_market", 0),
-                    "rejected_unsupported_market": buyer_run.get("rejected_unsupported_market", 0),
-                    "rejected_started": buyer_run.get("rejected_started", 0),
-                    "rejected_future_slate": buyer_run.get("rejected_future_slate", 0),
-                    "rejected_dedup": buyer_run.get("rejected_dedup", 0),
-                    "rejected_min_topup": buyer_run.get("rejected_min_topup", 0),
-                    "rejected_unmapped_market": buyer_run.get("rejected_unmapped_market", 0),
-                    "rejected_stale_quote": buyer_run.get("rejected_stale_quote", 0),
-                    "rejected_closed_market": buyer_run.get("rejected_closed_market", 0),
-                    "rejected_low_edge": buyer_run.get("rejected_low_edge", 0),
-                    "rejected_unrealistic_edge": buyer_run.get("rejected_unrealistic_edge", 0),
-                    "rejected_budget": buyer_run.get("rejected_budget", 0),
-                    "reason": buyer_run.get("reason"),
-                }
-            else:
-                auto_buyer_result = {"status": "disabled", "reason": "auto_buyer_disabled"}
-        except Exception:
-            logger.warning("Automated Polymarket buyer cycle failed", exc_info=True)
-            auto_buyer_result = {"status": "error"}
+        auto_buyer_result = _run_auto_buyer_step12(args.date)
 
     _lap("auto_buyer_cycle_12")
 
@@ -1857,7 +1875,9 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
             fallback_reconcile_result = {
                 "status": "ok",
-                **reconcile_pending_auto_buyer_fallbacks(data_directory),
+                **reconcile_pending_auto_buyer_fallbacks(
+                    data_directory, cancel_all_resting=_daily_cancels_all_resting()
+                ),
             }
         except Exception:
             logger.warning("Auto-Buyer fallback reconciliation failed", exc_info=True)

@@ -17,7 +17,9 @@ def test_paper_mode_cannot_be_overridden_into_live_execution(tmp_path, monkeypat
     reconciled = []
     settled = []
     monkeypatch.setattr(
-        auto_buyer_ledger, "reconcile_pending_auto_buyer_fallbacks", lambda: reconciled.append(True) or {}
+        auto_buyer_ledger,
+        "reconcile_pending_auto_buyer_fallbacks",
+        lambda **kwargs: reconciled.append(kwargs) or {},
     )
     monkeypatch.setattr(
         auto_buyer_ledger,
@@ -35,5 +37,7 @@ def test_paper_mode_cannot_be_overridden_into_live_execution(tmp_path, monkeypat
     expected_live = mode == "live" and (enabled if override is None else bool(override))
     assert configs[0].execute_live is expected_live
     assert bool(reconciled) is expected_live
+    # D-02: a cycle that is not enabled cancels every resting live fallback while it reconciles.
+    assert all(kwargs == {"cancel_all_resting": enabled is not True} for kwargs in reconciled)
     if mode == "paper":
         assert all(path == tmp_path / "paper" for path in settled)

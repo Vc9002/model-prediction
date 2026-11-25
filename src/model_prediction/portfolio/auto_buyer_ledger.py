@@ -14,7 +14,7 @@ import os
 import re
 from collections.abc import Callable
 from contextlib import suppress
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -423,6 +423,11 @@ def record_auto_buy_execution(
             rec["entry_price"] = avg_price
             rec["primary_filled_shares"] = total_shares
             rec["primary_filled_cost_usd"] = total_cost
+            # The earlier leg's fallback fills are now in the primary baseline above; the new leg has
+            # none yet. A stale count would be subtracted from the new remainder (C6) and under-count
+            # the daily and per-game caps.
+            rec["fallback_filled_shares"] = 0.0
+            rec["fallback_filled_cost_usd"] = 0.0
             rec["fallback_order_id"] = fallback_order_id
             rec["fallback_resting_shares"] = fallback_resting_shares
             rec["fallback_reconciled"] = fallback_reconciled
@@ -431,13 +436,12 @@ def record_auto_buy_execution(
             for field_name in _EXECUTION_PASSTHROUGH_FIELDS:
                 if order_payload.get(field_name) is not None:
                     rec[field_name] = order_payload[field_name]
-            # Cleared, not just never set: a stale True from an earlier, operator-resolved leg would
+            # Always written, never popped: a stale True from an earlier, operator-resolved leg would
             # re-hold a row whose new top-up has no fallback (fallback_order_id None) -- silently,
-            # since a fully filled top-up raises no alarm.
-            if fallback_unknown:
-                rec["fallback_submit_unknown"] = True
-            else:
-                rec.pop("fallback_submit_unknown", None)
+            # since a fully filled top-up raises no alarm. An explicit False must also win over
+            # is_fallback_submit_unknown()'s legacy fallback_status check, because the passthrough
+            # above keeps a stale "submit_unknown" status when the top-up payload carries none.
+            rec["fallback_submit_unknown"] = fallback_unknown
 
             target_spend = float(
                 order_payload.get("target_spend") or (float(rec.get("model_units") or 1.0) * unit_val)
@@ -641,10 +645,38 @@ def record_auto_buy_execution(
     return jsonl_record
 
 
+_TERMINAL_ORDER_STATES = frozenset(
+    {
+        "ORDER_STATE_FILLED",
+        "ORDER_STATE_CANCELED",
+        "ORDER_STATE_EXPIRED",
+        "ORDER_STATE_REJECTED",
+    }
+)
+
+
+def _default_live_executor(root: Path) -> Any:
+    """The executor reconcile and the cancel-only paths build when the caller passes none."""
+    from ..audit import AuditLog
+    from ..data_sources.polymarket_execute import PolymarketExecutor
+
+    return PolymarketExecutor(audit=AuditLog(root / "audit.jsonl"))
+
+
+def _cancel_by_id(executor: Any, order_id: str, market_slug: str | None) -> None:
+    """Cancel one order by id. Never a cancel-all: the account may hold manual orders."""
+    try:
+        executor.cancel(order_id, user_command=True, market_slug=market_slug)
+    except TypeError:
+        executor.cancel(order_id, user_command=True)
+
+
 def reconcile_pending_auto_buyer_fallbacks(
     data_root: Path | str | None = None,
     executor: Any | None = None,
     quote_fn: Callable[[str], dict[str, Any]] | None = None,
+    *,
+    cancel_all_resting: bool = False,
 ) -> dict[str, Any]:
     """Resolve resting IOC-fallback orders left open by record_auto_buy_execution.
 
@@ -655,20 +687,26 @@ def reconcile_pending_auto_buyer_fallbacks(
     authoritative order state via ``order_snapshots``, and:
 
     - adds whatever the resting order has filled (at its own recorded price,
-      since a GTC fallback never chases -- it only ever rests at the
-      original ticket price) on top of the immutable
+      since a fallback never chases -- it only ever rests at the original
+      ticket price) on top of the immutable
       ``primary_filled_shares``/``primary_filled_cost_usd`` baseline, so
       repeated runs stay idempotent rather than double-counting;
     - marks the row reconciled once the exchange reports a terminal state
       (filled/canceled/expired/rejected);
-    - cancels the resting order once its event has started and it is still
-      open -- a stale resting limit has no business filling after pregame
-      information is void, and a game that already started only becomes
-      more so as it progresses;
+    - cancels the resting order by id once its event has started, or for every
+      unreconciled fallback when ``cancel_all_resting`` (the kill switch, D-02) --
+      also when the order snapshots fail or the order is missing from them (B6),
+      since cancelling a resting order only ever reduces exposure;
     - checks resting order freshness and market movement: if the market has
       closed, or if the market moved away such that the edge has degraded
       below the minimum threshold or turned negative, the resting order is
       cancelled to prevent adverse fills.
+
+    After every cancel the order is read again (C5): the fill count read before
+    the cancel can be stale (a fill can land between the read and the cancel), so
+    shares are restated and the row is closed, or voided, only from a terminal
+    post-cancel read. Otherwise it stays pending with ``cancel_requested_at_utc``.
+    The summary carries ``cancel_failed`` and ``snapshot_error`` only when non-empty.
     """
     j_path, x_path = resolve_auto_buyer_paths(data_root=data_root)
     root = j_path.parent
@@ -689,10 +727,7 @@ def reconcile_pending_auto_buyer_fallbacks(
     live_executor = executor
     if live_executor is None:
         try:
-            from ..audit import AuditLog
-            from ..data_sources.polymarket_execute import PolymarketExecutor
-
-            live_executor = PolymarketExecutor(audit=AuditLog(root / "audit.jsonl"))
+            live_executor = _default_live_executor(root)
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
             return empty
 
@@ -710,22 +745,23 @@ def reconcile_pending_auto_buyer_fallbacks(
             and r.get("order_id")
         }
     )
+    # B6: a failed read no longer returns before any cancel. Fills stay unknown (nothing is
+    # restated or voided), but a started or kill-switched fallback is still cancelled by id.
+    snapshot_error = ""
+    by_id: dict[str, dict[str, Any]] = {}
     try:
         snapshot = live_executor.order_snapshots(order_ids)
-    except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError):
-        return {**empty, "still_pending": len(pending), "errors": len(pending)}
-    if snapshot.get("status") != "live":
-        return {**empty, "still_pending": len(pending)}
-    by_id = {str(item.get("order_id")): item for item in snapshot.get("orders", [])}
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
+        snapshot_error = f"{type(exc).__name__}: {exc}"[:300]
+    else:
+        if snapshot.get("status") != "live":
+            snapshot_error = f"order snapshots status {snapshot.get('status')!r}"
+        else:
+            by_id = {str(item.get("order_id")): item for item in snapshot.get("orders", [])}
 
     now = utc_now()
-    terminal_states = {
-        "ORDER_STATE_FILLED",
-        "ORDER_STATE_CANCELED",
-        "ORDER_STATE_EXPIRED",
-        "ORDER_STATE_REJECTED",
-    }
     reconciled_filled = cancelled_expired = still_pending = errors = 0
+    cancel_failed: list[str] = []
     changed = False
 
     def _cancel_order(
@@ -737,10 +773,7 @@ def reconcile_pending_auto_buyer_fallbacks(
         if not hasattr(live_executor, "cancel"):
             return False
         try:
-            try:
-                live_executor.cancel(order_id, user_command=True, market_slug=market_slug)
-            except TypeError:
-                live_executor.cancel(order_id, user_command=True)
+            _cancel_by_id(live_executor, order_id, market_slug)
             if reason:
                 row["cancellation_reason"] = reason
             return True
@@ -748,33 +781,34 @@ def reconcile_pending_auto_buyer_fallbacks(
             logger.warning("Failed to cancel resting order %s: %s", order_id, exc)
             return False
 
-    for r in records:
-        fid = r.get("fallback_order_id") or (r.get("order_id") if r.get("fill_known") is False else None)
-        if not fid:
-            continue
-        if r.get("fallback_reconciled") and r.get("fill_known") is not False:
-            continue
-        fid = str(fid)
-        order = by_id.get(fid)
-        if order is None:
-            still_pending += 1
-            continue
+    def _reread(order_id: str) -> dict[str, Any] | None:
+        try:
+            after = live_executor.order_snapshots([order_id])
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
+            logger.warning("Re-read after cancelling %s failed: %s", order_id, exc)
+            return None
+        if after.get("status") != "live":
+            return None
+        return next((o for o in after.get("orders", []) if str(o.get("order_id")) == order_id), None)
 
-        state = str(order.get("order_state") or "").upper()
+    def _restate(row: dict[str, Any], order: dict[str, Any]) -> tuple[float, float, float]:
+        """Fold the order's cum_quantity into the row; returns (fallback_filled, new_shares, primary)."""
+        nonlocal changed
         try:
             fallback_filled = max(0.0, float(order.get("cum_quantity") or 0.0))
         except (TypeError, ValueError):
             fallback_filled = 0.0
-
         # If resting fallback was placed with capped resting shares
-        if r.get("fallback_resting_shares") is not None and r.get("fallback_order_id") != r.get("order_id"):
-            fallback_filled = min(fallback_filled, float(r.get("fallback_resting_shares") or 0.0))
+        if row.get("fallback_resting_shares") is not None and row.get("fallback_order_id") != row.get(
+            "order_id"
+        ):
+            fallback_filled = min(fallback_filled, float(row.get("fallback_resting_shares") or 0.0))
 
-        primary_shares = float(r.get("primary_filled_shares") or 0.0)
-        primary_cost = float(r.get("primary_filled_cost_usd") or 0.0)
-        entry_price = float(r.get("entry_price") or 0.0)
+        primary_shares = float(row.get("primary_filled_shares") or 0.0)
+        primary_cost = float(row.get("primary_filled_cost_usd") or 0.0)
+        entry_price = float(row.get("entry_price") or 0.0)
 
-        if r.get("fill_known") is False and r.get("fallback_order_id") == r.get("order_id"):
+        if row.get("fill_known") is False and row.get("fallback_order_id") == row.get("order_id"):
             new_shares = round(fallback_filled, 4)
             new_cost = round(fallback_filled * entry_price, 4)
             update_primary = True
@@ -783,44 +817,85 @@ def reconcile_pending_auto_buyer_fallbacks(
             new_cost = round(primary_cost + fallback_filled * entry_price, 4)
             update_primary = False
 
-        if new_shares != r.get("shares") or new_cost != r.get("cost_usd"):
-            r["shares"] = new_shares
-            r["cost_usd"] = new_cost
+        if new_shares != row.get("shares") or new_cost != row.get("cost_usd"):
+            row["shares"] = new_shares
+            row["cost_usd"] = new_cost
             if update_primary:
-                r["primary_filled_shares"] = new_shares
-                r["primary_filled_cost_usd"] = new_cost
+                row["primary_filled_shares"] = new_shares
+                row["primary_filled_cost_usd"] = new_cost
             else:
-                r["fallback_filled_shares"] = round(fallback_filled, 4)
-                r["fallback_filled_cost_usd"] = round(fallback_filled * entry_price, 4)
+                row["fallback_filled_shares"] = round(fallback_filled, 4)
+                row["fallback_filled_cost_usd"] = round(fallback_filled * entry_price, 4)
             try:
-                unit_value = float(r.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
+                unit_value = float(row.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
             except (TypeError, ValueError):
                 unit_value = AUTO_BUYER_UNIT_VALUE_USD
             if unit_value > 0:
-                r["units"] = _usd_to_auto_buyer_units(new_cost, unit_value)
+                row["units"] = _usd_to_auto_buyer_units(new_cost, unit_value)
             changed = True
+        return fallback_filled, new_shares, primary_shares
 
-        is_terminal = state in terminal_states
+    def _close(row: dict[str, Any], state: str, new_shares: float, primary_shares: float) -> None:
+        """Terminal on the exchange's own read: reconciled, filled, partial, or a zero-fill void."""
+        nonlocal changed
+        row["fallback_reconciled"] = True
+        row["fill_known"] = True
+        row.pop("cancel_requested_at_utc", None)
+        if row.get("fallback_order_id") == row.get("order_id"):
+            requested_total = float(row.get("fallback_resting_shares") or 0.0)
+        else:
+            requested_total = round(primary_shares + float(row.get("fallback_resting_shares") or 0.0), 4)
+        if state == "ORDER_STATE_FILLED" or (new_shares + 1e-9 >= requested_total and new_shares > 0):
+            row["order_state"] = "ORDER_STATE_FILLED"
+        elif new_shares > 0:
+            row["order_state"] = "ORDER_STATE_PARTIALLY_FILLED"
+        else:
+            row["order_state"] = state
+            row["status"] = "settled"
+            row["result"] = "void"
+            row["pnl_usd"] = 0.0
+            row["pnl_units"] = 0.0
+            row["settled_at_utc"] = iso_utc(now)
+        changed = True
+
+    for r in records:
+        fid = r.get("fallback_order_id") or (r.get("order_id") if r.get("fill_known") is False else None)
+        if not fid:
+            continue
+        if r.get("fallback_reconciled") and r.get("fill_known") is not False:
+            continue
+        fid = str(fid)
+        true_fallback = r.get("fallback_order_id") != r.get("order_id")
+        market_slug = r.get("market_slug")
         try:
             started = parse_utc(str(r.get("event_start_utc") or "")) <= now
         except ValueError:
             started = False
 
-        market_slug = r.get("market_slug")
+        order = by_id.get(fid)
+        state = ""
+        fallback_filled = new_shares = primary_shares = 0.0
+        if order is not None:
+            state = str(order.get("order_state") or "").upper()
+            # A fill count from a live read only ever grows, so restating it is safe; closing the row
+            # is not (see the post-cancel re-read below).
+            fallback_filled, new_shares, primary_shares = _restate(r, order)
+            if state in _TERMINAL_ORDER_STATES:
+                _close(r, state, new_shares, primary_shares)
+                if fallback_filled > 0:
+                    reconciled_filled += 1
+                else:
+                    cancelled_expired += 1
+                continue
 
-        if not is_terminal and started and r.get("fallback_order_id") != r.get("order_id"):
-            if _cancel_order(fid, market_slug, r, reason="game_started"):
-                is_terminal = True
-                state = state or "ORDER_STATE_CANCELED"
-            else:
-                errors += 1
-        elif (
-            not is_terminal
-            and not started
-            and r.get("fallback_order_id") != r.get("order_id")
-            and market_slug
-        ):
+        cancel_reason = ""
+        if true_fallback and started:
+            cancel_reason = "game_started"
+        elif true_fallback and cancel_all_resting:
+            cancel_reason = "kill_switch"
+        elif true_fallback and order is not None and market_slug:
             # Check resting order freshness and adverse market movement
+            entry_price = float(r.get("entry_price") or 0.0)
             snap = None
             if quote_fn is not None:
                 try:
@@ -855,70 +930,51 @@ def reconcile_pending_auto_buyer_fallbacks(
                     min_edge = 0.035
                     max_edge = 0.20
 
-                should_cancel = False
-                stale_reason = ""
                 if m_state != "MARKET_STATE_OPEN":
-                    should_cancel = True
-                    stale_reason = f"market_state_{m_state}"
+                    cancel_reason = f"market_state_{m_state}"
                 elif current_ask is not None:
                     try:
                         ask_flt = float(current_ask)
                         current_edge = model_prob - ask_flt
                         if current_edge < min_edge:
                             # Edge lost or turned negative (adverse selection risk)
-                            should_cancel = True
-                            stale_reason = f"edge_degraded_to_{current_edge:.4f}_below_min_{min_edge:.4f}"
+                            cancel_reason = f"edge_degraded_to_{current_edge:.4f}_below_min_{min_edge:.4f}"
                         elif max_edge is not None and current_edge > max_edge:
                             # Edge became anomalous/uncalibrated
-                            should_cancel = True
-                            stale_reason = f"edge_anomalous_to_{current_edge:.4f}_above_max_{max_edge:.4f}"
+                            cancel_reason = f"edge_anomalous_to_{current_edge:.4f}_above_max_{max_edge:.4f}"
                         elif (
                             current_bid is not None
                             and float(current_bid) > entry_price
                             and (ask_flt - entry_price) > 0.015
                         ):
                             # Market moved up away from resting limit price
-                            should_cancel = True
-                            stale_reason = f"market_moved_up_ask_{ask_flt:.2f}_vs_limit_{entry_price:.2f}"
+                            cancel_reason = f"market_moved_up_ask_{ask_flt:.2f}_vs_limit_{entry_price:.2f}"
                     except (ValueError, TypeError):
                         pass
 
-                if should_cancel:
-                    if _cancel_order(fid, market_slug, r, reason=stale_reason):
-                        is_terminal = True
-                        state = state or "ORDER_STATE_CANCELED"
-                    else:
-                        errors += 1
-
-        if is_terminal:
-            r["fallback_reconciled"] = True
-            r["fill_known"] = True
-            is_unknown_primary = r.get("fallback_order_id") == r.get("order_id")
-            if is_unknown_primary:
-                requested_total = float(r.get("fallback_resting_shares") or 0.0)
-            else:
-                requested_total = round(
-                    primary_shares + float(r.get("fallback_resting_shares") or 0.0),
-                    4,
-                )
-            if state == "ORDER_STATE_FILLED" or (new_shares + 1e-9 >= requested_total and new_shares > 0):
-                r["order_state"] = "ORDER_STATE_FILLED"
-            elif new_shares > 0:
-                r["order_state"] = "ORDER_STATE_PARTIALLY_FILLED"
-            else:
-                r["order_state"] = state
-                r["status"] = "settled"
-                r["result"] = "void"
-                r["pnl_usd"] = 0.0
-                r["pnl_units"] = 0.0
-                r["settled_at_utc"] = iso_utc(now)
-            changed = True
-            if fallback_filled > 0:
-                reconciled_filled += 1
-            else:
-                cancelled_expired += 1
-        else:
+        if not cancel_reason:
             still_pending += 1
+            continue
+        if not _cancel_order(fid, market_slug, r, reason=cancel_reason):
+            errors += 1
+            cancel_failed.append(fid)
+            still_pending += 1
+            continue
+        changed = True
+        after = _reread(fid)
+        after_state = str((after or {}).get("order_state") or "").upper()
+        if after is None or after_state not in _TERMINAL_ORDER_STATES:
+            # C5: the cancel went out but the exchange has not confirmed a terminal state, so the
+            # fill count is not final. Keep it pending; the next reconcile reads it again.
+            r["cancel_requested_at_utc"] = iso_utc(now)
+            still_pending += 1
+            continue
+        fallback_filled, new_shares, primary_shares = _restate(r, after)
+        _close(r, after_state, new_shares, primary_shares)
+        if fallback_filled > 0:
+            reconciled_filled += 1
+        else:
+            cancelled_expired += 1
 
     if changed:
         try:
@@ -937,12 +993,101 @@ def reconcile_pending_auto_buyer_fallbacks(
         except (OSError, ValueError, KeyError, TypeError, RuntimeError) as err:
             logger.warning(f"Failed to update auto_buyer_picks.xlsx during fallback reconciliation: {err}")
 
-    return {
+    summary: dict[str, Any] = {
         "reconciled_filled": reconciled_filled,
         "cancelled_expired": cancelled_expired,
         "still_pending": still_pending,
         "errors": errors,
     }
+    # Only when non-empty: callers and tests pin the four-key dict of an uneventful run.
+    if cancel_failed:
+        summary["cancel_failed"] = cancel_failed
+    if snapshot_error:
+        summary["snapshot_error"] = snapshot_error
+    return summary
+
+
+def cancel_resting_live_fallbacks(
+    *,
+    data_root: Path | str | None = None,
+    executor: Any | None = None,
+    now: datetime | None = None,
+    cancel_all: bool,
+    start_lead_seconds: float = 30.0,
+    skip_order_ids: frozenset[str] = frozenset(),
+    reason: str,
+) -> dict[str, Any]:
+    """Cancel, by order id, the live book's resting fallbacks that are due (D-02, D-01 backstop).
+
+    Due means every unreconciled true fallback when ``cancel_all`` (the kill switch), otherwise
+    those whose event starts within ``start_lead_seconds`` (an unparseable start counts as due).
+    Cancel-only: it reads the ledger and never writes it. There is no ledger lock, and its callers
+    (the dashboard toggle, the backstop worker) do not hold daily.lock, so restating fills stays
+    with ``reconcile_pending_auto_buyer_fallbacks`` under that lock. With nothing due it builds no
+    executor and makes no network call. It never calls a cancel-all or batch endpoint: one
+    ``order_snapshots`` read (failure tolerated) and one cancel per id.
+    """
+    j_path, _ = resolve_auto_buyer_paths(data_root=data_root)
+    summary: dict[str, Any] = {
+        "reason": reason,
+        "candidates": 0,
+        "cancelled": [],
+        "already_terminal": [],
+        "failed": [],
+    }
+    if not j_path.exists():
+        return summary
+    moment = now or utc_now()
+    horizon = moment + timedelta(seconds=float(start_lead_seconds))
+    due: dict[str, str | None] = {}
+    for r in read_auto_buyer_ledger(jsonl_path=j_path):
+        fid = str(r.get("fallback_order_id") or "")
+        if not fid or r.get("fallback_reconciled") or fid == str(r.get("order_id") or ""):
+            continue
+        if fid in skip_order_ids or _is_settled_auto_buyer_record(r):
+            continue
+        if not cancel_all:
+            try:
+                if parse_utc(str(r.get("event_start_utc") or "")) > horizon:
+                    continue
+            except (TypeError, ValueError):
+                pass
+        due.setdefault(fid, r.get("market_slug") or None)
+    summary["candidates"] = len(due)
+    if not due:
+        return summary
+
+    live_executor = executor if executor is not None else _default_live_executor(j_path.parent)
+    terminal: set[str] = set()
+    try:
+        snapshot = live_executor.order_snapshots(sorted(due))
+        if snapshot.get("status") == "live":
+            terminal = {
+                str(o.get("order_id"))
+                for o in snapshot.get("orders", [])
+                if str(o.get("order_state") or "").upper() in _TERMINAL_ORDER_STATES
+            }
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
+        logger.warning("Order snapshots failed before cancelling resting fallbacks: %s", exc)
+    for fid, slug in due.items():
+        if fid in terminal:
+            summary["already_terminal"].append(fid)
+            continue
+        try:
+            _cancel_by_id(live_executor, fid, slug)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
+            logger.error("Failed to cancel resting live fallback %s (%s): %s", fid, reason, exc)
+            summary["failed"].append({"order_id": fid, "error": f"{type(exc).__name__}: {exc}"[:300]})
+            continue
+        summary["cancelled"].append(fid)
+    if summary["cancelled"] or summary["failed"]:
+        logger.warning(
+            "Cancelled resting live fallbacks (%s): cancelled=%s failed=%s",
+            reason,
+            summary["cancelled"],
+            [f["order_id"] for f in summary["failed"]],
+        )
+    return summary
 
 
 def read_auto_buyer_ledger(
@@ -1088,15 +1233,28 @@ def _exchange_sell_trades(snapshot: dict[str, Any]) -> dict[str, dict[str, Any]]
 
 _OFFSET_INTENT = {"short": "ORDER_INTENT_BUY_LONG", "long": "ORDER_INTENT_BUY_SHORT"}
 _SPREAD_SIDE_SUFFIX = re.compile(r"-(?:pos|neg)-\d+pt\d+$")
+# B4a: a total's line is the slug's last segment, so every line of one game's total shares the
+# prefix. The ``tsc-`` marker stays in the key: the 31d per-game cap allows a spread and a total
+# on one game, so a total key must never equal that game's spread or moneyline key.
+_TOTAL_LINE_SLUG = re.compile(r"^(tsc-.+)-\d+pt\d+$")
 
 
 def event_key_from_slug(slug: str) -> str:
-    """Slug shared by both sides of one spread market, so the two lines of a game match.
+    """Key shared by every contract of one game market, so a held line blocks a moved line.
 
-    Positions report ``nba-den-mem-2026-11-11`` while market slugs carry an ``asc-``
-    prefix and a ``-pos-4pt5`` suffix; both normalise to the former.
+    Real slug shapes (Polymarket US):
+
+    - spread ``asc-cbb-jac-stbr-2026-11-25-pos-11pt5`` -> ``cbb-jac-stbr-2026-11-25`` (both sides and
+      every line of the spread; positions report the bare ``nba-den-mem-2026-11-11`` form);
+    - moneyline ``aec-cbb-lbst-sutah-2026-11-25`` -> unchanged;
+    - total ``tsc-cbb-abchr-sdkst-2026-11-25-117pt5`` -> ``tsc-cbb-abchr-sdkst-2026-11-25`` (cfb and
+      nfl carry ``-total-44pt5``, esports ``-tot-2pt5``; each keeps its own prefix).
     """
-    key = _SPREAD_SIDE_SUFFIX.sub("", str(slug or ""))
+    text = str(slug or "")
+    total = _TOTAL_LINE_SLUG.match(text)
+    if total:
+        return total.group(1)
+    key = _SPREAD_SIDE_SUFFIX.sub("", text)
     return key.removeprefix("asc-")
 
 

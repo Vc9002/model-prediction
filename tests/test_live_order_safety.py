@@ -1767,7 +1767,9 @@ def test_topup_merge_carries_the_execution_fields_of_the_topup(tmp_path):
     assert merged["intent_id"] == "i-2"
     assert merged["idempotency_key"] == "mp-i-2-p"
     assert merged["fallback_idempotency_key"] == "mp-i-2-f"
-    assert "fallback_submit_unknown" not in merged
+    # The merge always writes the flag now (False here): an explicit False must beat the legacy
+    # fallback_status check in is_fallback_submit_unknown().
+    assert merged.get("fallback_submit_unknown") is not True
 
 
 def test_topup_merge_clears_a_resolved_unknown_flag(tmp_path):
@@ -1811,4 +1813,42 @@ def test_topup_merge_clears_a_resolved_unknown_flag(tmp_path):
     )
     assert merged["fallback_order_id"] is None
     assert merged.get("fallback_submit_unknown") is not True
+    assert not auto_buyer_ledger.is_fallback_submit_unknown(merged)
+
+
+def test_topup_merge_without_a_fallback_status_does_not_re_hold_a_resolved_row(tmp_path):
+    # Final review of 0db5d783: the passthrough keeps a stale fallback_status "submit_unknown" when
+    # the top-up payload carries none, and with the flag popped is_fallback_submit_unknown() fell
+    # back to that status and held the row again. The merge must write an explicit False.
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    row = _brow("tp4", "g1")
+    resolved = _partial_row(row)
+    resolved.update(
+        {
+            "fallback_order_id": "gtd-found-by-operator",
+            "fallback_reconciled": True,
+            "fallback_status": "submit_unknown",
+            "fallback_submit_unknown": True,
+        }
+    )
+    j_path.write_text(json.dumps(resolved) + "\n")
+    payload = _payload(
+        pick_id="tp4",
+        market_slug=row["market_slug"],
+        is_topup=True,
+        shares=7.0,
+        cost_usd=3.57,
+        limit_price=0.51,
+        order_ids=["ioc-full"],
+        fallback_order_id=None,
+        fallback_resting_shares=0.0,
+        requested_shares=7.0,
+        requested_cost_usd=3.57,
+    )
+    assert "fallback_status" not in payload
+    merged = auto_buyer_ledger.record_auto_buy_execution(
+        payload, order_id="ioc-full", order_state="ORDER_STATE_FILLED", jsonl_path=j_path
+    )
+    assert merged["fallback_order_id"] is None
+    assert merged["fallback_status"] == "submit_unknown"  # stale, kept by the passthrough
     assert not auto_buyer_ledger.is_fallback_submit_unknown(merged)

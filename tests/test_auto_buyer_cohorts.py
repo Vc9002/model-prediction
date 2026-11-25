@@ -442,6 +442,7 @@ def _cycle_harness(monkeypatch, tmp_path, state: dict[str, Any], rows: list[dict
         "saved": [],
         "history": [],
         "reconciled": [],
+        "reconcile_kwargs": [],
         "settled": [],
         "configs": [],
         "cohort_reads": [],
@@ -467,7 +468,7 @@ def _cycle_harness(monkeypatch, tmp_path, state: dict[str, Any], rows: list[dict
     monkeypatch.setattr(
         auto_buyer_ledger,
         "reconcile_pending_auto_buyer_fallbacks",
-        lambda: calls["reconciled"].append(1) or {},
+        lambda **kwargs: calls["reconciled"].append(1) or calls["reconcile_kwargs"].append(kwargs) or {},
     )
     monkeypatch.setattr(
         auto_buyer_ledger,
@@ -1065,6 +1066,8 @@ def test_toggle_stores_a_real_bool_and_refuses_ambiguous_payloads(monkeypatch, t
 
     state_file = tmp_path / "auto_buyer_state.json"
     monkeypatch.setattr(auto_executor, "AUTO_BUYER_STATE_FILE", state_file)
+    # toggle_auto_buyer(False) also reads DATA's live ledger for resting fallbacks to cancel.
+    monkeypatch.setattr(auto_executor, "DATA", tmp_path)
     state_file.write_text(json.dumps({"enabled": "false", "mode": "paper"}), encoding="utf-8")
     for bad in ("false", "true", 1, 0, "yes"):
         with pytest.raises(ValueError):
@@ -1127,6 +1130,8 @@ def test_governed_live_book_is_reconciled_whenever_it_has_resting_orders(
     calls = _cycle_harness(monkeypatch, tmp_path, _state(cohorts, enabled=enabled), _mixed_rows())
     auto_executor.run_auto_buyer_cycle()
     assert calls["reconciled"] == [1]
+    # D-02: while disabled, the cycle's reconcile cancels every resting live fallback by id.
+    assert calls["reconcile_kwargs"] == [{"cancel_all_resting": not enabled}]
     assert None in calls["settled"]
     assert FakeExecutor.executed == []
 
@@ -1143,7 +1148,7 @@ def test_reconcile_failure_without_live_buying_does_not_stop_the_cycle(monkeypat
     monkeypatch.setattr(
         auto_buyer_ledger,
         "reconcile_pending_auto_buyer_fallbacks",
-        lambda: (_ for _ in ()).throw(OSError("exchange unavailable")),
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("exchange unavailable")),
     )
     summary = auto_executor.run_auto_buyer_cycle()
     assert summary["reconciliation"]["status"] == "error"
@@ -1151,7 +1156,7 @@ def test_reconcile_failure_without_live_buying_does_not_stop_the_cycle(monkeypat
     monkeypatch.setattr(
         auto_buyer_ledger,
         "reconcile_pending_auto_buyer_fallbacks",
-        lambda: (_ for _ in ()).throw(OSError("exchange unavailable")),
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("exchange unavailable")),
     )
     with pytest.raises(RuntimeError, match="pre-cycle reconciliation failed"):
         auto_executor.run_auto_buyer_cycle()
@@ -1211,14 +1216,18 @@ def test_hand_built_cohort_cannot_reach_a_blocked_sport_or_skip_the_edge_ceiling
     assert result.rejected_unrealistic_edge == 1
 
 
-def test_paper_cohort_pass_never_quarantines_live_pass_does(monkeypatch, tmp_path):
+def test_no_cohort_pass_quarantines_the_legacy_pass_still_does(monkeypatch, tmp_path):
+    # D-06 (operator decision 2026-11-25) supersedes the live-pass quarantine this test pinned: the
+    # live book gets an advisory drawdown warning instead. The legacy global pass keeps it.
     calls = _cycle_harness(
         monkeypatch, tmp_path, _state(OPERATOR_COHORTS_FINAL, enabled=True), _mixed_four_rows()
     )
     auto_executor.run_auto_buyer_cycle()
     by_mode = {c.mode: c for c in calls["configs"] if c.cohorts}
     assert by_mode["paper"].auto_quarantine_underperforming is False
-    assert by_mode["live"].auto_quarantine_underperforming is True
+    assert by_mode["live"].auto_quarantine_underperforming is False
+    legacy = [c for c in calls["configs"] if not c.cohorts]
+    assert legacy and all(c.auto_quarantine_underperforming is True for c in legacy)
 
 
 def test_disabled_cycle_runs_no_cohort_buy_pass(monkeypatch, tmp_path):
