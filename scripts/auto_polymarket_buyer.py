@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""CLI script to run automated Polymarket buying linked to daily model picks."""
+"""CLI script to run automated Polymarket buying linked to daily model picks.
+
+``--execute`` places REAL orders, so it is governed like the scheduled buyer (quick-261125-hih C3):
+it refuses while the saved state has a ``cohorts`` key (only operator-set live cohorts may trade
+real money, through the scheduled cycle) or while ``enabled`` is not the boolean true (the kill
+switch), and it runs under the same ``daily.lock`` as the worker and the daily job, refusing when
+that lock is held. The dry run is unchanged.
+"""
 
 from __future__ import annotations
 
@@ -7,13 +14,29 @@ import argparse
 import json
 import sys
 
+from model_prediction.daily_lock import acquire_lock, release_lock
 from model_prediction.portfolio.auto_executor import (
+    COHORTS_STATE_KEY,
     AutoExecutionConfig,
     AutoPolymarketBuyer,
+    load_auto_buyer_state,
 )
+from model_prediction.runtime_paths import RuntimePaths
 
 
-def main() -> int:
+def _execute_refusal() -> str | None:
+    state = load_auto_buyer_state()
+    if COHORTS_STATE_KEY in state:
+        return (
+            "the saved auto-buyer state has a 'cohorts' key: real-money buying runs only through the "
+            "scheduled cycle's operator-set live cohorts, never this script"
+        )
+    if state.get("enabled") is not True:
+        return f"the auto-buyer kill switch is off (enabled is {state.get('enabled')!r}, not true)"
+    return None
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Automated Polymarket Buyer with safe risk gates and fractional unit sizing."
     )
@@ -51,8 +74,30 @@ def main() -> int:
         action="store_true",
         help="Output execution report in raw JSON format.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
+    if not args.execute:
+        return _run(args)
+    refusal = _execute_refusal()
+    if refusal is not None:
+        print(f"REFUSED --execute: {refusal}.", file=sys.stderr)
+        return 2
+    # Operational real-money path: fail closed without MODEL_PREDICTION_RUNTIME_ROOT.
+    lock_path = RuntimePaths.resolve(require_external_runtime=True).lock_root / "daily.lock"
+    lock = acquire_lock(lock_path)
+    if lock is None:
+        print(
+            f"REFUSED --execute: {lock_path} is held by the scheduled auto-buyer or the daily job; retry later.",
+            file=sys.stderr,
+        )
+        return 3
+    try:
+        return _run(args)
+    finally:
+        release_lock(lock)
+
+
+def _run(args: argparse.Namespace) -> int:
     config = AutoExecutionConfig(
         unit_value_usd=args.unit_value,
         min_edge=args.min_edge,

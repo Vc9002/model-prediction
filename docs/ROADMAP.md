@@ -140,6 +140,12 @@ flowchart TD
 3. **Hockey Production Wiring (COMPLETE)**:
    - Deployed and wired `hockey-poisson-dc-v1` (now `v2`) into `config/production.yaml`, `production_registry.py`, and CI contracts across NHL and AHL moneyline slates.
 
+4. **Live auto-buyer safety follow-ups (quick-261125-hih, open)**:
+   - **Unknown-row resolution tooling.** An `ORDER_STATE_SUBMIT_UNKNOWN` row, or a row whose GTD fallback leg is `fallback_submit_unknown`, stays open, blocks its pick and game market, and counts toward the caps until the operator resolves it by hand (procedure in `docs/DEBUG.md`, 2026-11-25 "Live auto-buyer safety"). Build a read-only matcher against exchange positions and activity, plus a governed resolve command.
+   - **Telegram wiring.** Alert on `portfolio/auto_buyer_drawdown.py::live_cohort_drawdown_report` warnings and on `last_run.alarms`. It is the single entry point; nothing calls it from Telegram yet.
+   - **Total position key.** How the exchange keys a `tsc-` total position is unverified (no position snapshot is stored). Confirm it on the first live total position; dedup handles any full total slug meanwhile.
+   - **Same-key retry of ambiguous order POSTs.** `ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY` ships False. Turning it on is an operator decision, once a real fallback has shown the exchange honours `Idempotency-Key`.
+
 ---
 
 ### Horizon 2: Offseason Rebuilds & Market Architecture (Q1 2027)

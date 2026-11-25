@@ -964,3 +964,239 @@ def test_unguarded_filter_bar_mounts_target_elements_that_exist() -> None:
     assert unguarded, "expected unguarded filter bar mounts"
     for container in unguarded:
         assert f'id="{container}"' in html, f"mountFilterBars writes to missing #{container}"
+
+
+# ---------------------------------------------------------------- auto-buyer kill switch and LIVE label
+# quick-261125-hih Task 3 (C1, C2, DD): the controls block runs in Node against a stub DOM and a
+# scripted fetch. Every scenario prints one JSON result.
+
+_AUTO_BUYER_HARNESS = r"""
+const els = {};
+const mk = () => ({
+  textContent: '', className: '', title: '', innerHTML: '', value: '', hidden: false,
+  dataset: {}, style: {}, attrs: {},
+  setAttribute(k, v) { this.attrs[k] = v; },
+  classList: { _s: new Set(), toggle(c, on) { on ? this._s.add(c) : this._s.delete(c); },
+               contains(c) { return this._s.has(c); } },
+});
+const $ = q => { const k = q.replace(/^#/, ''); return els[k] || (els[k] = mk()); };
+const document = { activeElement: null };
+const window = { _DASHBOARD_TOKEN: 'tok' };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const alerts = [], confirms = [], fetchLog = [];
+async function customConfirm(message, opts) { confirms.push({ message, opts: opts || {} }); return true; }
+function customAlert(message) { alerts.push(String(message)); }
+function showModal(html) { alerts.push(String(html)); }
+function renderOverview() {}
+const routes = {};
+const reply = (status, body) => ({
+  ok: status >= 200 && status < 300, status,
+  json: async () => { if (typeof body === 'string') throw new SyntaxError('Unexpected token'); return body; },
+});
+async function fetch(url, opts) {
+  fetchLog.push({ url, method: (opts && opts.method) || 'GET', body: opts && opts.body });
+  const handler = routes[url];
+  if (!handler) return reply(404, { error: 'no route' });
+  return handler(opts);
+}
+"""
+
+
+def _run_auto_buyer_ui(scenario: str) -> dict:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is unavailable")
+    html = (ROOT / "dashboard.html").read_text(encoding="utf-8")
+    match = re.search(
+        r"/\* ---------- Auto-Buyer Controls ---------- \*/([\s\S]*?)/\* ---------- manual bets ---------- \*/",
+        html,
+    )
+    assert match, "auto-buyer controls block is missing"
+    script = (
+        _AUTO_BUYER_HARNESS
+        + match.group(1)
+        + "\n(async () => {\n"
+        + scenario
+        + "\n})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });\n"
+    )
+    result = subprocess.run(
+        [node, "-e", script], text=True, encoding="utf-8", check=True, capture_output=True
+    )
+    return json.loads(result.stdout)
+
+
+_LIVE_STATUS = {
+    "enabled": True,
+    "mode": "paper",
+    "unit_value_usd": 5.0,
+    "max_game_stake_units": 5.0,
+    "max_daily_spend_units": 100.0,
+    "cohorts": [],
+    "live_cohorts": ["ncaab-spread-v7:spread:[0.05,0.12):live", "ncaab-total-v6:total:[0.05,0.12):live"],
+    "live_trading_active": True,
+}
+
+_REPORT = """
+process.stdout.write(JSON.stringify({
+  btn: $('#autoBuyerToggleBtn').textContent, btnClass: $('#autoBuyerToggleBtn').className,
+  pill: $('#autoBuyerPillTxt').textContent, pillState: $('#autoBuyerTopControl').dataset.state,
+  dot: $('#autoBuyerDot').className, alerts, confirms, fetchLog,
+  drawdown: $('#autoBuyerLiveDrawdown').innerHTML,
+}));
+"""
+
+
+@pytest.mark.parametrize(
+    "toggle_reply",
+    ["reply(401, '<html>Unauthorized</html>')", "reply(200, {status: 'refused', error: 'state conflict'})"],
+)
+def test_refused_toggle_shows_the_error_and_renders_server_state(toggle_reply: str) -> None:
+    status = json.dumps(_LIVE_STATUS)
+    out = _run_auto_buyer_ui(
+        f"""
+        routes['/api/auto-buyer/status'] = () => reply(200, {status});
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        routes['/api/auto-buyer/toggle'] = () => {toggle_reply};
+        await loadAutoBuyerStatus();
+        fetchLog.length = 0;
+        await toggleAutoBuyer();
+        """
+        + _REPORT
+    )
+    toggle_body = next(f["body"] for f in out["fetchLog"] if f["url"] == "/api/auto-buyer/toggle")
+    assert json.loads(toggle_body)["enabled"] is False
+    urls = [f["url"] for f in out["fetchLog"]]
+    assert urls.index("/api/auto-buyer/status") > urls.index("/api/auto-buyer/toggle")
+    assert len(out["alerts"]) == 1 and "refused" in out["alerts"][0].lower()
+    assert out["btn"] == "ON (LIVE)"
+    assert out["pillState"] == "live"
+
+
+def test_string_true_is_not_on() -> None:
+    status = json.dumps({**_LIVE_STATUS, "enabled": "true", "live_trading_active": False})
+    out = _run_auto_buyer_ui(f"updateAutoBuyerUI({status});" + _REPORT)
+    assert "ON" not in out["btn"]
+    assert out["pillState"] != "live" and "LIVE: real orders" not in out["pill"]
+
+
+def test_live_cohorts_render_live_even_with_the_paper_trial_on() -> None:
+    status = json.dumps(_LIVE_STATUS)
+    out = _run_auto_buyer_ui(f"updateNcaabPaperUI({{enabled: true}}); updateAutoBuyerUI({status});" + _REPORT)
+    assert out["btn"] == "ON (LIVE)" and "live" in out["btnClass"].split()
+    assert out["pillState"] == "live" and out["dot"] == "dot r"
+    assert out["pill"].startswith("LIVE: real orders ON")
+
+
+def test_disabled_buyer_with_live_cohorts_is_armed_not_off() -> None:
+    status = json.dumps({**_LIVE_STATUS, "enabled": False, "live_trading_active": False})
+    out = _run_auto_buyer_ui(f"updateAutoBuyerUI({status});" + _REPORT)
+    assert out["btn"] == "OFF" and out["pillState"] == "armed"
+
+
+def test_enable_confirm_lists_live_cohorts_and_real_money() -> None:
+    status = json.dumps({**_LIVE_STATUS, "enabled": False, "live_trading_active": False})
+    after = json.dumps(_LIVE_STATUS)
+    out = _run_auto_buyer_ui(
+        f"""
+        let served = {status};
+        routes['/api/auto-buyer/status'] = () => reply(200, served);
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        routes['/api/auto-buyer/toggle'] = () => {{ served = {after}; return reply(200, {{enabled: true}}); }};
+        await loadAutoBuyerStatus();
+        await toggleAutoBuyer();
+        """
+        + _REPORT
+    )
+    confirm = out["confirms"][0]
+    assert "REAL MONEY" in confirm["message"]
+    for label in _LIVE_STATUS["live_cohorts"]:
+        assert label in confirm["message"]
+    assert confirm["opts"].get("danger") is True
+    assert out["btn"] == "ON (LIVE)"
+
+
+def test_successful_disable_renders_a_fresh_status_and_reports_cancels() -> None:
+    status = json.dumps(_LIVE_STATUS)
+    off = json.dumps({**_LIVE_STATUS, "enabled": False, "live_trading_active": False})
+    out = _run_auto_buyer_ui(
+        f"""
+        let served = {status};
+        routes['/api/auto-buyer/status'] = () => reply(200, served);
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        routes['/api/auto-buyer/toggle'] = () => {{
+          served = {off};
+          // The toggle body itself claims ON: the UI must not render from it.
+          return reply(200, {{enabled: true, kill_switch_cancel:
+            {{candidates: 2, cancelled: ['gtd-1'], already_terminal: [], failed: [{{order_id: 'gtd-2', error: 'x'}}]}}}});
+        }};
+        await loadAutoBuyerStatus();
+        await toggleAutoBuyer();
+        """
+        + _REPORT
+    )
+    assert out["btn"] == "OFF" and out["pillState"] == "armed"
+    assert any("1 cancelled" in a and "1 failed" in a for a in out["alerts"])
+
+
+def test_status_failure_marks_the_pill_unavailable() -> None:
+    status = json.dumps(_LIVE_STATUS)
+    out = _run_auto_buyer_ui(
+        f"""
+        routes['/api/auto-buyer/status'] = () => reply(200, {status});
+        await loadAutoBuyerStatus();
+        routes['/api/auto-buyer/status'] = () => reply(500, 'boom');
+        await loadAutoBuyerStatus();
+        """
+        + _REPORT
+    )
+    assert "unavailable" in out["pill"].lower()
+    assert out["pillState"] == "unknown"
+
+
+def test_live_drawdown_block_lists_each_cohort_and_flags_warnings() -> None:
+    drawdown = {
+        "status": "ok",
+        "cohorts": [
+            {
+                "label": "ncaab-spread-v7:spread:[0.05,0.12):live",
+                "wins": 3,
+                "losses": 5,
+                "pushes": 1,
+                "settled": 9,
+                "cost_usd": 90.0,
+                "pnl_usd": -104.5,
+                "pnl_units": -20.9,
+                "roi": -0.1161,
+                "current_drawdown_usd": 104.5,
+                "current_drawdown_units": 20.9,
+                "max_drawdown_usd": 110.0,
+                "max_drawdown_units": 22.0,
+                "warnings": ["current drawdown $104.50 / 20.9U from peak"],
+            },
+            {
+                "label": "ncaab-total-v6:total:[0.05,0.12):live",
+                "wins": 2,
+                "losses": 0,
+                "pushes": 0,
+                "settled": 2,
+                "cost_usd": 20.0,
+                "pnl_usd": 18.0,
+                "pnl_units": 3.6,
+                "roi": 0.9,
+                "current_drawdown_usd": 0.0,
+                "current_drawdown_units": 0.0,
+                "max_drawdown_usd": 0.0,
+                "max_drawdown_units": 0.0,
+                "warnings": [],
+            },
+        ],
+        "warnings": ["ncaab-spread-v7:spread:[0.05,0.12):live: current drawdown $104.50 / 20.9U from peak"],
+    }
+    status = json.dumps({**_LIVE_STATUS, "live_drawdown": drawdown})
+    out = _run_auto_buyer_ui(f"updateAutoBuyerUI({status});" + _REPORT)
+    block = out["drawdown"]
+    assert "ncaab-spread-v7:spread:[0.05,0.12):live" in block
+    assert "ncaab-total-v6:total:[0.05,0.12):live" in block
+    assert "3-5-1" in block and "2-0-0" in block
+    assert "-$104.50" in block and "-20.9U" in block and "-11.6%" in block
+    assert 'class="red"' in block and "current drawdown $104.50" in block

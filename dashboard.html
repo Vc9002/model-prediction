@@ -423,6 +423,7 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
         <div class="menu-row"><span>NCAAB v6 spread paper trial</span><button id="ncaabPaperToggleBtn" class="ab-toggle off" onclick="toggleNcaabPaperTrial()">OFF</button></div>
         <p class="menu-note">The NCAAB spread paper trial runs alongside the main buyer on the worker schedule. Its saved edge band is 5.0%–7.9%; it never places real orders.</p>
         <button onclick="runAutoBuyerNow('live')" title="Trigger main Auto-Buyer check now">Run main buyer check</button>
+        <div id="autoBuyerLiveDrawdown" class="menu-note"></div>
       </div>
     </details>
     <details class="bar-menu unit-control">
@@ -3589,14 +3590,14 @@ function renderOverview(){
   const errs=alerts.filter(a=>a.level==="error").length,warns=alerts.filter(a=>a.level==="warn").length;
   const dp=s.daily_pipeline||{};
   const pnl=Number(p.total_pnl);
-  const abMode=String(ab.mode||"paper").toLowerCase();
+  const abLs=autoBuyerLiveState(ab);
   const items=[
     {tab:"perf",label:"Total P&L",value:Number.isFinite(pnl)?`${pnl>=0?"+":""}${pnl.toFixed(2)}U`:"—",cls:Number.isFinite(pnl)?pnlClass(pnl):"",sub:p.roi!=null?`ROI ${pct(p.roi)}`:""},
     {tab:"perf",label:"Win rate",value:pct(p.win_rate),sub:p.settled!=null?`${Number(p.settled).toLocaleString()} settled`:""},
     {tab:"picks",label:"Open picks",value:p.open??"—",sub:s.unit_value_usd!=null?`1U = $${Number(s.unit_value_usd).toFixed(2)}`:""},
     {tab:"health",label:"Alerts",value:alerts.length,level:errs?"bad":warns?"warn":"",sub:errs?`${errs} error${errs>1?"s":""}`:warns?`${warns} warning${warns>1?"s":""}`:"all clear"},
     {tab:"health",label:"Pipeline",value:dp.last_run_at_utc?(dp.stale?"STALE":"OK"):"—",level:dp.stale?"bad":"",sub:dp.age_hours!=null?`${dp.age_hours}h ago`:""},
-    {tab:abMode==="live"?"auto-buyer-live-ledger":"auto-buyer-paper-ledger",label:"Auto-Buyer",value:ab.enabled?abMode.toUpperCase():"OFF",level:ab.enabled&&abMode==="live"?"bad":"",sub:ab.enabled?"enabled":"disabled"}
+    {tab:abLs.liveConfigured?"auto-buyer-live-ledger":"auto-buyer-paper-ledger",label:"Auto-Buyer",value:abLs.live?"LIVE":abLs.on?"PAPER":"OFF",level:abLs.live?"bad":"",sub:abLs.on?"enabled":"disabled"}
   ];
   el.innerHTML=items.map(i=>`<button class="ov-item ${i.level||""}" onclick="gotoTab('${i.tab}')" title="Open ${esc(i.label)} details">
     <span class="ov-label">${esc(i.label)}</span><span class="ov-value ${i.cls||""}">${esc(i.value)}</span><span class="ov-sub">${esc(i.sub||"")}</span></button>`).join("");
@@ -3801,30 +3802,49 @@ function copyPolymarketOrdersJson() {
 /* ---------- Auto-Buyer Controls ---------- */
 let _autoBuyerStatusCache = {};
 let _ncaabPaperStatusCache = {};
+// One derivation of on/live for every auto-buyer surface (button, pill, overview, paper-trial pill):
+// ON only for the boolean true, LIVE when the server says live trading is active, or for the legacy
+// ungoverned mode=live (no cohorts key). A refused or failed response is never rendered (C1, C2).
+function autoBuyerLiveState(d){
+  d=d||{};
+  const on=d.enabled===true;
+  const cohorts=Array.isArray(d.live_cohorts)?d.live_cohorts.map(String):[];
+  const legacyLive=!Object.prototype.hasOwnProperty.call(d,"cohorts")&&String(d.mode||"paper").toLowerCase()==="live";
+  const liveConfigured=cohorts.length>0||legacyLive;
+  return {on,live:on&&(d.live_trading_active===true||legacyLive),liveConfigured,cohorts};
+}
+function _abToken(){return {"X-Dashboard-Token":window._DASHBOARD_TOKEN||""};}
+async function _abJson(res){try{return await res.json();}catch(_e){return null;}}
+function markAutoBuyerStatusUnavailable(detail){
+  const pill=$("#autoBuyerTopControl");if(pill)pill.dataset.state="unknown";
+  const pillTxt=$("#autoBuyerPillTxt");if(pillTxt)pillTxt.textContent="Auto-Buyer status unavailable, reload";
+  const pillDot=$("#autoBuyerDot");if(pillDot)pillDot.className="dot y";
+  const btn=$("#autoBuyerToggleBtn");
+  if(btn)btn.title=`Auto-Buyer status could not be read (${detail}). Reload before relying on this switch.`;
+}
 async function loadAutoBuyerStatus(){
   try{
-    const res=await fetch("/api/auto-buyer/status",{headers:{"X-Dashboard-Token":window._DASHBOARD_TOKEN||""}});
-    if(!res.ok)return;
-    const data=await res.json();
-    updateAutoBuyerUI(data);
-  }catch(e){}
+    const res=await fetch("/api/auto-buyer/status",{headers:_abToken()});
+    const data=res.ok?await _abJson(res):null;
+    if(!res.ok||!data||typeof data!=="object")markAutoBuyerStatusUnavailable(`HTTP ${res.status}`);
+    else updateAutoBuyerUI(data);
+  }catch(e){markAutoBuyerStatusUnavailable(String(e));}
   try{
-    const res=await fetch("/api/auto-buyer/ncaab-paper/status",{headers:{"X-Dashboard-Token":window._DASHBOARD_TOKEN||""}});
+    const res=await fetch("/api/auto-buyer/ncaab-paper/status",{headers:_abToken()});
     if(res.ok)updateNcaabPaperUI(await res.json());
   }catch(e){}
 }
 function updateNcaabPaperUI(data){
   _ncaabPaperStatusCache=data||{};
-  const on=!!data.enabled;
+  const on=!!_ncaabPaperStatusCache.enabled;
   const btn=$("#ncaabPaperToggleBtn");
   if(btn){btn.textContent=on?"ON (PAPER)":"OFF";btn.className="ab-toggle "+(on?"paper":"off");btn.setAttribute("aria-pressed",String(on));}
   const badge=$("#ncaabPaperStatus");
   if(badge)badge.textContent=`NCAAB v6 spread paper trial: ${on?"ON":"OFF"} · saved edge 5.0%–7.9%`;
-  const mainOn=!!_autoBuyerStatusCache.enabled;
-  const mainLive=(_autoBuyerStatusCache.mode||"paper").toLowerCase()==="live";
+  const main=autoBuyerLiveState(_autoBuyerStatusCache);
   const pillTxt=$("#autoBuyerPillTxt");
-  if(pillTxt&&on)pillTxt.textContent=mainOn&&mainLive?"LIVE + PAPER ON":mainOn?"MAIN + PAPER ON":"PAPER TRIAL ON";
-  if(on&&!mainOn){const pill=$("#autoBuyerTopControl"),dot=$("#autoBuyerDot");if(pill)pill.dataset.state="paper";if(dot)dot.className="dot g";}
+  if(pillTxt&&on)pillTxt.textContent=main.live?"LIVE: real orders ON + paper trial":main.on?"MAIN + PAPER ON":"PAPER TRIAL ON";
+  if(on&&!main.on){const pill=$("#autoBuyerTopControl"),dot=$("#autoBuyerDot");if(pill)pill.dataset.state="paper";if(dot)dot.className="dot g";}
 }
 async function toggleNcaabPaperTrial(){
   const enabled=!_ncaabPaperStatusCache.enabled;
@@ -3836,27 +3856,47 @@ async function toggleNcaabPaperTrial(){
     updateNcaabPaperUI(data);
   }catch(e){customAlert("NCAAB paper trial update failed: "+e);}
 }
+function _abMoney(v){const n=Number(v);return Number.isFinite(n)?`${n<0?"-":""}$${Math.abs(n).toFixed(2)}`:"—";}
+function _abSignedMoney(v){const n=Number(v);return Number.isFinite(n)?`${n>0?"+":n<0?"-":""}$${Math.abs(n).toFixed(2)}`:"—";}
+function _abUnits(v,signed){const n=Number(v);return Number.isFinite(n)?`${signed&&n>0?"+":""}${n.toFixed(1)}U`:"—";}
+function _abPct(v){const n=Number(v);return v!=null&&Number.isFinite(n)?`${n>0?"+":""}${(n*100).toFixed(1)}%`:"—";}
+// Live cohort drawdown (advisory, D-06): record, ROI, P&L and drawdown per live cohort.
+function liveDrawdownHtml(dd){
+  if(!dd||typeof dd!=="object")return "";
+  if(dd.status==="error")return `<div class="red">Live drawdown report unavailable: ${esc(dd.error||"error")}</div>`;
+  const cohorts=Array.isArray(dd.cohorts)?dd.cohorts:[];
+  if(!cohorts.length)return "";
+  return `<div><b>Live cohorts</b> (advisory drawdown)</div>`+cohorts.map(c=>{
+    const warn=Array.isArray(c.warnings)?c.warnings:[];
+    return `<div class="mb-4"><div class="mono">${esc(c.label)}</div>`
+      +`<div>${Number(c.wins)||0}-${Number(c.losses)||0}-${Number(c.pushes)||0} · ROI ${_abPct(c.roi)} · P&amp;L ${_abSignedMoney(c.pnl_usd)} / ${_abUnits(c.pnl_units,true)}</div>`
+      +`<div>Drawdown now ${_abMoney(c.current_drawdown_usd)} / ${_abUnits(c.current_drawdown_units)} · max ${_abMoney(c.max_drawdown_usd)} / ${_abUnits(c.max_drawdown_units)}</div>`
+      +warn.map(w=>`<div class="red">⚠ ${esc(w)}</div>`).join("")
+      +`</div>`;
+  }).join("");
+}
 function updateAutoBuyerUI(data){
   _autoBuyerStatusCache=data||{};
   const btn=$("#autoBuyerToggleBtn");
   if(!btn)return;
-  const unitValue=Number(data.unit_value_usd||0.50);
+  const unitValue=Number(_autoBuyerStatusCache.unit_value_usd||0.50);
   const unitBadge=$("#autoBuyerUnitBadge");
-  const unitInput=$("#autoBuyerUnitValueInput");
-  const mode=(data.mode||"paper").toLowerCase();
-  const isLive=mode==="live";
+  const mode=(_autoBuyerStatusCache.mode||"paper").toLowerCase();
   if(unitBadge)unitBadge.textContent=unitValue<1?`${Math.round(unitValue*100)}¢/U`:`$${unitValue.toFixed(2)}/U`;
   const unitInputs = [$("#paperAutoBuyerUnitValueInput"), $("#liveAutoBuyerUnitValueInput"), $("#autoBuyerUnitValueInput")];
   unitInputs.forEach(inp => {
     if(inp && document.activeElement !== inp) inp.value = unitValue.toFixed(2);
   });
-  const on=!!data.enabled;
+  const ls=autoBuyerLiveState(_autoBuyerStatusCache);
+  const on=ls.on,isLive=ls.liveConfigured;
   const state=on?(isLive?"live":"paper"):(isLive?"armed":"off");
+  const liveList=ls.cohorts.length?ls.cohorts.join(", "):"legacy mode=live";
   btn.className="ab-toggle "+(on?(isLive?"live":"paper"):"off");
   btn.textContent=on?(isLive?"ON (LIVE)":"ON (PAPER)"):"OFF";
   btn.title=on
-    ?`Auto-Buyer is ACTIVE in ${isLive?"LIVE":"PAPER"} mode (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`
-    :"Auto-Buyer is DISABLED. Click to turn ON.";
+    ?(isLive?`Auto-Buyer is placing REAL-MONEY orders for: ${liveList} (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`
+      :`Auto-Buyer is ACTIVE in PAPER mode (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`)
+    :(isLive?`Auto-Buyer is DISABLED. Live cohorts are set (${liveList}); turning it ON places REAL-MONEY orders.`:"Auto-Buyer is DISABLED. Click to turn ON.");
   const pill=$("#autoBuyerTopControl");
   if(pill)pill.dataset.state=state;
   const pillTxt=$("#autoBuyerPillTxt");
@@ -3864,6 +3904,8 @@ function updateAutoBuyerUI(data){
   const pillDot=$("#autoBuyerDot");
   if(pillDot)pillDot.className="dot "+({live:"r",paper:"g",armed:"y",off:"gray"}[state]);
   $("#statusbar").classList.toggle("live-on",state==="live");
+  const dd=$("#autoBuyerLiveDrawdown");
+  if(dd)dd.innerHTML=liveDrawdownHtml(_autoBuyerStatusCache.live_drawdown);
   renderOverview();
   for(const [id,target] of [["autoBuyerPaperBtn","paper"],["autoBuyerLiveBtn","live"]]){
     const modeBtn=$("#"+id);
@@ -3877,27 +3919,50 @@ function updateAutoBuyerUI(data){
   updateNcaabPaperUI(_ncaabPaperStatusCache);
 }
 async function toggleAutoBuyer(){
-  const btn=$("#autoBuyerToggleBtn");
-  const currentlyOn=btn&&btn.textContent.includes("ON");
-  const nextState=!currentlyOn;
+  // From the last server status, never from the button text (C1).
+  const ls=autoBuyerLiveState(_autoBuyerStatusCache);
+  const nextState=!ls.on;
   const unitValue=Number(_autoBuyerStatusCache.unit_value_usd||0.50);
   const gameCapUnits=Number(_autoBuyerStatusCache.max_game_stake_units||5);
   const dailyCapUnits=Number(_autoBuyerStatusCache.max_daily_spend_units||50);
-  const modeLabel=((_autoBuyerStatusCache.mode||"paper").toLowerCase()==="live")?"LIVE":"PAPER";
-  const msg=nextState
-    ?`Enable Polymarket Auto-Buyer in ${modeLabel} mode?\n\n- Sizing: 1U = $${unitValue.toFixed(2)}\n- Per-game cap: ${gameCapUnits.toFixed(1)}U = $${(gameCapUnits*unitValue).toFixed(2)}\n- Daily cap: ${dailyCapUnits.toFixed(1)}U = $${(dailyCapUnits*unitValue).toFixed(2)}\n- Whitelisted models only (Tennis, Soccer, WNBA ML, CS2/LoL Gated, MLB NRFI/Totals)\n- Blacklisted negative-EV derivatives blocked\n${modeLabel==="LIVE"?"- Limit IOC orders placed on Polymarket US API (REAL MONEY)":"- Simulated fills recorded to the paper ledger only, no real orders"}`
-    :"Disable Polymarket Auto-Buyer?";
-  if(!(await customConfirm(msg,{danger:nextState&&modeLabel==="LIVE"})))return;
+  const caps=`- Sizing: 1U = $${unitValue.toFixed(2)}\n- Per-game cap: ${gameCapUnits.toFixed(1)}U = $${(gameCapUnits*unitValue).toFixed(2)}\n- Daily cap: ${dailyCapUnits.toFixed(1)}U = $${(dailyCapUnits*unitValue).toFixed(2)}`;
+  let msg;
+  if(!nextState){
+    msg="Disable Polymarket Auto-Buyer?\n\nResting live orders are cancelled by order id.";
+  }else if(ls.liveConfigured){
+    const list=ls.cohorts.length?ls.cohorts.map(c=>`- ${c}`).join("\n"):"- legacy whitelist (mode=live, no cohorts)";
+    msg=`Enable the Auto-Buyer with REAL MONEY orders?\n\nThese live cohorts place REAL MONEY orders on Polymarket US:\n${list}\n\n${caps}\n- Limit IOC orders; any unfilled remainder rests until the game starts, then expires\n- Paper cohorts record simulated fills only`;
+  }else{
+    msg=`Enable Polymarket Auto-Buyer in PAPER mode?\n\n${caps}\n- Simulated fills recorded to the paper ledger only, no real orders`;
+  }
+  if(!(await customConfirm(msg,{danger:nextState&&ls.liveConfigured})))return;
+  let res,data;
   try{
-    const res=await fetch("/api/auto-buyer/toggle",{
+    res=await fetch("/api/auto-buyer/toggle",{
       method:"POST",
-      headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
+      headers:{"Content-Type":"application/json",..._abToken()},
       body:JSON.stringify({confirm:true,enabled:nextState})
     });
-    const data=await res.json();
-    updateAutoBuyerUI(data);
+    data=await _abJson(res);
   }catch(e){
-    customAlert("Failed to toggle Auto-Buyer: "+e);
+    customAlert("Auto-Buyer toggle failed: "+e+". Showing the server's current state.");
+    await loadAutoBuyerStatus();
+    return;
+  }
+  if(!res.ok||!data||typeof data!=="object"||data.status==="refused"||data.status==="error"){
+    customAlert(`Auto-Buyer toggle refused (HTTP ${res.status}): ${(data&&data.error)||"no details"}. Showing the server's current state.`);
+    await loadAutoBuyerStatus();
+    return;
+  }
+  await loadAutoBuyerStatus();
+  const kc=data.kill_switch_cancel;
+  if(kc&&typeof kc==="object"){
+    if(kc.status==="error"){
+      customAlert(`Auto-Buyer is OFF, but cancelling resting live orders failed: ${kc.error||"unknown error"}. The next cycle and the backstop retry.`);
+    }else{
+      const n=k=>Array.isArray(kc[k])?kc[k].length:0;
+      if(n("cancelled")||n("failed")||n("already_terminal"))customAlert(`Auto-Buyer is OFF. Resting live orders: ${n("cancelled")} cancelled, ${n("already_terminal")} already closed, ${n("failed")} failed.`);
+    }
   }
 }
 async function setAutoBuyerMode(nextMode){
@@ -3907,17 +3972,21 @@ async function setAutoBuyerMode(nextMode){
     ?"Switch the main Auto-Buyer to LIVE mode?\n\nFuture main cycles will place REAL Polymarket orders whenever the main buyer is ON. The NCAAB paper trial has its own switch."
     :"Switch the main Auto-Buyer to PAPER mode?\n\nFuture main cycles will simulate fills. The NCAAB paper trial has its own switch.";
   if(!(await customConfirm(msg,{danger:nextMode==="live"})))return;
+  let res,data;
   try{
-    const res=await fetch("/api/auto-buyer/mode",{
+    res=await fetch("/api/auto-buyer/mode",{
       method:"POST",
-      headers:{"Content-Type":"application/json","X-Dashboard-Token":window._DASHBOARD_TOKEN||""},
+      headers:{"Content-Type":"application/json",..._abToken()},
       body:JSON.stringify({confirm:true,mode:nextMode})
     });
-    const data=await res.json();
-    updateAutoBuyerUI(data);
+    data=await _abJson(res);
   }catch(e){
     customAlert("Failed to switch Auto-Buyer mode: "+e);
+    await loadAutoBuyerStatus();
+    return;
   }
+  if(!res.ok||!data||data.status==="refused"||data.status==="error")customAlert(`Auto-Buyer mode change refused (HTTP ${res.status}): ${(data&&data.error)||"no details"}.`);
+  await loadAutoBuyerStatus();
 }
 async function saveAutoBuyerUnitValue(mode = "paper"){
   const input=$(`#${mode}AutoBuyerUnitValueInput`)||$("#autoBuyerUnitValueInput")||$("#paperAutoBuyerUnitValueInput"),value=Number(input&&input.value);
@@ -4754,7 +4823,7 @@ async function settleAutoBuyerTrades(mode = "paper", fromButton = false) {
 async function runAutoBuyerNow(mode = "paper") {
   const m = getAutoBuyerMode(mode);
   const paper=m==="paper";
-  const liveActive=!paper&&!!_autoBuyerStatusCache.enabled&&(_autoBuyerStatusCache.mode||"").toLowerCase()==="live";
+  const liveActive=!paper&&autoBuyerLiveState(_autoBuyerStatusCache).live;
   const msg=paper
     ?"Run the NCAAB v6 spread paper trial now? This records simulated fills only."
     :liveActive?"Run the main LIVE Auto-Buyer now? This may place REAL Polymarket orders.":"Run the main Auto-Buyer check now using its saved mode and enabled state?";

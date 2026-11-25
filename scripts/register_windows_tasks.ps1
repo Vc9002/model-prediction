@@ -1,12 +1,16 @@
 # register_windows_tasks.ps1 -- schedule the model-prediction workers (Windows).
 # Windows counterpart of the launchd plists in ops/launchd/. Every scheduled
 # run goes through run_supervisor, which owns the leases and records each run.
-# The auto-buyer runs every 30 minutes, matching the launchd plist. It only places
-# real orders when the saved state is mode=live, so this task is paper-safe by default.
-# Re-run safely; existing tasks with these names are replaced.
+# The auto-buyer runs every 15 minutes. It places real orders only for operator-set live cohorts
+# (or the legacy mode=live without cohorts) while enabled; see CLAUDE.md "What this project is".
+# Existing tasks with these names are replaced. Every live ModelPrediction-* worker task runs S4U
+# (checked 2026-11-25), so S4U is the default: the old Interactive default silently switched them
+# to run only while the user is logged on. Pass -LogonType Interactive only on purpose. Registering
+# S4U tasks may need an elevated shell. To add one task without touching the others, use its own
+# script (scripts/register_auto_buyer_cancel_task.ps1 for the cancel backstop).
 param(
     [ValidateSet('Interactive', 'S4U')]
-    [string]$LogonType = 'Interactive',
+    [string]$LogonType = 'S4U',
     [string]$User = $env:USERNAME
 )
 $ErrorActionPreference = 'Stop'
@@ -65,6 +69,13 @@ Write-Output "registered: ModelPrediction-BackupOffsite ($LogonType)"
 $autoBuyerTriggers = New-ScheduledTaskTrigger -Daily -At '08:00'
 $autoBuyerTriggers.Repetition = (New-ScheduledTaskTrigger -Once -At '08:00' -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
 Register-WorkerTask 'ModelPrediction-AutoBuyer' 'auto-buyer' $autoBuyerTriggers 'model-prediction auto-buyer (paper unless saved state is live)'
+
+# Auto-buyer cancel backstop: every 2 minutes over the auto-buyer's own 08:00-02:00 window (quick-261125-hih
+# D-01/D-02). Cancel-only: by order id, it cancels live resting fallbacks whose game starts within 30 s, and
+# every one while the buyer is disabled. The GTD expiry at start minus 90 s is the primary mechanism.
+$autoBuyerCancelTrigger = New-ScheduledTaskTrigger -Daily -At '08:00'
+$autoBuyerCancelTrigger.Repetition = (New-ScheduledTaskTrigger -Once -At '08:00' -RepetitionInterval (New-TimeSpan -Minutes 2) -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
+Register-WorkerTask 'ModelPrediction-AutoBuyerCancel' 'auto-buyer-cancel' $autoBuyerCancelTrigger 'model-prediction auto-buyer cancel backstop (cancel-only by order id, own lock, never places orders)'
 
 # NBA pre-tip capture: every 10 minutes from 11:00 to 02:00 local (this host runs on Eastern time),
 # so each game gets ESPN odds and Polymarket quotes about 20 and 10 minutes before tip (NBA v10

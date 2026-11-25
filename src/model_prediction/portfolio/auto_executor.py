@@ -1485,6 +1485,44 @@ def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
     return state
 
 
+def _live_drawdown(state: dict[str, Any]) -> dict[str, Any]:
+    """The advisory live-cohort drawdown report (D-06). Never raises."""
+    try:
+        from .auto_buyer_drawdown import live_cohort_drawdown_report
+
+        # DATA is read at call time: tests and the dashboard's own process point it elsewhere.
+        return live_cohort_drawdown_report(state, data_root=DATA)
+    except Exception as exc:  # advisory only; must never break the status page or a buy cycle
+        logger.warning("Live cohort drawdown report failed", exc_info=True)
+        return {
+            "status": "error",
+            "error": f"{type(exc).__name__}: {exc}"[:300],
+            "cohorts": [],
+            "warnings": [],
+        }
+
+
+def auto_buyer_status() -> dict[str, Any]:
+    """Saved state plus what the dashboard needs to show real-money trading truthfully (C1, C2, DD).
+
+    ``live_trading_active`` holds only when ``enabled`` is the boolean true and a live book trades:
+    an active live cohort, or the legacy ungoverned ``mode: live`` (no ``cohorts`` key at all).
+    """
+    state = load_auto_buyer_state()
+    try:
+        live_cohorts = [c.label for c in _parse_cohorts(state).active if c.mode == "live"]
+    except Exception:  # a malformed state must still render the kill switch
+        logger.warning("Could not parse auto-buyer cohorts for the status page", exc_info=True)
+        live_cohorts = []
+    legacy_live = COHORTS_STATE_KEY not in state and str(state.get("mode") or "").lower() == "live"
+    return {
+        **state,
+        "live_cohorts": live_cohorts,
+        "live_trading_active": state.get("enabled") is True and (bool(live_cohorts) or legacy_live),
+        "live_drawdown": _live_drawdown(state),
+    }
+
+
 def set_auto_buyer_mode(raw_mode: Any) -> dict[str, Any]:
     """Switch the Auto-Buyer between "paper" (simulated, recorded fills) and
     "live" (real Polymarket orders). Never places or cancels a real order by
@@ -1965,6 +2003,14 @@ def run_auto_buyer_cycle(
 
     if preview:
         return run_summary
+
+    if governed:
+        # Advisory only (D-06): the warnings get their own key and never join `alarms`, which would
+        # raise LiveAutoBuyerAlarm and fail the worker run.
+        live_drawdown = _live_drawdown(state)
+        run_summary["live_drawdown"] = live_drawdown
+        if "live" in cohort_passes:
+            cohort_passes["live"]["drawdown_warnings"] = list(live_drawdown.get("warnings") or [])
 
     paper_history_path = PAPER_AUTO_BUYER_DATA_ROOT / "logs" / "auto_buyer_cycle_history.jsonl"
     _append_auto_buyer_cycle_history(

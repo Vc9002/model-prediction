@@ -108,6 +108,14 @@ WORKERS: dict[str, list[str]] = {
         "-m",
         "model_prediction.ncaaf_prekickoff_capture_worker",
     ],
+    # Every 2 minutes 08:00-02:00 ET: the cancel-only backstop for live resting fallbacks
+    # (quick-261125-hih D-01/D-02). Own lock, never daily.lock; cancels by order id only, never
+    # places an order and never writes the ledger.
+    "auto-buyer-cancel": [
+        _VENV_PYTHON,
+        "-m",
+        "model_prediction.auto_buyer_cancel_worker",
+    ],
 }
 
 _RUN_STATUSES = ("started", "completed", "failed", "skipped")
@@ -124,6 +132,8 @@ DEFAULT_WORKER_TIMEOUTS: dict[str, float] = {
     "nba-pretip-capture": 300.0,
     # Capture is budgeted at 240 s and writes only at the end; under the 10-minute cadence.
     "ncaaf-prekickoff-capture": 360.0,
+    # One order read plus a cancel per due id; inside the 2-minute cadence so runs never overlap.
+    "auto-buyer-cancel": 120.0,
     "daily": 3600.0,  # 60 minutes max
     "rebuild-shadow": 3600.0,  # 60 minutes max
 }

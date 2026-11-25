@@ -79,6 +79,7 @@ _SKIP_ESCALATION: dict[str, tuple[int, float]] = {
     "auto-buyer": (12, 3.0),  # every 15 min; 25 min timeout; 2026-10-31 hung lease ran >3 h
     "nba-pretip-capture": (6, 1.0),  # every 10 min, takes no lock; 5 min timeout
     "ncaaf-prekickoff-capture": (6, 1.0),  # every 10 min, takes no lock; 6 min timeout
+    "auto-buyer-cancel": (15, 0.5),  # every 2 min, own lock; 2 min timeout; ~15 skips in 30 min
 }
 
 

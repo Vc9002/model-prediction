@@ -4,8 +4,8 @@ plan: 01
 subsystem: live auto-buyer / Polymarket US execution
 status: in_progress
 tags: [real-money, auto-buyer, idempotency, gtd, audit, ledger]
-tasks_done: [1]
-tasks_open: [2, 3, 4]
+tasks_done: [1, 2, 3]
+tasks_open: [4]
 requirements_done_task1: [HIH-B1, HIH-B2, HIH-B3, HIH-B4 (b only), HIH-B5, HIH-D01 (order side; backstop is Task 3), HIH-D07 (code read-back), HIH-C9]
 key-files:
   created:
@@ -472,3 +472,177 @@ All 21 mutations went red.
 - **B7 is inert today.** The buyer reads calibration from the runtime root, which has no `calibration/` directory (`no_artifact`). The repo's `data/calibration` serves `identity_champion` for both live models. The guard arms itself if an artifact appears.
 - **D-03 gap.** After the last daily forecast run (21:00 ET), a pick for a late tip can be more than 3 h old at buy time, and it is refused. This is by design.
 - **Pre-existing, unchanged.** With credentials, `_build_bought_index` adds `held_events` for every exchange position, including a partial row's own contract. On the live book, a same-contract top-up is therefore already blocked by the position read.
+
+## Task 3
+
+Task 3 adds the cancel-only backstop worker, the governed manual script, the dashboard kill switch and LIVE label, and the live drawdown report (D-01 and D-02 backstop, DD, D-06 warning, C1, C2, C3), plus the docs. It is one code commit, and this section is committed with it. The worker is registered in code only; Task 4 schedules it on the host.
+
+### What changed
+
+- **Backstop worker**, new `src/model_prediction/auto_buyer_cancel_worker.py`.
+  - `main()`:
+    - Demotes its own priority, then resolves `RuntimePaths(require_external_runtime=True)`. Without the env var it raises; it never falls back to repo `data/`.
+    - Takes its OWN lock, `locks/auto_buyer_cancel.lock`, non-blocking. If that lock is held it prints `skipped` and exits 0.
+  - `_run()`:
+    - Calls Task 2's `cancel_resting_live_fallbacks(data_root=<runtime root>, cancel_all=not enabled, start_lead_seconds=30, skip_order_ids=<memo>, reason=backstop_tipoff | backstop_kill_switch)`.
+    - Memoises cancelled and already-terminal ids in `auto_buyer_cancel_worker_memo.json` (atomic write under its lock, pruned after 3 days). Failed ids are never memoised.
+    - Prints one JSON line. It exits 1 when any cancel failed or the helper raised, otherwise 0.
+  - It never writes the ledger. With nothing due it builds no executor and makes no network call.
+- **Scheduling.**
+  - `run_supervisor.py`:
+    - `WORKERS["auto-buyer-cancel"]`.
+    - `DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"] = 120.0`.
+  - `system_health.py`: `_SKIP_ESCALATION["auto-buyer-cancel"] = (15, 0.5)`.
+  - `scripts/register_windows_tasks.ps1`:
+    - Adds a `ModelPrediction-AutoBuyerCancel` block: daily at 08:00, every 2 min, for 18 h.
+    - The `-LogonType` default is now `S4U`. Every live ModelPrediction-* task is S4U (read 2026-11-25), so re-running the whole script no longer flips them to Interactive.
+    - The stale "every 30 minutes" header is corrected.
+  - New `scripts/register_auto_buyer_cancel_task.ps1` registers ONLY the new task. It copies the principal, the settings and the action from the live `ModelPrediction-AutoBuyer` task and swaps only `run auto-buyer }` for `run auto-buyer-cancel }`, checking that the match is exactly 1. It does not start the task. Both ps1 files parse with 0 errors, and a dry string swap against the live action was checked.
+- **Drawdown**, new `src/model_prediction/portfolio/auto_buyer_drawdown.py::live_cohort_drawdown_report`, the single entry point for the Telegram task.
+  - Cohorts:
+    - Active live cohorts come from `_parse_cohorts`.
+    - `approved_at_utc` is taken from the raw state entry, since `BuyCohort` has no such field.
+    - A date-only approval (the real value is `"2026-11-25"`) means midnight Eastern. `parse_utc` rejects a date-only value, so a naive parse would have silently dropped the filter.
+  - Rows:
+    - The live ledger is read at `<data_root>/auto_buyer_ledger.jsonl`. This avoids `resolve_auto_buyer_paths`'s paper-root redirect.
+    - Rows match the model, the sport casefolded (`NCAAB` in real rows) and the market.
+    - Excluded: void zero-fill, manual and submit_unknown rows.
+  - Figures and warnings:
+    - Exact figures as in the plan, plus `rows`, `open` and `open_cost_usd`.
+    - Thresholds come from the state keys `drawdown_warning_usd` and `drawdown_warning_units`, with defaults 100 and 20. A bool, a non-finite, a zero or a negative value falls back to the default.
+    - The comparison is made after rounding to cents (USD) and 0.01U.
+    - The warning uses CURRENT drawdown, so it clears on recovery; the max drawdown is reported alongside.
+  - It never raises: an error returns `status: error`.
+- **auto_executor.py.**
+  - `_live_drawdown(state)` reads `DATA` at call time and never raises.
+  - `auto_buyer_status()` returns the state plus:
+    - `live_cohorts` (labels)
+    - `live_trading_active`: `enabled is True`, and either live cohorts exist or the legacy ungoverned `mode: live` applies (no `cohorts` key)
+    - `live_drawdown`
+  - `run_auto_buyer_cycle`, on a governed, non-preview cycle:
+    - sets `run_summary["live_drawdown"]` (saved in `last_run`);
+    - copies the warnings into the live pass summary as `drawdown_warnings`.
+
+    The warnings never enter `alarms`, so they cannot raise `LiveAutoBuyerAlarm`.
+  - Edits sit near lines 1478-1512 and 1997-2003, away from the foreign hunks near 820 and 2668.
+- **routes.py**: `/api/auto-buyer/status` returns `auto_buyer_status()`. `/api/auto-buyer/toggle` already returned `toggle_auto_buyer`'s dict, including `kill_switch_cancel`.
+- **dashboard.html.**
+  - One derivation, `autoBuyerLiveState`, decides ON and LIVE for every surface:
+    - ON: `enabled === true` only.
+    - LIVE: `live_trading_active === true`, or the legacy `mode: live` with no `cohorts` key.
+    - The surfaces: the button, the pill, `updateNcaabPaperUI` (which used to overwrite the LIVE pill with "MAIN + PAPER ON"), `renderOverview` and the "Run main buyer check" confirm.
+  - `toggleAutoBuyer`:
+    - Reads the current state from the cached server status, not the button text.
+    - With live cohorts, the enable confirm lists each one, says REAL MONEY, and is `danger`.
+    - On failure (`res.ok`, a non-JSON 401, `status` refused or error, or a fetch throw), it alerts and re-renders from a fresh `/api/auto-buyer/status`. It never renders from the failed body.
+    - On success it also renders from a fresh status, then reports `kill_switch_cancel` counts.
+  - `loadAutoBuyerStatus` puts the pill into "status unavailable, reload" (`data-state="unknown"`) when the status can't be read.
+  - Live state: "ON (LIVE)" with the `live` class, and the pill "LIVE: real orders ON" with a red dot.
+  - New drawdown block `#autoBuyerLiveDrawdown` in the auto-buyer menu, rendered by `liveDrawdownHtml`: W-L-P, ROI, P&L in $ and U, current and max drawdown, and warnings in `class="red"`. Prices only, no American odds.
+- **scripts/auto_polymarket_buyer.py (C3).** `main(argv=None)` changes:
+  - `--execute` refuses with exit 2 when the state has a `cohorts` key or `enabled` is not `True`.
+  - It then takes `<runtime lock_root>/daily.lock` non-blocking, resolved with `require_external_runtime=True`. If the lock is held it refuses with exit 3; otherwise it holds the lock for the run.
+  - The dry run is unchanged and takes no lock.
+- **Docs.**
+  - `docs/DEBUG.md`: a new top entry, "2026-11-25 — Live auto-buyer safety (quick-261125-hih)". It covers every defect with its trace and fix, the Idempotency-Key facts, the GTD design and its read-back, the no-ledger-lock decision, the kill switch, the backstop, the drawdown, the unknown-row procedure, and the known limits.
+  - `docs/ROADMAP.md`: Horizon 1 item 4 lists the open items: unknown-row tooling, Telegram wiring, the total position key, and the same-key retry switch.
+  - `docs/PROJECT_STATUS.md`: a one-paragraph top entry.
+
+### Tests
+
+- **New `tests/test_auto_buyer_cancel_worker.py`.**
+  - Worker tests use a strict per-id exchange fake, which raises on anything but `order_snapshots` and `cancel`. `httpx.request` raises.
+  - Worker: nothing due, due, disabled, missing or unreadable state (4 variants), memo, corrupt memo, memo pruning, failed cancel (exit 1, not memoised, retried), helper failure, own lock held, `daily.lock` held (still runs), and fail-closed without a runtime root.
+  - Scheduling: supervisor, ps1, the standalone snippet, and health.
+  - Script: refusals (5 states), `daily.lock` held, an allowed run under the lock, and the dry run.
+- **New `tests/test_auto_buyer_drawdown.py`.** Exact figures with every exclusion, last-30 at 15 versus 14, last-30 window, $100 versus $99.99, 20U independent of USD, overrides and bad values, recovery, never raises, no live cohorts, `auto_buyer_status` (3 enabled values, legacy live mode, drawdown failure), the status route, and cycle `last_run` plus a warning that never alarms, and a preview that computes nothing.
+- **`tests/test_dashboard_html.py` (+9 node tests).** The auto-buyer controls block runs in Node against a stub DOM and a scripted fetch: the refused toggle (401 non-JSON, and 200 refused), string `"true"` not ON, LIVE with the paper trial on, armed, the enable confirm, a successful disable rendered from a fresh status with cancel counts, status unavailable, and the drawdown block.
+- **Combined:** the three files run 73 tests, all passing.
+
+### Red before the fix
+
+- **Against base 1e49d24c.** The two new test files fail at collection: `ImportError: cannot import name 'auto_buyer_cancel_worker'` and `ModuleNotFoundError: No module named 'model_prediction.portfolio.auto_buyer_drawdown'`. The new node tests: `9 failed, 20 passed`.
+
+  ```
+  test_dashboard_html.py:1111: AssertionError: assert 'REAL MONEY' in 'Enable Polymarket Auto-Buyer in PAPER mode?...'
+  test_dashboard_html.py:1137: AssertionError: assert ('ON (PAPER)' == 'OFF'
+  test_dashboard_html.py:1152: AssertionError: assert 'unavailable' in 'auto-buyer on · paper'
+  test_dashboard_html.py:1198: AssertionError: assert 'ncaab-spread-v7:spread:[0.05,0.12):live' in ''
+  9 failed, 20 passed
+  ```
+
+- **Base plus only the two new modules (wiring absent):** `19 failed, 25 passed`.
+
+  ```
+  test_auto_buyer_cancel_worker.py:410: AttributeError: <module 'auto_polymarket_buyer_script'> has no attribute 'load_auto_buyer_state'
+  test_auto_buyer_drawdown.py:204: AttributeError: module '...auto_executor' has no attribute 'auto_buyer_status'
+  test_auto_buyer_drawdown.py:238: AttributeError: <module '...dashboard.routes'> has no attribute 'auto_buyer_status'
+  test_auto_buyer_drawdown.py:278: KeyError: 'live_drawdown'
+  FAILED test_supervisor_registers_the_backstop_worker, test_windows_task_script_registers_the_backstop_every_two_minutes,
+         test_standalone_registration_snippet_registers_only_the_backstop, test_health_has_a_skip_escalation_for_the_backstop,
+         test_execute_refuses_under_cohorts_or_unless_enabled_is_true x5, test_execute_refuses_while_daily_lock_is_held, ...
+  19 failed, 25 passed
+  ```
+
+### Mutation proofs
+
+Each mutation was a break, then a run of the named test, then a restore by bytes with a sha256 check. The `git diff` hash was identical before and after. All 13 went red, and the set was re-run after the final edit.
+
+| # | Mutation | Red |
+|---|---|---|
+| M1 | the no-candidate short-circuit removed from the cancel helper | `test_nothing_due_builds_no_executor_and_exits_zero` (executor built) |
+| M2 | the worker takes `daily.lock` | `test_daily_lock_held_does_not_stop_the_backstop` |
+| M3 | the worker writes the ledger (marks cancelled rows reconciled) | `test_due_fallback_is_cancelled_by_id_and_the_ledger_is_untouched` (ledger bytes changed) |
+| M4 | cancel by id replaced with an account-wide cancel | same test (the strict exchange refuses) |
+| M5 | failed cancels memoised | `test_failed_cancel_exits_one_and_is_not_memoised` |
+| M6 | an unreadable state counts as enabled | `test_missing_or_unreadable_state_counts_as_disabled[None]`, `[{not json]` |
+| M7 | the drawdown includes void zero-fill rows | `test_figures_are_exact_and_excluded_rows_never_count` |
+| M8 | current drawdown replaced by max | `test_warning_clears_on_recovery_but_max_drawdown_stays` |
+| M9 | drawdown warnings joined to the live alarms | `test_cycle_last_run_carries_live_drawdown_and_a_warning_never_alarms` (LiveAutoBuyerAlarm) |
+| M10 | the toggle renders from the failed body | `test_refused_toggle_...` x2 |
+| M11 | a truthy enabled check | `test_string_true_is_not_on` |
+| M12 | the script ignores the cohorts key | `test_execute_refuses_...[state0]`, `[state1]` |
+| M13 | the script skips `daily.lock` | `test_execute_refuses_while_daily_lock_is_held` |
+
+### Verify (MODEL_PREDICTION_* unset, `-o addopts='' -q`)
+
+- **Files.** The plan's list (cancel_worker, drawdown, dashboard_html, dual_auto_buyer_dashboard, resting_lifecycle, live_order_safety, auto_buyer_cohorts), plus auto_polymarket_buyer, mode_boundary, state_versioning, run_supervisor, system_health, nba_pretip_capture, ncaaf_prekickoff_capture, auto_buyer_worker_pair, dashboard_server, execution_gate and auto_buyer_ncaab_settle.
+- **Worktree on base 1e49d24c: 615 passed, 4 failed.** All 4 fail identically at base in a worktree:
+  - `test_run_supervisor.py::test_worker_registry_commands_exist_on_disk`
+  - the 3 known `test_dashboard_server` worktree-only failures
+- **Checks.**
+  - `ruff check` is clean.
+  - `ruff format --check` is clean on every changed Python file. The two files it would reformat in the tree, `espn.py` and `test_ingest.py`, are pre-existing.
+  - mypy on the 6 changed or new source files: 78 errors, identical to base. Diffing the sorted messages shows no new error; the 6 union-attr errors first introduced were fixed.
+  - CRLF holds on every edited and new file (`\r\n` == `\n`).
+- **Grep gates** (comment lines excluded):
+
+  | File | Token | Count | Required |
+  |---|---|---|---|
+  | run_supervisor.py | `auto-buyer-cancel` | 2 | >=2 |
+  | register_windows_tasks.ps1 | `auto-buyer-cancel` | 1 | >=1 |
+  | auto_buyer_drawdown.py | `def live_cohort_drawdown_report` | 1 | ==1 |
+  | dashboard.html | `live_trading_active` | 1 | >=1 |
+
+### Deviations from plan
+
+1. **[Rule 2] The worker reads `enabled` straight from `<runtime root>/auto_buyer_state.json`, not through `load_auto_buyer_state`.** That loader falls back to the repo seed file when the runtime file is missing. A missing, corrupt or non-dict file, or any non-boolean `enabled`, counts as disabled, which means cancel all.
+2. **[Rule 2] `register_windows_tasks.ps1` now defaults to `-LogonType S4U`.** The coordinator asked that a full re-run stay safe, and the live tasks are all S4U. The standalone script is still the one to run.
+3. **[Rule 1] C1 also fixed in three places the plan did not name:**
+   - `setAutoBuyerMode` rendered from a refused body; it now re-renders from a fresh status.
+   - `updateNcaabPaperUI` overwrote the LIVE pill.
+   - `renderOverview` and the "Run main buyer check" confirm used the legacy `mode` with a truthy `enabled`.
+4. **`live_trading_active` also covers the legacy ungoverned `mode: live`** (no `cohorts` key), so a legacy live buyer still shows LIVE.
+5. **The drawdown output adds `rows`, `open`, `open_cost_usd` and `approval_filter`.** An unparseable non-date approval keeps every row (`approval_filter: "none"`) rather than hiding them.
+6. **`_SKIP_ESCALATION` entry for the new worker.** `system_health` reports a worker that has never run as degraded, so it shows degraded until Task 4 registers the task.
+
+### Open items for the orchestrator (Task 4)
+
+- **Register only the new task:** `powershell -NoProfile -ExecutionPolicy Bypass -File E:\MP\scripts\register_auto_buyer_cancel_task.ps1`, elevated if S4U registration requires it. Do not run `register_windows_tasks.ps1`. Then run `Start-ScheduledTask ModelPrediction-AutoBuyerCancel` once and confirm that runs.db shows an `auto-buyer-cancel` run completed with exit 0 and `candidates` 0 (or a cancel of a genuinely due fallback).
+- **Restart the dashboard.** The status, LIVE label, drawdown block and toggle handling reach it only after a restart.
+- **State keys (optional; the code defaults apply when absent):** `"drawdown_warning_usd": 100.0` and `"drawdown_warning_units": 20.0`.
+- **Health.** Until the task's first run, system_health reports "worker 'auto-buyer-cancel' has never run under the supervisor" (degraded).
+- **Known limits.**
+  - A cancel's audit append can wait about 120 s on the audit lock, which equals the backstop's supervisor timeout. The cancel itself is already sent by then.
+  - The backstop never re-verifies a memoised "cancelled" id; reconcile does.
+  - The backstop runs 08:00-02:00, the buyer's own window.

@@ -1,5 +1,9 @@
 # Project status and source of truth
 
+## 2026-11-25 — Live auto-buyer safety layer (quick-261125-hih)
+
+Live cohort orders now carry an `Idempotency-Key` and are never resent after an ambiguous outcome. The intent is audited before the POST, and every placed order is either in the live ledger or raised as an alarm that halts the pass. A partly filled IOC rests its remainder as GTD at start minus 90 s, verified by read-back. Orders are refused on a live ask more than 2 cents off the ticket, a pick older than 3 h, or non-identity calibration. The kill switch cancels resting live orders by id from the toggle, every disabled cycle, the daily job and the cancel-only backstop task `ModelPrediction-AutoBuyerCancel` (every 2 min). The dashboard shows LIVE when live cohorts trade, and an advisory per-cohort drawdown report replaces the live quarantine. Details: `docs/DEBUG.md` (same date).
+
 ## 2026-11-25 — Auto-buyer per-model cohorts; first scheduled live cohorts pending (quick-261125-31d)
 
 **Status: code shipped (79250d80, e425053d); live state change pending the operator's go (Task 4).**

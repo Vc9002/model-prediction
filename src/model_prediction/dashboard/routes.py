@@ -104,6 +104,7 @@ from model_prediction.portfolio.auto_buyer_ledger import (
 from model_prediction.portfolio.auto_executor import (
     PAPER_AUTO_BUYER_DATA_ROOT,
     LiveAutoBuyerAlarm,
+    auto_buyer_status,
     load_auto_buyer_state,
     run_auto_buyer_cycle,
     set_auto_buyer_mode,
@@ -499,7 +500,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/health":
                 self._send({"ok": True, "at": datetime.now(UTC).isoformat()[:19]})
             elif route == "/api/auto-buyer/status":
-                self._send(load_auto_buyer_state())
+                self._send(auto_buyer_status())
             elif route == "/api/auto-buyer/ncaab-paper/status":
                 from model_prediction.portfolio.ncaab_paper_trial import paper_trial_status
 

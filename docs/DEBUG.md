@@ -1,5 +1,183 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-25 — Live auto-buyer safety (quick-261125-hih)
+
+State: Tasks 1-3 landed (14bc409f, c2af49a8, 3c1dfd4a, 0db5d783, 327b8ccc, 7f77fb44, 1e49d24c,
+plus the Task 3 commit). Task 4 (register the backstop task, restart the dashboard, read back the
+first GTD fallback) is the orchestrator's. Plan and per-task evidence:
+`.planning/quick/261125-hih-live-auto-buyer-safety-no-duplicate-orde/`. Two NCAAB cohorts trade real
+money from the scheduler (`ncaab-spread-v7` and `ncaab-total-v6`, saved and live-ask edge 5-12%,
+$5/unit, $25/game, $500/day spend, $250/day settled-loss stop).
+
+**Defects, each with its trace and fix**
+
+- **B1, duplicate orders from an HTTP retry.** `_request` retried any `httpx.HTTPError` on
+  `POST /v1/orders`, so a timeout after the exchange accepted the order could place it twice. Fix:
+  every order POST carries `Idempotency-Key` (`mp-<intent>-p` for the IOC leg, `-f` for the
+  fallback). Connect-phase errors and 429 resend with the same key; if every attempt fails that way
+  the result is REFUSED. Anything ambiguous (read timeout, 5xx, 409/ABORTED, a 2xx without an id)
+  makes exactly one POST and raises `OrderSubmitUnknownError`. The buyer writes an
+  `ORDER_STATE_SUBMIT_UNKNOWN` row that blocks a re-buy and counts its requested cost toward the
+  caps, raises alarm `submit_unknown`, and halts the pass. A same-key retry exists behind
+  `ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY = False`, pending an operator decision.
+- **B2, order placed but not recorded.** The `order_executed` audit ran after the POST, and an
+  `AuditLockTimeout` there was recorded as "refused". Fix: `order_intent` is audited before the
+  POST (if that append fails, nothing is sent), and the event start is re-checked after the append.
+  An audit failure after the POST returns `audit_error`; the row is still recorded, with alarm
+  `audit_failed_after_submit` and a halt.
+- **B3, swallowed ledger-write failure.** `record_auto_buy_execution` only logged a failed JSONL
+  append or top-up rewrite. Fix: on the live ledger it raises `AutoBuyerLedgerWriteError`. The buyer
+  logs the order ids, raises alarm `ledger_write_failed` and halts. The paper ledger still only
+  warns.
+- **B4, dedup gaps.**
+  - (a) Total-line slugs (`tsc-...-117pt5`) were not normalised. `event_key_from_slug` now maps every
+    line of a game's total to `tsc-<event>`, which never equals that game's spread or moneyline key.
+  - (b) The audit payload now carries event_id, selection and market_type.
+  - (c) A partial row tops up only on its own contract (same slug and side).
+- **B5, price drift.** `_verify_live_side_and_timing` never compared the live ask with the ticket.
+  Live tickets now carry `max_live_price_deviation = 0.02`. A missing ask, a non-finite ask, or an
+  ask more than 2 cents off the ticket in either direction is refused before any POST.
+- **B6 / C5, reconcile robustness.**
+  - A failed `order_snapshots` no longer returns early, and the summary gets `snapshot_error`.
+  - A started (or, under the kill switch, any) true fallback is cancelled by id even when it is
+    missing from the snapshot.
+  - After every cancel the id is re-read, and a row is restated or closed only from that re-read,
+    never from a pre-cancel read. A non-terminal re-read keeps the row pending with
+    `cancel_requested_at_utc` set.
+- **B7, calibration drift.** A live cohort row is refused (`rejected_live_calibration`, alarm
+  `live_calibration_not_identity`) when the served calibration is not identity. That covers both
+  the buyer's own `calibrate_for_serving` and the pick's own record (1e49d24c): a calibration_method
+  other than identity, a raw probability that differs from the served one, or no raw probability.
+- **C1, a refused toggle rendered as OFF.** The dashboard toggle rendered whatever body came back and
+  inferred the current state from the button text. It now derives the state from the last server
+  status (`enabled === true` only), checks `res.ok` and `status !== "refused"`, alerts on failure,
+  and always re-renders from a fresh `/api/auto-buyer/status`. When that status is unreadable, the
+  pill says "status unavailable, reload". `setAutoBuyerMode` had the same defect and got the same fix.
+- **C2, "ON (PAPER)" while live cohorts trade.** `/api/auto-buyer/status` now returns
+  `auto_buyer_status()`: the state plus `live_cohorts`, `live_trading_active` (enabled is the
+  boolean true and a live cohort, or the legacy ungoverned `mode: live`, exists) and `live_drawdown`.
+  The button reads "ON (LIVE)" and the pill "LIVE: real orders ON". The enable confirm lists each
+  live cohort and says REAL MONEY. The same live/on derivation drives the paper-trial pill, the
+  overview strip and the "Run main buyer check" confirm.
+- **C3, an ungoverned manual path.** `scripts/auto_polymarket_buyer.py --execute` built a live
+  config with no governance. It now refuses (exit 2) when the state has a `cohorts` key or `enabled`
+  is not true, and runs under `daily.lock` (exit 3 when the lock is held). The dry run is unchanged.
+- **C4 / D-06, the live quarantine latch.** No cohort book auto-quarantines; the legacy global pass
+  keeps it. Void zero-fill, submit_unknown and explicit zero-share rows no longer count in the
+  quarantine sample. An advisory drawdown report replaces it (below).
+- **C6 / C7, pending exposure.** `_pending_exposure_cost` counts only the unfilled remainder, and a
+  row with resting or unknown exposure is never dropped from dedup or from its game's exposure.
+- **C8 / C9, the enabled checks.** Daily step 12 runs only for the boolean true (tested through
+  `_run_auto_buyer_step12`). A running cycle re-reads `enabled` before each live submission and
+  halts with `live_halt_reason="kill_switch"`.
+- **D-03, live pick age.** Live cohorts buy only picks whose model timestamp is at most 3 h old. A
+  late tip whose pick is the freshest the scheduler could produce may be up to 6 h old (7f77fb44).
+
+**Idempotency facts** (docs.polymarket.us `orders/overview.md`, "Idempotency and Ambiguous Retries")
+
+- The header is `Idempotency-Key`: non-empty, at most 255 bytes, one value per placement intent. The
+  old `idempotencyKey` spelling is ignored.
+- A successful response is retained for 24 h and returned on a same-key retry. A concurrent retry
+  can answer `ABORTED`.
+- After an ambiguous outcome, never resubmit with a new key; reconcile through
+  `GET /v1/orders/open?slugs=` and recent fills.
+- There is no client order id, so an ambiguous IOC cannot be found afterwards: an IOC never rests.
+  Only a resting leg can be adopted, by a heuristic match.
+
+**GTD fallback (D-01) and how to read one back**
+
+- **Placement.** An IOC that fills only in part rests the remainder as
+  `TIME_IN_FORCE_GOOD_TILL_DATE`, post-only, at the same price. `goodTillTime` is RFC 3339 UTC,
+  floored to the second, with a `Z` suffix. It is the earlier of the event start minus 90 s and the
+  exchange `gameStartTime` minus 90 s.
+- **When no fallback is placed.** No expiry gives `not_placed_no_expiry`; an expiry at or before
+  now + 60 s gives `not_placed_near_start`. No auto-buyer POST can carry GOOD_TILL_CANCEL.
+- **In-code read-back.** Every placed or adopted fallback is read back with `GET /v1/order/{id}`. It
+  must show tif GTD and a goodTillTime within 2 s, otherwise it is cancelled by id and marked
+  `cancelled_unverified_gtd`.
+- **A rejected leg.** If the exchange rejects the GTD leg (`fallback_status: rejected` plus
+  `fallback_error`), the IOC fill still stands and the alarm surfaces the error.
+- **Operator read-back, no test order (D-07).**
+  1. Read the ledger row: `fallback_status: resting`, `good_till_time` equal to start minus 90 s,
+     and both idempotency keys present.
+  2. Call `PolymarketExecutor.order_snapshots([fallback_order_id])`: `tif` GOOD_TILL_DATE and a
+     matching `good_till_time`.
+  3. After the expiry, the state is `ORDER_STATE_EXPIRED`, filled or cancelled.
+
+**No ledger lock (decision).** `_write_jsonl_atomic` is a read-modify-write with an atomic rename,
+and everything that rewrites the live ledger already runs under `daily.lock`: the worker, the daily
+job and the dashboard's manual run. The new paths that run outside that lock (the dashboard
+toggle's kill-switch cancel and the backstop worker) cancel by id and never write the ledger.
+Restating fills stays with reconcile under `daily.lock`. Adding a ledger lock would put a second
+lock order into the buyer for no gain.
+
+**Kill switch (D-02).** Turning the buyer off cancels resting live fallbacks by order id, never with
+an exchange-wide cancel. This happens in four places:
+- `toggle_auto_buyer(False)`, right after the save (`kill_switch_cancel` in the response);
+- every disabled cycle's reconcile (`cancel_all_resting`);
+- daily 11b/12b;
+- the backstop.
+
+**Backstop worker** (`auto_buyer_cancel_worker.py`, supervisor worker `auto-buyer-cancel`, task
+`ModelPrediction-AutoBuyerCancel`, every 2 min from 08:00 for 18 h)
+
+- **What it cancels.** Cancel-only: by order id, live fallbacks whose event starts within 30 s, and
+  every live fallback while the buyer is disabled. A missing or unreadable state file counts as
+  disabled.
+- **Lock and runtime root.** It takes its own lock, `locks/auto_buyer_cancel.lock`, never
+  `daily.lock`, which the daily job holds for up to ~50 min. It fails closed without
+  `MODEL_PREDICTION_RUNTIME_ROOT`.
+- **Network and writes.** With nothing due it builds no executor and makes no network call. It never
+  writes the ledger.
+- **Memo.** Ids it cancelled or found terminal go to `auto_buyer_cancel_worker_memo.json` in the
+  runtime root, pruned after 3 days, and are never re-sent. A failed cancel exits 1 and is retried on
+  the next run.
+- **Registration.** `scripts/register_auto_buyer_cancel_task.ps1` registers only this task, copying
+  the live auto-buyer task's principal, settings and action. `register_windows_tasks.ps1` now
+  defaults to `-LogonType S4U`: the old Interactive default would have switched every live S4U
+  worker task to run only while logged on.
+
+**Drawdown warning (DD, D-06).** `portfolio/auto_buyer_drawdown.py::live_cohort_drawdown_report` is
+the single entry point (the later Telegram task calls it).
+
+- **Rows.** Per active live cohort: the live ledger's rows of its model, sport and market executed
+  on or after `approved_at_utc` (a date means midnight Eastern), without void zero-fill, manual or
+  submit_unknown rows.
+- **Figures.** W-L-P, cost, P&L in $ and U, ROI, last-30 ROI, and maximum and current peak-to-trough
+  drawdown in $ and U.
+- **Warnings.** A warning fires when the last-30 ROI is below -10% with at least 15 settled, or when
+  the CURRENT drawdown reaches `drawdown_warning_usd` (default 100) or `drawdown_warning_units`
+  (default 20), both optional state keys. Current drawdown is used so the warning clears on
+  recovery; the maximum is reported too.
+- **Where it shows.** `last_run.live_drawdown`, the live pass's `drawdown_warnings`,
+  `/api/auto-buyer/status` and the dashboard auto-buyer menu. Advisory only: it never enters
+  `alarms` and never stops buying.
+
+**Unknown-row operator procedure** (`ORDER_STATE_SUBMIT_UNKNOWN`, or `fallback_submit_unknown`)
+
+1. Check the exchange positions and activity for the row's `market_slug` around `executed_at_utc`.
+2. If nothing filled and nothing rests, remove the row with `remove_open_rows` (primary unknown).
+   For an unknown fallback leg, set `fallback_submit_unknown` false and `fallback_reconciled` true.
+3. If it filled or rests, record the operator decision. For a fallback, set `fallback_order_id`
+   with `fallback_reconciled` false so reconcile takes over, or use
+   `manually_settle_auto_buyer_order`.
+4. Edit between buyer runs. Settlement holds these rows open until then. Resolution tooling is an
+   open ROADMAP item.
+
+**Known limits**
+- **The total position key is unverified.** No exchange position snapshot is stored, so how a
+  `tsc-` total is keyed in positions will show on the first live total position. Dedup handles any
+  full total slug.
+- **Not proven without a real order (D-07).** The exchange may not echo `tif`/`goodTillTime` on
+  `GET /v1/order/{id}`. In that case every fallback is cancelled as `cancelled_unverified_gtd` and
+  buying continues IOC-only. Task 4 observes the first one.
+- **Backstop timing.** A cancel's audit append can wait on the audit lock for about 120 s, which
+  equals the backstop's supervisor timeout. The cancel itself is already sent by then, and the next
+  run reads the id back as terminal. A memoised "cancelled" id is never re-verified by the backstop;
+  reconcile under `daily.lock` re-reads it.
+- **Backstop window.** The task runs 08:00-02:00, the same window as the buyer. A fallback for a
+  game that starts after 02:00 relies on GTD expiry and the daily reconcile.
+
 ## 2026-11-25 — Auto-buyer per-model cohorts, live enable pending operator go (quick-261125-31d)
 
 State: **live enable pending operator go.** Code is in 79250d80 (cohorts, live pass, submission

@@ -1,0 +1,131 @@
+"""Supervisor worker ``auto-buyer-cancel``: the cancel-only backstop for live resting fallbacks.
+
+Scheduled every 2 minutes from 08:00 for 18 hours (``scripts/register_windows_tasks.ps1``). A live
+cohort buy whose IOC leg fills only in part rests the remainder as a GOOD_TILL_DATE order that the
+exchange expires at the event start minus 90 s (quick-261125-hih D-01). That expiry is the primary
+mechanism; this worker is the backstop for an exchange that did not honour it and for the kill switch
+(D-02):
+
+- buyer enabled: cancel, by order id, every unreconciled live fallback whose event starts within
+  ``START_LEAD_SECONDS`` (the operator's 30 s spec);
+- buyer disabled, or the state file missing or unreadable: cancel every unreconciled live fallback.
+
+It only cancels. It never places an order, never calls a cancel-all or batch endpoint, and never
+writes the ledger: there is no ledger lock, so restating fills stays with the reconcile that runs under
+daily.lock. It takes its OWN lock, never daily.lock, because the daily job holds that for up to
+~50 minutes and the backstop has to keep running through it. With nothing due it builds no executor
+and makes no network call.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+from .daily_lock import acquire_lock, release_lock
+from .domain import iso_utc, parse_utc, utc_now
+from .runtime_paths import RuntimePaths
+from .stealth_runtime import enable_background_priority
+
+LOCK_FILE_NAME = "auto_buyer_cancel.lock"
+MEMO_FILE_NAME = "auto_buyer_cancel_worker_memo.json"
+START_LEAD_SECONDS = 30.0
+# Ids this worker already cancelled or found terminal are never re-sent (the gateway's rate limit is
+# shared with the buyer). Three days outlives any fallback, which expires at its game's start.
+MEMO_RETENTION = timedelta(days=3)
+
+
+def _buyer_enabled(state_path: Path) -> bool:
+    """Only the boolean true in the canonical runtime state file counts as enabled.
+
+    Read directly rather than through ``load_auto_buyer_state``: that loader falls back to the repo
+    seed file when the runtime file is missing, and this worker must fail toward cancelling.
+    """
+    try:
+        data = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(data, dict) and data.get("enabled") is True
+
+
+def _load_memo(path: Path, now: datetime) -> dict[str, str]:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        entries = raw.get("order_ids") if isinstance(raw, dict) else None
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(entries, dict):
+        return {}
+    kept: dict[str, str] = {}
+    for order_id, stamp in entries.items():
+        try:
+            if now - parse_utc(str(stamp)) <= MEMO_RETENTION:
+                kept[str(order_id)] = str(stamp)
+        except (TypeError, ValueError):
+            continue
+    return kept
+
+
+def _save_memo(path: Path, memo: dict[str, str]) -> None:
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps({"order_ids": memo}, sort_keys=True), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _run(paths: RuntimePaths) -> int:
+    from .portfolio import auto_buyer_ledger
+
+    now = utc_now()
+    root = paths.runtime_root
+    enabled = _buyer_enabled(root / "auto_buyer_state.json")
+    reason = "backstop_tipoff" if enabled else "backstop_kill_switch"
+    memo_path = root / MEMO_FILE_NAME
+    memo = _load_memo(memo_path, now)
+    try:
+        summary: dict[str, Any] = auto_buyer_ledger.cancel_resting_live_fallbacks(
+            data_root=root,
+            now=now,
+            cancel_all=not enabled,
+            start_lead_seconds=START_LEAD_SECONDS,
+            skip_order_ids=frozenset(memo),
+            reason=reason,
+        )
+    except Exception as exc:  # noqa: BLE001 -- reported as a failed run, never a silent pass
+        error = f"{type(exc).__name__}: {exc}"[:300]
+        print(
+            json.dumps({"status": "error", "enabled": enabled, "reason": reason, "error": error}), flush=True
+        )
+        return 1
+    done = [*summary.get("cancelled", []), *summary.get("already_terminal", [])]
+    result: dict[str, Any] = {"enabled": enabled, **summary}
+    if done:
+        memo.update({str(order_id): iso_utc(now) for order_id in done})
+        try:
+            _save_memo(memo_path, memo)
+        except OSError as exc:
+            # Benign: the next run reads these ids back as terminal before it would cancel again.
+            result["memo_error"] = f"{type(exc).__name__}: {exc}"[:300]
+    failed = bool(summary.get("failed"))
+    print(json.dumps({"status": "error" if failed else "ok", **result}, default=str), flush=True)
+    return 1 if failed else 0
+
+
+def main() -> int:
+    enable_background_priority()
+    # Operational entry point: fail closed without MODEL_PREDICTION_RUNTIME_ROOT, never repo data/.
+    paths = RuntimePaths.resolve(require_external_runtime=True)
+    lock = acquire_lock(paths.lock_root / LOCK_FILE_NAME)
+    if lock is None:
+        print(json.dumps({"status": "skipped", "reason": "AUTO_BUYER_CANCEL_ALREADY_RUNNING"}), flush=True)
+        return 0
+    try:
+        return _run(paths)
+    finally:
+        release_lock(lock)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
