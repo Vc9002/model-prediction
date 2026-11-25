@@ -128,7 +128,7 @@ def _row(
     pick_id: str,
     event: str,
     market: str = "spread",
-    selection: str = "home",
+    selection: str | None = None,
     edge: Any = "0.07",
     model_probability: float = 0.58,
     ask: float = 0.51,
@@ -148,7 +148,7 @@ def _row(
         "model_version": model_id,
         "league": league,
         "market_type": market,
-        "selection": selection,
+        "selection": selection or ("over" if market == "total" else "home"),
         "status": "open",
         "decision": "CALL",
         "reason_code": "FLAT_CALL",
@@ -515,3 +515,453 @@ def test_cycle_malformed_cohorts_still_force_global_paper(monkeypatch, tmp_path)
     assert summary["cohorts_governed"] is True
     assert summary["cohort_config_errors"]
     assert summary["cohorts_active"] == []
+
+
+# ---------------------------------------------------------------- Task 2: paper pass, books, preview
+
+NBA_V9_PAPER = BuyCohort(NBA_SPREAD, "nba", "spread", 0.12, None, "paper")
+TOTAL_V6_LIVE = BuyCohort(TOTAL_V6, "ncaab", "total", 0.05, 0.08, "live")
+
+# Operator cohorts as of 2026-11-25 (late): two live, two paper.
+OPERATOR_COHORTS_FINAL = [
+    _entry(
+        model_id=ML_V7M, market="moneyline", min_saved_edge=0.12, max_saved_edge_exclusive=None, mode="paper"
+    ),
+    _entry(
+        model_id=NBA_SPREAD,
+        sport="nba",
+        market="spread",
+        min_saved_edge=0.12,
+        max_saved_edge_exclusive=None,
+        mode="paper",
+    ),
+    _entry(),
+    _entry(model_id=TOTAL_V6, market="total", max_saved_edge_exclusive=0.08, mode="live"),
+]
+
+_REAL_TODAY_TOTALS = auto_executor._today_auto_buyer_totals
+
+
+def _ledger_rows(path) -> list[dict[str, Any]]:
+    return auto_buyer_ledger.read_auto_buyer_ledger(jsonl_path=path)
+
+
+def _write_ledger(path, rows: list[dict[str, Any]]) -> None:
+    import json
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row) + "\n")
+
+
+def test_operator_final_cohorts_parse_to_four():
+    parsed = _parse_cohorts({"cohorts": OPERATOR_COHORTS_FINAL})
+    assert parsed.errors == ()
+    assert set(parsed.active) == {ML_V7M_PAPER, NBA_V9_PAPER, SPREAD_V7_LIVE, TOTAL_V6_LIVE}
+
+
+def test_live_cohorts_never_cross_match():
+    total = _row(TOTAL_V6, pick_id="t", event="g1", market="total", edge="0.06")
+    spread = _row(SPREAD_V7, pick_id="s", event="g1", edge="0.09")
+    config = AutoExecutionConfig(mode="live", cohorts=(SPREAD_V7_LIVE, TOTAL_V6_LIVE))
+    assert auto_executor._match_cohort(total, config) == TOTAL_V6_LIVE
+    assert auto_executor._match_cohort(spread, config) == SPREAD_V7_LIVE
+    # A 9% total is inside the spread window but must never borrow it.
+    assert auto_executor._match_cohort({**total, "edge": "0.09"}, config) is None
+    assert auto_executor._match_cohort({**spread, "model_version": TOTAL_V6}, config) is None
+
+
+def test_nba_spread_paper_cohort_bypasses_nba_floor_and_max_edge(tmp_path, decorate):
+    rows = [
+        _row(
+            NBA_SPREAD,
+            pick_id="nba13",
+            event="n1",
+            league="nba",
+            edge="0.13",
+            model_probability=0.64,
+            ask=0.51,
+        ),
+        _row(
+            NBA_SPREAD,
+            pick_id="nba10",
+            event="n2",
+            league="nba",
+            edge="0.10",
+            model_probability=0.61,
+            ask=0.51,
+        ),
+    ]
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            mode="paper",
+            cohorts=(NBA_V9_PAPER,),
+            whitelisted_models=(),
+            disabled_sport_markets=(("nba", "spread"),),
+            capture_missing_slates=False,
+            require_model_timestamp=True,
+        ),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        data_root=tmp_path,
+    )
+    result = buyer.evaluate_and_execute(rows)
+    assert [o["pick_id"] for o in result.dry_run_orders] == ["nba13"]
+    assert result.dry_run_orders[0]["status"] == "paper_filled"
+    assert result.dry_run_orders[0]["cohort"] == NBA_V9_PAPER.label
+    assert result.rejected_not_whitelisted == 1
+    assert FakeExecutor.constructed == 0
+    assert FakeExecutor.executed == []
+
+
+def test_cycle_paper_cohorts_record_paper_fills_and_never_touch_executor(monkeypatch, tmp_path):
+    rows = [
+        _row(
+            ML_V7M,
+            pick_id="ml-dog",
+            event="g1",
+            market="moneyline",
+            edge="0.15",
+            model_probability=0.45,
+            ask=0.30,
+        ),
+        _row(
+            ML_V7M,
+            pick_id="ml-fav",
+            event="g2",
+            market="moneyline",
+            edge="0.15",
+            model_probability=0.85,
+            ask=0.70,
+        ),
+        _row(
+            ML_V7M,
+            pick_id="ml-phantom",
+            event="g3",
+            market="moneyline",
+            edge="0.15",
+            model_probability=0.60,
+            ask=0.30,
+        ),
+        _row(
+            NBA_SPREAD,
+            pick_id="nba13",
+            event="n1",
+            league="nba",
+            edge="0.13",
+            model_probability=0.64,
+            ask=0.51,
+        ),
+    ]
+    cohorts = [OPERATOR_COHORTS_FINAL[0], OPERATOR_COHORTS_FINAL[1]]
+    calls = _cycle_harness(
+        monkeypatch, tmp_path, {**_state(cohorts, enabled=True), "whitelist_models": []}, rows
+    )
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert FakeExecutor.constructed == 0
+    assert FakeExecutor.executed == []
+    paper = _ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")
+    assert sorted(r["pick_id"] for r in paper) == ["ml-dog", "ml-fav", "nba13"]
+    assert not (tmp_path / "auto_buyer_ledger.jsonl").exists()
+    paper_pass = summary["cohort_passes"]["paper"]
+    assert paper_pass["mode"] == "PAPER_TRADING"
+    assert paper_pass["rejected_unrealistic_edge"] == 1
+    assert "live" not in summary["cohort_passes"]
+    assert all(c.execute_live is False for c in calls["configs"])
+    passes = [summary_row.get("pass") for summary_row, _ in calls["history"]]
+    assert sorted(passes) == ["cohort_paper", "global"]
+
+
+def _mixed_four_rows() -> list[dict[str, Any]]:
+    return [
+        _row(SPREAD_V7, pick_id="spread9", event="g1", edge="0.09", model_probability=0.60, ask=0.51),
+        _row(
+            TOTAL_V6,
+            pick_id="total6",
+            event="g2",
+            market="total",
+            edge="0.06",
+            model_probability=0.57,
+            ask=0.51,
+        ),
+        _row(
+            TOTAL_V6,
+            pick_id="total9",
+            event="g3",
+            market="total",
+            edge="0.09",
+            model_probability=0.60,
+            ask=0.51,
+        ),
+        _row(
+            ML_V7M,
+            pick_id="ml15",
+            event="g4",
+            market="moneyline",
+            edge="0.15",
+            model_probability=0.55,
+            ask=0.40,
+        ),
+        _row(
+            NBA_SPREAD,
+            pick_id="nba13",
+            event="n1",
+            league="nba",
+            edge="0.13",
+            model_probability=0.64,
+            ask=0.51,
+        ),
+    ]
+
+
+def test_cycle_two_live_cohorts_and_two_paper_cohorts(monkeypatch, tmp_path):
+    state = {**_state(OPERATOR_COHORTS_FINAL, enabled=True), "whitelist_models": []}
+    calls = _cycle_harness(monkeypatch, tmp_path, state, _mixed_four_rows())
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert sorted(t.pick_id for t, _ in FakeExecutor.executed) == ["spread9", "total6"]
+    live = _ledger_rows(tmp_path / "auto_buyer_ledger.jsonl")
+    assert sorted(r["pick_id"] for r in live) == ["spread9", "total6"]
+    paper = _ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")
+    assert sorted(r["pick_id"] for r in paper) == ["ml15", "nba13"]
+    assert summary["cohort_passes"]["live"]["cohort_matched"] == 2
+    assert summary["cohort_passes"]["live"]["orders_count"] == 2
+    assert calls["reconciled"] == [1]
+
+
+def test_cycle_disabled_four_cohorts_does_nothing(monkeypatch, tmp_path):
+    state = {**_state(OPERATOR_COHORTS_FINAL, enabled=False), "whitelist_models": []}
+    _cycle_harness(monkeypatch, tmp_path, state, _mixed_four_rows())
+    summary = auto_executor.run_auto_buyer_cycle(execute_override=True)
+    assert FakeExecutor.executed == []
+    assert FakeExecutor.constructed == 0
+    assert not (tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl").exists()
+    assert not (tmp_path / "auto_buyer_ledger.jsonl").exists()
+    assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_DRY_RUN"
+
+
+def test_live_per_game_cap_is_shared_across_spread_and_total(tmp_path, decorate):
+    rows = [
+        _row(SPREAD_V7, pick_id="s", event="g1", edge="0.09", model_probability=0.60, ask=0.51, units=3.0),
+        _row(
+            TOTAL_V6,
+            pick_id="t",
+            event="g1",
+            market="total",
+            edge="0.06",
+            model_probability=0.57,
+            ask=0.51,
+            units=3.0,
+        ),
+    ]
+    result = _live_buyer(tmp_path, cohorts=(SPREAD_V7_LIVE, TOTAL_V6_LIVE)).evaluate_and_execute(rows)
+    costs = [t.estimated_cost_usd for t, _ in FakeExecutor.executed]
+    assert len(costs) == 2
+    assert costs[0] == pytest.approx(15.0, abs=0.06)
+    assert sum(costs) <= 25.0 + 0.10
+    assert result.total_spend_usd <= 25.10
+
+
+def test_live_per_game_cap_counts_ledger_exposure(tmp_path, decorate):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            {
+                "pick_id": "old",
+                "event_id": "g1",
+                "selection": "over",
+                "market_type": "total",
+                "status": "open",
+                "cost_usd": 24.8,
+                "shares": 48,
+                "market_slug": "tsc-cbb-g1-2026-11-25-140pt5",
+                "token_side": "long",
+            }
+        ],
+    )
+    row = _row(SPREAD_V7, pick_id="s", event="g1", edge="0.09", model_probability=0.60, ask=0.51)
+    result = _live_buyer(tmp_path).evaluate_and_execute([row])
+    assert FakeExecutor.executed == []
+    assert result.rejected_budget == 1
+
+
+def _caps_state() -> dict[str, Any]:
+    return {**_state([OPERATOR_COHORTS_FINAL[0], _entry()], enabled=True), "whitelist_models": []}
+
+
+def _caps_rows() -> list[dict[str, Any]]:
+    return [
+        _row(SPREAD_V7, pick_id="spread9", event="g1", edge="0.09", model_probability=0.60, ask=0.51),
+        _row(
+            ML_V7M,
+            pick_id="ml15",
+            event="g4",
+            market="moneyline",
+            edge="0.15",
+            model_probability=0.55,
+            ask=0.40,
+        ),
+    ]
+
+
+def _today_row(**fields: Any) -> dict[str, Any]:
+    now = iso_utc(utc_now())
+    return {
+        "pick_id": "prior",
+        "event_id": "other",
+        "selection": "home",
+        "market_type": "spread",
+        "status": "settled",
+        "executed_at_utc": now,
+        **fields,
+    }
+
+
+@pytest.mark.parametrize(
+    ("book", "prior", "live_bought", "paper_bought", "reason"),
+    [
+        ("live", {"cost_usd": 250.0}, False, True, "rejected_budget"),
+        (
+            "live",
+            {"settled_at_utc": "NOW", "result": "loss", "pnl_usd": -250.0},
+            False,
+            True,
+            "rejected_daily_loss_breaker",
+        ),
+        ("paper", {"cost_usd": 250.0}, True, False, "rejected_budget"),
+    ],
+)
+def test_caps_and_breaker_are_per_book(monkeypatch, tmp_path, book, prior, live_bought, paper_bought, reason):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    prior = {k: (iso_utc(utc_now()) if v == "NOW" else v) for k, v in prior.items()}
+    root = tmp_path if book == "live" else tmp_path / "paper_auto_buyer"
+    _write_ledger(root / "auto_buyer_ledger.jsonl", [_today_row(**prior)])
+    _cycle_harness(monkeypatch, tmp_path, _caps_state(), _caps_rows())
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert bool(FakeExecutor.executed) is live_bought
+    paper = [r["pick_id"] for r in _ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")]
+    assert ("ml15" in paper) is paper_bought
+    blocked = "live" if book == "live" else "paper"
+    assert summary["cohort_passes"][blocked][reason] >= 1
+
+
+def test_dedup_is_per_book_for_cohort_passes(monkeypatch, tmp_path):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            {
+                "pick_id": "live-old",
+                "event_id": "g1",
+                "selection": "home",
+                "market_type": "spread",
+                "status": "open",
+                "cost_usd": 10.0,
+                "shares": 20,
+                "market_slug": "asc-cbb-g1-2026-11-25-neg-3pt5",
+                "token_side": "long",
+            }
+        ],
+    )
+    _write_ledger(
+        tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl",
+        [
+            {
+                "pick_id": "paper-old",
+                "event_id": "g2",
+                "selection": "home",
+                "market_type": "moneyline",
+                "status": "open",
+                "cost_usd": 10.0,
+                "shares": 20,
+                "market_slug": "aec-cbb-g2-2026-11-25",
+                "token_side": "long",
+            }
+        ],
+    )
+    rows = [
+        _row(
+            ML_V7M,
+            pick_id="ml-g1",
+            event="g1",
+            market="moneyline",
+            edge="0.15",
+            model_probability=0.55,
+            ask=0.40,
+        ),
+        _row(SPREAD_V7, pick_id="spread-g2", event="g2", edge="0.09", model_probability=0.60, ask=0.51),
+    ]
+    # Before the cycle adds its own fills: the legacy index reads both books, a cohort book its own.
+    legacy = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(), audit=AuditLog(tmp_path / "audit.jsonl"), data_root=tmp_path
+    )._build_bought_index()
+    assert {("g1", "home"), ("g2", "home")} <= legacy["event_selections"]
+    own = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(mode="paper", dedup_own_ledger_only=True),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        data_root=tmp_path,
+    )._build_bought_index()
+    assert ("g2", "home") in own["event_selections"]
+    assert ("g1", "home") not in own["event_selections"]
+    _cycle_harness(monkeypatch, tmp_path, _caps_state(), rows)
+    auto_executor.run_auto_buyer_cycle()
+    assert [t.pick_id for t, _ in FakeExecutor.executed] == ["spread-g2"]
+    paper = [r["pick_id"] for r in _ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")]
+    assert "ml-g1" in paper
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_preview_has_no_side_effects(monkeypatch, tmp_path, enabled):
+    recorded: list[Any] = []
+    monkeypatch.setattr(auto_buyer_ledger, "record_auto_buy_execution", lambda *a, **k: recorded.append(1))
+    later = _row(
+        SPREAD_V7,
+        pick_id="later",
+        event="g9",
+        edge="0.09",
+        model_probability=0.60,
+        ask=0.51,
+        start_minutes=180,
+    )
+    state = {**_state(OPERATOR_COHORTS_FINAL, enabled=enabled), "whitelist_models": [NBA_SPREAD]}
+    calls = _cycle_harness(monkeypatch, tmp_path, state, [*_mixed_four_rows(), later])
+    summary = auto_executor.run_auto_buyer_cycle(preview=True)
+    assert FakeExecutor.constructed == 0
+    assert FakeExecutor.executed == []
+    assert recorded == []
+    assert calls["reconciled"] == [] and calls["settled"] == []
+    assert calls["saved"] == [] and calls["history"] == []
+    assert summary["preview"] is True
+    live_orders = summary["cohort_passes"]["live"]["orders"]
+    assert summary["cohort_passes"]["live"]["mode"] == "LIVE_PREVIEW"
+    assert sorted(o["pick_id"] for o in live_orders) == ["spread9", "total6"]
+    assert all(not o["model_id"].startswith("nba-") for o in live_orders)
+    assert sorted(o["pick_id"] for o in summary["cohort_passes"]["paper"]["orders"]) == ["ml15", "nba13"]
+    assert all(c.execute_live is False for c in calls["configs"])
+
+    widened = auto_executor.run_auto_buyer_cycle(preview=True, preview_lookahead_hours=12)
+    assert "later" in [o["pick_id"] for o in widened["cohort_passes"]["live"]["orders"]]
+    assert all(c.capture_missing_slates is False for c in calls["configs"][-3:])
+    assert FakeExecutor.executed == [] and recorded == [] and calls["saved"] == []
+
+
+def test_wiped_state_is_paper_with_no_cohorts(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        auto_executor, "AUTO_BUYER_STATE_FILE", tmp_path / "missing" / "auto_buyer_state.json"
+    )
+    state = auto_executor.load_auto_buyer_state()
+    assert state["mode"] == "paper"
+    assert "cohorts" not in state
+    assert _parse_cohorts(state).active == ()
+    default = AutoExecutionConfig()
+    assert default.cohorts == () and default.execute_live is False
+
+
+def test_fallback_buyer_from_governed_live_state_is_paper(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        auto_executor,
+        "load_auto_buyer_state",
+        lambda: _state(OPERATOR_COHORTS_FINAL, enabled=True, mode="live"),
+    )
+    buyer = AutoPolymarketBuyer(data_root=tmp_path)
+    assert buyer.config.execute_live is False
+    assert buyer.config.mode == "paper"
+    assert buyer.config.cohorts == ()

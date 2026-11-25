@@ -588,6 +588,17 @@ def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionCo
     )
 
 
+def _game_key(row: dict[str, Any]) -> str:
+    """One key per game across markets: event id, else the away/home/date matchup."""
+    event_id = str(row.get("event_id") or "").strip()
+    if event_id:
+        return f"event:{event_id}"
+    away = str(row.get("away_team") or "").strip().lower()
+    home = str(row.get("home_team") or "").strip().lower()
+    start = str(row.get("event_start_utc") or "")[:10]
+    return f"matchup:{away}|{home}|{start}" if away and home and start else ""
+
+
 def _row_in_cohort(row: dict[str, Any], cohort: BuyCohort) -> bool:
     """True when a saved pick row belongs to ``cohort``, with decision-time quote evidence."""
     if str(row.get("model_id") or row.get("model_version") or "") != cohort.model_id:
@@ -1269,6 +1280,7 @@ def _cohort_pass_config(
     cohorts: tuple[BuyCohort, ...],
     mode: str,
     execute_live: bool,
+    **overrides: Any,
 ) -> AutoExecutionConfig:
     """One book's cohort pass: whitelists nothing, so only its own cohorts can buy. A fresh ask
     (300 s, live refresh) measures the live-ask edge window in either book."""
@@ -1277,6 +1289,7 @@ def _cohort_pass_config(
             **_base_auto_execution_kwargs_from_state(state),
             "whitelisted_models": (),
             "ncaab_spread_v6_live_bucket": None,
+            **overrides,
         },
         **_cycle_gate_kwargs(state),
         cohorts=cohorts,
@@ -1310,16 +1323,77 @@ def _cohort_pass_summary(
     }
 
 
+def _record_paper_fills(orders: list[dict[str, Any]]) -> None:
+    """Record dry-run orders as paper fills in the shared paper ledger.
+
+    Paper fills are recorded as immediately, fully filled at the requested
+    limit price -- there's no real order book to rest on, so "what would
+    have happened" is the simulated fact here. Persisted at the cycle layer
+    (not inside AutoPolymarketBuyer) so direct/unit-test construction of
+    the buyer never has a filesystem side effect.
+    """
+    from .auto_buyer_ledger import record_auto_buy_execution
+
+    PAPER_AUTO_BUYER_DATA_ROOT.mkdir(parents=True, exist_ok=True)
+    for preview in orders:
+        pick_id = str(preview.get("pick_id") or "")
+        paper_order_id = f"PAPER-{pick_id}" if pick_id else f"PAPER-{preview.get('market_slug', '')}"
+        paper_payload = {
+            **preview,
+            "order_id": paper_order_id,
+            "order_ids": [paper_order_id],
+            "fill_known": True,
+        }
+        try:
+            record_auto_buy_execution(
+                paper_payload,
+                order_id=paper_order_id,
+                order_state="ORDER_STATE_FILLED",
+                pick_row=paper_payload,
+                jsonl_path=PAPER_AUTO_BUYER_DATA_ROOT / "auto_buyer_ledger.jsonl",
+                xlsx_path=PAPER_AUTO_BUYER_DATA_ROOT / "auto_buyer_picks.xlsx",
+            )
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+            logger.warning("Failed to record paper trade for %s: %s", pick_id, exc)
+
+
+def _preview_pass_overrides(preview: bool, preview_lookahead_hours: float | None) -> dict[str, Any]:
+    """Config overrides a preview applies to every pass for that call only.
+
+    A widened lookahead also turns slate capture off: a 12-hour capture burst takes minutes and
+    meets the gateway 429 limit, so rows whose contracts are not already in the snapshot files
+    show as unmapped. A default-lookahead preview still captures missing snapshot slates (market
+    data only) and, never executing, does not read exchange positions into the dedup index.
+    """
+    if not preview or preview_lookahead_hours is None:
+        return {}
+    try:
+        hours = float(preview_lookahead_hours)
+    except (TypeError, ValueError):
+        return {}
+    if not math.isfinite(hours) or hours <= 0:
+        return {}
+    return {"max_event_lookahead_hours": hours, "capture_missing_slates": False}
+
+
 def run_auto_buyer_cycle(
     execute_override: bool | None = None,
     forecast_date: str | None = None,
     force: bool = False,
+    *,
+    preview: bool = False,
+    preview_lookahead_hours: float | None = None,
 ) -> dict[str, Any]:
     """Run one cycle of the Auto-Buyer based on saved configuration.
 
     Evaluates all open forecast picks and executes qualifying whitelisted orders,
     with fail-closed deduplication ensuring already-bought events are never re-purchased
     across multiple daily runs (e.g. 12:30 AM and 12:00 PM schedules).
+
+    With cohorts in the state file one cycle runs up to three passes, each its own book with its
+    own caps: the live cohort pass, the legacy whitelist pass (paper whenever a ``cohorts`` key
+    exists), and the paper cohort pass. ``preview=True`` places no order, records no paper fill,
+    runs no reconcile or settle, saves no state and appends no history.
     """
     state = load_auto_buyer_state()
     mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
@@ -1333,14 +1407,19 @@ def run_auto_buyer_cycle(
     governed = COHORTS_STATE_KEY in state
     parsed_cohorts = _parse_cohorts(state)
     live_cohorts = tuple(c for c in parsed_cohorts.active if c.mode == "live")
+    paper_cohorts = tuple(c for c in parsed_cohorts.active if c.mode == "paper")
     global_mode = "paper" if governed else mode
     wants_execution = cycle_enabled if execute_override is None else bool(execute_override)
     # Explicit execution can request a one-off live cycle, but can never
     # override PAPER mode. Changing the saved mode is a separate action.
-    should_execute = global_mode == "live" and wants_execution
+    should_execute = global_mode == "live" and wants_execution and not preview
     # `enabled: false` in the state file is the cohorts' kill switch: execute_override=True never
     # bypasses it (the legacy ungoverned pass keeps its override semantics above).
-    cohort_live_execute = bool(live_cohorts) and cycle_enabled and execute_override is not False
+    cohort_live_execute = (
+        bool(live_cohorts) and cycle_enabled and execute_override is not False and not preview
+    )
+    record_paper = cycle_enabled and not preview
+    pass_overrides = _preview_pass_overrides(preview, preview_lookahead_hours)
 
     # Reconcile resting orders, update fills, and cancel stale/moved orders before evaluating new picks
     reconciliation_summary: dict[str, Any] = {}
@@ -1356,7 +1435,8 @@ def run_auto_buyer_cycle(
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
             raise RuntimeError("Live auto-buyer stopped: pre-cycle reconciliation failed") from exc
-    elif cycle_enabled and global_mode == "paper":
+    # Not an elif of the live branch: a live cohort and paper books can run in one cycle.
+    if record_paper and (global_mode == "paper" or paper_cohorts):
         try:
             from .auto_buyer_ledger import settle_auto_buyer_ledger
 
@@ -1365,24 +1445,25 @@ def run_auto_buyer_cycle(
             logger.warning("Pre-cycle paper-ledger settlement failed: %s", exc)
 
     cohort_passes: dict[str, Any] = {}
-    cohort_picks = _read_cohort_candidate_picks() if live_cohorts else []
+    cohort_picks = _read_cohort_candidate_picks() if (live_cohorts or paper_cohorts) else []
     if live_cohorts:
         # First, so the live book is evaluated before any paper fill of this cycle exists.
         live_config = _cohort_pass_config(
-            state, cohorts=live_cohorts, mode="live", execute_live=cohort_live_execute
+            state, cohorts=live_cohorts, mode="live", execute_live=cohort_live_execute, **pass_overrides
         )
         live_res = AutoPolymarketBuyer(config=live_config).evaluate_and_execute(
             [dict(r) for r in cohort_picks]
         )
+        if preview:
+            live_label = "LIVE_PREVIEW"
+        else:
+            live_label = "LIVE_EXECUTION" if cohort_live_execute else "LIVE_DRY_RUN"
         cohort_passes["live"] = _cohort_pass_summary(
-            "LIVE_EXECUTION" if cohort_live_execute else "LIVE_DRY_RUN",
-            live_cohorts,
-            live_res,
-            executing=cohort_live_execute,
+            live_label, live_cohorts, live_res, executing=cohort_live_execute
         )
 
     config = AutoExecutionConfig(
-        **_base_auto_execution_kwargs_from_state(state),
+        **{**_base_auto_execution_kwargs_from_state(state), **pass_overrides},
         **_cycle_gate_kwargs(state),
         require_model_timestamp=True,
         execute_live=should_execute,
@@ -1403,37 +1484,28 @@ def run_auto_buyer_cycle(
     buyer = AutoPolymarketBuyer(config=config)
     res = buyer.evaluate_and_execute()
 
-    if not should_execute and cycle_enabled and global_mode == "paper":
-        # Paper fills are recorded as immediately, fully filled at the requested
-        # limit price -- there's no real order book to rest on, so "what would
-        # have happened" is the simulated fact here. Persisted at this layer
-        # (not inside AutoPolymarketBuyer) so direct/unit-test construction of
-        # the buyer never has a filesystem side effect.
-        from .auto_buyer_ledger import record_auto_buy_execution
+    if not should_execute and record_paper and global_mode == "paper":
+        _record_paper_fills(res.dry_run_orders)
 
-        PAPER_AUTO_BUYER_DATA_ROOT.mkdir(parents=True, exist_ok=True)
-        for preview in res.dry_run_orders:
-            pick_id = str(preview.get("pick_id") or "")
-            paper_order_id = f"PAPER-{pick_id}" if pick_id else f"PAPER-{preview.get('market_slug', '')}"
-            paper_payload = {
-                **preview,
-                "order_id": paper_order_id,
-                "order_ids": [paper_order_id],
-                "fill_known": True,
-            }
-            try:
-                record_auto_buy_execution(
-                    paper_payload,
-                    order_id=paper_order_id,
-                    order_state="ORDER_STATE_FILLED",
-                    pick_row=paper_payload,
-                    jsonl_path=PAPER_AUTO_BUYER_DATA_ROOT / "auto_buyer_ledger.jsonl",
-                    xlsx_path=PAPER_AUTO_BUYER_DATA_ROOT / "auto_buyer_picks.xlsx",
-                )
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
-                logger.warning("Failed to record paper trade for %s: %s", pick_id, exc)
+    if paper_cohorts:
+        # After the global pass recorded its paper fills, so this book's dedup sees them.
+        paper_config = _cohort_pass_config(
+            state, cohorts=paper_cohorts, mode="paper", execute_live=False, **pass_overrides
+        )
+        paper_res = AutoPolymarketBuyer(config=paper_config).evaluate_and_execute(
+            [dict(r) for r in cohort_picks]
+        )
+        if record_paper:
+            _record_paper_fills(paper_res.dry_run_orders)
+        if preview:
+            paper_label = "PAPER_PREVIEW"
+        else:
+            paper_label = "PAPER_TRADING" if record_paper else "PAPER_DRY_RUN"
+        cohort_passes["paper"] = _cohort_pass_summary(paper_label, paper_cohorts, paper_res, executing=False)
 
-    if should_execute:
+    if preview:
+        run_mode_label = "PREVIEW"
+    elif should_execute:
         run_mode_label = "LIVE_EXECUTION"
     elif cycle_enabled and global_mode == "paper":
         run_mode_label = "PAPER_TRADING"
@@ -1476,20 +1548,31 @@ def run_auto_buyer_cycle(
         "snapshot_captures": res.snapshot_captures,
         "reconciliation": reconciliation_summary,
         "global_pass_mode": global_mode,
+        "preview": preview,
         "cohorts_governed": governed,
         "cohort_config_errors": list(parsed_cohorts.errors),
         "cohorts_active": [c.label for c in parsed_cohorts.active],
         "cohort_passes": cohort_passes,
     }
 
-    history_path = (
-        PAPER_AUTO_BUYER_DATA_ROOT / "logs" / "auto_buyer_cycle_history.jsonl"
-        if global_mode == "paper"
-        else AUTO_BUYER_CYCLE_HISTORY_PATH
-    )
+    if preview:
+        return run_summary
+
+    paper_history_path = PAPER_AUTO_BUYER_DATA_ROOT / "logs" / "auto_buyer_cycle_history.jsonl"
     _append_auto_buyer_cycle_history(
-        {k: v for k, v in run_summary.items() if k != "cohort_passes"}, history_path=history_path
+        {**{k: v for k, v in run_summary.items() if k != "cohort_passes"}, "pass": "global"},
+        history_path=paper_history_path if global_mode == "paper" else AUTO_BUYER_CYCLE_HISTORY_PATH,
     )
+    for book, pass_summary in cohort_passes.items():
+        _append_auto_buyer_cycle_history(
+            {
+                "executed_at_utc": run_summary["executed_at_utc"],
+                "forecast_date": forecast_date,
+                "pass": f"cohort_{book}",
+                **pass_summary,
+            },
+            history_path=AUTO_BUYER_CYCLE_HISTORY_PATH if book == "live" else paper_history_path,
+        )
 
     state["last_run"] = run_summary
     if forecast_date:
@@ -1627,6 +1710,10 @@ class AutoPolymarketBuyer:
             state_mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
             if state_mode not in AUTO_BUYER_MODES:
                 state_mode = DEFAULT_AUTO_BUYER_MODE
+            if COHORTS_STATE_KEY in state:
+                # The fallback never runs cohort passes, and the legacy whitelist never trades
+                # live while cohorts exist.
+                state_mode = "paper"
             state_should_execute = bool(state.get("enabled", False)) and state_mode == "live"
             self.config = AutoExecutionConfig(
                 **_base_auto_execution_kwargs_from_state(state),
@@ -1761,6 +1848,12 @@ class AutoPolymarketBuyer:
             (self.data_root / "auto_buyer_ledger.jsonl", "live_auto_buyer_ledger"),
             (self.paper_data_root / "auto_buyer_ledger.jsonl", "paper_auto_buyer_ledger"),
         ]
+        if self.config.dedup_own_ledger_only:
+            # Cohort books are separate (a model sits in one window per market; overlaps are
+            # rejected at parse), while `event_selections` keys home/away across markets, so one
+            # book's fills would block the other book's cohort on the same game and side.
+            auto_ledger_files = [auto_ledger_files[0] if self.config.mode == "live" else auto_ledger_files[1]]
+        game_exposure: dict[str, dict[str, float]] = {}
         for auto_ledger_file, source_label in auto_ledger_files:
             if not auto_ledger_file.exists():
                 continue
@@ -1782,6 +1875,15 @@ class AutoPolymarketBuyer:
                         or (result_st == "void" and shares_cnt == 0)
                     ):
                         continue
+
+                    game = _game_key(r)
+                    if game:
+                        exposure = float(r.get("cost_usd") or 0.0) + float(
+                            r.get("fallback_resting_shares") or 0.0
+                        ) * float(r.get("entry_price") or 0.0)
+                        by_pick = game_exposure.setdefault(game, {})
+                        pick_key = str(r.get("pick_id") or r.get("order_id") or "")
+                        by_pick[pick_key] = by_pick.get(pick_key, 0.0) + exposure
 
                     pid = str(r.get("pick_id") or "")
                     slug = str(r.get("market_slug") or "")
@@ -1924,6 +2026,7 @@ class AutoPolymarketBuyer:
             "partially_filled_market_sides": partially_filled_market_sides,
             "partially_filled_event_selections": partially_filled_event_selections,
             "partially_filled_slugs": partially_filled_slugs,
+            "game_exposure": game_exposure,
         }
 
     def _get_partial_fill_info(
@@ -2520,6 +2623,21 @@ class AutoPolymarketBuyer:
             raw_units = float(row.get("units") or row.get("display_units") or 1.0)
             target_spend = raw_units * self.config.unit_value_usd
             target_spend = min(target_spend, self.config.max_game_stake_usd)
+            # Cohort books cap a game, not an order (operator directive 2026-11-25): the live spread
+            # and total cohorts on one game share max_game_stake_usd with this book's earlier fills.
+            game = _game_key(row) if self.config.cohorts else ""
+            game_other_spend = 0.0
+            if game:
+                game_other_spend = sum(
+                    cost
+                    for key, cost in bought_index.get("game_exposure", {}).get(game, {}).items()
+                    if key != pick_id
+                )
+                game_room = round(self.config.max_game_stake_usd - game_other_spend, 2)
+                if game_room < 0.50:
+                    result.rejected_budget += 1
+                    continue
+                target_spend = min(target_spend, game_room)
 
             # Optional edge-scaled sizing (on by default since f9d077e0; see
             # edge_scaled_sizing_enabled).
@@ -2575,6 +2693,9 @@ class AutoPolymarketBuyer:
 
             # Daily budget check
             if current_spend + actual_cost > self.config.max_daily_spend_usd:
+                result.rejected_budget += 1
+                continue
+            if game and game_other_spend + actual_cost > self.config.max_game_stake_usd + 0.10:
                 result.rejected_budget += 1
                 continue
 
@@ -2650,6 +2771,10 @@ class AutoPolymarketBuyer:
                     bought_index.setdefault("matchup_selections", set()).add((*m_key, selection.lower()))
             bought_index["held_slugs"].add(market_slug)
             bought_index.setdefault("held_events", set()).add(event_key_from_slug(market_slug))
+            if game:
+                # Requested cost, not filled: an IOC remainder can still rest and fill.
+                game_picks = bought_index.setdefault("game_exposure", {}).setdefault(game, {})
+                game_picks[pick_id] = game_picks.get(pick_id, 0.0) + actual_cost
             if "partially_filled" in bought_index and pick_id in bought_index["partially_filled"]:
                 del bought_index["partially_filled"][pick_id]
 
