@@ -202,6 +202,23 @@ def is_manual_auto_buyer_record(record: dict[str, Any]) -> bool:
     return str(record.get("model_id") or "").strip().lower() == "manual"
 
 
+def is_fallback_submit_unknown(record: dict[str, Any]) -> bool:
+    """An open row whose IOC-remainder (GTD fallback) POST has an unknown outcome.
+
+    The remainder may rest or fill on the exchange, but there is no order id to reconcile it, so the
+    row is neither reconciled nor a top-up-eligible partial, and settlement leaves it open. The
+    operator resolves it: find the order and set ``fallback_order_id`` (reconciliation then takes
+    over), or confirm none exists and set ``fallback_submit_unknown`` False. Rows written before the
+    flag existed are recognised by ``fallback_status`` alone.
+    """
+    if record.get("fallback_order_id") or str(record.get("status") or "open").lower() != "open":
+        return False
+    flag = record.get("fallback_submit_unknown")
+    if flag is not None:
+        return flag is True
+    return record.get("fallback_status") == "submit_unknown"
+
+
 def _uses_live_auto_buyer_ledger(path: Path) -> bool:
     """Return whether a writer targets the production Auto-Buyer ledger.
 
@@ -360,6 +377,9 @@ def record_auto_buy_execution(
     # of, so repeated reconciliation runs stay idempotent.
     fallback_order_id = order_payload.get("fallback_order_id") or None
     fallback_resting_shares = round(float(order_payload.get("fallback_resting_shares") or 0.0), 4)
+    # The remainder POST went out but its outcome is unknown: it may rest or fill with no id to track.
+    fallback_unknown = not fallback_order_id and order_payload.get("fallback_status") == "submit_unknown"
+    fallback_reconciled = not fallback_order_id and not fallback_unknown
 
     # Top-up remainder handling: update existing position row instead of appending duplicate pick row.
     # An unknown submission is never merged: it gets its own row, so the filled row stays truthful and
@@ -403,15 +423,21 @@ def record_auto_buy_execution(
             rec["primary_filled_cost_usd"] = total_cost
             rec["fallback_order_id"] = fallback_order_id
             rec["fallback_resting_shares"] = fallback_resting_shares
-            rec["fallback_reconciled"] = not bool(fallback_order_id)
+            rec["fallback_reconciled"] = fallback_reconciled
             rec["fill_known"] = bool(order_payload.get("fill_known", True))
+            # The fallback fields now describe the top-up's own legs.
+            for field_name in _EXECUTION_PASSTHROUGH_FIELDS:
+                if order_payload.get(field_name) is not None:
+                    rec[field_name] = order_payload[field_name]
+            if fallback_unknown:
+                rec["fallback_submit_unknown"] = True
 
             target_spend = float(
                 order_payload.get("target_spend") or (float(rec.get("model_units") or 1.0) * unit_val)
             )
             if (
                 total_cost >= target_spend - 0.10 or order_state == "ORDER_STATE_FILLED"
-            ) and not fallback_order_id:
+            ) and fallback_reconciled:
                 rec["order_state"] = "ORDER_STATE_FILLED"
             elif total_shares > 0:
                 rec["order_state"] = "ORDER_STATE_PARTIALLY_FILLED"
@@ -495,7 +521,7 @@ def record_auto_buy_execution(
         "rationale": f"Auto-Buyer order {oid} on {slug} ({side})",
         "fallback_order_id": fallback_order_id,
         "fallback_resting_shares": fallback_resting_shares,
-        "fallback_reconciled": not bool(fallback_order_id),
+        "fallback_reconciled": fallback_reconciled,
         "fill_known": bool(order_payload.get("fill_known", True)),
         "primary_filled_shares": round(shares, 4),
         "primary_filled_cost_usd": round(cost, 4),
@@ -503,6 +529,8 @@ def record_auto_buy_execution(
     for field_name in _EXECUTION_PASSTHROUGH_FIELDS:
         if order_payload.get(field_name) is not None:
             jsonl_record[field_name] = order_payload[field_name]
+    if fallback_unknown:
+        jsonl_record["fallback_submit_unknown"] = True
     if submit_unknown:
         # The exchange may or may not hold this order: no id, nothing known filled, and the
         # requested cost kept so dedup and the caps still count it. Only the operator resolves it.
@@ -1642,8 +1670,11 @@ def settle_auto_buyer_ledger(
             r["pnl_units"] = _usd_to_auto_buyer_units(float(r.get("pnl_usd") or 0.0), unit_value_usd)
 
         # An unknown submission is never settled or voided here: whether the order exists is
-        # unknown, so it stays open (and counted pending) until the operator resolves it.
-        if r.get("submit_unknown") is True and str(r.get("status") or "").lower() == "open":
+        # unknown, so it stays open (and counted pending) until the operator resolves it. The same
+        # holds for an unknown fallback leg: settling on the IOC shares alone would miss a GTD fill.
+        if str(r.get("status") or "").lower() == "open" and (
+            r.get("submit_unknown") is True or is_fallback_submit_unknown(r)
+        ):
             pending_count += 1
             updated_records.append(r)
             continue

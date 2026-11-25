@@ -38,7 +38,7 @@ from model_prediction.data_sources.polymarket_execute import (
     PolymarketExecutor,
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
-from model_prediction.portfolio.auto_buyer_ledger import event_key_from_slug
+from model_prediction.portfolio.auto_buyer_ledger import event_key_from_slug, is_fallback_submit_unknown
 from model_prediction.runtime_paths import RuntimePaths, load_dotenv_into_environ
 
 _paths = RuntimePaths.resolve()
@@ -925,7 +925,7 @@ def _resting_fallback_cost(row: dict[str, Any]) -> float:
     try:
         if row.get("submit_unknown") is True and str(row.get("status") or "open").lower() == "open":
             cost = float(row.get("requested_cost_usd") or 0.0)
-        elif row.get("fallback_status") == "submit_unknown" and not row.get("fallback_order_id"):
+        elif is_fallback_submit_unknown(row):
             cost = float(row.get("fallback_resting_shares") or 0.0) * float(row.get("entry_price") or 0.0)
         elif not row.get("fallback_order_id") or row.get("fallback_reconciled"):
             return 0.0
@@ -959,8 +959,9 @@ def _alarm(
 
 
 def _live_book_has_pending_orders(ledger_path: Path) -> bool:
-    """Same selection as ``reconcile_pending_auto_buyer_fallbacks``: an unreconciled resting fallback,
-    or an open row whose fill is unknown. An unreadable ledger counts as pending (manage the book)."""
+    """An unreconciled resting fallback, an open row whose fill is unknown (the selection
+    ``reconcile_pending_auto_buyer_fallbacks`` works on), or an open fallback leg whose outcome is
+    unknown. An unreadable ledger counts as pending (manage the book)."""
     from model_prediction.portfolio.auto_buyer_ledger import read_auto_buyer_ledger
 
     try:
@@ -970,6 +971,7 @@ def _live_book_has_pending_orders(ledger_path: Path) -> bool:
     return any(
         (row.get("fallback_order_id") and not row.get("fallback_reconciled"))
         or (str(row.get("status", "")).lower() == "open" and row.get("fill_known") is False)
+        or is_fallback_submit_unknown(row)
         for row in rows
     )
 
@@ -1919,6 +1921,9 @@ class AutoPolymarketBuyer:
         # exclusion below, so a top-up whose POST went unanswered can never be retried.
         unknown_pick_ids: set[str] = set()
         unknown_market_sides: set[tuple[str, str]] = set()
+        unknown_event_selections: set[tuple[str, str]] = set()
+        unknown_event_markets: set[tuple[str, str]] = set()
+        unknown_matchup_markets: set[tuple[str, str, str, str]] = set()
         # Audit payloads now carry event_id/selection/market_type (B4b). Those event-level keys
         # block a whole game, so they apply only to the live book (or the legacy shared index): a
         # live fill must never block a paper cohort's row (the 31d per-book dedup design).
@@ -1987,9 +1992,13 @@ class AutoPolymarketBuyer:
                     sel = str(payload.get("selection") or "").lower()
                     if ev_id and sel:
                         bought_event_selections.add((ev_id, sel))
+                        if unknown:
+                            unknown_event_selections.add((ev_id, sel))
                     mtype = str(payload.get("market_type") or "").lower()
                     if ev_id and mtype:
                         bought_event_markets.add((ev_id, mtype))
+                        if unknown:
+                            unknown_event_markets.add((ev_id, mtype))
 
         # 2. Dashboard orders file (dashboard/orders.json)
         dashboard_orders_file = _paths.repo_root / "dashboard" / "orders.json"
@@ -2066,12 +2075,31 @@ class AutoPolymarketBuyer:
                 from .auto_buyer_ledger import read_auto_buyer_ledger
 
                 for r in read_auto_buyer_ledger(auto_ledger_file):
-                    if r.get("submit_unknown") is True and str(r.get("status") or "").lower() == "open":
+                    # An unknown primary submission, or an unknown fallback leg (the remainder may
+                    # rest or fill with no id to track): never a top-up candidate, always blocked.
+                    fallback_unknown = is_fallback_submit_unknown(r)
+                    if fallback_unknown or (
+                        r.get("submit_unknown") is True and str(r.get("status") or "").lower() == "open"
+                    ):
                         unknown_pid = str(r.get("pick_id") or "")
                         if unknown_pid:
                             unknown_pick_ids.add(unknown_pid)
                         if r.get("market_slug") and r.get("token_side"):
                             unknown_market_sides.add((str(r["market_slug"]), str(r["token_side"]).lower()))
+                        unknown_ev = str(r.get("event_id") or "")
+                        unknown_sel = str(r.get("selection") or "").lower()
+                        unknown_mtype = str(r.get("market_type") or "").lower()
+                        if unknown_ev and unknown_sel:
+                            unknown_event_selections.add((unknown_ev, unknown_sel))
+                        if unknown_ev and unknown_mtype:
+                            unknown_event_markets.add((unknown_ev, unknown_mtype))
+                        unknown_away = str(r.get("away_team") or "").strip().lower()
+                        unknown_home = str(r.get("home_team") or "").strip().lower()
+                        unknown_start = str(r.get("event_start_utc") or "")[:10]
+                        if unknown_away and unknown_home and unknown_start and unknown_mtype:
+                            unknown_matchup_markets.add(
+                                (unknown_away, unknown_home, unknown_start, unknown_mtype.strip())
+                            )
                     # Per-game exposure before the dead-row filter below: a zero-fill primary whose
                     # IOC was cancelled can still have its fallback resting on the book.
                     game = _game_key(r)
@@ -2119,6 +2147,7 @@ class AutoPolymarketBuyer:
                         and not operator_sold
                         and order_st == "ORDER_STATE_PARTIALLY_FILLED"
                         and is_reconciled
+                        and not fallback_unknown
                         and shares_cnt > 0
                     ):
                         filled_cost = float(r.get("cost_usd") or 0.0)
@@ -2216,8 +2245,19 @@ class AutoPolymarketBuyer:
         held_slugs.difference_update(partially_filled_slugs)
         bought_pick_ids.update(unknown_pick_ids)
         bought_market_sides.update(unknown_market_sides)
-        for unknown_pid in unknown_pick_ids:
-            partially_filled.pop(unknown_pid, None)
+        bought_event_selections.update(unknown_event_selections)
+        bought_event_markets.update(unknown_event_markets)
+        bought_matchup_markets.update(unknown_matchup_markets)
+        # No top-up on anything an unknown order may already cover: same pick, market side or game side.
+        for pf_pid, info in list(partially_filled.items()):
+            if (
+                pf_pid in unknown_pick_ids
+                or (str(info.get("market_slug") or ""), str(info.get("token_side") or "").lower())
+                in unknown_market_sides
+                or (str(info.get("event_id") or ""), str(info.get("selection") or "").lower())
+                in unknown_event_selections
+            ):
+                del partially_filled[pf_pid]
 
         if failures:
             detail = "; ".join(f"{name}: {msg}" for name, msg in failures)

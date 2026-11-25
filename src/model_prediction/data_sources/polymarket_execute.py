@@ -95,6 +95,28 @@ def _format_good_till_time(value: datetime) -> str:
     return value.astimezone(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _earliest_event_start(pick_row: dict[str, Any], live_snapshot: dict[str, Any] | None) -> datetime | None:
+    """The earlier of the row's and the exchange's event start; None when neither parses."""
+    starts: list[datetime] = []
+    for raw in (pick_row.get("event_start_utc"), (live_snapshot or {}).get("event_start_utc")):
+        with suppress(TypeError, ValueError):
+            starts.append(parse_utc(str(raw or "")))
+    return min(starts) if starts else None
+
+
+def _describe_prior_buy(event: dict[str, Any]) -> str:
+    """Name the audit event that blocks a second buy: an order, an unknown outcome, or a dangling intent."""
+    payload = event.get("payload") or {}
+    event_type = str(event.get("event_type") or "")
+    if event_type == "order_executed":
+        return f"order {payload.get('order_id')} at {payload.get('submitted_at_utc')}"
+    intent_id = payload.get("intent_id") or "unrecorded"
+    if event_type == "order_submit_unknown":
+        return f"order_submit_unknown for intent {intent_id}; the order may exist, check the exchange"
+    created = payload.get("created_at_utc") or event.get("occurred_at_utc") or "an unrecorded time"
+    return f"order_intent {intent_id} created at {created} with no recorded outcome"
+
+
 def _response_order_id(response: Any) -> str | None:
     if not isinstance(response, dict):
         return None
@@ -446,9 +468,9 @@ class PolymarketExecutor:
         # Injectable so tests can supply a fake quote without a real network
         # call or a live Polymarket US account; defaults to the real client.
         self._live_quote = live_quote
-        # (Idempotency-Key, leg) for the order POST in flight. An attribute rather than a _request
-        # argument so the 3-positional-argument _request fakes in the tests keep working.
-        self._order_post_context: tuple[str, str] | None = None
+        # (Idempotency-Key, leg, event start) for the order POST in flight. An attribute rather than a
+        # _request argument so the 3-positional-argument _request fakes in the tests keep working.
+        self._order_post_context: tuple[str, str, datetime | None] | None = None
 
     # ------------------------------------------------------------------ gate
 
@@ -523,8 +545,7 @@ class PolymarketExecutor:
             if prior_buy is not None:
                 raise ExecutionGateError(
                     f"REFUSED: a buy order was already submitted for pick {ticket.pick_id} "
-                    f"(order {prior_buy['payload'].get('order_id')} at "
-                    f"{prior_buy['payload'].get('submitted_at_utc')}); single_order policy "
+                    f"({_describe_prior_buy(prior_buy)}); single_order policy "
                     "refuses a second buy against the same pick. Use `sell-position` or "
                     "`execute --action sell` to close the existing position, not to accumulate."
                 )
@@ -643,6 +664,7 @@ class PolymarketExecutor:
                 idempotency_key=primary_key,
                 fallback_idempotency_key=fallback_key,
                 live_snapshot=live_snapshot,
+                event_start=_earliest_event_start(pick_row, live_snapshot),
             )
         except ExecutionGateError as error:
             with suppress(*_AUDIT_ERRORS):
@@ -901,14 +923,16 @@ class PolymarketExecutor:
         Resent with the same key only when nothing reached the exchange (a connect-phase error, or a
         429 from the edge, which rejects before the API). Anything else that leaves the outcome open
         raises ``OrderSubmitUnknownError`` at once, unless ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY.
-        A definite 4xx is REFUSED.
+        A definite 4xx is REFUSED. Once any attempt was ambiguous, no later attempt can make the
+        outcome REFUSED: that reads as "nothing was sent" and frees the pick for a second buy. No
+        resend goes out once the event has started.
         """
         context = self._order_post_context
         if context is None or not context[0]:
             raise ExecutionGateError(
                 "REFUSED: an order POST must carry an Idempotency-Key; nothing was sent."
             )
-        key, leg = context
+        key, leg, event_start = context
         market_slug = str((payload or {}).get("marketSlug") or "")
         max_attempts = 3
         backoff = 0.5
@@ -916,6 +940,11 @@ class PolymarketExecutor:
         for attempt in range(max_attempts):
             final_attempt = attempt == max_attempts - 1
             retry_ambiguous = ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY and not final_attempt
+            if attempt > 0 and event_start is not None and utc_now() >= event_start:
+                # The back-off outlasted the pregame window: the resend must not go out.
+                raise last_unknown or ExecutionGateError(
+                    f"REFUSED: the event started before the {leg} order could be resent; it was never sent."
+                )
             try:
                 response = httpx.request(
                     "POST",
@@ -928,6 +957,8 @@ class PolymarketExecutor:
                 if not final_attempt:
                     time.sleep(backoff * (2**attempt))
                     continue
+                if last_unknown is not None:
+                    raise last_unknown from error
                 raise ExecutionGateError(
                     f"REFUSED: could not connect to Polymarket US ({type(error).__name__}); the order was never sent."
                 ) from error
@@ -949,11 +980,11 @@ class PolymarketExecutor:
                 if not final_attempt:
                     time.sleep(backoff * (2**attempt))
                     continue
-                raise ExecutionGateError(
+                raise last_unknown or ExecutionGateError(
                     f"REFUSED by Polymarket US (429): rate limited on every attempt: {body_text}"
                 )
             if 400 <= status < 500 and status != 409 and "ABORTED" not in body_text:
-                raise ExecutionGateError(f"REFUSED by Polymarket US ({status}): {body_text}")
+                raise last_unknown or ExecutionGateError(f"REFUSED by Polymarket US ({status}): {body_text}")
             output: Any = None
             if 200 <= status < 300:
                 try:
@@ -1060,6 +1091,7 @@ class PolymarketExecutor:
         idempotency_key: str | None = None,
         fallback_idempotency_key: str | None = None,
         live_snapshot: dict[str, Any] | None = None,
+        event_start: datetime | None = None,
     ) -> dict[str, Any]:
         """Submit a capped resting or immediately marketable limit order.
 
@@ -1105,7 +1137,7 @@ class PolymarketExecutor:
             return body
 
         def submit_order(body: dict[str, Any], key: str, leg: str) -> tuple[dict[str, Any], str]:
-            self._order_post_context = (key, leg)
+            self._order_post_context = (key, leg, event_start)
             try:
                 response = self._request("POST", _ORDER_POST_PATH, body)
             finally:

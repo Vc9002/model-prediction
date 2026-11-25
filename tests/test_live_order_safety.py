@@ -1365,3 +1365,406 @@ def test_audit_unknown_and_dangling_intent_block_live_dedup_but_rejected_does_no
     assert "dangling" in paper_index["pick_ids"]
     assert ("ev-d", "home") not in paper_index["event_selections"], "a live fill never blocks a paper game"
     assert ("ev-d", "spread") not in paper_index["event_markets"]
+
+
+# ------------------------------------------------------------------ review cycle 1
+
+
+def _switch_on(monkeypatch) -> None:
+    monkeypatch.setattr(pe, "ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY", True)
+
+
+@pytest.mark.parametrize(
+    "script",
+    [
+        pytest.param(
+            [httpx.ReadTimeout("lost"), httpx.ConnectError("down"), httpx.ConnectError("down")],
+            id="read-timeout-then-connect-errors",
+        ),
+        pytest.param([(502, {"error": "bad gateway"}), (429, {"e": 1}), (429, {"e": 1})], id="5xx-then-429s"),
+        pytest.param([httpx.ReadTimeout("lost"), (400, {"error": "duplicate"})], id="read-timeout-then-400"),
+    ],
+)
+def test_switch_on_a_refusal_after_an_ambiguous_attempt_stays_unknown(
+    tmp_path, exchange, monkeypatch, script
+):
+    """Review fix 2: once one attempt may have reached the exchange, no later attempt can turn the
+    outcome into "refused" (which would audit order_rejected and make the pick buyable again)."""
+    _switch_on(monkeypatch)
+    start = _start()
+    exchange.post_script = list(script)
+    with pytest.raises(pe.OrderSubmitUnknownError):
+        _executor(tmp_path, _snapshot(start)).execute(
+            _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+        )
+    assert len(exchange.order_posts()) == len(script)
+    assert len(_same_key_posts(exchange)) == 1
+    types = _audit_types(tmp_path)
+    assert "order_submit_unknown" in types
+    assert "order_rejected" not in types
+
+
+def test_switch_on_fallback_leg_refusal_after_ambiguity_is_unknown_not_rejected(
+    tmp_path, exchange, monkeypatch
+):
+    _switch_on(monkeypatch)
+    start = _start()
+    exchange.post_script = [exchange.default_post, httpx.ReadTimeout("lost"), (400, {"error": "duplicate"})]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+    )
+    posts = exchange.order_posts()
+    assert len(posts) == 3
+    assert posts[1]["headers"]["Idempotency-Key"] == posts[2]["headers"]["Idempotency-Key"]
+    assert result["fallback_status"] == "submit_unknown"
+    assert result["fallback_order_id"] is None
+    assert result["filled_size_shares"] == 4.0
+
+
+def _advancing_clock(monkeypatch, seconds_per_sleep: float) -> None:
+    """utc_now keeps running, and every retry back-off jumps it forward by ``seconds_per_sleep``."""
+    offset = [0.0]
+    monkeypatch.setattr(pe, "utc_now", lambda: utc_now() + timedelta(seconds=offset[0]))
+    monkeypatch.setattr(pe.time, "sleep", lambda *_a: offset.__setitem__(0, offset[0] + seconds_per_sleep))
+
+
+def test_no_resend_after_the_event_starts(tmp_path, exchange, monkeypatch):
+    """Review fix 4: a connect-phase failure sent nothing, but the resend after its back-off must not
+    go out once the event has started."""
+    start = _start(minutes=5)
+    _advancing_clock(monkeypatch, seconds_per_sleep=600)
+    exchange.ioc_fill = 10.0
+    exchange.post_script = [httpx.ConnectError("down")]
+    with pytest.raises(pe.ExecutionGateError) as caught:
+        _executor(tmp_path, _snapshot(start)).execute(
+            _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+        )
+    assert not isinstance(caught.value, pe.OrderSubmitUnknownError)
+    assert "never sent" in str(caught.value)
+    assert len(exchange.order_posts()) == 1
+    assert _audit_types(tmp_path)[-1] == "order_rejected"
+
+
+def test_no_resend_after_the_event_starts_keeps_an_earlier_unknown(tmp_path, exchange, monkeypatch):
+    _switch_on(monkeypatch)
+    start = _start(minutes=5)
+    _advancing_clock(monkeypatch, seconds_per_sleep=600)
+    exchange.post_script = [httpx.ReadTimeout("lost")]
+    with pytest.raises(pe.OrderSubmitUnknownError):
+        _executor(tmp_path, _snapshot(start)).execute(
+            _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+        )
+    assert len(exchange.order_posts()) == 1
+    assert "order_rejected" not in _audit_types(tmp_path)
+
+
+def test_resend_before_the_event_start_still_goes_out(tmp_path, exchange, monkeypatch):
+    start = _start(minutes=30)
+    _advancing_clock(monkeypatch, seconds_per_sleep=1)
+    exchange.ioc_fill = 10.0
+    exchange.post_script = [httpx.ConnectError("down")]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+    )
+    assert result["status"] == "submitted"
+    assert len(exchange.order_posts()) == 2
+
+
+def test_single_order_refusal_names_the_prior_event_and_intent(tmp_path, exchange):
+    """Review fix 5: the refusal read "order None at None" for an unknown or dangling intent."""
+    start = _start()
+    exchange.post_script = [httpx.ReadTimeout("lost")]
+    client = _executor(tmp_path, _snapshot(start))
+    with pytest.raises(pe.OrderSubmitUnknownError) as unknown:
+        client.execute(_ticket(start), _pick_row(start), execute_flag=True, user_command=True)
+    with pytest.raises(pe.ExecutionGateError, match="single_order policy refuses a second buy") as caught:
+        client.execute(_ticket(start), _pick_row(start), execute_flag=True, user_command=True)
+    message = str(caught.value)
+    assert "None" not in message
+    assert "order_submit_unknown" in message
+    assert unknown.value.intent_id in message
+
+    other = tmp_path / "other"
+    other.mkdir()
+    AuditLog(other / "audit.jsonl").append(
+        "order_intent",
+        "pick-1",
+        {"intent_id": "abc", "action": "buy", "created_at_utc": "2026-11-25T20:00:00Z"},
+    )
+    with pytest.raises(pe.ExecutionGateError, match="single_order") as dangling:
+        _executor(other, _snapshot(start)).execute(
+            _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+        )
+    assert "None" not in str(dangling.value)
+    assert "order_intent" in str(dangling.value)
+    assert "abc" in str(dangling.value)
+
+
+def _espn_final(away: str, home: str, away_score: int, home_score: int):
+    class _Espn:
+        def scoreboard(self, *_a: Any, **_k: Any) -> dict[str, Any]:
+            return {
+                "events": [
+                    {
+                        "competitions": [
+                            {
+                                "status": {"type": {"completed": True}},
+                                "competitors": [
+                                    {
+                                        "homeAway": "away",
+                                        "team": {"displayName": away},
+                                        "score": str(away_score),
+                                    },
+                                    {
+                                        "homeAway": "home",
+                                        "team": {"displayName": home},
+                                        "score": str(home_score),
+                                    },
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+
+    return _Espn()
+
+
+def _settle_with_a_control_row(tmp_path: Path, unknown_pick: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Move every row's start into the past, add an ordinary filled control row for the same game, and
+    settle against a final score. The control row settling proves the fixture can settle a row."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    rows = _ledger(tmp_path)
+    past = iso_utc(utc_now() - timedelta(hours=6))
+    for r in rows:
+        r["event_start_utc"] = past
+    (target,) = [r for r in rows if r["pick_id"] == unknown_pick]
+    control = {
+        **target,
+        "pick_id": "control",
+        "order_id": "ioc-control",
+        "order_ids": ["ioc-control"],
+        "order_state": "ORDER_STATE_FILLED",
+        "fallback_order_id": None,
+        "fallback_status": "no_remainder",
+        "fallback_reconciled": True,
+        "fill_known": True,
+        "shares": 4.0,
+        "cost_usd": 2.04,
+        "primary_filled_shares": 4.0,
+        "primary_filled_cost_usd": 2.04,
+    }
+    control.pop("fallback_submit_unknown", None)
+    j_path.write_text("".join(json.dumps(r) + "\n" for r in [*rows, control]), encoding="utf-8")
+    auto_buyer_ledger.settle_auto_buyer_ledger(
+        data_root=tmp_path, espn=_espn_final(target["away_team"], target["home_team"], 60, 80)
+    )
+    after = {r["pick_id"]: r for r in _ledger(tmp_path)}
+    return after[unknown_pick], after["control"]
+
+
+def test_unknown_fallback_leg_blocks_the_next_cycle_and_is_never_settled(tmp_path, exchange, buyer_env):
+    """Review fix 1 (major): IOC fills 4, the GTD POST times out and no open order matches, so the
+    remainder may rest or fill on the exchange. The row must not read as a top-up-eligible partial,
+    and settlement must not settle it on the IOC shares alone."""
+    row = _brow("fu1", "g1")
+    exchange.post_script = [exchange.default_post, httpx.ReadTimeout("fallback response lost")]
+    first = _buyer(tmp_path, [row]).evaluate_and_execute([dict(row)])
+    assert [a["alarm"] for a in first.alarms] == ["fallback_submit_unknown"]
+    assert len(exchange.order_posts()) == 2
+
+    again = _buyer(tmp_path, [row]).evaluate_and_execute([dict(row)])
+    assert len(exchange.order_posts()) == 2, "no order may be sent for a pick whose fallback leg is unknown"
+    assert again.rejected_dedup == 1
+
+    unknown, control = _settle_with_a_control_row(tmp_path, "fu1")
+    assert control["status"] == "settled" and control["result"] == "win"
+    assert unknown["status"] == "open"
+    assert unknown["result"] == "open"
+
+
+def test_unknown_fallback_leg_row_is_unreconciled_pending_and_counts_toward_the_caps(
+    tmp_path, exchange, buyer_env
+):
+    row = _brow("fu2", "g1")
+    exchange.post_script = [exchange.default_post, httpx.ReadTimeout("fallback response lost")]
+    _buyer(tmp_path, [row]).evaluate_and_execute([dict(row)])
+    (recorded,) = _ledger(tmp_path)
+    assert recorded["shares"] == 4.0
+    assert recorded["fallback_status"] == "submit_unknown"
+    assert recorded["fallback_order_id"] is None
+    assert recorded["fallback_reconciled"] is False
+    assert recorded["fallback_submit_unknown"] is True
+    assert recorded["fill_known"] is True, "the IOC fill is known; only the fallback leg is not"
+    assert auto_buyer_ledger.is_fallback_submit_unknown(recorded)
+    assert auto_executor._live_book_has_pending_orders(tmp_path / "auto_buyer_ledger.jsonl")
+
+    remainder_cost = recorded["fallback_resting_shares"] * recorded["entry_price"]
+    assert remainder_cost > 0
+    expected = recorded["cost_usd"] + remainder_cost
+    assert auto_executor._today_auto_buyer_totals(tmp_path)[0] == pytest.approx(expected, abs=0.01)
+    index = _buyer(tmp_path, [row])._build_bought_index()
+    assert "fu2" not in index["partially_filled"]
+    assert "fu2" in index["pick_ids"]
+    assert (row["market_slug"], "long") in index["market_sides"]
+    assert ("g1", "home") in index["event_selections"]
+    assert sum(index["game_exposure"]["event:g1"].values()) == pytest.approx(expected)
+
+
+def test_zero_fill_ioc_with_an_unknown_fallback_is_held(tmp_path, exchange, buyer_env):
+    row = _brow("fz1", "g1")
+    exchange.ioc_fill = 0.0
+    exchange.post_script = [exchange.default_post, httpx.ReadTimeout("fallback response lost")]
+    _buyer(tmp_path, [row]).evaluate_and_execute([dict(row)])
+    (recorded,) = _ledger(tmp_path)
+    assert recorded["shares"] == 0.0
+    assert auto_buyer_ledger.is_fallback_submit_unknown(recorded)
+    assert auto_executor._live_book_has_pending_orders(tmp_path / "auto_buyer_ledger.jsonl")
+    again = _buyer(tmp_path, [row]).evaluate_and_execute([dict(row)])
+    assert len(exchange.order_posts()) == 2
+    assert again.rejected_dedup == 1
+    unknown, control = _settle_with_a_control_row(tmp_path, "fz1")
+    assert control["status"] == "settled"
+    assert unknown["status"] == "open"
+
+
+def test_a_row_written_before_the_fix_is_still_held(tmp_path, buyer_env):
+    """Rows recorded by 14bc409f carry fallback_reconciled True for an unknown leg; the fallback_status
+    and the missing id alone must hold them."""
+    start = iso_utc(utc_now() + timedelta(minutes=20))
+    legacy = {
+        "order_id": "ioc-1",
+        "order_ids": ["ioc-1"],
+        "pick_id": "old1",
+        "event_id": "g7",
+        "executed_at_utc": iso_utc(utc_now() - timedelta(minutes=10)),
+        "event_start_utc": start,
+        "sport": "NCAAB",
+        "away_team": "g7 away",
+        "home_team": "g7 home",
+        "market_type": "spread",
+        "selection": "home",
+        "line": -3.5,
+        "market_slug": "asc-cbb-g7-2026-11-25-neg-3pt5",
+        "token_side": "long",
+        "shares": 4.0,
+        "entry_price": 0.51,
+        "cost_usd": 2.04,
+        "unit_value_usd": 5.0,
+        "order_state": "ORDER_STATE_PARTIALLY_FILLED",
+        "status": "open",
+        "result": "open",
+        "fallback_order_id": None,
+        "fallback_status": "submit_unknown",
+        "fallback_resting_shares": 15.6,
+        "fallback_reconciled": True,
+        "fill_known": True,
+        "primary_filled_shares": 4.0,
+        "primary_filled_cost_usd": 2.04,
+    }
+    (tmp_path / "auto_buyer_ledger.jsonl").write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+    assert auto_buyer_ledger.is_fallback_submit_unknown(legacy)
+    assert auto_executor._live_book_has_pending_orders(tmp_path / "auto_buyer_ledger.jsonl")
+    index = _buyer(tmp_path, [])._build_bought_index()
+    assert "old1" not in index["partially_filled"]
+    assert "old1" in index["pick_ids"]
+    assert auto_buyer_ledger.event_key_from_slug(legacy["market_slug"]) in index["held_events"]
+    unknown, control = _settle_with_a_control_row(tmp_path, "old1")
+    assert control["status"] == "settled"
+    assert unknown["status"] == "open"
+
+
+def _partial_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "order_id": "ioc-old",
+        "order_ids": ["ioc-old"],
+        "pick_id": row["pick_id"],
+        "event_id": row["event_id"],
+        "executed_at_utc": iso_utc(utc_now() - timedelta(minutes=30)),
+        "event_start_utc": row["event_start_utc"],
+        "sport": "NCAAB",
+        "away_team": row["away_team"],
+        "home_team": row["home_team"],
+        "market_type": "spread",
+        "selection": "home",
+        "line": -3.5,
+        "market_slug": row["market_slug"],
+        "token_side": "long",
+        "shares": 2.0,
+        "entry_price": 0.51,
+        "cost_usd": 1.02,
+        "unit_value_usd": 5.0,
+        "model_id": SPREAD_V7,
+        "order_state": "ORDER_STATE_PARTIALLY_FILLED",
+        "status": "open",
+        "result": "open",
+        "fallback_order_id": None,
+        "fallback_status": "rejected",
+        "fallback_reconciled": True,
+        "fill_known": True,
+        "primary_filled_shares": 2.0,
+        "primary_filled_cost_usd": 1.02,
+    }
+
+
+def test_topup_with_an_unknown_fallback_merges_as_unknown_and_blocks_the_next_cycle(
+    tmp_path, exchange, buyer_env
+):
+    """Review fix 3: the top-up merge returned before the execution passthrough fields and marked an
+    unknown fallback leg reconciled, so the merged row read as a partial and was topped up again."""
+    row = _brow("tp1", "g1")
+    (tmp_path / "auto_buyer_ledger.jsonl").write_text(json.dumps(_partial_row(row)) + "\n")
+    exchange.post_script = [exchange.default_post, httpx.ReadTimeout("fallback response lost")]
+    first = _buyer(tmp_path, [row]).evaluate_and_execute([dict(row)])
+    assert [a["alarm"] for a in first.alarms] == ["fallback_submit_unknown"]
+    (merged,) = _ledger(tmp_path)
+    assert merged["shares"] == 6.0
+    assert merged["fallback_status"] == "submit_unknown"
+    assert merged["fallback_reconciled"] is False
+    assert merged["fallback_submit_unknown"] is True
+    assert "ReadTimeout after sending" in merged["fallback_error"]
+    ioc_key = exchange.order_posts()[0]["headers"]["Idempotency-Key"]
+    assert merged["idempotency_key"] == ioc_key
+    assert merged["fallback_idempotency_key"] == exchange.order_posts()[1]["headers"]["Idempotency-Key"]
+    assert merged["order_state"] == "ORDER_STATE_PARTIALLY_FILLED"
+
+    again = _buyer(tmp_path, [row]).evaluate_and_execute([dict(row)])
+    assert len(exchange.order_posts()) == 2
+    assert again.rejected_dedup == 1
+
+
+def test_topup_merge_carries_the_execution_fields_of_the_topup(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    row = _brow("tp2", "g1")
+    j_path.write_text(json.dumps(_partial_row(row)) + "\n")
+    merged = auto_buyer_ledger.record_auto_buy_execution(
+        _payload(
+            pick_id="tp2",
+            market_slug=row["market_slug"],
+            is_topup=True,
+            shares=4.0,
+            cost_usd=2.04,
+            limit_price=0.51,
+            order_ids=["ioc-new", "gtd-new"],
+            fallback_order_id="gtd-new",
+            fallback_status="resting",
+            fallback_resting_shares=3.0,
+            good_till_time="2026-11-25T23:58:30Z",
+            intent_id="i-2",
+            idempotency_key="mp-i-2-p",
+            fallback_idempotency_key="mp-i-2-f",
+            requested_shares=7.0,
+            requested_cost_usd=3.57,
+        ),
+        order_id="ioc-new",
+        order_state="ORDER_STATE_PARTIALLY_FILLED",
+        jsonl_path=j_path,
+    )
+    assert merged["fallback_order_id"] == "gtd-new"
+    assert merged["fallback_status"] == "resting"
+    assert merged["fallback_reconciled"] is False
+    assert merged["good_till_time"] == "2026-11-25T23:58:30Z"
+    assert merged["intent_id"] == "i-2"
+    assert merged["idempotency_key"] == "mp-i-2-p"
+    assert merged["fallback_idempotency_key"] == "mp-i-2-f"
+    assert "fallback_submit_unknown" not in merged
