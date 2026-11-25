@@ -249,6 +249,135 @@ DEFAULT_MAX_MODEL_AGE_MINUTES = 24 * 60
 MAX_AUTO_BUYER_QUOTE_AGE_SECONDS = 300
 MAX_SOURCE_QUOTE_AGE_SECONDS = 6 * 3600
 
+# Per-model cohorts (quick-261125-31d): operator-set state-file entries that let one model's rows in
+# a saved-edge window through the categorical gates, in exactly one book. Only a valid, enabled
+# ``mode: live`` cohort can reach the real-money order path from the scheduler.
+COHORTS_STATE_KEY = "cohorts"
+COHORT_MODES = ("paper", "live")
+COHORT_MARKETS = frozenset({"moneyline", "spread", "total"})
+COHORT_REQUIRED_KEYS = frozenset(
+    {"model_id", "sport", "market", "min_saved_edge", "max_saved_edge_exclusive", "mode", "enabled"}
+)
+COHORT_OPTIONAL_KEYS = frozenset({"note", "approved_by", "approved_at_utc"})
+# Phantom-edge guard for open-ended windows (no upper bound): a live-ask edge above 25% is far more
+# often a bad quote than a mispriced market. Same value as the NCAAB paper trial's sanity ceiling;
+# the measured ML v7m cohort's largest saved edge is 19.6%, so it drops none of the measured rows.
+COHORT_OPEN_ENDED_EXECUTION_EDGE_CEILING = 0.25
+
+
+@dataclass(frozen=True)
+class BuyCohort:
+    """One operator-approved cohort: model, sport/market, half-open saved-edge window, book."""
+
+    model_id: str
+    sport: str
+    market: str
+    min_saved_edge: float
+    max_saved_edge_exclusive: float | None
+    mode: str
+
+    @property
+    def label(self) -> str:
+        upper = "inf" if self.max_saved_edge_exclusive is None else f"{self.max_saved_edge_exclusive:g}"
+        return f"{self.model_id}:{self.market}:[{self.min_saved_edge:g},{upper}):{self.mode}"
+
+    def contains(self, edge: float) -> bool:
+        if not math.isfinite(edge) or edge < self.min_saved_edge:
+            return False
+        return self.max_saved_edge_exclusive is None or edge < self.max_saved_edge_exclusive
+
+
+@dataclass(frozen=True)
+class CohortParse:
+    active: tuple[BuyCohort, ...]
+    errors: tuple[str, ...]
+
+
+def _cohort_edge(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
+def _parse_one_cohort(entry: Any) -> tuple[BuyCohort | None, str | None]:
+    """Validate one state entry. Returns (cohort, None), (None, error), or (None, None) when disabled."""
+    if not isinstance(entry, dict):
+        return None, f"entry is {type(entry).__name__}, not an object"
+    keys = set(entry)
+    missing = COHORT_REQUIRED_KEYS - keys
+    if missing:
+        # A missing upper-bound key must never silently mean "open-ended".
+        return None, f"missing keys {sorted(missing)}"
+    unknown = keys - COHORT_REQUIRED_KEYS - COHORT_OPTIONAL_KEYS
+    if unknown:
+        return None, f"unknown keys {sorted(unknown)}"
+    enabled = entry["enabled"]
+    if not isinstance(enabled, bool):
+        return None, f"enabled must be true or false, got {enabled!r}"
+    model_id = entry["model_id"]
+    if not isinstance(model_id, str) or not model_id.strip():
+        return None, "model_id must be a non-empty string"
+    sport = entry["sport"]
+    if not isinstance(sport, str) or not sport.strip():
+        return None, "sport must be a non-empty string"
+    market = entry["market"]
+    if not isinstance(market, str) or market not in COHORT_MARKETS:
+        return None, f"market must be one of {sorted(COHORT_MARKETS)}, got {market!r}"
+    mode = entry["mode"]
+    if not isinstance(mode, str) or mode not in COHORT_MODES:
+        return None, f"mode must be exactly 'paper' or 'live', got {mode!r}"
+    minimum = _cohort_edge(entry["min_saved_edge"])
+    if minimum is None or not 0 <= minimum < 1:
+        return None, f"min_saved_edge must be a finite number in [0, 1), got {entry['min_saved_edge']!r}"
+    raw_max = entry["max_saved_edge_exclusive"]
+    maximum: float | None = None
+    if raw_max is not None:
+        maximum = _cohort_edge(raw_max)
+        if maximum is None or not minimum < maximum <= 1:
+            return None, f"max_saved_edge_exclusive must be null or in (min, 1], got {raw_max!r}"
+    if mode == "live" and maximum is None:
+        return None, "a live cohort needs a finite max_saved_edge_exclusive (no open-ended real money)"
+    if not enabled:
+        return None, None
+    return BuyCohort(model_id.strip(), sport.strip().lower(), market, minimum, maximum, mode), None
+
+
+def _parse_cohorts(state: dict[str, Any]) -> CohortParse:
+    """Strict, fail-closed parse of the state file's ``cohorts`` list.
+
+    Every bad entry is ignored and named in ``errors`` (and logged); a value that is not a list
+    yields no cohorts. Two enabled cohorts of the same model/sport/market with overlapping windows
+    are both dropped: a row must belong to at most one book.
+    """
+    if COHORTS_STATE_KEY not in state:
+        return CohortParse((), ())
+    raw = state.get(COHORTS_STATE_KEY)
+    errors: list[str] = []
+    candidates: list[tuple[int, BuyCohort]] = []
+    if not isinstance(raw, list):
+        errors.append(f"cohorts must be a list, got {type(raw).__name__}")
+    else:
+        for index, entry in enumerate(raw):
+            cohort, error = _parse_one_cohort(entry)
+            if error is not None:
+                errors.append(f"cohorts[{index}]: {error}")
+            elif cohort is not None:
+                candidates.append((index, cohort))
+    dropped: set[int] = set()
+    for position, (index_a, a) in enumerate(candidates):
+        for index_b, b in candidates[position + 1 :]:
+            if (a.model_id, a.sport, a.market) != (b.model_id, b.sport, b.market):
+                continue
+            a_max = math.inf if a.max_saved_edge_exclusive is None else a.max_saved_edge_exclusive
+            b_max = math.inf if b.max_saved_edge_exclusive is None else b.max_saved_edge_exclusive
+            if a.min_saved_edge < b_max and b.min_saved_edge < a_max:
+                dropped.update({index_a, index_b})
+                errors.append(f"cohorts[{index_a}] and cohorts[{index_b}]: overlapping windows, both dropped")
+    for error in errors:
+        logger.warning("auto-buyer cohort ignored: %s", error)
+    return CohortParse(tuple(c for index, c in candidates if index not in dropped), tuple(errors))
+
 
 @dataclass(frozen=True)
 class AutoExecutionConfig:
@@ -287,10 +416,19 @@ class AutoExecutionConfig:
     capture_missing_slates: bool = True
     paper_ncaab_spread_v6_trial: bool = False
     ncaab_spread_v6_live_bucket: tuple[float, float] | None = None
+    cohorts: tuple[BuyCohort, ...] = ()
+    # Cohort passes index only their own book's auto-buyer ledger (see _build_bought_index).
+    dedup_own_ledger_only: bool = False
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
             object.__setattr__(self, "mode", "live")
+        object.__setattr__(self, "cohorts", tuple(self.cohorts))
+        # One book per config: an executing config can never carry a paper cohort, and a paper
+        # config never a live one, so a paper row has no route to the order path.
+        for cohort in self.cohorts:
+            if not isinstance(cohort, BuyCohort) or cohort.mode != self.mode:
+                raise ValueError(f"cohort {cohort!r} does not belong in a mode={self.mode!r} config")
 
 
 @dataclass
@@ -319,6 +457,7 @@ class AutoExecutionResult:
     rejected_min_topup: int = 0
     rejected_daily_loss_breaker: int = 0
     rejected_quarantined_model: int = 0
+    cohort_matched: int = 0
     quarantined_models: list[str] = field(default_factory=list)
     submitted_orders: list[dict[str, Any]] = field(default_factory=list)
     dry_run_orders: list[dict[str, Any]] = field(default_factory=list)
@@ -449,14 +588,11 @@ def _is_paper_ncaab_spread_v6_trial(row: dict[str, Any], config: AutoExecutionCo
     )
 
 
-def _is_live_ncaab_spread_v6_bucket(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
-    """Exact operator-approved live cohort, with decision-time quote evidence."""
-    bucket = config.ncaab_spread_v6_live_bucket
-    if not (bucket and config.execute_live and config.mode == "live"):
+def _row_in_cohort(row: dict[str, Any], cohort: BuyCohort) -> bool:
+    """True when a saved pick row belongs to ``cohort``, with decision-time quote evidence."""
+    if str(row.get("model_id") or row.get("model_version") or "") != cohort.model_id:
         return False
-    if str(row.get("model_id") or row.get("model_version") or "") != "ncaab-spread-v6":
-        return False
-    if _auto_buyer_sport_market(row) != ("ncaab", "spread"):
+    if _auto_buyer_sport_market(row) != (cohort.sport, cohort.market):
         return False
     if str(row.get("status") or "").lower() != "open":
         return False
@@ -479,10 +615,52 @@ def _is_live_ncaab_spread_v6_bucket(row: dict[str, Any], config: AutoExecutionCo
         return False
     try:
         edge = float(row["edge"])
-        line = float(row["line"])
     except (KeyError, TypeError, ValueError):
         return False
-    return math.isfinite(edge) and math.isfinite(line) and bucket[0] <= edge < bucket[1]
+    if not cohort.contains(edge):
+        return False
+    if cohort.market in ("spread", "total"):
+        try:
+            line = float(row["line"])
+        except (KeyError, TypeError, ValueError):
+            return False
+        if not math.isfinite(line):
+            return False
+    # Zero-unit rows are unquoted shadow rows with a manufactured edge; sizing would still lift
+    # them to a one-share real order. Missing units keep the buyer's normal 1U default.
+    units = row.get("units")
+    if units is not None and not (isinstance(units, str) and not units.strip()):
+        try:
+            parsed_units = float(units)
+        except (TypeError, ValueError):
+            return False
+        if not (math.isfinite(parsed_units) and parsed_units > 0):
+            return False
+    return True
+
+
+def _legacy_ncaab_spread_v6_cohort(config: AutoExecutionConfig) -> BuyCohort | None:
+    bucket = config.ncaab_spread_v6_live_bucket
+    if not (bucket and config.execute_live and config.mode == "live"):
+        return None
+    return BuyCohort("ncaab-spread-v6", "ncaab", "spread", bucket[0], bucket[1], "live")
+
+
+def _is_live_ncaab_spread_v6_bucket(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
+    """Exact operator-approved live cohort, with decision-time quote evidence."""
+    cohort = _legacy_ncaab_spread_v6_cohort(config)
+    return cohort is not None and _row_in_cohort(row, cohort)
+
+
+def _match_cohort(row: dict[str, Any], config: AutoExecutionConfig) -> BuyCohort | None:
+    """The config's cohort this row belongs to (state cohorts first, then the legacy v6 bucket)."""
+    for cohort in config.cohorts:
+        if _row_in_cohort(row, cohort):
+            return cohort
+    legacy = _legacy_ncaab_spread_v6_cohort(config)
+    if legacy is not None and _row_in_cohort(row, legacy):
+        return legacy
+    return None
 
 
 def _ncaab_spread_v6_live_bucket_from_state(state: dict[str, Any]) -> tuple[float, float] | None:
@@ -551,14 +729,12 @@ def _capture_missing_active_snapshot_slates(
     missing: set[tuple[str, str]] = set()
     for row in picks:
         model_id = str(row.get("model_id") or row.get("model_version") or "")
-        approved_ncaab_bucket = _is_live_ncaab_spread_v6_bucket(row, config)
-        if not approved_ncaab_bucket and (
+        in_cohort = _match_cohort(row, config) is not None
+        if not in_cohort and (
             model_id in config.blacklisted_models or model_id not in config.whitelisted_models
         ):
             continue
-        if not approved_ncaab_bucket and _is_disabled_auto_buyer_sport_market(
-            row, config.disabled_sport_markets
-        ):
+        if not in_cohort and _is_disabled_auto_buyer_sport_market(row, config.disabled_sport_markets):
             continue
         if row.get("status") != "open":
             continue
@@ -1062,6 +1238,78 @@ def _base_auto_execution_kwargs_from_state(state: dict[str, Any]) -> dict[str, A
     }
 
 
+def _cycle_gate_kwargs(state: dict[str, Any]) -> dict[str, Any]:
+    """Gate values every cycle pass (global and cohort) takes from saved state."""
+    return {
+        "min_model_probability": float(state.get("min_model_probability", 0.50)),
+        "min_ncaaf_edge": (
+            float(state["min_ncaaf_edge"]) if state.get("min_ncaaf_edge") is not None else 0.02
+        ),
+        "max_ncaaf_edge": (
+            float(state["max_ncaaf_edge"]) if state.get("max_ncaaf_edge") is not None else 0.08
+        ),
+        "max_moneyline_price": (
+            float(state["max_moneyline_price"]) if state.get("max_moneyline_price") is not None else 0.72
+        ),
+    }
+
+
+def _read_cohort_candidate_picks() -> list[dict[str, Any]]:
+    """Flat-ledger rows only. The cohorts were measured on ``ledger_tier='flat'`` rows, and a Main
+    copy would otherwise win the merge with its own units and reason code; gated research rows are
+    never cohort candidates."""
+    from model_prediction.dashboard.picks import read_flat_picks
+
+    return _merge_auto_buyer_pick_sources(read_flat_picks())
+
+
+def _cohort_pass_config(
+    state: dict[str, Any],
+    *,
+    cohorts: tuple[BuyCohort, ...],
+    mode: str,
+    execute_live: bool,
+) -> AutoExecutionConfig:
+    """One book's cohort pass: whitelists nothing, so only its own cohorts can buy. A fresh ask
+    (300 s, live refresh) measures the live-ask edge window in either book."""
+    return AutoExecutionConfig(
+        **{
+            **_base_auto_execution_kwargs_from_state(state),
+            "whitelisted_models": (),
+            "ncaab_spread_v6_live_bucket": None,
+        },
+        **_cycle_gate_kwargs(state),
+        cohorts=cohorts,
+        mode=mode,
+        execute_live=execute_live,
+        require_model_timestamp=True,
+        max_quote_age_seconds=MAX_AUTO_BUYER_QUOTE_AGE_SECONDS,
+        refresh_stale_quotes=True,
+        dedup_own_ledger_only=True,
+    )
+
+
+def _cohort_pass_summary(
+    label: str,
+    cohorts: tuple[BuyCohort, ...],
+    res: AutoExecutionResult,
+    *,
+    executing: bool,
+) -> dict[str, Any]:
+    orders = res.submitted_orders if executing else res.dry_run_orders
+    return {
+        "mode": label,
+        "cohorts": [c.label for c in cohorts],
+        "total_evaluated": res.total_evaluated,
+        "cohort_matched": res.cohort_matched,
+        **{name: value for name, value in vars(res).items() if name.startswith("rejected_")},
+        "quarantined_models": res.quarantined_models,
+        "total_spend_usd": res.total_spend_usd,
+        "orders_count": len(orders),
+        "orders": orders,
+    }
+
+
 def run_auto_buyer_cycle(
     execute_override: bool | None = None,
     forecast_date: str | None = None,
@@ -1079,15 +1327,24 @@ def run_auto_buyer_cycle(
         mode = DEFAULT_AUTO_BUYER_MODE
     state["mode"] = mode
     cycle_enabled = bool(state.get("enabled", False))
+    # Cohort governance (quick-261125-31d): any `cohorts` key, even an empty or malformed one, puts
+    # the legacy whitelist pass on paper, so only an operator-set live cohort can trade real money
+    # from the scheduler. A separate local keeps the saved `mode` untouched in the state written back.
+    governed = COHORTS_STATE_KEY in state
+    parsed_cohorts = _parse_cohorts(state)
+    live_cohorts = tuple(c for c in parsed_cohorts.active if c.mode == "live")
+    global_mode = "paper" if governed else mode
+    wants_execution = cycle_enabled if execute_override is None else bool(execute_override)
     # Explicit execution can request a one-off live cycle, but can never
     # override PAPER mode. Changing the saved mode is a separate action.
-    should_execute = mode == "live" and (
-        cycle_enabled if execute_override is None else bool(execute_override)
-    )
+    should_execute = global_mode == "live" and wants_execution
+    # `enabled: false` in the state file is the cohorts' kill switch: execute_override=True never
+    # bypasses it (the legacy ungoverned pass keeps its override semantics above).
+    cohort_live_execute = bool(live_cohorts) and cycle_enabled and execute_override is not False
 
     # Reconcile resting orders, update fills, and cancel stale/moved orders before evaluating new picks
     reconciliation_summary: dict[str, Any] = {}
-    if should_execute:
+    if should_execute or cohort_live_execute:
         try:
             from .auto_buyer_ledger import (
                 reconcile_pending_auto_buyer_fallbacks,
@@ -1099,7 +1356,7 @@ def run_auto_buyer_cycle(
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
             raise RuntimeError("Live auto-buyer stopped: pre-cycle reconciliation failed") from exc
-    elif cycle_enabled and mode == "paper":
+    elif cycle_enabled and global_mode == "paper":
         try:
             from .auto_buyer_ledger import settle_auto_buyer_ledger
 
@@ -1107,12 +1364,29 @@ def run_auto_buyer_cycle(
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle paper-ledger settlement failed: %s", exc)
 
+    cohort_passes: dict[str, Any] = {}
+    cohort_picks = _read_cohort_candidate_picks() if live_cohorts else []
+    if live_cohorts:
+        # First, so the live book is evaluated before any paper fill of this cycle exists.
+        live_config = _cohort_pass_config(
+            state, cohorts=live_cohorts, mode="live", execute_live=cohort_live_execute
+        )
+        live_res = AutoPolymarketBuyer(config=live_config).evaluate_and_execute(
+            [dict(r) for r in cohort_picks]
+        )
+        cohort_passes["live"] = _cohort_pass_summary(
+            "LIVE_EXECUTION" if cohort_live_execute else "LIVE_DRY_RUN",
+            live_cohorts,
+            live_res,
+            executing=cohort_live_execute,
+        )
+
     config = AutoExecutionConfig(
         **_base_auto_execution_kwargs_from_state(state),
-        min_model_probability=float(state.get("min_model_probability", 0.50)),
+        **_cycle_gate_kwargs(state),
         require_model_timestamp=True,
         execute_live=should_execute,
-        mode=mode,
+        mode=global_mode,
         max_quote_age_seconds=(
             MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
             if should_execute
@@ -1124,17 +1398,12 @@ def run_auto_buyer_cycle(
             )
         ),
         refresh_stale_quotes=should_execute,
-        min_ncaaf_edge=(float(state["min_ncaaf_edge"]) if state.get("min_ncaaf_edge") is not None else 0.02),
-        max_ncaaf_edge=(float(state["max_ncaaf_edge"]) if state.get("max_ncaaf_edge") is not None else 0.08),
-        max_moneyline_price=(
-            float(state["max_moneyline_price"]) if state.get("max_moneyline_price") is not None else 0.72
-        ),
     )
 
     buyer = AutoPolymarketBuyer(config=config)
     res = buyer.evaluate_and_execute()
 
-    if not should_execute and cycle_enabled and mode == "paper":
+    if not should_execute and cycle_enabled and global_mode == "paper":
         # Paper fills are recorded as immediately, fully filled at the requested
         # limit price -- there's no real order book to rest on, so "what would
         # have happened" is the simulated fact here. Persisted at this layer
@@ -1166,7 +1435,7 @@ def run_auto_buyer_cycle(
 
     if should_execute:
         run_mode_label = "LIVE_EXECUTION"
-    elif cycle_enabled and mode == "paper":
+    elif cycle_enabled and global_mode == "paper":
         run_mode_label = "PAPER_TRADING"
     else:
         run_mode_label = "DISABLED_OR_DRY_RUN"
@@ -1206,14 +1475,21 @@ def run_auto_buyer_cycle(
         "orders": res.submitted_orders if should_execute else res.dry_run_orders,
         "snapshot_captures": res.snapshot_captures,
         "reconciliation": reconciliation_summary,
+        "global_pass_mode": global_mode,
+        "cohorts_governed": governed,
+        "cohort_config_errors": list(parsed_cohorts.errors),
+        "cohorts_active": [c.label for c in parsed_cohorts.active],
+        "cohort_passes": cohort_passes,
     }
 
     history_path = (
         PAPER_AUTO_BUYER_DATA_ROOT / "logs" / "auto_buyer_cycle_history.jsonl"
-        if mode == "paper"
+        if global_mode == "paper"
         else AUTO_BUYER_CYCLE_HISTORY_PATH
     )
-    _append_auto_buyer_cycle_history(run_summary, history_path=history_path)
+    _append_auto_buyer_cycle_history(
+        {k: v for k, v in run_summary.items() if k != "cohort_passes"}, history_path=history_path
+    )
 
     state["last_run"] = run_summary
     if forecast_date:
@@ -1871,7 +2147,7 @@ class AutoPolymarketBuyer:
             model_id = str(row.get("model_id") or row.get("model_version") or "")
             event_id = str(row.get("event_id") or "")
             selection = str(row.get("selection") or "").lower()
-            approved_ncaab_bucket = _is_live_ncaab_spread_v6_bucket(row, self.config)
+            cohort = _match_cohort(row, self.config)
 
             # 1. Status filter (must be open). Checked first, ahead of every other
             # gate: the pick-source files (main/flat/gated/research) are append-only
@@ -1883,6 +2159,8 @@ class AutoPolymarketBuyer:
             if row.get("status") != "open":
                 result.rejected_not_open += 1
                 continue
+            if cohort is not None:
+                result.cohort_matched += 1
 
             # Tags name destinations (operator directive 2026-11-11), so a row's legacy
             # record_type no longer blocks it; the whitelist/blacklist/quarantine/caps
@@ -1894,7 +2172,7 @@ class AutoPolymarketBuyer:
             decision = str(row.get("decision") or "").upper()
             reason_code = str(row.get("reason_code") or "").upper()
             if (decision and decision != "CALL") or (
-                not approved_ncaab_bucket and reason_code.startswith("PAPER_CALL_")
+                cohort is None and reason_code.startswith("PAPER_CALL_")
             ):
                 result.rejected_not_qualified_decision += 1
                 continue
@@ -1916,12 +2194,12 @@ class AutoPolymarketBuyer:
                 continue
 
             # 2. Blacklist filter
-            if model_id in self.config.blacklisted_models and not approved_ncaab_bucket:
+            if model_id in self.config.blacklisted_models and cohort is None:
                 result.rejected_blacklist += 1
                 continue
 
             # 3. Whitelist filter
-            if model_id not in self.config.whitelisted_models and not approved_ncaab_bucket:
+            if model_id not in self.config.whitelisted_models and cohort is None:
                 result.rejected_not_whitelisted += 1
                 continue
 
@@ -1931,7 +2209,7 @@ class AutoPolymarketBuyer:
             paper_ncaab_trial = _is_paper_ncaab_spread_v6_trial(row, self.config)
             if (
                 not paper_ncaab_trial
-                and not approved_ncaab_bucket
+                and cohort is None
                 and _is_disabled_auto_buyer_sport_market(row, self.config.disabled_sport_markets)
             ):
                 result.rejected_disabled_sport_market += 1
@@ -2166,7 +2444,8 @@ class AutoPolymarketBuyer:
 
             # Heavy favorite moneyline gate: cap moneyline buying price to prevent negative vig traps (odds <= -260)
             if (
-                market_type == "moneyline"
+                cohort is None
+                and market_type == "moneyline"
                 and self.config.max_moneyline_price is not None
                 and clob_ask > self.config.max_moneyline_price
             ):
@@ -2190,35 +2469,44 @@ class AutoPolymarketBuyer:
                 "model_probability_raw": raw_model_prob,
                 "calibration_method": calibration.method,
             }
-            if model_prob < self.config.min_model_probability:
+            if cohort is None and model_prob < self.config.min_model_probability:
                 result.rejected_below_win_probability += 1
                 continue
 
             # 10. Sizing & Edge check against real Polymarket CLOB ask (mirrors Main Ledger sport hurdles)
             edge = model_prob - clob_ask
-            if approved_ncaab_bucket and not (
-                self.config.ncaab_spread_v6_live_bucket[0]
-                <= edge
-                < self.config.ncaab_spread_v6_live_bucket[1]
-            ):
-                result.rejected_low_edge += 1
-                continue
-            effective_min_edge = self._effective_min_edge(
-                sport_norm,
-                market_type,
-                row.get("line"),
-            )
-            if edge < effective_min_edge:
-                result.rejected_low_edge += 1
-                continue
-            effective_max_edge = (
-                self.config.max_ncaaf_edge
-                if sport_norm in ("ncaaf", "cfb") and self.config.max_ncaaf_edge is not None
-                else self.config.max_edge
-            )
-            if effective_max_edge is not None and edge > effective_max_edge:
-                result.rejected_unrealistic_edge += 1
-                continue
+            if cohort is not None:
+                # A cohort is bounded by its own window on the live-ask edge, not by the sport
+                # floors or the global max edge (both would drop the measured cohort rows).
+                if not 0 < clob_ask < 1:
+                    result.rejected_unrealistic_edge += 1
+                    continue
+                if not math.isfinite(edge) or edge < cohort.min_saved_edge:
+                    result.rejected_low_edge += 1
+                    continue
+                if not cohort.contains(edge) or (
+                    cohort.max_saved_edge_exclusive is None
+                    and edge > COHORT_OPEN_ENDED_EXECUTION_EDGE_CEILING
+                ):
+                    result.rejected_unrealistic_edge += 1
+                    continue
+            else:
+                effective_min_edge = self._effective_min_edge(
+                    sport_norm,
+                    market_type,
+                    row.get("line"),
+                )
+                if edge < effective_min_edge:
+                    result.rejected_low_edge += 1
+                    continue
+                effective_max_edge = (
+                    self.config.max_ncaaf_edge
+                    if sport_norm in ("ncaaf", "cfb") and self.config.max_ncaaf_edge is not None
+                    else self.config.max_edge
+                )
+                if effective_max_edge is not None and edge > effective_max_edge:
+                    result.rejected_unrealistic_edge += 1
+                    continue
 
             if sport_norm in ("ncaaf", "cfb") and market_type == "spread" and row.get("line") is not None:
                 try:
@@ -2339,6 +2627,7 @@ class AutoPolymarketBuyer:
                 "market_probability": row.get("market_probability") or row.get("market_implied_probability"),
                 "event_id": row.get("event_id"),
                 "line": row.get("line"),
+                "cohort": cohort.label if cohort is not None else None,
             }
 
             # Update bought_index to prevent intra-batch double buys
@@ -2384,6 +2673,20 @@ class AutoPolymarketBuyer:
                 f"FATAL: Live order execution reached under invalid configuration! "
                 f"mode={self.config.mode!r}, execute_live={self.config.execute_live!r}"
             )
+            # Explicit guard that survives `python -O`, outside the submission try/except so it
+            # can never be downgraded to a "refused" row. In a cohort-carrying config only a row
+            # matched to a live cohort may reach the exchange.
+            if not (self.config.mode == "live" and self.config.execute_live is True):
+                raise RuntimeError(
+                    f"Refusing live submission for {model_id} pick {pick_id}: config is not live-executing"
+                )
+            if (self.config.cohorts or cohort is not None) and not (
+                cohort is not None and cohort.mode == "live"
+            ):
+                raise RuntimeError(
+                    f"Refusing live submission for {model_id} pick {pick_id}: "
+                    "not matched to a live cohort in a cohort-governed config"
+                )
             executor = PolymarketExecutor(
                 audit=self.audit,
                 confirm=lambda _prompt: "Y",
