@@ -2341,12 +2341,17 @@ def settle_auto_buyer_ledger(
                         h_team = str((h_c.get("team") or {}).get("displayName", ""))
                         if not a_team or not h_team or not home_key or not away_key:
                             continue
-                        if (
-                            _scoreboard_team_key(a_team, espn_lg.upper()) == away_key
-                            and _scoreboard_team_key(h_team, espn_lg.upper()) == home_key
-                        ):
-                            event_key = str(ev.get("id") or f"{a_team}:{h_team}")
+                        espn_away = _scoreboard_team_key(a_team, espn_lg.upper())
+                        espn_home = _scoreboard_team_key(h_team, espn_lg.upper())
+                        event_key = str(ev.get("id") or f"{a_team}:{h_team}")
+                        if espn_away == away_key and espn_home == home_key:
                             candidates[event_key] = (float(a_c["score"]), float(h_c["score"]))
+                        elif espn_away == home_key and espn_home == away_key:
+                            # Neutral-site games often carry the opposite designation on ESPN
+                            # (2026-11-25: ledger Liberty @ Princeton, ESPN Princeton @ Liberty),
+                            # which left them unsettled. Scores are swapped back into the
+                            # ledger's own orientation so spread sides grade against the right team.
+                            candidates[event_key] = (float(h_c["score"]), float(a_c["score"]))
                 if len(candidates) == 1:
                     a_sc, h_sc = next(iter(candidates.values()))
                     away_score = int(a_sc)

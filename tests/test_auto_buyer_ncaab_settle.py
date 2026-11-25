@@ -114,3 +114,105 @@ def test_settlement_refuses_shared_words_and_multiple_games(tmp_path: Path):
         ]
     }
     assert settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)["newly_settled"] == 0
+
+
+def _reversed_neutral_site_board():
+    # 2026-11-25, real case: the ledger has Liberty @ Princeton, ESPN lists the neutral-site game
+    # the other way round (Princeton away 79, Liberty home 72).
+    return {
+        "events": [
+            {
+                "id": "401900001",
+                "competitions": [
+                    {
+                        "status": {"type": {"completed": True}},
+                        "competitors": [
+                            {"homeAway": "away", "team": {"displayName": "Princeton Tigers"}, "score": "79"},
+                            {"homeAway": "home", "team": {"displayName": "Liberty Flames"}, "score": "72"},
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def _liberty_princeton_row(**overrides):
+    row = {
+        "order_id": "LIVE-rev-1",
+        "sport": "NCAAB",
+        "away_team": "Liberty Flames",
+        "home_team": "Princeton Tigers",
+        "event_start_utc": "2026-11-25T21:00:00Z",
+        "executed_at_utc": "2026-11-25T20:30:00Z",
+        "shares": 10.0,
+        "entry_price": 0.50,
+        "cost_usd": 5.0,
+        "unit_value_usd": 5.0,
+        "units": 1.0,
+        "status": "open",
+        "result": "open",
+        "fill_known": True,
+    }
+    row.update(overrides)
+    return row
+
+
+def _no_exchange(monkeypatch):
+    # ESPN path only: the gateway lookup must neither resolve these rows nor touch the network.
+    from model_prediction.data_sources import polymarket_us
+
+    class _Unresolved:
+        def market(self, slug):
+            return {"status": "MARKET_STATUS_OPEN"}
+
+    monkeypatch.setattr(polymarket_us, "PolymarketUSClient", _Unresolved)
+
+
+def test_total_settles_when_espn_lists_the_teams_in_reverse_order(tmp_path: Path, monkeypatch):
+    _no_exchange(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    row = _liberty_princeton_row(
+        market_slug="test-rev-total",
+        market_type="total",
+        line=137.5,
+        selection="over",
+        token_side="long",
+    )
+    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    espn = MagicMock()
+    espn.scoreboard.return_value = _reversed_neutral_site_board()
+    res = settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)
+    assert res["newly_settled"] == 1
+    assert res["changes"][0]["to_result"] == "win"  # 79 + 72 = 151 > 137.5
+    settled = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+    # Scores are stored in the ledger's own orientation: away = Liberty 72, home = Princeton 79.
+    assert (settled["away_score"], settled["home_score"]) == (72, 79)
+
+
+def test_spread_side_is_graded_in_the_ledgers_orientation_when_espn_is_reversed(tmp_path: Path, monkeypatch):
+    _no_exchange(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    away_pick = _liberty_princeton_row(
+        order_id="LIVE-rev-away",
+        market_slug="test-rev-spread-away",
+        market_type="spread",
+        line=3.5,
+        selection="away",
+        token_side="long",
+    )
+    home_pick = _liberty_princeton_row(
+        order_id="LIVE-rev-home",
+        market_slug="test-rev-spread-home",
+        market_type="spread",
+        line=-3.5,
+        selection="home",
+        token_side="short",
+    )
+    path.write_text(json.dumps(away_pick) + "\n" + json.dumps(home_pick) + "\n", encoding="utf-8")
+    espn = MagicMock()
+    espn.scoreboard.return_value = _reversed_neutral_site_board()
+    res = settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)
+    by_order = {c["order_id"]: c["to_result"] for c in res["changes"]}
+    # Liberty +3.5 lost by 7 -> loss; Princeton -3.5 won by 7 -> win.
+    assert by_order == {"LIVE-rev-away": "loss", "LIVE-rev-home": "win"}
