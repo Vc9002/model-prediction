@@ -386,7 +386,17 @@ def _spread_side_for_row(row: dict, snapshot: dict) -> str | None:
     market_line = snapshot.get("line")
     if not selected_team or row_line is None or market_team is None or market_line is None:
         return None
-    is_market_team = _participant_matches(row, selected_team, str(market_team))
+    # The market team must be exactly one of the row's two teams. Real-money
+    # bug 2026-11-25: Polymarket's "UCA" matched neither "Central Arkansas" nor
+    # "Jacksonville", so it was assumed to be the opponent and a "Central
+    # Arkansas -3.5" pick mapped to the short side, Jacksonville -3.5. A team
+    # matching both ("Louisiana" vs "Louisiana-Monroe") is the same hazard.
+    market_is_away = _participant_matches(row, str(row.get("away_team") or ""), str(market_team))
+    market_is_home = _participant_matches(row, str(row.get("home_team") or ""), str(market_team))
+    if market_is_away == market_is_home:
+        return None
+    selection = str(row.get("selection") or "").casefold()
+    is_market_team = market_is_home if selection == "home" else market_is_away
     if is_market_team and _lines_match(row_line, float(market_line)):
         return "long"
     if not is_market_team and _lines_match(row_line, -float(market_line)):
