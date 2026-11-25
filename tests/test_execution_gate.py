@@ -667,11 +667,32 @@ def test_marketable_limit_uses_ioc_and_can_take_liquidity(tmp_path, monkeypatch)
     assert payloads[-1]["synchronousExecution"] is True
 
 
+def _gtd_readback(order_id: str, payloads: list) -> dict:
+    """The exchange's read-back of the resting fallback: GTD with the requested expiry."""
+    return {
+        "order": {
+            "id": order_id,
+            "state": "ORDER_STATE_NEW",
+            "tif": "TIME_IN_FORCE_GOOD_TILL_DATE",
+            "goodTillTime": payloads[-1]["goodTillTime"],
+        }
+    }
+
+
+def _resting_expiry() -> str:
+    return (datetime.now(UTC) + timedelta(hours=2)).isoformat()
+
+
 def test_ioc_partial_fill_rests_remainder_at_same_price_not_chased(tmp_path, monkeypatch) -> None:
+    # D-01 (quick-261125-hih) supersedes the old GTC remainder: the remainder now rests
+    # GOOD_TILL_DATE, expiring before the start, and is read back by id.
     client = executor(tmp_path, answer="y", env=US_CREDS)
     post_payloads = []
 
     def fake_request(method, path, payload=None):
+        if method == "GET":
+            assert path == "/v1/order/resting-remainder"
+            return _gtd_readback("resting-remainder", post_payloads)
         assert path == "/v1/orders"
         post_payloads.append(payload)
         if len(post_payloads) == 1:
@@ -688,6 +709,7 @@ def test_ioc_partial_fill_rests_remainder_at_same_price_not_chased(tmp_path, mon
             "estimated_cost_usd": 6.25,
             "maximum_cost_usd": 6.35,
             "ioc_fallback_resting": True,
+            "resting_expires_at_utc": _resting_expiry(),
         }
     )
 
@@ -699,7 +721,8 @@ def test_ioc_partial_fill_rests_remainder_at_same_price_not_chased(tmp_path, mon
     assert post_payloads[0]["price"]["value"] == "0.51"
     assert post_payloads[1]["price"]["value"] == "0.51"
     assert post_payloads[1]["quantity"] == 11.37
-    assert post_payloads[1]["tif"] == "TIME_IN_FORCE_GOOD_TILL_CANCEL"
+    assert post_payloads[1]["tif"] == "TIME_IN_FORCE_GOOD_TILL_DATE"
+    assert post_payloads[1]["goodTillTime"].endswith("Z")
     assert post_payloads[1]["participateDontInitiate"] is True
     assert post_payloads[1]["synchronousExecution"] is False
     assert result["order_ids"] == ["primary-partial", "resting-remainder"]
@@ -718,6 +741,8 @@ def test_ioc_zero_fill_rests_full_remainder(tmp_path, monkeypatch) -> None:
     post_payloads = []
 
     def fake_request(method, path, payload=None):
+        if method == "GET":
+            return _gtd_readback("resting-full", post_payloads)
         post_payloads.append(payload)
         if len(post_payloads) == 1:
             return {"id": "primary-expired", "state": "ORDER_STATE_EXPIRED"}
@@ -733,11 +758,13 @@ def test_ioc_zero_fill_rests_full_remainder(tmp_path, monkeypatch) -> None:
             "estimated_cost_usd": 6.4,
             "maximum_cost_usd": 6.5,
             "ioc_fallback_resting": True,
+            "resting_expires_at_utc": _resting_expiry(),
         }
     )
 
     result = client.execute(zero_fill_ticket, qualified_row(), execute_flag=True, user_command=True)
 
+    assert post_payloads[1]["tif"] == "TIME_IN_FORCE_GOOD_TILL_DATE"
     assert result["fallback_order_id"] == "resting-full"
     assert result["fallback_resting_shares"] == 14.88
     assert result["filled_size_shares"] == 0.0

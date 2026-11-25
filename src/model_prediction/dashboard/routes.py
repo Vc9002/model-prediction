@@ -103,6 +103,7 @@ from model_prediction.portfolio.auto_buyer_ledger import (
 )
 from model_prediction.portfolio.auto_executor import (
     PAPER_AUTO_BUYER_DATA_ROOT,
+    LiveAutoBuyerAlarm,
     load_auto_buyer_state,
     run_auto_buyer_cycle,
     set_auto_buyer_mode,
@@ -733,6 +734,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 try:
                     self._send(run_auto_buyer_cycle(force=True))
+                except LiveAutoBuyerAlarm as alarm:
+                    # The cycle saved its state and history before raising; show the operator why.
+                    self._send({"status": "alarm", "alarms": alarm.alarms, "run": alarm.run_summary})
                 finally:
                     lock.close()
         elif parsed.path == "/api/auto-buyer/ncaab-paper/toggle":

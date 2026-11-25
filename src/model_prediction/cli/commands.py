@@ -42,7 +42,12 @@ from ..config import (
 from ..data_sources.espn import ESPNClient
 from ..data_sources.espn_wnba_injuries import capture_espn_event_injuries
 from ..data_sources.kalshi import DEFERRED_MESSAGE as KALSHI_DEFERRED_MESSAGE
-from ..data_sources.polymarket_execute import ExecutionGateError, OrderTicket, PolymarketExecutor
+from ..data_sources.polymarket_execute import (
+    ExecutionGateError,
+    OrderSubmitUnknownError,
+    OrderTicket,
+    PolymarketExecutor,
+)
 from ..data_sources.polymarket_us import (
     POLYMARKET_SPORT_LEAGUES,
     PolymarketSnapshotStore,
@@ -1275,6 +1280,24 @@ def cmd_train_residual(args, config, registry, bans, ledger, audit, data_root) -
     return output
 
 
+def _execute_or_report_unknown(
+    executor: PolymarketExecutor, ticket: OrderTicket, row: dict, **kwargs: Any
+) -> dict:
+    """Run ``executor.execute``; an unknown order outcome is reported, never shown as REFUSED."""
+    try:
+        return executor.execute(ticket, row, **kwargs)
+    except OrderSubmitUnknownError as error:
+        return {
+            "status": "submit_unknown",
+            "error": str(error),
+            "market_slug": error.market_slug,
+            "idempotency_key": error.idempotency_key,
+            "intent_id": error.intent_id,
+            "note": "Order outcome unknown: check the exchange (open orders, fills) before any retry. "
+            "Do not resubmit.",
+        }
+
+
 def cmd_execute(args, config, registry, bans, ledger, audit, data_root) -> dict:
     row = next((r for r in ledger.rows() if r["pick_id"] == args.pick_id), None)
     if row is None:
@@ -1339,7 +1362,8 @@ def cmd_execute(args, config, registry, bans, ledger, audit, data_root) -> dict:
         authorization_type=("manual_research_override" if manual else "qualified_model"),
     )
     executor = PolymarketExecutor(audit)
-    output = executor.execute(
+    output = _execute_or_report_unknown(
+        executor,
         ticket,
         row,
         execute_flag=args.execute_flag,
@@ -1371,7 +1395,8 @@ def cmd_sell_position(args, config, registry, bans, ledger, audit, data_root) ->
         "status": "open",
         "reason_code": "LIVE_POSITION_EXIT",
     }
-    output = PolymarketExecutor(audit).execute(
+    output = _execute_or_report_unknown(
+        PolymarketExecutor(audit),
         ticket,
         synthetic_row,
         execute_flag=args.execute_flag,

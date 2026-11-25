@@ -86,6 +86,23 @@ logger = logging.getLogger("model_prediction.auto_buyer")
 
 AUTO_BUYER_UNIT_VALUE_USD = 0.50  # 1U = 50 cents
 AUTO_BUYER_TERMINAL_RESULTS = frozenset({"win", "loss", "push"})
+# An order POST whose outcome is unknown (quick-261125-hih B1): no exchange id, nothing known filled.
+ORDER_STATE_SUBMIT_UNKNOWN = "ORDER_STATE_SUBMIT_UNKNOWN"
+# Execution facts passed through to the JSONL row when the payload carries them.
+_EXECUTION_PASSTHROUGH_FIELDS = (
+    "requested_shares",
+    "requested_cost_usd",
+    "intent_id",
+    "idempotency_key",
+    "fallback_idempotency_key",
+    "good_till_time",
+    "fallback_status",
+    "fallback_error",
+)
+
+
+class AutoBuyerLedgerWriteError(RuntimeError):
+    """The live Auto-Buyer ledger could not record an order the exchange already has (B3)."""
 
 
 def _write_jsonl_atomic(j_path: Path, records: list[dict[str, Any]], *, allow_shrink: bool = False) -> None:
@@ -282,12 +299,22 @@ def record_auto_buy_execution(
     pick_row: dict[str, Any] | None = None,
     jsonl_path: Path | str | None = None,
     xlsx_path: Path | str | None = None,
+    *,
+    raise_on_write_failure: bool = False,
 ) -> dict[str, Any]:
-    """Record an auto-bought trade to both the JSONL and Excel auto-buyer ledgers."""
+    """Record an auto-bought trade to both the JSONL and Excel auto-buyer ledgers.
+
+    The JSONL write is the record of a real order on the live ledger (or whenever the caller passes
+    ``raise_on_write_failure``, as the live submission path does): a failure there raises
+    ``AutoBuyerLedgerWriteError`` instead of only logging (B3). The paper ledger keeps warning, and
+    the xlsx export stays best effort everywhere.
+    """
     j_path = Path(jsonl_path) if jsonl_path else AUTO_BUYER_JSONL_PATH
     x_path = Path(xlsx_path) if xlsx_path else AUTO_BUYER_XLSX_PATH
     j_path.parent.mkdir(parents=True, exist_ok=True)
     x_path.parent.mkdir(parents=True, exist_ok=True)
+    strict_write = raise_on_write_failure or _uses_live_auto_buyer_ledger(j_path)
+    submit_unknown = order_payload.get("submit_unknown") is True
 
     pick = pick_row or {}
     oid = str(order_id or order_payload.get("order_id") or "")
@@ -334,8 +361,10 @@ def record_auto_buy_execution(
     fallback_order_id = order_payload.get("fallback_order_id") or None
     fallback_resting_shares = round(float(order_payload.get("fallback_resting_shares") or 0.0), 4)
 
-    # Top-up remainder handling: update existing position row instead of appending duplicate pick row
-    if order_payload.get("is_topup") and j_path.exists():
+    # Top-up remainder handling: update existing position row instead of appending duplicate pick row.
+    # An unknown submission is never merged: it gets its own row, so the filled row stays truthful and
+    # the unknown one stays visible to dedup and the operator.
+    if order_payload.get("is_topup") and not submit_unknown and j_path.exists():
         records = read_auto_buyer_ledger(jsonl_path=j_path)
         matching_idx = None
         for idx, rec in enumerate(records):
@@ -393,6 +422,10 @@ def record_auto_buy_execution(
                 _write_jsonl_atomic(j_path, records)
             except (OSError, ValueError) as err:
                 logger.error(f"Failed to update auto_buyer_ledger.jsonl on topup: {err}")
+                if strict_write:
+                    raise AutoBuyerLedgerWriteError(
+                        f"live ledger top-up rewrite failed for order {oid} ({slug}): {err}"
+                    ) from err
 
             try:
                 if x_path.exists():
@@ -467,12 +500,40 @@ def record_auto_buy_execution(
         "primary_filled_shares": round(shares, 4),
         "primary_filled_cost_usd": round(cost, 4),
     }
+    for field_name in _EXECUTION_PASSTHROUGH_FIELDS:
+        if order_payload.get(field_name) is not None:
+            jsonl_record[field_name] = order_payload[field_name]
+    if submit_unknown:
+        # The exchange may or may not hold this order: no id, nothing known filled, and the
+        # requested cost kept so dedup and the caps still count it. Only the operator resolves it.
+        jsonl_record.update(
+            {
+                "submit_unknown": True,
+                "order_id": "",
+                "order_ids": [],
+                "shares": 0.0,
+                "cost_usd": 0.0,
+                "units": 0.0,
+                "primary_filled_shares": 0.0,
+                "primary_filled_cost_usd": 0.0,
+                "fill_known": False,
+                "order_state": ORDER_STATE_SUBMIT_UNKNOWN,
+                "fallback_order_id": None,
+                "fallback_reconciled": True,
+                "status": "open",
+            }
+        )
 
     # 1. Append to JSONL log
     try:
         with j_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(jsonl_record, sort_keys=True) + "\n")
     except OSError as err:
+        if strict_write:
+            logger.error(f"Failed to append to the live auto_buyer_ledger.jsonl (order {oid}, {slug}): {err}")
+            raise AutoBuyerLedgerWriteError(
+                f"live ledger append failed for order {oid} ({slug}): {err}"
+            ) from err
         logger.warning(f"Failed to append to auto_buyer_ledger.jsonl: {err}")
 
     # 2. Update Excel ledger
@@ -1579,6 +1640,13 @@ def settle_auto_buyer_ledger(
         units = float(r["units"])
         if str(r.get("status") or "").lower() == "settled":
             r["pnl_units"] = _usd_to_auto_buyer_units(float(r.get("pnl_usd") or 0.0), unit_value_usd)
+
+        # An unknown submission is never settled or voided here: whether the order exists is
+        # unknown, so it stays open (and counted pending) until the operator resolves it.
+        if r.get("submit_unknown") is True and str(r.get("status") or "").lower() == "open":
+            pending_count += 1
+            updated_records.append(r)
+            continue
 
         # 0. Void / Zero-share guard: A voided row or a settled row with 0 shares has 0 PnL
         if r.get("result") == "void" or (

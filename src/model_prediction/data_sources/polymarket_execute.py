@@ -20,8 +20,13 @@ Orders use the exact user-confirmed outcome price. The Polymarket US API's
 ``price.value`` is always expressed in the long/YES coordinate, so a confirmed
 short/NO price of X is submitted as 1-X without changing the user's economic
 limit. Resting GTC limits are post-only; marketable IOC limits may take
-liquidity up to that price and cancel any unfilled remainder. The midpoint is
-never silently substituted.
+liquidity up to that price and cancel any unfilled remainder. An IOC remainder
+fallback rests only as a post-only GOOD_TILL_DATE order that expires before the
+event starts. The midpoint is never silently substituted.
+
+Every ``POST /v1/orders`` carries an ``Idempotency-Key`` (one per order leg),
+the intent is audited before the POST, and an ambiguous outcome (sent, but no
+usable answer) raises ``OrderSubmitUnknownError`` instead of being resent.
 
 Submission uses the authenticated Polymarket US retail REST API. It does not
 use the international Polymarket CLOB or a wallet private key.
@@ -30,14 +35,17 @@ use the international Polymarket CLOB or a wallet private key.
 from __future__ import annotations
 
 import base64
+import logging
 import math
 import os
 import re
 import time
 import unicodedata
+import uuid
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -50,9 +58,49 @@ from ..runtime_paths import RuntimePaths, load_dotenv_into_environ
 _paths = RuntimePaths.resolve()
 load_dotenv_into_environ(_paths.repo_root / ".env")
 
+logger = logging.getLogger(__name__)
+
 _MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9_\-]+)")
 _MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9_\-]+)\)\.?\s*$")
 _LIVE_QUOTE_MAXIMUM_AGE_SECONDS = 300
+
+# Operator decision 2026-11-25 (quick-261125-hih B1): an ambiguous order POST (sent, then a read
+# timeout, a 5xx, a 409/ABORTED, or a 2xx with no order id) is NOT resent. The Polymarket US docs
+# prescribe a same-key retry, but no test order may prove the Idempotency-Key header is honoured
+# (D-07) and the docs record that the older `idempotencyKey` spelling was silently ignored. Flip only
+# on a recorded operator decision; the same-key retry path below is tested either way.
+ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY = False
+_ORDER_POST_PATH = "/v1/orders"
+# These fail before any byte of the request reaches the exchange, so a same-key resend is safe.
+_CONNECT_PHASE_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+_GOOD_TILL_DATE = "TIME_IN_FORCE_GOOD_TILL_DATE"
+_IMMEDIATE_OR_CANCEL = "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL"
+# D-01: a fallback must outlive its own placement; an expiry this close is not worth resting.
+_FALLBACK_MIN_LIFETIME_SECONDS = 60
+# D-01: the exchange's own gameStartTime clamps the ticket's expiry to start minus this lead.
+_FALLBACK_EXCHANGE_START_LEAD_SECONDS = 90
+_GTD_READBACK_TOLERANCE_SECONDS = 2.0
+# An adopted fallback must have been created at or after its intent, give or take clock skew.
+_ADOPTION_CLOCK_SKEW_SECONDS = 5.0
+_AUDIT_ERRORS = (OSError, TimeoutError, ValueError, TypeError, RuntimeError)
+
+
+def _idempotency_key(intent_id: str, leg: str) -> str:
+    """One key per placement intent and leg (``p`` primary, ``f`` fallback), under the 255-byte cap."""
+    return f"mp-{intent_id}-{leg}"[:255]
+
+
+def _format_good_till_time(value: datetime) -> str:
+    """RFC 3339 UTC to the second, floored so the expiry never moves later than requested."""
+    return value.astimezone(UTC).replace(microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _response_order_id(response: Any) -> str | None:
+    if not isinstance(response, dict):
+        return None
+    nested = response.get("order")
+    order_id = response.get("id") or (nested.get("id") if isinstance(nested, dict) else None)
+    return str(order_id) if order_id else None
 
 
 # Mirror of dashboard/backtests.py _TEAM_NAME_ALIASES: ESPN-style names that
@@ -311,6 +359,31 @@ class ExecutionGateError(RuntimeError):
     """Raised whenever any gate condition fails. Nothing was submitted."""
 
 
+class OrderSubmitUnknownError(RuntimeError):
+    """An order POST was sent but its outcome is unknown: it may or may not exist on the exchange.
+
+    Deliberately not an ExecutionGateError ("nothing was submitted"). Never resubmit under a new
+    key; check the exchange (open orders, fills) for ``market_slug`` first.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        idempotency_key: str,
+        market_slug: str,
+        leg: str,
+        detail: str = "",
+        intent_id: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.idempotency_key = idempotency_key
+        self.market_slug = market_slug
+        self.leg = leg
+        self.detail = detail or message
+        self.intent_id = intent_id
+
+
 @dataclass(frozen=True)
 class OrderTicket:
     market_slug: str
@@ -324,13 +397,17 @@ class OrderTicket:
     maximum_cost_usd: float | None = None
     authorization_type: str = "qualified_model"
     ioc_fallback_resting: bool = False
+    # D-01: the IOC remainder rests GOOD_TILL_DATE until this instant; None places no fallback.
+    resting_expires_at_utc: str | None = None
+    # B5: refuse when the live ask is more than this far from ``price`` (either way); None skips it.
+    max_live_price_deviation: float | None = None
 
     def describe(self) -> str:
         fallback = (
             " If the IOC only partially fills, the unfilled remainder is "
-            "placed as a resting GTC order at this same price (never a "
-            "higher/chased price)."
-            if self.ioc_fallback_resting
+            "placed as a post-only GOOD_TILL_DATE order at this same price "
+            f"(never a higher/chased price), expiring by {self.resting_expires_at_utc}."
+            if self.ioc_fallback_resting and self.resting_expires_at_utc
             else ""
         )
         return (
@@ -369,6 +446,9 @@ class PolymarketExecutor:
         # Injectable so tests can supply a fake quote without a real network
         # call or a live Polymarket US account; defaults to the real client.
         self._live_quote = live_quote
+        # (Idempotency-Key, leg) for the order POST in flight. An attribute rather than a _request
+        # argument so the 3-positional-argument _request fakes in the tests keep working.
+        self._order_post_context: tuple[str, str] | None = None
 
     # ------------------------------------------------------------------ gate
 
@@ -439,16 +519,7 @@ class PolymarketExecutor:
         # `execute` path too, not just the dashboard. A SELL is exempt: it's
         # how a bought position is legitimately closed, not accumulated.
         if ticket.action == "buy":
-            prior_buy = next(
-                (
-                    event
-                    for event in self.audit.reversed_events()
-                    if event.get("event_type") == "order_executed"
-                    and event.get("subject_id") == ticket.pick_id
-                    and event.get("payload", {}).get("action") == "buy"
-                ),
-                None,
-            )
+            prior_buy = self._prior_buy_event(ticket.pick_id)
             if prior_buy is not None:
                 raise ExecutionGateError(
                     f"REFUSED: a buy order was already submitted for pick {ticket.pick_id} "
@@ -510,7 +581,7 @@ class PolymarketExecutor:
         # Without this, a caller (or a bug/typo in either path) could submit
         # token_side="short" for a pick whose real selection was the long
         # side, and nothing upstream of here would catch it.
-        self._verify_live_side_and_timing(ticket, pick_row)
+        live_snapshot = self._verify_live_side_and_timing(ticket, pick_row)
         # Gate 4: interactive confirmation with exact order details.
         answer = self.confirm(f"{ticket.describe()} Confirm? (Y/N): ").strip().casefold()
         if answer not in {"y", "yes"}:
@@ -520,44 +591,164 @@ class PolymarketExecutor:
                 {"market_slug": ticket.market_slug, "reason": "user_declined_confirmation"},
             )
             return {"status": "declined", "note": "User declined at confirmation. No order placed."}
-        submission = self._submit(ticket)
-        # Gate 7: audit chain.
-        self.audit.append(
-            "order_executed",
-            ticket.pick_id,
-            {
-                "order_id": submission.get("order_id"),
-                "market_slug": ticket.market_slug,
-                "token_side": ticket.token_side,
-                "action": ticket.action,
-                "order_type": ticket.order_type,
-                "price": ticket.price,
-                "price_basis": "selected_outcome_probability",
-                "exchange_price": submission.get("exchange_price"),
-                "exchange_price_basis": "long_side_probability",
-                "size_shares": ticket.size_shares,
-                "estimated_cost_usd": recomputed_cost,
-                "maximum_cost_usd": ticket.maximum_cost_usd,
-                "authorization_type": ticket.authorization_type,
-                "source_record_type": pick_row.get("record_type"),
-                "source_reason_code": pick_row.get("reason_code"),
-                "source_artifact_qualified": artifact_qualified,
-                "transaction_hash": submission.get("transaction_hash"),
-                "order_ids": submission.get("order_ids") or [submission.get("order_id")],
-                "filled_size_shares": submission.get("filled_size_shares"),
-                "estimated_filled_cost_usd": submission.get("estimated_filled_cost_usd"),
-                "ioc_fallback_resting": ticket.ioc_fallback_resting,
-                "fallback_order_id": submission.get("fallback_order_id"),
-                "fallback_status": submission.get("fallback_status"),
-                "fallback_resting_shares": submission.get("fallback_resting_shares"),
-                "submitted_at_utc": iso_utc(utc_now()),
-            },
-        )
+        # B2: the intent is audited BEFORE the POST, so an order the exchange accepted can never be
+        # missing from the audit chain; if the intent cannot be written, nothing is sent.
+        intent_id = uuid.uuid4().hex
+        primary_key = _idempotency_key(intent_id, "p")
+        fallback_key = _idempotency_key(intent_id, "f")
+        event_fields = {
+            "event_id": pick_row.get("event_id"),
+            "selection": str(pick_row.get("selection") or "").casefold() or None,
+            "market_type": pick_row.get("market_type"),
+            "line": pick_row.get("line"),
+        }
+        try:
+            self.audit.append(
+                "order_intent",
+                ticket.pick_id,
+                {
+                    "intent_id": intent_id,
+                    "idempotency_key": primary_key,
+                    "fallback_idempotency_key": fallback_key,
+                    "market_slug": ticket.market_slug,
+                    "token_side": ticket.token_side,
+                    "action": ticket.action,
+                    "order_type": ticket.order_type,
+                    "price": ticket.price,
+                    "size_shares": ticket.size_shares,
+                    **event_fields,
+                    "event_start_utc": pick_row.get("event_start_utc"),
+                    "resting_expires_at_utc": ticket.resting_expires_at_utc,
+                    "created_at_utc": iso_utc(utc_now()),
+                },
+            )
+        except _AUDIT_ERRORS as error:
+            raise ExecutionGateError(
+                f"REFUSED: could not audit the order intent ({type(error).__name__}: {error}); nothing was sent."
+            ) from error
+        # The intent append can wait on the audit lock; the pregame check above ran before that wait.
+        with suppress(TypeError, ValueError):
+            if utc_now() >= parse_utc(str(pick_row.get("event_start_utc", ""))):
+                with suppress(*_AUDIT_ERRORS):
+                    self.audit.append(
+                        "order_rejected", ticket.pick_id, {"intent_id": intent_id, "error": "event started"}
+                    )
+                raise ExecutionGateError(
+                    "REFUSED: the event started while the order intent was being audited; nothing was sent."
+                )
+        try:
+            submission = self._submit(
+                ticket,
+                intent_id=intent_id,
+                idempotency_key=primary_key,
+                fallback_idempotency_key=fallback_key,
+                live_snapshot=live_snapshot,
+            )
+        except ExecutionGateError as error:
+            with suppress(*_AUDIT_ERRORS):
+                self.audit.append(
+                    "order_rejected", ticket.pick_id, {"intent_id": intent_id, "error": str(error)[:500]}
+                )
+            raise
+        except OrderSubmitUnknownError as error:
+            error.intent_id = intent_id
+            with suppress(*_AUDIT_ERRORS):
+                self.audit.append(
+                    "order_submit_unknown",
+                    ticket.pick_id,
+                    {
+                        "intent_id": intent_id,
+                        "idempotency_key": error.idempotency_key,
+                        "fallback_idempotency_key": fallback_key,
+                        "leg": error.leg,
+                        "detail": str(error.detail)[:500],
+                        "market_slug": ticket.market_slug,
+                        "token_side": ticket.token_side,
+                        "action": ticket.action,
+                        "price": ticket.price,
+                        "size_shares": ticket.size_shares,
+                        **event_fields,
+                    },
+                )
+            raise
+        # Gate 7: audit chain. The order exists now, so an audit failure is returned, never raised:
+        # raising here would read as "refused" upstream and invite a duplicate buy.
+        executed_payload = {
+            "order_id": submission.get("order_id"),
+            "market_slug": ticket.market_slug,
+            "token_side": ticket.token_side,
+            "action": ticket.action,
+            "order_type": ticket.order_type,
+            "price": ticket.price,
+            "price_basis": "selected_outcome_probability",
+            "exchange_price": submission.get("exchange_price"),
+            "exchange_price_basis": "long_side_probability",
+            "size_shares": ticket.size_shares,
+            "estimated_cost_usd": recomputed_cost,
+            "maximum_cost_usd": ticket.maximum_cost_usd,
+            "authorization_type": ticket.authorization_type,
+            "source_record_type": pick_row.get("record_type"),
+            "source_reason_code": pick_row.get("reason_code"),
+            "source_artifact_qualified": artifact_qualified,
+            "transaction_hash": submission.get("transaction_hash"),
+            "order_ids": submission.get("order_ids") or [submission.get("order_id")],
+            "filled_size_shares": submission.get("filled_size_shares"),
+            "estimated_filled_cost_usd": submission.get("estimated_filled_cost_usd"),
+            "ioc_fallback_resting": ticket.ioc_fallback_resting,
+            "fallback_order_id": submission.get("fallback_order_id"),
+            "fallback_status": submission.get("fallback_status"),
+            "fallback_resting_shares": submission.get("fallback_resting_shares"),
+            "fallback_error": submission.get("fallback_error"),
+            "good_till_time": submission.get("good_till_time"),
+            "intent_id": intent_id,
+            "idempotency_key": submission.get("idempotency_key"),
+            "fallback_idempotency_key": submission.get("fallback_idempotency_key"),
+            **event_fields,
+            "submitted_at_utc": iso_utc(utc_now()),
+        }
+        try:
+            self.audit.append("order_executed", ticket.pick_id, executed_payload)
+        except _AUDIT_ERRORS as error:
+            logger.error(
+                "order %s for pick %s on %s was placed but its order_executed audit failed: %s",
+                submission.get("order_ids"),
+                ticket.pick_id,
+                ticket.market_slug,
+                error,
+            )
+            return {"status": "submitted", **submission, "audit_error": f"{type(error).__name__}: {error}"}
         return {"status": "submitted", **submission}
+
+    def _prior_buy_event(self, pick_id: str) -> dict[str, Any] | None:
+        """The newest audit event that means a buy may already exist for ``pick_id``.
+
+        An executed buy, an unknown submission, or an intent whose outcome was never recorded (a
+        crash mid-POST) all count. Only an intent later marked ``order_rejected`` does not.
+        ``reversed_events`` yields newest first, so a rejection is seen before its own intent.
+        """
+        rejected_intents: set[str] = set()
+        for event in self.audit.reversed_events():
+            if event.get("subject_id") != pick_id:
+                continue
+            event_type = event.get("event_type")
+            payload = event.get("payload") or {}
+            if event_type == "order_rejected":
+                rejected_intents.add(str(payload.get("intent_id") or ""))
+                continue
+            if event_type == "order_executed" and payload.get("action") == "buy":
+                return event
+            if (
+                event_type in {"order_submit_unknown", "order_intent"}
+                and payload.get("action", "buy") == "buy"
+            ):
+                if event_type == "order_intent" and str(payload.get("intent_id") or "") in rejected_intents:
+                    continue
+                return event
+        return None
 
     # ------------------------------------------------------ live verification
 
-    def _verify_live_side_and_timing(self, ticket: OrderTicket, pick_row: dict[str, str]) -> None:
+    def _verify_live_side_and_timing(self, ticket: OrderTicket, pick_row: dict[str, str]) -> dict[str, Any]:
         """Fetch a fresh quote and independently confirm token_side, market
         state, and pregame status -- rather than trusting whatever the
         caller already derived.
@@ -616,6 +807,24 @@ class PolymarketExecutor:
                 f"REFUSED: ticket token_side {ticket.token_side!r} does not match the "
                 f"live market side for this pick ({expected_side!r})."
             )
+        if ticket.max_live_price_deviation is not None:
+            # B5: the ticket was priced from a quote read earlier in the cycle; refuse when the live
+            # ask has since moved more than the allowed deviation in either direction.
+            raw_ask: Any = (snapshot.get(ticket.token_side) or {}).get("ask")
+            try:
+                live_ask = float(raw_ask)
+            except (TypeError, ValueError):
+                live_ask = math.nan
+            if not math.isfinite(live_ask):
+                raise ExecutionGateError(
+                    f"REFUSED: the live ask for {ticket.token_side} is missing ({raw_ask!r})."
+                )
+            if abs(live_ask - ticket.price) > ticket.max_live_price_deviation + 1e-9:
+                raise ExecutionGateError(
+                    f"REFUSED: the live ask {live_ask:.2f} is more than {ticket.max_live_price_deviation:.2f} "
+                    f"from the ticket price {ticket.price:.2f}; nothing was sent."
+                )
+        return snapshot
 
     # ---------------------------------------------------------------- submit
 
@@ -644,6 +853,8 @@ class PolymarketExecutor:
         path: str,
         payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        if method.upper() == "POST" and path == _ORDER_POST_PATH:
+            return self._post_order(payload)
         max_retries = 3
         backoff = 0.5
         # The Ed25519 request signature covers the path WITHOUT the query
@@ -684,17 +895,184 @@ class PolymarketExecutor:
                 ) from error
         raise ExecutionGateError("REFUSED: Polymarket US request exceeded retry attempts.")
 
-    def _submit(self, ticket: OrderTicket) -> dict[str, Any]:
+    def _post_order(self, payload: dict[str, Any] | None) -> dict[str, Any]:
+        """POST /v1/orders with this leg's Idempotency-Key (B1).
+
+        Resent with the same key only when nothing reached the exchange (a connect-phase error, or a
+        429 from the edge, which rejects before the API). Anything else that leaves the outcome open
+        raises ``OrderSubmitUnknownError`` at once, unless ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY.
+        A definite 4xx is REFUSED.
+        """
+        context = self._order_post_context
+        if context is None or not context[0]:
+            raise ExecutionGateError(
+                "REFUSED: an order POST must carry an Idempotency-Key; nothing was sent."
+            )
+        key, leg = context
+        market_slug = str((payload or {}).get("marketSlug") or "")
+        max_attempts = 3
+        backoff = 0.5
+        last_unknown: OrderSubmitUnknownError | None = None
+        for attempt in range(max_attempts):
+            final_attempt = attempt == max_attempts - 1
+            retry_ambiguous = ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY and not final_attempt
+            try:
+                response = httpx.request(
+                    "POST",
+                    f"{API_HOST}{_ORDER_POST_PATH}",
+                    headers={**self._auth_headers("POST", _ORDER_POST_PATH), "Idempotency-Key": key},
+                    json=payload,
+                    timeout=15,
+                )
+            except _CONNECT_PHASE_ERRORS as error:
+                if not final_attempt:
+                    time.sleep(backoff * (2**attempt))
+                    continue
+                raise ExecutionGateError(
+                    f"REFUSED: could not connect to Polymarket US ({type(error).__name__}); the order was never sent."
+                ) from error
+            except httpx.HTTPError as error:
+                last_unknown = OrderSubmitUnknownError(
+                    f"order outcome unknown ({leg} leg, {market_slug}): {type(error).__name__} after sending",
+                    idempotency_key=key,
+                    market_slug=market_slug,
+                    leg=leg,
+                    detail=f"{type(error).__name__}: {error}",
+                )
+                if retry_ambiguous:
+                    time.sleep(backoff * (2**attempt))
+                    continue
+                raise last_unknown from error
+            status = response.status_code
+            body_text = response.text[:500]
+            if status == 429:
+                if not final_attempt:
+                    time.sleep(backoff * (2**attempt))
+                    continue
+                raise ExecutionGateError(
+                    f"REFUSED by Polymarket US (429): rate limited on every attempt: {body_text}"
+                )
+            if 400 <= status < 500 and status != 409 and "ABORTED" not in body_text:
+                raise ExecutionGateError(f"REFUSED by Polymarket US ({status}): {body_text}")
+            output: Any = None
+            if 200 <= status < 300:
+                try:
+                    output = response.json()
+                except ValueError:
+                    output = None
+                if _response_order_id(output):
+                    return output
+            last_unknown = OrderSubmitUnknownError(
+                f"order outcome unknown ({leg} leg, {market_slug}): HTTP {status} {body_text[:200]}",
+                idempotency_key=key,
+                market_slug=market_slug,
+                leg=leg,
+                detail=f"HTTP {status}: {body_text}",
+            )
+            if retry_ambiguous:
+                time.sleep(backoff * (2**attempt))
+                continue
+            raise last_unknown
+        raise last_unknown or ExecutionGateError(
+            "REFUSED: Polymarket US order request exceeded retry attempts."
+        )
+
+    def _fallback_expiry(self, ticket: OrderTicket, live_snapshot: dict[str, Any] | None) -> datetime | None:
+        """Ticket expiry, clamped to the exchange's own start minus 90 s when the live quote has one."""
+        if not ticket.resting_expires_at_utc:
+            return None
+        try:
+            expiry = parse_utc(str(ticket.resting_expires_at_utc))
+        except ValueError:
+            return None
+        exchange_start = (live_snapshot or {}).get("event_start_utc")
+        if exchange_start:
+            with suppress(TypeError, ValueError):
+                clamp = parse_utc(str(exchange_start)) - timedelta(
+                    seconds=_FALLBACK_EXCHANGE_START_LEAD_SECONDS
+                )
+                expiry = min(expiry, clamp)
+        return expiry
+
+    def _gtd_readback_problem(self, order_id: str, good_till_time: str) -> str | None:
+        """None when the exchange reports ``order_id`` as GOOD_TILL_DATE expiring as requested."""
+        try:
+            response = self._request("GET", f"/v1/order/{order_id}", None)
+            nested = response.get("order")
+            order = nested if isinstance(nested, dict) else response
+            tif = str(order.get("tif") or order.get("timeInForce") or "")
+            if tif != _GOOD_TILL_DATE:
+                return f"read-back tif {tif or 'missing'}"
+            reported = parse_utc(str(order.get("goodTillTime") or ""))
+            drift = abs((reported - parse_utc(good_till_time)).total_seconds())
+            if drift > _GTD_READBACK_TOLERANCE_SECONDS:
+                return f"read-back goodTillTime {order.get('goodTillTime')} is {drift:.0f}s from {good_till_time}"
+        except Exception as error:  # noqa: BLE001 -- an unreadable order is unverified, whatever the cause
+            return f"read-back failed ({type(error).__name__}: {error})"
+        return None
+
+    def _adopt_open_fallback(
+        self,
+        ticket: OrderTicket,
+        *,
+        intent: str,
+        exchange_price: float,
+        quantity: float,
+        placed_after: datetime,
+    ) -> str | None:
+        """The id of the single open GTD order that is this fallback, or None (zero or several matches).
+
+        There is no client order id, so a lost fallback response is matched on intent, price,
+        quantity, tif and creation time. An IOC never rests, so this applies to the fallback only.
+        """
+        try:
+            orders = self.open_orders([ticket.market_slug])
+        except Exception as error:  # noqa: BLE001 -- adoption is best effort; unknown is the safe default
+            logger.warning("open-orders read for fallback adoption failed: %s", error)
+            return None
+        matches = []
+        for order in orders:
+            try:
+                price: Any = order.get("price")
+                raw_price: Any = price.get("value") if isinstance(price, dict) else price
+                raw_quantity: Any = order.get("quantity")
+                price_value = float(raw_price)
+                created = parse_utc(str(order.get("createTime") or ""))
+                same = (
+                    str(order.get("marketSlug") or ticket.market_slug) == ticket.market_slug
+                    and order.get("intent") == intent
+                    and abs(price_value - round(exchange_price, 2)) < 1e-9
+                    and abs(float(raw_quantity) - quantity) < 1e-6
+                    and str(order.get("tif") or order.get("timeInForce") or "") == _GOOD_TILL_DATE
+                    and created >= placed_after - timedelta(seconds=_ADOPTION_CLOCK_SKEW_SECONDS)
+                )
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if same and order.get("id"):
+                matches.append(str(order["id"]))
+        return matches[0] if len(matches) == 1 else None
+
+    def _submit(
+        self,
+        ticket: OrderTicket,
+        *,
+        intent_id: str | None = None,
+        idempotency_key: str | None = None,
+        fallback_idempotency_key: str | None = None,
+        live_snapshot: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Submit a capped resting or immediately marketable limit order.
 
         Polymarket US always expects ``price.value`` in the market's long/YES
         coordinate, even for a short/NO intent. ``OrderTicket.price`` remains
         the exact user-confirmed price of the selected outcome. When an IOC
         buy only partially (or never) fills and ``ioc_fallback_resting`` is
-        set, the unfilled remainder is placed as a second order -- but that
-        second order is a GTC resting limit AT THE SAME PRICE, never a
-        marketable order at a higher price. It waits on the book for a
-        seller rather than paying up to force an immediate fill.
+        set, the unfilled remainder is placed as a second order -- a post-only
+        GOOD_TILL_DATE limit AT THE SAME PRICE that expires before the event
+        starts (D-01), never a marketable order at a higher price and never a
+        GOOD_TILL_CANCEL. The fallback is read back by id and cancelled on any
+        mismatch. Once the primary order exists nothing here raises: a failed
+        fallback leg is reported in ``fallback_status`` / ``fallback_error``.
         """
         intent = {
             ("buy", "long"): "ORDER_INTENT_BUY_LONG",
@@ -705,34 +1083,44 @@ class PolymarketExecutor:
         if intent is None:
             raise ExecutionGateError("REFUSED: unsupported order action/side.")
         exchange_price = ticket.price if ticket.token_side == "long" else 1.0 - ticket.price
+        intent_id = intent_id or uuid.uuid4().hex
+        primary_key = idempotency_key or _idempotency_key(intent_id, "p")
+        fallback_key = fallback_idempotency_key or _idempotency_key(intent_id, "f")
 
-        def submit_order(order_type: str, quantity: float) -> tuple[dict[str, Any], str]:
-            marketable_order = order_type == "limit_ioc"
-            response = self._request(
-                "POST",
-                "/v1/orders",
-                {
-                    "marketSlug": ticket.market_slug,
-                    "intent": intent,
-                    "type": "ORDER_TYPE_LIMIT",
-                    "price": {"value": f"{exchange_price:.2f}", "currency": "USD"},
-                    "quantity": quantity,
-                    "tif": (
-                        "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL"
-                        if marketable_order
-                        else "TIME_IN_FORCE_GOOD_TILL_CANCEL"
-                    ),
-                    "participateDontInitiate": not marketable_order,
-                    "manualOrderIndicator": "MANUAL_ORDER_INDICATOR_MANUAL",
-                    "synchronousExecution": marketable_order,
-                },
-            )
-            order_id = response.get("id") or (response.get("order") or {}).get("id")
+        def order_body(tif: str, quantity: float, good_till_time: str | None = None) -> dict[str, Any]:
+            marketable_order = tif == _IMMEDIATE_OR_CANCEL
+            body: dict[str, Any] = {
+                "marketSlug": ticket.market_slug,
+                "intent": intent,
+                "type": "ORDER_TYPE_LIMIT",
+                "price": {"value": f"{exchange_price:.2f}", "currency": "USD"},
+                "quantity": quantity,
+                "tif": tif,
+                "participateDontInitiate": not marketable_order,
+                "manualOrderIndicator": "MANUAL_ORDER_INDICATOR_MANUAL",
+                "synchronousExecution": marketable_order,
+            }
+            if good_till_time is not None:
+                body["goodTillTime"] = good_till_time
+            return body
+
+        def submit_order(body: dict[str, Any], key: str, leg: str) -> tuple[dict[str, Any], str]:
+            self._order_post_context = (key, leg)
+            try:
+                response = self._request("POST", _ORDER_POST_PATH, body)
+            finally:
+                self._order_post_context = None
+            order_id = _response_order_id(response)
             if not order_id:
-                raise ExecutionGateError(
-                    "REFUSED: Polymarket US did not return an order ID; no submitted state was recorded."
+                raise OrderSubmitUnknownError(
+                    "Polymarket US did not return an order ID; the order may exist.",
+                    idempotency_key=key,
+                    market_slug=ticket.market_slug,
+                    leg=leg,
+                    detail="response without an order id",
+                    intent_id=intent_id,
                 )
-            return response, str(order_id)
+            return response, order_id
 
         def order_from(response: dict[str, Any]) -> dict[str, Any]:
             nested = response.get("order")
@@ -759,7 +1147,9 @@ class PolymarketExecutor:
             return max(0.0, min(requested, float(value)))
 
         marketable = ticket.order_type == "limit_ioc"
-        response, order_id = submit_order(ticket.order_type, ticket.size_shares)
+        # A manual `limit_gtc` order keeps its GOOD_TILL_CANCEL; no auto-buyer order is ever one.
+        primary_tif = _IMMEDIATE_OR_CANCEL if marketable else "TIME_IN_FORCE_GOOD_TILL_CANCEL"
+        response, order_id = submit_order(order_body(primary_tif, ticket.size_shares), primary_key, "primary")
         order = order_from(response)
         primary_filled = fill_quantity(order, ticket.size_shares)
         if marketable and primary_filled is None:
@@ -783,6 +1173,8 @@ class PolymarketExecutor:
         fallback_order_id: str | None = None
         fallback_status = "not_authorized"
         fallback_resting_shares = 0.0
+        fallback_error: str | None = None
+        good_till_time: str | None = None
         # A resting GTC order is legitimately "not yet filled", so unknown-fill
         # tracking only applies to marketable IOC orders whose fill we could not
         # observe at all.
@@ -796,13 +1188,52 @@ class PolymarketExecutor:
             and primary_filled + 1e-9 < ticket.size_shares
         )
         if can_fallback and primary_filled is not None:
-            fallback_resting_shares = round(ticket.size_shares - primary_filled, 4)
-            if fallback_resting_shares >= 0.01:
-                _fallback_response, fallback_order_id = submit_order("limit_gtc", fallback_resting_shares)
-                order_ids.append(fallback_order_id)
-                fallback_status = "resting"
-            else:
+            remainder = round(ticket.size_shares - primary_filled, 4)
+            expiry = self._fallback_expiry(ticket, live_snapshot)
+            if remainder < 0.01:
                 fallback_status = "no_remainder"
+            elif expiry is None:
+                fallback_status = "not_placed_no_expiry"
+            elif expiry <= utc_now() + timedelta(seconds=_FALLBACK_MIN_LIFETIME_SECONDS):
+                fallback_status = "not_placed_near_start"
+            else:
+                good_till_time = _format_good_till_time(expiry)
+                placed_after = utc_now()
+                try:
+                    _fallback_response, fallback_order_id = submit_order(
+                        order_body(_GOOD_TILL_DATE, remainder, good_till_time), fallback_key, "fallback"
+                    )
+                    fallback_status = "resting"
+                except ExecutionGateError as error:
+                    # The exchange refused the GTD leg (e.g. a payload format it rejects): the IOC
+                    # result stands and nothing rests. Never retried as GOOD_TILL_CANCEL (D-01).
+                    fallback_status = "rejected"
+                    fallback_error = str(error)[:500]
+                except Exception as error:  # noqa: BLE001 -- the IOC already exists; never lose it
+                    fallback_error = f"{type(error).__name__}: {error}"[:500]
+                    fallback_order_id = self._adopt_open_fallback(
+                        ticket,
+                        intent=intent,
+                        exchange_price=exchange_price,
+                        quantity=remainder,
+                        placed_after=placed_after,
+                    )
+                    fallback_status = "resting" if fallback_order_id else "submit_unknown"
+                if fallback_status in {"resting", "submit_unknown"}:
+                    fallback_resting_shares = remainder
+                if fallback_order_id:
+                    order_ids.append(fallback_order_id)
+                    problem = self._gtd_readback_problem(fallback_order_id, good_till_time)
+                    if problem is not None:
+                        fallback_error = problem
+                        try:
+                            self.cancel(fallback_order_id, user_command=True, market_slug=ticket.market_slug)
+                            fallback_status = "cancelled_unverified_gtd"
+                        except Exception as error:  # noqa: BLE001 -- reported; reconcile retries later
+                            fallback_status = "unverified_gtd_cancel_failed"
+                            fallback_error = f"{problem}; cancel failed ({type(error).__name__}: {error})"[
+                                :500
+                            ]
 
         if not fill_known:
             # We could not determine whether the primary IOC filled. Do NOT
@@ -828,7 +1259,7 @@ class PolymarketExecutor:
             final_state = "ORDER_STATE_UNKNOWN"
         elif total_filled + 1e-9 >= ticket.size_shares:
             final_state = "ORDER_STATE_FILLED"
-        elif total_filled > 0 or fallback_order_id is not None:
+        elif total_filled > 0 or fallback_order_id is not None or fallback_status == "submit_unknown":
             final_state = "ORDER_STATE_PARTIALLY_FILLED"
         else:
             final_state = str(order.get("state") or "ORDER_STATE_EXPIRED")
@@ -843,7 +1274,12 @@ class PolymarketExecutor:
             "fallback_order_id": fallback_order_id,
             "fallback_status": fallback_status,
             "fallback_resting_shares": fallback_resting_shares,
+            "fallback_error": fallback_error,
+            "good_till_time": good_till_time,
             "fill_known": fill_known,
+            "intent_id": intent_id,
+            "idempotency_key": primary_key,
+            "fallback_idempotency_key": fallback_key,
             "raw_response": response,
         }
 
@@ -937,6 +1373,8 @@ class PolymarketExecutor:
                     "market_slug": order.get("marketSlug"),
                     "cum_quantity": order.get("cumQuantity"),
                     "leaves_quantity": order.get("leavesQuantity"),
+                    "tif": order.get("tif") or order.get("timeInForce"),
+                    "good_till_time": order.get("goodTillTime"),
                 }
             )
         return {
@@ -945,6 +1383,67 @@ class PolymarketExecutor:
             "unavailable_order_ids": unavailable,
             "observed_at_utc": iso_utc(utc_now()),
         }
+
+    def open_orders(self, slugs: list[str]) -> list[dict[str, Any]]:
+        """Open orders for ``slugs`` (GET /v1/orders/open, repeated ``slugs=``; not paginated). Read only."""
+        missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
+        if missing:
+            raise ExecutionGateError(f"REFUSED: {', '.join(missing)} is not set.")
+        query = "&".join(f"slugs={slug}" for slug in dict.fromkeys(str(s) for s in slugs if s))
+        response = self._request("GET", f"/v1/orders/open?{query}", None)
+        orders = response.get("orders")
+        return [order for order in orders if isinstance(order, dict)] if isinstance(orders, list) else []
+
+    def preview_order(self, request_body: dict[str, Any], user_command: bool) -> dict[str, Any]:
+        """POST /v1/order/preview once, for the operator's optional GTD format probe (D-07).
+
+        The buyer never calls this. The docs call it a preview "before submission" but never state
+        that it places nothing, so it requires an explicit user command and is never retried: an
+        ambiguous outcome raises ``OrderSubmitUnknownError``.
+        """
+        if not user_command:
+            raise ExecutionGateError("REFUSED: an order preview requires an explicit user command.")
+        missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
+        if missing:
+            raise ExecutionGateError(f"REFUSED: {', '.join(missing)} is not set.")
+        path = "/v1/order/preview"
+        market_slug = str(request_body.get("marketSlug") or "")
+        try:
+            response = httpx.request(
+                "POST",
+                f"{API_HOST}{path}",
+                headers=self._auth_headers("POST", path),
+                json={"request": request_body},
+                timeout=15,
+            )
+        except _CONNECT_PHASE_ERRORS as error:
+            raise ExecutionGateError(
+                f"REFUSED: could not connect ({type(error).__name__}); nothing was sent."
+            ) from error
+        except httpx.HTTPError as error:
+            raise OrderSubmitUnknownError(
+                f"preview outcome unknown ({type(error).__name__})",
+                idempotency_key="",
+                market_slug=market_slug,
+                leg="preview",
+            ) from error
+        if 400 <= response.status_code < 500:
+            raise ExecutionGateError(
+                f"REFUSED by Polymarket US ({response.status_code}): {response.text[:500]}"
+            )
+        try:
+            output = response.json()
+        except ValueError:
+            output = None
+        if response.status_code >= 300 or not isinstance(output, dict):
+            raise OrderSubmitUnknownError(
+                f"preview outcome unknown (HTTP {response.status_code})",
+                idempotency_key="",
+                market_slug=market_slug,
+                leg="preview",
+                detail=response.text[:500],
+            )
+        return output
 
     # ---------------------------------------------------------------- cancel
 
@@ -968,5 +1467,14 @@ class PolymarketExecutor:
                 if order_info.get("marketSlug"):
                     payload["marketSlug"] = order_info["marketSlug"]
         response = self._request("POST", f"/v1/order/{order_id}/cancel", payload)
-        self.audit.append("order_cancelled", order_id, {"raw_response": str(response)[:500]})
+        try:
+            self.audit.append("order_cancelled", order_id, {"raw_response": str(response)[:500]})
+        except _AUDIT_ERRORS as error:
+            # The cancel already went out; raising would report it as failed and invite a retry.
+            logger.error("order %s was cancelled but its order_cancelled audit failed: %s", order_id, error)
+            return {
+                "status": "cancelled",
+                "order_id": order_id,
+                "audit_error": f"{type(error).__name__}: {error}",
+            }
         return {"status": "cancelled", "order_id": order_id}

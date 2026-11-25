@@ -20,7 +20,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -33,6 +33,7 @@ from model_prediction.audit import AuditLog
 from model_prediction.calibration_pipeline import calibrate_for_serving
 from model_prediction.data_sources.polymarket_execute import (
     ExecutionGateError,
+    OrderSubmitUnknownError,
     OrderTicket,
     PolymarketExecutor,
 )
@@ -431,6 +432,9 @@ class AutoExecutionConfig:
     cohorts: tuple[BuyCohort, ...] = ()
     # Cohort passes index only their own book's auto-buyer ledger (see _build_bought_index).
     dedup_own_ledger_only: bool = False
+    # C9: re-read the state file before every live submission and stop the pass unless `enabled`
+    # is still exactly True, so the kill switch also stops a cycle that is already running.
+    recheck_enabled_before_submit: bool = False
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
@@ -475,6 +479,10 @@ class AutoExecutionResult:
     dry_run_orders: list[dict[str, Any]] = field(default_factory=list)
     total_spend_usd: float = 0.0
     snapshot_captures: list[dict[str, Any]] = field(default_factory=list)
+    # Live-pass alarms (unknown order, unrecorded order, fallback problem) and why live buying
+    # stopped early in this pass, if it did.
+    alarms: list[dict[str, Any]] = field(default_factory=list)
+    live_halt_reason: str | None = None
 
 
 INPUT_FLAG_FIELDS = ("input_qualified", "weather_inputs_verified")
@@ -865,6 +873,27 @@ def _capture_missing_active_snapshot_slates(
 
 AUTO_BUYER_CYCLE_HISTORY_PATH = DATA / "logs" / "auto_buyer_cycle_history.jsonl"
 
+# D-01 (operator, 2026-11-25): a live IOC remainder rests GOOD_TILL_DATE and expires this long before
+# the event start, so nothing the buyer placed can rest into a live game.
+LIVE_FALLBACK_EXPIRY_LEAD_SECONDS = 90
+# B5: a live order is refused when the live ask has moved more than this from the ticket price.
+LIVE_MAX_PRICE_DEVIATION = 0.02
+# fallback_status values that need the operator's eye but leave the placed IOC itself intact.
+_FALLBACK_ALARM_STATUSES = frozenset(
+    {"rejected", "submit_unknown", "cancelled_unverified_gtd", "unverified_gtd_cancel_failed"}
+)
+
+
+class LiveAutoBuyerAlarm(RuntimeError):
+    """A live pass raised an alarm (unknown order, unrecorded order, ...). Raised by
+    ``run_auto_buyer_cycle`` after state and history are saved, so the scheduled run is marked
+    failed; ``run_summary`` is the cycle's full summary."""
+
+    def __init__(self, message: str, *, run_summary: dict[str, Any], alarms: list[dict[str, Any]]) -> None:
+        super().__init__(message)
+        self.run_summary = run_summary
+        self.alarms = alarms
+
 
 def _append_auto_buyer_cycle_history(
     run_summary: dict[str, Any],
@@ -888,14 +917,45 @@ def _append_auto_buyer_cycle_history(
 
 
 def _resting_fallback_cost(row: dict[str, Any]) -> float:
-    """Dollars still resting on the book for an unreconciled IOC fallback (0 once reconciled)."""
-    if not row.get("fallback_order_id") or row.get("fallback_reconciled"):
-        return 0.0
+    """Dollars still resting on the book for an unreconciled IOC fallback (0 once reconciled).
+
+    An open unknown submission counts its full requested cost and an unknown fallback leg its
+    remainder: either may exist on the exchange, so the caps must count it.
+    """
     try:
-        cost = float(row.get("fallback_resting_shares") or 0.0) * float(row.get("entry_price") or 0.0)
+        if row.get("submit_unknown") is True and str(row.get("status") or "open").lower() == "open":
+            cost = float(row.get("requested_cost_usd") or 0.0)
+        elif row.get("fallback_status") == "submit_unknown" and not row.get("fallback_order_id"):
+            cost = float(row.get("fallback_resting_shares") or 0.0) * float(row.get("entry_price") or 0.0)
+        elif not row.get("fallback_order_id") or row.get("fallback_reconciled"):
+            return 0.0
+        else:
+            cost = float(row.get("fallback_resting_shares") or 0.0) * float(row.get("entry_price") or 0.0)
     except (TypeError, ValueError):
         return 0.0
     return cost if math.isfinite(cost) and cost > 0 else 0.0
+
+
+def _live_buying_still_enabled() -> bool:
+    """C9: the kill switch as saved right now; an unreadable state fails toward stopping."""
+    try:
+        return load_auto_buyer_state().get("enabled") is True
+    except Exception:
+        logger.exception("Auto-buyer state unreadable before a live submission; stopping live buying")
+        return False
+
+
+def _alarm(
+    kind: str, *, pick_id: str, market_slug: str, detail: str, order_ids: Any = None
+) -> dict[str, Any]:
+    return {
+        "alarm": kind,
+        "pick_id": pick_id,
+        "market_slug": market_slug,
+        "order_ids": [str(o) for o in (order_ids or []) if o],
+        "detail": str(detail)[:500],
+        "at_utc": iso_utc(utc_now()),
+    }
 
 
 def _live_book_has_pending_orders(ledger_path: Path) -> bool:
@@ -1347,6 +1407,7 @@ def _cohort_pass_config(
         max_quote_age_seconds=MAX_AUTO_BUYER_QUOTE_AGE_SECONDS,
         refresh_stale_quotes=True,
         dedup_own_ledger_only=True,
+        recheck_enabled_before_submit=mode == "live",
     )
 
 
@@ -1392,6 +1453,8 @@ def _cohort_pass_summary(
         "total_spend_usd": res.total_spend_usd,
         "orders_count": len(orders),
         "orders": orders,
+        "alarms": res.alarms,
+        "live_halt_reason": res.live_halt_reason,
     }
 
 
@@ -1565,6 +1628,7 @@ def run_auto_buyer_cycle(
             )
         ),
         refresh_stale_quotes=should_execute,
+        recheck_enabled_before_submit=should_execute,
     )
 
     buyer = AutoPolymarketBuyer(config=config)
@@ -1647,6 +1711,8 @@ def run_auto_buyer_cycle(
         "cohort_config_errors": list(parsed_cohorts.errors),
         "cohorts_active": [c.label for c in parsed_cohorts.active],
         "cohort_passes": cohort_passes,
+        "alarms": res.alarms,
+        "live_halt_reason": res.live_halt_reason,
     }
 
     if preview:
@@ -1686,6 +1752,15 @@ def run_auto_buyer_cycle(
         if forecast_date:
             fresh["last_daily_date"] = forecast_date
         save_auto_buyer_state(fresh)
+    # Raised only after state and history are saved, so the alarm is on record whichever caller
+    # catches it (the worker marks the run failed; daily step 12 logs it and still reconciles).
+    live_alarms = [*(res.alarms if should_execute else []), *cohort_passes.get("live", {}).get("alarms", [])]
+    if live_alarms:
+        kinds = ", ".join(sorted({str(a.get("alarm")) for a in live_alarms}))
+        logger.error("Live auto-buyer alarm(s): %s -- %s", kinds, live_alarms)
+        raise LiveAutoBuyerAlarm(
+            f"live auto-buyer alarm: {kinds}", run_summary=run_summary, alarms=live_alarms
+        )
     return run_summary
 
 
@@ -1839,6 +1914,15 @@ class AutoPolymarketBuyer:
         partially_filled_slugs: set[str] = set()
 
         failures: list[tuple[str, str]] = []
+        # Orders that may exist on the exchange with no known fill (an unknown submission, or an
+        # intent with no recorded outcome). Their keys are re-added after the partial-fill
+        # exclusion below, so a top-up whose POST went unanswered can never be retried.
+        unknown_pick_ids: set[str] = set()
+        unknown_market_sides: set[tuple[str, str]] = set()
+        # Audit payloads now carry event_id/selection/market_type (B4b). Those event-level keys
+        # block a whole game, so they apply only to the live book (or the legacy shared index): a
+        # live fill must never block a paper cohort's row (the 31d per-book dedup design).
+        audit_event_keys = self.config.mode == "live" or not self.config.dedup_own_ledger_only
 
         # 1. Audit logs (self.audit, data_root / audit.jsonl, data_root / audit_log.jsonl)
         audit_paths = [self.audit.path, self.data_root / "audit.jsonl", self.data_root / "audit_log.jsonl"]
@@ -1848,6 +1932,8 @@ class AutoPolymarketBuyer:
             if resolved in seen_paths or not log_path.exists():
                 continue
             seen_paths.add(resolved)
+            buy_events: list[tuple[str, dict[str, Any]]] = []
+            settled_intents: set[str] = set()
             try:
                 with log_path.open(encoding="utf-8") as handle:
                     for line in handle:
@@ -1858,27 +1944,52 @@ class AutoPolymarketBuyer:
                             event = json.loads(line)
                         except json.JSONDecodeError:
                             continue
-                        ev_type = event.get("event_type")
-                        if ev_type in {"order_executed", "order_submitted"}:
-                            subj = str(event.get("subject_id") or "")
-                            payload = event.get("payload") or {}
-                            action = str(payload.get("action") or "buy").lower()
-                            if action == "buy":
-                                if subj:
-                                    bought_pick_ids.add(subj)
-                                if payload.get("pick_id"):
-                                    bought_pick_ids.add(str(payload["pick_id"]))
-                                slug = str(payload.get("market_slug") or "")
-                                side = str(payload.get("token_side") or payload.get("side") or "").lower()
-                                if slug and side:
-                                    bought_market_sides.add((slug, side))
-                                ev_id = str(payload.get("event_id") or "")
-                                sel = str(payload.get("selection") or "").lower()
-                                if ev_id and sel:
-                                    bought_event_selections.add((ev_id, sel))
+                        ev_type = str(event.get("event_type") or "")
+                        payload = event.get("payload") or {}
+                        if ev_type in {"order_executed", "order_rejected"} and payload.get("intent_id"):
+                            # The intent has an outcome; only an executed one indexes (below).
+                            settled_intents.add(str(payload["intent_id"]))
+                        if ev_type in {
+                            "order_executed",
+                            "order_submitted",
+                            "order_submit_unknown",
+                            "order_intent",
+                        }:
+                            buy_events.append((ev_type, event))
             except OSError as exc:
                 logger.warning("Failed to read audit log %s for bought-index build: %s", log_path, exc)
                 failures.append((f"audit_log:{log_path}", str(exc)))
+                continue
+            # A forward read sees an intent before its own rejection, so outcomes are collected
+            # first and the events indexed second.
+            for ev_type, event in buy_events:
+                payload = event.get("payload") or {}
+                if str(payload.get("action") or "buy").lower() != "buy":
+                    continue
+                unknown = ev_type == "order_submit_unknown"
+                if ev_type == "order_intent":
+                    if str(payload.get("intent_id") or "") in settled_intents:
+                        continue
+                    unknown = True
+                subj = str(event.get("subject_id") or "")
+                slug = str(payload.get("market_slug") or "")
+                side = str(payload.get("token_side") or payload.get("side") or "").lower()
+                pick_keys = {k for k in (subj, str(payload.get("pick_id") or "")) if k}
+                bought_pick_ids.update(pick_keys)
+                if slug and side:
+                    bought_market_sides.add((slug, side))
+                if unknown:
+                    unknown_pick_ids.update(pick_keys)
+                    if slug and side:
+                        unknown_market_sides.add((slug, side))
+                if audit_event_keys:
+                    ev_id = str(payload.get("event_id") or "")
+                    sel = str(payload.get("selection") or "").lower()
+                    if ev_id and sel:
+                        bought_event_selections.add((ev_id, sel))
+                    mtype = str(payload.get("market_type") or "").lower()
+                    if ev_id and mtype:
+                        bought_event_markets.add((ev_id, mtype))
 
         # 2. Dashboard orders file (dashboard/orders.json)
         dashboard_orders_file = _paths.repo_root / "dashboard" / "orders.json"
@@ -1955,6 +2066,12 @@ class AutoPolymarketBuyer:
                 from .auto_buyer_ledger import read_auto_buyer_ledger
 
                 for r in read_auto_buyer_ledger(auto_ledger_file):
+                    if r.get("submit_unknown") is True and str(r.get("status") or "").lower() == "open":
+                        unknown_pid = str(r.get("pick_id") or "")
+                        if unknown_pid:
+                            unknown_pick_ids.add(unknown_pid)
+                        if r.get("market_slug") and r.get("token_side"):
+                            unknown_market_sides.add((str(r["market_slug"]), str(r["token_side"]).lower()))
                     # Per-game exposure before the dead-row filter below: a zero-fill primary whose
                     # IOC was cancelled can still have its fallback resting on the book.
                     game = _game_key(r)
@@ -2097,6 +2214,10 @@ class AutoPolymarketBuyer:
         bought_event_markets.difference_update(partially_filled_event_markets)
         bought_matchup_markets.difference_update(partially_filled_matchup_markets)
         held_slugs.difference_update(partially_filled_slugs)
+        bought_pick_ids.update(unknown_pick_ids)
+        bought_market_sides.update(unknown_market_sides)
+        for unknown_pid in unknown_pick_ids:
+            partially_filled.pop(unknown_pid, None)
 
         if failures:
             detail = "; ".join(f"{name}: {msg}" for name, msg in failures)
@@ -2809,6 +2930,11 @@ class AutoPolymarketBuyer:
                 maximum_cost_usd=actual_cost + 0.10,
                 authorization_type="auto_whitelisted_model",
                 ioc_fallback_resting=True,
+                # D-01: the remainder expires before tip-off; B5: re-checked against the live ask.
+                resting_expires_at_utc=iso_utc(
+                    event_start - timedelta(seconds=LIVE_FALLBACK_EXPIRY_LEAD_SECONDS)
+                ),
+                max_live_price_deviation=LIVE_MAX_PRICE_DEVIATION,
             )
 
             order_payload = {
@@ -2905,6 +3031,11 @@ class AutoPolymarketBuyer:
                     f"Refusing live submission for {model_id} pick {pick_id}: "
                     "not matched to a live cohort in a cohort-governed config"
                 )
+            if self.config.recheck_enabled_before_submit and not _live_buying_still_enabled():
+                # C9: the operator turned the buyer off while this pass was running.
+                logger.warning("Auto-buyer disabled mid-pass; no further live submissions (pick %s)", pick_id)
+                result.live_halt_reason = "kill_switch"
+                break
             executor = PolymarketExecutor(
                 audit=self.audit,
                 confirm=lambda _prompt: "Y",
@@ -2916,6 +3047,8 @@ class AutoPolymarketBuyer:
             exec_row["market_slug"] = market_slug
             exec_row["rationale"] = f"auto_buy market_slug:{market_slug}"
 
+            # Only a gate refusal raised before anything was sent is "refused". An unknown outcome
+            # and anything after the order exists are alarms that stop live buying for this pass.
             try:
                 sub = executor.execute(
                     ticket=ticket,
@@ -2925,70 +3058,67 @@ class AutoPolymarketBuyer:
                     manual_research_order=False,
                     artifact_qualified=True,
                 )
-                oid = sub.get("order_id")
-                filled_shares = float(sub.get("filled_size_shares") or 0.0)
-                filled_cost = float(sub.get("estimated_filled_cost_usd") or 0.0)
-                fill_known = bool(sub.get("fill_known", True))
-                executed_payload = {
+            except OrderSubmitUnknownError as exc:
+                unknown_payload: dict[str, Any] = {
                     **order_payload,
+                    # Its own row, never merged into a partial row as a top-up.
+                    "is_topup": False,
+                    "submit_unknown": True,
                     "requested_shares": shares,
                     "requested_cost_usd": actual_cost,
-                    "shares": filled_shares,
-                    "cost_usd": filled_cost,
-                    "order_ids": sub.get("order_ids") or [oid],
-                    "fallback_order_id": sub.get("fallback_order_id"),
-                    "fallback_status": sub.get("fallback_status"),
-                    "fallback_resting_shares": sub.get("fallback_resting_shares"),
-                    "fill_known": fill_known,
+                    "shares": 0.0,
+                    "cost_usd": 0.0,
+                    "order_ids": [],
+                    "fill_known": False,
+                    "intent_id": exc.intent_id,
+                    "idempotency_key": exc.idempotency_key,
                 }
                 result.submitted_orders.append(
-                    {
-                        "status": sub.get("status", "submitted"),
-                        "order_id": oid,
-                        "order_state": sub.get("order_state"),
-                        **executed_payload,
-                    }
+                    {"status": "submit_unknown", "error": str(exc), **unknown_payload}
                 )
-                # The daily cap counts committed money: a GTC fallback resting on the book can still
-                # fill after this cycle, so 30 zero-fill IOCs resting $25 each must not read as $0.
-                resting_cost = float(sub.get("fallback_resting_shares") or 0.0) * limit_price
-                committed = round(filled_cost + resting_cost, 2)
-                if not fill_known:
-                    committed = max(committed, actual_cost)
-                committed_spend += committed
-                current_spend += filled_cost
-                result.total_spend_usd = round(current_spend, 2)
-
-                # Record directly to dedicated Auto-Buyer Ledger and Logger
-                # -- the confirmed *filled* quantity/cost, not the requested
-                # ones: an IOC can partially or never fill, and any
-                # unfilled remainder is now resting separately (see
-                # ioc_fallback_resting) rather than assumed complete here.
-                # Record a zero-fill primary when a fallback order is resting,
-                # or when the primary fill is unknown, so a later
-                # reconcile_pending_auto_buyer_fallbacks() pass can restate it
-                # from the exchange instead of leaving a fully untracked live
-                # position.
+                # The order may exist: its requested cost counts against this pass's caps.
+                committed_spend += actual_cost
+                logger.error(
+                    "Live order outcome UNKNOWN for pick %s on %s (key %s): %s -- check the exchange, "
+                    "never resubmit",
+                    pick_id,
+                    market_slug,
+                    exc.idempotency_key,
+                    exc,
+                )
+                result.alarms.append(
+                    _alarm("submit_unknown", pick_id=pick_id, market_slug=market_slug, detail=str(exc))
+                )
+                result.live_halt_reason = "submit_unknown"
                 try:
-                    from model_prediction.portfolio.auto_buyer_ledger import (
-                        record_auto_buy_execution,
+                    from model_prediction.portfolio.auto_buyer_ledger import record_auto_buy_execution
+
+                    record_auto_buy_execution(
+                        order_payload=unknown_payload,
+                        order_id="",
+                        order_state="ORDER_STATE_SUBMIT_UNKNOWN",
+                        pick_row=row,
+                        jsonl_path=self.data_root / "auto_buyer_ledger.jsonl",
+                        xlsx_path=self.data_root / "auto_buyer_picks.xlsx",
+                        raise_on_write_failure=True,
                     )
-
-                    if filled_shares > 0 or executed_payload.get("fallback_order_id") or not fill_known:
-                        record_auto_buy_execution(
-                            order_payload=executed_payload,
-                            order_id=oid,
-                            order_state=str(sub.get("order_state") or "FILLED").upper(),
-                            pick_row=row,
-                            jsonl_path=self.data_root / "auto_buyer_ledger.jsonl",
-                            xlsx_path=self.data_root / "auto_buyer_picks.xlsx",
+                except Exception as record_exc:  # noqa: BLE001 -- recorded as an alarm, never swallowed
+                    logger.error(
+                        "Failed to record the UNKNOWN live order for pick %s on %s: %s",
+                        pick_id,
+                        market_slug,
+                        record_exc,
+                    )
+                    result.alarms.append(
+                        _alarm(
+                            "ledger_write_failed",
+                            pick_id=pick_id,
+                            market_slug=market_slug,
+                            detail=str(record_exc),
                         )
-                except (OSError, ValueError, KeyError, TypeError, RuntimeError):
-                    pass
-
-                # Polite pacing to respect exchange rate limits
-                time.sleep(0.25)
-            except (ExecutionGateError, RuntimeError, OSError) as exc:
+                    )
+                break
+            except ExecutionGateError as exc:
                 result.submitted_orders.append(
                     {
                         "status": "refused",
@@ -2996,5 +3126,138 @@ class AutoPolymarketBuyer:
                         **order_payload,
                     }
                 )
+                continue
+            except (RuntimeError, OSError) as exc:
+                # Not a gate refusal: the intent may already be audited and the POST may have gone
+                # out. The pick stays blocked by its dangling intent; stop and alarm.
+                logger.error(
+                    "Live submission for pick %s on %s failed unexpectedly: %s", pick_id, market_slug, exc
+                )
+                result.submitted_orders.append({"status": "error", "error": str(exc), **order_payload})
+                result.alarms.append(
+                    _alarm("execution_error", pick_id=pick_id, market_slug=market_slug, detail=str(exc))
+                )
+                result.live_halt_reason = "execution_error"
+                break
+
+            oid = sub.get("order_id")
+            order_ids = sub.get("order_ids") or [oid]
+            filled_shares = float(sub.get("filled_size_shares") or 0.0)
+            filled_cost = float(sub.get("estimated_filled_cost_usd") or 0.0)
+            fill_known = bool(sub.get("fill_known", True))
+            fallback_status = sub.get("fallback_status")
+            executed_payload = {
+                **order_payload,
+                "requested_shares": shares,
+                "requested_cost_usd": actual_cost,
+                "shares": filled_shares,
+                "cost_usd": filled_cost,
+                "order_ids": order_ids,
+                "fallback_order_id": sub.get("fallback_order_id"),
+                "fallback_status": fallback_status,
+                "fallback_resting_shares": sub.get("fallback_resting_shares"),
+                "fallback_error": sub.get("fallback_error"),
+                "good_till_time": sub.get("good_till_time"),
+                "fill_known": fill_known,
+                "intent_id": sub.get("intent_id"),
+                "idempotency_key": sub.get("idempotency_key"),
+                "fallback_idempotency_key": sub.get("fallback_idempotency_key"),
+            }
+            result.submitted_orders.append(
+                {
+                    "status": sub.get("status", "submitted"),
+                    "order_id": oid,
+                    "order_state": sub.get("order_state"),
+                    **executed_payload,
+                }
+            )
+            # The daily cap counts committed money: a fallback resting on the book can still
+            # fill after this cycle, so 30 zero-fill IOCs resting $25 each must not read as $0.
+            resting_cost = float(sub.get("fallback_resting_shares") or 0.0) * limit_price
+            committed = round(filled_cost + resting_cost, 2)
+            if not fill_known:
+                committed = max(committed, actual_cost)
+            committed_spend += committed
+            current_spend += filled_cost
+            result.total_spend_usd = round(current_spend, 2)
+
+            halt_reason: str | None = None
+            if sub.get("audit_error"):
+                result.alarms.append(
+                    _alarm(
+                        "audit_failed_after_submit",
+                        pick_id=pick_id,
+                        market_slug=market_slug,
+                        detail=str(sub["audit_error"]),
+                        order_ids=order_ids,
+                    )
+                )
+                halt_reason = "audit_failed_after_submit"
+            if fallback_status in _FALLBACK_ALARM_STATUSES:
+                # The IOC result stands; the remainder did not rest as intended. Alarm, keep buying.
+                result.alarms.append(
+                    _alarm(
+                        f"fallback_{fallback_status}",
+                        pick_id=pick_id,
+                        market_slug=market_slug,
+                        detail=str(sub.get("fallback_error") or fallback_status),
+                        order_ids=order_ids,
+                    )
+                )
+
+            # Record directly to dedicated Auto-Buyer Ledger and Logger
+            # -- the confirmed *filled* quantity/cost, not the requested
+            # ones: an IOC can partially or never fill, and any
+            # unfilled remainder is now resting separately (see
+            # ioc_fallback_resting) rather than assumed complete here.
+            # Record a zero-fill primary when a fallback order is resting,
+            # or when the primary fill is unknown, so a later
+            # reconcile_pending_auto_buyer_fallbacks() pass can restate it
+            # from the exchange instead of leaving a fully untracked live
+            # position. A failure here is an alarm (B3): the order exists.
+            needs_row = (
+                filled_shares > 0
+                or executed_payload.get("fallback_order_id")
+                or not fill_known
+                or fallback_status == "submit_unknown"
+            )
+            if needs_row:
+                try:
+                    from model_prediction.portfolio.auto_buyer_ledger import record_auto_buy_execution
+
+                    record_auto_buy_execution(
+                        order_payload=executed_payload,
+                        order_id=oid,
+                        order_state=str(sub.get("order_state") or "FILLED").upper(),
+                        pick_row=row,
+                        jsonl_path=self.data_root / "auto_buyer_ledger.jsonl",
+                        xlsx_path=self.data_root / "auto_buyer_picks.xlsx",
+                        raise_on_write_failure=True,
+                    )
+                except Exception as record_exc:  # noqa: BLE001 -- recorded as an alarm, never swallowed
+                    logger.error(
+                        "Live order(s) %s for pick %s on %s were placed but NOT recorded in the ledger: %s",
+                        order_ids,
+                        pick_id,
+                        market_slug,
+                        record_exc,
+                    )
+                    result.alarms.append(
+                        _alarm(
+                            "ledger_write_failed",
+                            pick_id=pick_id,
+                            market_slug=market_slug,
+                            detail=str(record_exc),
+                            order_ids=order_ids,
+                        )
+                    )
+                    halt_reason = halt_reason or "ledger_write_failed"
+
+            if halt_reason is not None:
+                result.live_halt_reason = halt_reason
+                break
+
+            # Polite pacing to respect exchange rate limits
+            time.sleep(0.25)
 
         return result
