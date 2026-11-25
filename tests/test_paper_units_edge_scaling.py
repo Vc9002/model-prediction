@@ -143,6 +143,25 @@ def test_unqualified_main_moneyline_scales_by_edge(tmp_path) -> None:
     assert row["reason_code"] == "PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED"
 
 
+def test_downgraded_main_moneyline_with_one_unit_gets_the_edge_bump(tmp_path) -> None:
+    # Production downgrades (forecast._downgrade_unserved) arrive with units already set, often
+    # 1.0 after edge_scaled_units rounds a small uncertainty-adjusted edge down. Main must apply
+    # the same raw-edge bump as Flat, or every downgraded NBA moneyline keeps reading 1.00U.
+    request = _moneyline()
+    downgraded = _eligibility(
+        League.NBA, 1.0, qualified=False, reason_code="PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED"
+    )
+    row = _stored_row(tmp_path / "main", "main", request, downgraded)
+    flat_units = _units(tmp_path / "flat", "flat", request)
+    assert float(row["units"]) == pytest.approx(1.75)
+    assert float(row["units"]) == pytest.approx(flat_units)
+    assert row["reason_code"] == "PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED"
+    capped = _eligibility(
+        League.NBA, 1.0, qualified=False, reason_code="PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED", units_cap=1.0
+    )
+    assert float(_stored_row(tmp_path / "capped", "main", request, capped)["units"]) == pytest.approx(1.0)
+
+
 def test_flat_moneyline_keeps_flat_call_reason_when_not_qualified(tmp_path) -> None:
     # replace() in the Flat branch must still relabel a non-qualified result as FLAT_CALL.
     request = _moneyline()

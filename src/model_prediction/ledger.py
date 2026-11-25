@@ -802,6 +802,16 @@ class PickLedger:
             # QUALIFIED_SHADOW_CALL on Main on 2026-11-11 while the champion was
             # historical_only (MODEL_REVIEW_2026-11-11 #3, NBA moneyline path).
             eligibility = enforce_universal_paper_call(request, eligibility)
+            # Same raw-edge bump as Flat and qualified Main: a downgrade arrives sized by
+            # edge_scaled_units, which rounds small uncertainty-adjusted edges down to 1.0U, so
+            # every downgraded NBA moneyline read 1.00U (operator: nothing flat 1U, 2026-11-25).
+            market_p = implied_probability(request.american_odds) if request.american_odds else 0.5
+            calc_edge = max(0.0, request.model_probability - market_p)
+            if 0.0 < eligibility.units <= 1.0 and calc_edge > 0.01:
+                bumped = round(1.0 + min(1.0, calc_edge / 0.08), 2)
+                if eligibility.units_cap is not None:
+                    bumped = min(bumped, max(0.0, float(eligibility.units_cap)))
+                eligibility = replace(eligibility, units=bumped)
         elif self.tier == "main":
             # Main ledger is the gated ledger. Calls reaching Main as qualified stay qualified.
             # Every market (moneyline and NCAAF Over included) sizes by edge, 1.0U-2.0U; the
