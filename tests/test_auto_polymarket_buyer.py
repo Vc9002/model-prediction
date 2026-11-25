@@ -178,6 +178,9 @@ def test_ncaab_live_bucket_uses_normal_stake_sizing(tmp_path, monkeypatch):
         "edge": "0.06",
         "line": -3.5,
         "model_probability": 0.56,
+        # A live cohort row (the legacy v6 bucket): raw and served agree for the B7 guard.
+        "model_probability_raw": 0.56,
+        "calibration_method": "identity",
         "market_probability": 0.50,
         "units": 2.0,
         "home_team": "Home",

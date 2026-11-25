@@ -134,6 +134,9 @@ def _row(
         "edge": edge,
         "line": -3.5 if market == "spread" else 140.5,
         "model_probability": model_probability,
+        # Self-certified raw probability, so the B7 guard need not read a canonical ledger.
+        "model_probability_raw": model_probability,
+        "calibration_method": "identity",
         "market_probability": ask,
         "units": units,
         "home_team": f"{event}-home",
@@ -1156,6 +1159,125 @@ def test_paper_cohort_is_unaffected_by_the_live_calibration_guard(tmp_path, monk
     )
     buyer = _buyer(tmp_path, mode="paper", execute_live=False, cohorts=(SPREAD_PAPER,))
     result = buyer.evaluate_and_execute([_row(SPREAD_V7, pick_id="p1", event="g1")])
+    assert result.rejected_live_calibration == 0
+    assert len(result.dry_run_orders) == 1
+
+
+# The NCAAB forward calibrates inside the forecast (college_basketball_forward.py) and writes the
+# served value as model_probability, so calibrate_for_serving above sees an already-calibrated number.
+# The buyer's dashboard rows carry only that served value; the raw value and method live in the
+# canonical ledger's decision_payload_json (shape below from a real 2026-11-25 ncaab-total-v6 flat row).
+_REAL_PAYLOAD_FIELDS = {
+    "model_probability": 0.665201,
+    "model_probability_raw": 0.665201,
+    "serving_probability": 0.665201,
+    "calibration_method": "identity",
+    "calibration_version": "",
+    "calibration_artifact_hash": "",
+}
+
+
+def _dashboard_row(pick_id: str, event: str, probability: float) -> dict[str, Any]:
+    """A row as read_flat_picks projects it: no model_probability_raw or calibration_method."""
+    row = _row(TOTAL_V6, pick_id=pick_id, event=event, market="total", model_probability=probability)
+    row.pop("model_probability_raw", None)
+    row.pop("calibration_method", None)
+    return row
+
+
+def _write_canonical_ledger(
+    paths: RuntimePaths, records: list[tuple[str, str, float, dict[str, Any]]]
+) -> None:
+    import sqlite3
+
+    paths.ledgers_db.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(paths.ledgers_db)
+    with conn:
+        conn.execute(
+            "CREATE TABLE ledger_records (pick_id TEXT, ledger_tier TEXT, model_probability REAL,"
+            " decision_payload_json TEXT, feature_payload_json TEXT)"
+        )
+        conn.executemany(
+            "INSERT INTO ledger_records VALUES (?, ?, ?, ?, '{}')",
+            [(pid, tier, column, json.dumps(payload)) for pid, tier, column, payload in records],
+        )
+    conn.close()
+
+
+@pytest.mark.parametrize(
+    ("served", "raw", "method"),
+    [(0.60, 0.57, "platt"), (0.60, 0.60, "platt"), (0.60, 0.57, "identity"), (0.60, 0.57, "")],
+)
+def test_live_row_calibrated_inside_the_forecast_is_refused(tmp_path, served, raw, method):
+    rows = [
+        _row(SPREAD_V7, pick_id="p1", event="g1", model_probability=served),
+        _row(SPREAD_V7, pick_id="p2", event="g2", model_probability=served),
+    ]
+    for row in rows:
+        row["model_probability_raw"] = raw
+        row["calibration_method"] = method
+    result = _buyer(tmp_path).evaluate_and_execute(rows)
+    assert _BuyExecutor.executed == []
+    assert result.rejected_live_calibration == 2
+    assert [a["alarm"] for a in result.alarms] == ["live_calibration_not_identity"]
+
+
+def test_real_shaped_identity_row_passes_the_live_calibration_guard(tmp_path, monkeypatch):
+    paths = RuntimePaths.for_test(tmp_path)
+    _write_canonical_ledger(
+        paths,
+        [
+            ("p1", "flat", 0.665201, _REAL_PAYLOAD_FIELDS),
+            ("p1", "main", 0.665201, _REAL_PAYLOAD_FIELDS),
+        ],
+    )
+    monkeypatch.setattr(auto_executor, "_paths", paths)
+    row = _dashboard_row("p1", "g1", 0.665201)
+    row["test_ask"] = 0.58
+    result = _buyer(tmp_path).evaluate_and_execute([row])
+    assert result.rejected_live_calibration == 0
+    assert len(_BuyExecutor.executed) == 1
+
+
+@pytest.mark.parametrize(
+    "records",
+    [
+        [],  # the pick is not in the canonical ledger
+        [
+            (
+                "p1",
+                "flat",
+                0.665201,
+                {k: v for k, v in _REAL_PAYLOAD_FIELDS.items() if k != "model_probability_raw"},
+            )
+        ],
+        [("p1", "flat", 0.62, _REAL_PAYLOAD_FIELDS)],  # the raw column disagrees with the served value
+        [
+            ("p1", "flat", 0.665201, _REAL_PAYLOAD_FIELDS),
+            ("p1", "main", 0.665201, {"calibration_method": "platt"}),
+        ],
+        None,  # no ledgers.db at all
+    ],
+)
+def test_live_row_without_a_provable_raw_probability_is_refused(tmp_path, monkeypatch, records):
+    paths = RuntimePaths.for_test(tmp_path)
+    if records is not None:
+        _write_canonical_ledger(paths, records)
+    monkeypatch.setattr(auto_executor, "_paths", paths)
+    row = _dashboard_row("p1", "g1", 0.665201)
+    row["test_ask"] = 0.58
+    result = _buyer(tmp_path).evaluate_and_execute([row])
+    assert _BuyExecutor.executed == []
+    assert result.rejected_live_calibration == 1
+    assert [a["alarm"] for a in result.alarms] == ["live_calibration_not_identity"]
+
+
+def test_paper_cohort_does_not_need_a_raw_probability(tmp_path, monkeypatch):
+    monkeypatch.setattr(auto_executor, "_paths", RuntimePaths.for_test(tmp_path))
+    row = _row(SPREAD_V7, pick_id="p1", event="g1")
+    del row["model_probability_raw"], row["calibration_method"]
+    buyer = _buyer(tmp_path, mode="paper", execute_live=False, cohorts=(SPREAD_PAPER,))
+    result = buyer.evaluate_and_execute([row])
     assert result.rejected_live_calibration == 0
     assert len(result.dry_run_orders) == 1
 

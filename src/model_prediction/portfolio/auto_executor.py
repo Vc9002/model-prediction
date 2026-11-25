@@ -576,6 +576,93 @@ def _has_unqualified_inputs(row: dict[str, Any], ledger_flags: dict[str, dict[st
     )
 
 
+def _load_pick_calibration_fields(
+    pick_ids: list[str], ledgers_db: Path | None = None
+) -> dict[str, list[dict[str, Any]]] | None:
+    """Each pick's stored raw probability and calibration method, one entry per ledger copy.
+
+    The dashboard rows the buyer reads carry the served ``model_probability`` only: the
+    payload's ``model_probability_raw`` and ``calibration_method`` are not dashboard columns.
+    The SQLite ``model_probability`` column holds the raw value. Returns None when the ledger
+    cannot be read, so a live row fails closed.
+    """
+    db_path = Path(ledgers_db) if ledgers_db is not None else _paths.ledgers_db
+    wanted = sorted({pid for pid in pick_ids if pid})
+    fields: dict[str, list[dict[str, Any]]] = {}
+    if not wanted:
+        return fields
+    if not db_path.is_file():
+        return None
+    try:
+        conn = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
+        try:
+            for start in range(0, len(wanted), 500):
+                chunk = wanted[start : start + 500]
+                marks = ",".join("?" for _ in chunk)
+                query = (
+                    "SELECT pick_id, model_probability, decision_payload_json FROM ledger_records "
+                    f"WHERE pick_id IN ({marks})"
+                )
+                for pick_id, column_raw, payload_json in conn.execute(query, chunk):
+                    try:
+                        payload = json.loads(payload_json or "{}")
+                    except (TypeError, ValueError):
+                        payload = None
+                    if not isinstance(payload, dict):
+                        payload = {}
+                    fields.setdefault(str(pick_id), []).append(
+                        {
+                            "model_probability_raw": payload.get("model_probability_raw"),
+                            "calibration_method": payload.get("calibration_method"),
+                            "column_model_probability": column_raw,
+                        }
+                    )
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        logger.warning("auto-buyer could not read pick calibration from %s", db_path, exc_info=True)
+        return None
+    return fields
+
+
+def _live_calibration_refusal(row: dict[str, Any], stored: list[dict[str, Any]] | None) -> str | None:
+    """Why a live row's ``model_probability`` may not be the raw model output (B7), or None.
+
+    The NCAAB forward calibrates inside the forecast and saves the served value as
+    ``model_probability``, so ``calibrate_for_serving`` in the buyer only ever sees that already
+    served number. A live cohort's edge window was approved on raw probabilities: refuse a
+    non-identity method in any copy, any raw value that differs from the served one, and a row
+    whose raw value cannot be found at all.
+    """
+    copies = [row, *(stored or [])]
+    for copy in copies:
+        method = str(copy.get("calibration_method") or "").strip()
+        if method and method.lower() != "identity":
+            return f"calibration_method {method}"
+    try:
+        served = float(row.get("model_probability"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return "model_probability unreadable"
+    if not math.isfinite(served):
+        return "model_probability unreadable"
+    found_raw = False
+    for copy in copies:
+        for key in ("model_probability_raw", "column_model_probability"):
+            value = copy.get(key)
+            if value in (None, ""):
+                continue
+            try:
+                raw = float(value)
+            except (TypeError, ValueError):
+                return f"{key} unreadable"
+            if not math.isfinite(raw) or abs(raw - served) > 1e-6:
+                return f"{key} {raw} differs from served {served}"
+            found_raw = found_raw or key == "model_probability_raw"
+    if not found_raw:
+        return "model_probability_raw missing"
+    return None
+
+
 def _auto_buyer_sport_market(row: dict[str, Any]) -> tuple[str, str]:
     """Return a normalized sport/market pair for categorical execution gates."""
     model_id = str(row.get("model_id") or row.get("model_version") or "").lower()
@@ -2684,8 +2771,11 @@ class AutoPolymarketBuyer:
         bought_index = self._build_bought_index()
         live_calibration_alarmed: set[str] = set()
         overnight_age = _OvernightAgeExtension(picks)
-        input_flags = _load_pick_input_flags(
-            [str(row.get("pick_id") or "") for row in picks if row.get("status") == "open"]
+        open_pick_ids = [str(row.get("pick_id") or "") for row in picks if row.get("status") == "open"]
+        input_flags = _load_pick_input_flags(open_pick_ids)
+        # Any live pass may hold a live cohort (state cohorts or the legacy NCAAB v6 bucket).
+        live_calibration_fields = (
+            _load_pick_calibration_fields(open_pick_ids) if self.config.mode == "live" else {}
         )
 
         for row in sorted(picks, key=_auto_buyer_start_order):
@@ -3021,21 +3111,30 @@ class AutoPolymarketBuyer:
                 model_id, market_type, raw_model_prob, data_root=self.data_root
             )
             model_prob = calibration.probability
-            if live_cohort and (
-                calibration.applied
-                or calibration.method != "identity"
-                or calibration.probability != calibration.raw_probability
-            ):
+            calibration_refusal: str | None = None
+            if live_cohort:
                 # B7: a live cohort's edge window was approved on raw probabilities. A calibrator the
                 # calibrate job writes (4x a day) must never silently move it: fail closed, loudly.
+                # The forecast may already have calibrated the saved value, so check the pick's
+                # own record first; the buyer-side calibrator is checked as well.
+                calibration_refusal = _live_calibration_refusal(
+                    row,
+                    None if live_calibration_fields is None else live_calibration_fields.get(pick_id, []),
+                )
+                if calibration_refusal is None and (
+                    calibration.applied
+                    or calibration.method != "identity"
+                    or calibration.probability != calibration.raw_probability
+                ):
+                    calibration_refusal = f"served calibration {calibration.method} ({calibration.reason})"
+            if calibration_refusal is not None:
                 result.rejected_live_calibration += 1
                 logger.error(
-                    "Live cohort pick %s (%s %s) refused: served calibration is %s (%s), not identity",
+                    "Live cohort pick %s (%s %s) refused, not identity calibration: %s",
                     pick_id,
                     model_id,
                     market_type,
-                    calibration.method,
-                    calibration.reason,
+                    calibration_refusal,
                 )
                 if model_id not in live_calibration_alarmed:
                     live_calibration_alarmed.add(model_id)
@@ -3044,7 +3143,7 @@ class AutoPolymarketBuyer:
                             "live_calibration_not_identity",
                             pick_id=pick_id,
                             market_slug=market_slug,
-                            detail=f"{model_id} {market_type}: {calibration.method} ({calibration.reason})",
+                            detail=f"{model_id} {market_type}: {calibration_refusal}",
                         )
                     )
                 continue

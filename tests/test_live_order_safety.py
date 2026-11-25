@@ -831,6 +831,9 @@ def _brow(pick_id: str, event: str, *, ask: float = 0.51, start_minutes: float =
         "edge": "0.07",
         "line": -3.5,
         "model_probability": 0.58,
+        # Raw and served agree: the B7 guard needs no canonical ledger read.
+        "model_probability_raw": 0.58,
+        "calibration_method": "identity",
         "market_probability": ask,
         "units": 2.0,
         "home_team": f"{event} home",

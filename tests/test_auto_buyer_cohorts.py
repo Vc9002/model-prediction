@@ -171,6 +171,9 @@ def _row(
         "edge": edge,
         "line": None if market == "moneyline" else line,
         "model_probability": model_probability,
+        # Raw and served agree: the B7 guard needs no canonical ledger read.
+        "model_probability_raw": model_probability,
+        "calibration_method": "identity",
         "market_probability": ask,
         "units": units,
         "home_team": f"{event}-home",
