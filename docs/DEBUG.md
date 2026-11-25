@@ -3,7 +3,8 @@
 ## 2026-11-25 — Auto-buyer per-model cohorts, live enable pending operator go (quick-261125-31d)
 
 State: **live enable pending operator go.** Code is in 79250d80 (cohorts, live pass, submission
-guard) and e425053d (paper pass, per-book caps and dedup, shared per-game cap, preview). Decisions
+guard), e425053d (paper pass, per-book caps and dedup, shared per-game cap, preview) and 35df1fe2
+(decision-time Polymarket quote provenance). Decisions
 D-01 to D-04 and the measured cohorts are in `PROJECT_STATUS.md` (same date).
 
 - **Replaces** the hard-coded `ncaab-spread-v6` live bucket with a general cohort list in
@@ -40,6 +41,13 @@ D-01 to D-04 and the measured cohorts are in `PROJECT_STATUS.md` (same date).
   and selection, so a live spread fill does not block the paper ML row on the same game.
 - **Per-game cap is per game in a cohort book** (operator 2026-11-25): live spread and total cohorts
   on one game share the $25 cap with that book's earlier fills (cost plus resting fallback shares).
+- **Quote provenance.** A cohort row needs decision-time quote evidence: `archived_two_sided_bbo` or
+  `decision_time_executable_quote` with a true timestamp flag, observed-at, snapshot hash and archive
+  path, or `indicative_slate` with a false timestamp flag. A read-only check of the live Flat rows on
+  2026-11-25 matched 2 / 17 / 1 open NCAAB rows (ML, spread, total; as measured), but 0 of the 3 open
+  NBA spread v9 rows in the 12%+ window until `decision_time_executable_quote` (the forecast's own
+  Polymarket quote, `cli/forecast.py`, which NBA rows carry) was accepted (35df1fe2); now 3 of 3.
+  Sportsbook decision quotes stay refused.
 - **Candidates are Flat rows only** (`_read_cohort_candidate_picks`), the rows the cohorts were
   measured on; a Main copy would otherwise win the merge with its own units and reason code.
 - **Mutation proofs** (each run in a detached worktree of the commit, restored after):
@@ -48,7 +56,7 @@ D-01 to D-04 and the measured cohorts are in `PROJECT_STATUS.md` (same date).
   `Failed: DID NOT RAISE <class 'RuntimeError'>` (`test_submission_guard_refuses_whitelisted_row_in_cohort_config`);
   (c) global pass on the saved mode while governed: `assert ['ncaab-sprea...ad-margin-v9'] == ['ncaab-spread-v7']`
   plus three more cycle tests red; (d) paper cohort pass built `mode="live", execute_live=cycle_enabled`:
-  `ValueError: cohort BuyCohort(... mode='paper') does not belong in a mode='live' config`, five cycle
+  `ValueError: cohort BuyCohort(... mode='paper') does not belong in a mode='live' config`, nine cycle
   tests red; (e) preview allowed to record paper fills: `assert [1, 1] == []`
   (`test_preview_has_no_side_effects[True]`); (f) `dedup_own_ledger_only=False` on cohort passes:
   `assert [] == ['spread-g2']` (`test_dedup_is_per_book_for_cohort_passes`); (g) game-room trim
