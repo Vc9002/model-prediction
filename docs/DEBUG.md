@@ -156,13 +156,18 @@ the single entry point (the later Telegram task calls it).
 **Unknown-row operator procedure** (`ORDER_STATE_SUBMIT_UNKNOWN`, or `fallback_submit_unknown`)
 
 1. Check the exchange positions and activity for the row's `market_slug` around `executed_at_utc`.
-2. If nothing filled and nothing rests, remove the row with `remove_open_rows` (primary unknown).
-   For an unknown fallback leg, set `fallback_submit_unknown` false and `fallback_reconciled` true.
+2. If nothing filled and nothing rests: for a primary unknown, mark the row void (`result` and
+   `status` void, `shares` 0). For an unknown fallback leg, set `fallback_submit_unknown` false and
+   `fallback_reconciled` true. `remove_open_rows` cannot do this (the plan named it, but it acts
+   only on `PickLedger` workbooks/SQLite, not on the auto-buyer JSONL), so this is a hand edit of
+   `auto_buyer_ledger.jsonl`. Take a named backup first.
 3. If it filled or rests, record the operator decision. For a fallback, set `fallback_order_id`
-   with `fallback_reconciled` false so reconcile takes over, or use
-   `manually_settle_auto_buyer_order`.
-4. Edit between buyer runs. Settlement holds these rows open until then. Resolution tooling is an
-   open ROADMAP item.
+   with `fallback_reconciled` false so reconcile takes over. For a primary that filled, set the real
+   `order_id`, `shares` and `cost_usd`, and clear `submit_unknown`; settlement then grades it, or
+   `manually_settle_auto_buyer_order` can grade it once the result is independently verified.
+4. Edit between buyer runs. Hand edits are safest while holding `daily.lock`; no other path
+   rewrites the live ledger without it. Settlement holds these rows open until then. Resolution
+   tooling is an open ROADMAP item.
 
 **Known limits**
 - **The total position key is unverified.** No exchange position snapshot is stored, so how a
@@ -175,6 +180,9 @@ the single entry point (the later Telegram task calls it).
   equals the backstop's supervisor timeout. The cancel itself is already sent by then, and the next
   run reads the id back as terminal. A memoised "cancelled" id is never re-verified by the backstop;
   reconcile under `daily.lock` re-reads it.
+- **Backstop cadence.** With a 2-minute cadence and a 30-second lead, the first run that sees a
+  fallback as due can come up to about 90 s after tip. The GTD expiry at start minus 90 s stays
+  the primary mechanism.
 - **Backstop window.** The task runs 08:00-02:00, the same window as the buyer. A fallback for a
   game that starts after 02:00 relies on GTD expiry and the daily reconcile.
 

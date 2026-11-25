@@ -1138,11 +1138,14 @@ def test_successful_disable_renders_a_fresh_status_and_reports_cancels() -> None
     assert any("1 cancelled" in a and "1 failed" in a for a in out["alerts"])
 
 
-def test_status_failure_marks_the_pill_unavailable() -> None:
+@pytest.mark.parametrize("paper_trial_on", [False, True])
+def test_status_failure_marks_the_pill_unavailable(paper_trial_on: bool) -> None:
     status = json.dumps(_LIVE_STATUS)
+    paper = "true" if paper_trial_on else "false"
     out = _run_auto_buyer_ui(
         f"""
         routes['/api/auto-buyer/status'] = () => reply(200, {status});
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: {paper}}});
         await loadAutoBuyerStatus();
         routes['/api/auto-buyer/status'] = () => reply(500, 'boom');
         await loadAutoBuyerStatus();

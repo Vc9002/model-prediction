@@ -3802,6 +3802,8 @@ function copyPolymarketOrdersJson() {
 /* ---------- Auto-Buyer Controls ---------- */
 let _autoBuyerStatusCache = {};
 let _ncaabPaperStatusCache = {};
+// False after a failed status read, so the paper-trial pill never re-renders the main pill from a stale cache.
+let _autoBuyerStatusOk = false;
 // One derivation of on/live for every auto-buyer surface (button, pill, overview, paper-trial pill):
 // ON only for the boolean true, LIVE when the server says live trading is active, or for the legacy
 // ungoverned mode=live (no cohorts key). A refused or failed response is never rendered (C1, C2).
@@ -3816,6 +3818,7 @@ function autoBuyerLiveState(d){
 function _abToken(){return {"X-Dashboard-Token":window._DASHBOARD_TOKEN||""};}
 async function _abJson(res){try{return await res.json();}catch(_e){return null;}}
 function markAutoBuyerStatusUnavailable(detail){
+  _autoBuyerStatusOk=false;
   const pill=$("#autoBuyerTopControl");if(pill)pill.dataset.state="unknown";
   const pillTxt=$("#autoBuyerPillTxt");if(pillTxt)pillTxt.textContent="Auto-Buyer status unavailable, reload";
   const pillDot=$("#autoBuyerDot");if(pillDot)pillDot.className="dot y";
@@ -3842,6 +3845,7 @@ function updateNcaabPaperUI(data){
   const badge=$("#ncaabPaperStatus");
   if(badge)badge.textContent=`NCAAB v6 spread paper trial: ${on?"ON":"OFF"} · saved edge 5.0%–7.9%`;
   const main=autoBuyerLiveState(_autoBuyerStatusCache);
+  if(!_autoBuyerStatusOk)return;
   const pillTxt=$("#autoBuyerPillTxt");
   if(pillTxt&&on)pillTxt.textContent=main.live?"LIVE: real orders ON + paper trial":main.on?"MAIN + PAPER ON":"PAPER TRIAL ON";
   if(on&&!main.on){const pill=$("#autoBuyerTopControl"),dot=$("#autoBuyerDot");if(pill)pill.dataset.state="paper";if(dot)dot.className="dot g";}
@@ -3877,6 +3881,7 @@ function liveDrawdownHtml(dd){
 }
 function updateAutoBuyerUI(data){
   _autoBuyerStatusCache=data||{};
+  _autoBuyerStatusOk=true;
   const btn=$("#autoBuyerToggleBtn");
   if(!btn)return;
   const unitValue=Number(_autoBuyerStatusCache.unit_value_usd||0.50);

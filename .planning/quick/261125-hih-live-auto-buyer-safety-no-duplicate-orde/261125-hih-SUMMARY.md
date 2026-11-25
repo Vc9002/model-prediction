@@ -536,7 +536,7 @@ Task 3 adds the cancel-only backstop worker, the governed manual script, the das
     - With live cohorts, the enable confirm lists each one, says REAL MONEY, and is `danger`.
     - On failure (`res.ok`, a non-JSON 401, `status` refused or error, or a fetch throw), it alerts and re-renders from a fresh `/api/auto-buyer/status`. It never renders from the failed body.
     - On success it also renders from a fresh status, then reports `kill_switch_cancel` counts.
-  - `loadAutoBuyerStatus` puts the pill into "status unavailable, reload" (`data-state="unknown"`) when the status can't be read.
+  - `loadAutoBuyerStatus` puts the pill into "status unavailable, reload" (`data-state="unknown"`) when the status can't be read. A `_autoBuyerStatusOk` flag stops the paper-trial pill from re-rendering the main pill from the stale cache afterwards (found in self-review: red `test_status_failure_marks_the_pill_unavailable[True]`, then green).
   - Live state: "ON (LIVE)" with the `live` class, and the pill "LIVE: real orders ON" with a red dot.
   - New drawdown block `#autoBuyerLiveDrawdown` in the auto-buyer menu, rendered by `liveDrawdownHtml`: W-L-P, ROI, P&L in $ and U, current and max drawdown, and warnings in `class="red"`. Prices only, no American odds.
 - **scripts/auto_polymarket_buyer.py (C3).** `main(argv=None)` changes:
@@ -557,7 +557,7 @@ Task 3 adds the cancel-only backstop worker, the governed manual script, the das
   - Script: refusals (5 states), `daily.lock` held, an allowed run under the lock, and the dry run.
 - **New `tests/test_auto_buyer_drawdown.py`.** Exact figures with every exclusion, last-30 at 15 versus 14, last-30 window, $100 versus $99.99, 20U independent of USD, overrides and bad values, recovery, never raises, no live cohorts, `auto_buyer_status` (3 enabled values, legacy live mode, drawdown failure), the status route, and cycle `last_run` plus a warning that never alarms, and a preview that computes nothing.
 - **`tests/test_dashboard_html.py` (+9 node tests).** The auto-buyer controls block runs in Node against a stub DOM and a scripted fetch: the refused toggle (401 non-JSON, and 200 refused), string `"true"` not ON, LIVE with the paper trial on, armed, the enable confirm, a successful disable rendered from a fresh status with cancel counts, status unavailable, and the drawdown block.
-- **Combined:** the three files run 73 tests, all passing.
+- **Combined:** the three files run 74 tests, all passing.
 
 ### Red before the fix
 
@@ -634,6 +634,7 @@ Each mutation was a break, then a run of the named test, then a restore by bytes
    - `renderOverview` and the "Run main buyer check" confirm used the legacy `mode` with a truthy `enabled`.
 4. **`live_trading_active` also covers the legacy ungoverned `mode: live`** (no `cohorts` key), so a legacy live buyer still shows LIVE.
 5. **The drawdown output adds `rows`, `open`, `open_cost_usd` and `approval_filter`.** An unparseable non-date approval keeps every row (`approval_filter: "none"`) rather than hiding them.
+7. **[Rule 1] The plan's unknown-row procedure named `remove_open_rows`, which cannot act on the auto-buyer JSONL** (it is a `PickLedger` method). DEBUG.md instead gives a backed-up hand edit under `daily.lock`: void a primary unknown that never filled, or restate it from the exchange.
 6. **`_SKIP_ESCALATION` entry for the new worker.** `system_health` reports a worker that has never run as degraded, so it shows degraded until Task 4 registers the task.
 
 ### Open items for the orchestrator (Task 4)
@@ -646,3 +647,6 @@ Each mutation was a break, then a run of the named test, then a restore by bytes
   - A cancel's audit append can wait about 120 s on the audit lock, which equals the backstop's supervisor timeout. The cancel itself is already sent by then.
   - The backstop never re-verifies a memoised "cancelled" id; reconcile does.
   - The backstop runs 08:00-02:00, the buyer's own window.
+  - With a 2-minute cadence and a 30-second lead, the first due run can come up to about 90 s after tip. GTD expiry is the primary mechanism.
+  - The new worker adds about 540 runs.db rows a day. `_read_daily_run_history` and system_health filter by worker, but the dashboard's `/runs` list (last 20, unfiltered) and the `latest_run` fingerprint will be dominated by `auto-buyer-cancel`. This is cosmetic, and nothing was changed.
+  - Until the dashboard restarts, the new page talks to the old server, which sends no `live_cohorts`. It still reads PAPER while live cohorts trade, which is no worse than before.
