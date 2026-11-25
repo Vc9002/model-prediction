@@ -67,9 +67,37 @@ D-01 to D-04 and the measured cohorts are in `PROJECT_STATUS.md` (same date).
   slates (rows without snapshot contracts show unmapped). The live cohorts accept `indicative_slate`
   decision quotes (27 of 79 settled spread rows) as the v6 bucket did, protected by the live-ask
   window. The NCAAB paper trial selected on saved edge only; cohorts require both saved and live-ask
-  edge in window, so some price-drift members of the measured cohort are dropped. A disabled
-  (`enabled: false`) cycle still runs the cohort passes as dry runs, including live quote refreshes
-  for cohort rows (market data only).
+  edge in window, so some price-drift members of the measured cohort are dropped. (Superseded by
+  review cycle 1: a disabled cycle no longer runs the cohort passes.)
+- **Review cycle 1 fixes.**
+  - The kill switch is strict. `enabled` counts only when it is the boolean true, in the cycle, the
+    fallback buyer and `cli/daily.py`; `bool("false")` is True, and that was live before this fix.
+    `toggle_auto_buyer` refuses non-bool payloads, and a bare toggle of a non-bool value goes to off.
+  - The daily cap counts committed money. In a cycle, each live order adds its fill plus its resting
+    fallback (the requested cost when the fill is unknown). Across cycles, `_today_auto_buyer_totals`
+    adds unreconciled resting fallback shares times the entry price. The per-game cap counts the
+    same resting exposure, including a cancelled zero-fill primary whose fallback still rests.
+    `total_spend_usd` still reports fills only.
+  - Under cohorts the live book is reconciled and settled whenever its ledger holds an unreconciled
+    fallback or an unknown-fill open row, regardless of `enabled` or which cohorts parsed, because
+    cancelling only reduces risk. A reconcile failure stops the cycle only when it buys live.
+    `cli/daily.py` defers its own reconcile only to a cycle that will run (enabled, or the decoupled
+    worker) and will reconcile (`auto_buyer_cycle_manages_live_book`). Before this fix an enabled
+    ungoverned paper state with resting live orders deferred to a cycle that never touched them.
+  - Cohort sports are restricted to nba, ncaab, nfl, mlb and wnba (NCAAF off since 2026-11-24). The
+    code-level MLB moneyline and NBA total blocks hold for cohorts, at parse and in the row predicate.
+    Every cohort window is at most 25%, and every cohort row is refused above a 25% live-ask edge.
+  - The paper cohort pass never quarantines. The live pass keeps the rolling breaker: a model with
+    15 or more settled live rows whose last 30 lost more than 10% ROI is skipped.
+  - A disabled, non-preview cycle runs no cohort buy pass: no candidate read, no quote refresh, no
+    slate capture. The legacy global pass still runs its dry run as before.
+  - The dashboard's manual run (`/api/auto-buyer/run`) takes the daily writer lock without waiting
+    and answers 409 while the scheduled worker or the daily run holds it.
+  - Nits. A default-lookahead preview still captures missing snapshot slates and refreshes stale
+    quotes (market data only), and never adds exchange positions to the dedup index. The legacy v6
+    bucket now routes through the cohort branch, but it is inert under governance: it needs a
+    live-executing config, and the governed global pass is always paper while the live cohort pass
+    sets `ncaab_spread_v6_live_bucket` to None.
 
 ## 2026-11-25 — Moneylines and NCAAF Overs edge-scaled; 1.0U caps removed (quick-261125-1bw)
 
