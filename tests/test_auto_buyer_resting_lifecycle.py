@@ -891,6 +891,10 @@ _RUN_0030 = "2026-11-24T05:30:01.873477+00:00"  # 00:30 ET 11-24, the next slate
 LATE_CREATED = datetime(2026, 11, 24, 0, 44, 16, 895371, tzinfo=UTC)  # 19:44 ET, written by the 19:30 run
 LATE_TIP = datetime(2026, 11, 24, 4, 30, tzinfo=UTC)  # 23:30 ET 11-23
 BUY_AT = datetime(2026, 11, 24, 3, 56, tzinfo=UTC)  # 22:56 ET, 34 minutes before the tip
+# The last run of the date writes the only rows no later same-date run re-prices (the ET-date clear).
+LAST_RUN_CREATED = datetime(2026, 11, 24, 2, 10, 54, tzinfo=UTC)  # 21:10 ET, written by the 21:00 run
+POST_MIDNIGHT_TIP = datetime(2026, 11, 24, 6, 0, tzinfo=UTC)  # 01:00 ET 11-24, on the 11-23 slate
+OVERNIGHT_BUY_AT = datetime(2026, 11, 24, 5, 25, tzinfo=UTC)  # 00:25 ET, 3 h 14 min after the pick
 
 
 class _AdvancingClock:
@@ -942,12 +946,23 @@ def _overnight(
     return result, calls
 
 
-def test_late_tip_the_2100_run_could_not_reprice_is_bought_at_the_overnight_limit(monkeypatch, tmp_path):
-    # (a) The 21:00 ET run (--date 2026-11-23) clears rows whose UTC created or event date starts with
-    # 2026-11-23; this row's are both 2026-11-24, so the run kept it (same line: duplicate key) and the
-    # 19:44 ET pick is the freshest the scheduler could produce. 3 h 12 min old at the buy.
+def test_late_tip_the_2100_run_repriced_keeps_the_three_hour_limit(monkeypatch, tmp_path):
+    # (a) The 21:00 ET run (--date 2026-11-23) retires the 19:44 ET pick: its created and event timestamps
+    # (00:44Z and 04:30Z on 11-24) are both on ET date 2026-11-23. Until 2026-11-25 the clear prefix-matched
+    # the raw UTC strings, kept the row, and this pick was bought 3 h 12 min old under the extension.
     row = _late_row(created=LATE_CREATED, tip=LATE_TIP)
     result, calls = _overnight(monkeypatch, tmp_path, [row], _EVENING_RUNS)
+    assert not _BuyExecutor.executed
+    assert result.rejected_stale_model == 1
+    assert result.live_overnight_age_extended == 0
+    assert calls == [1]
+
+
+def test_row_from_the_last_run_of_its_date_is_bought_at_the_overnight_limit(monkeypatch, tmp_path):
+    # (a') Written 21:10 ET by the 21:00 run for a 01:00 ET tip on the 11-23 slate: no later 2026-11-23 run
+    # exists, so it is the freshest pick the scheduler could produce. 3 h 14 min old at the buy.
+    row = _late_row(created=LAST_RUN_CREATED, tip=POST_MIDNIGHT_TIP)
+    result, calls = _overnight(monkeypatch, tmp_path, [row], _EVENING_RUNS, at=OVERNIGHT_BUY_AT)
     assert len(_BuyExecutor.executed) == 1
     assert result.rejected_stale_model == 0
     assert result.live_overnight_age_extended == 1
@@ -974,8 +989,8 @@ def test_a_run_that_would_reprice_the_row_keeps_the_three_hour_limit(monkeypatch
 @pytest.mark.parametrize(("age", "bought"), [(359.0, True), (361.0, False)])
 def test_overnight_limit_is_six_hours(monkeypatch, tmp_path, age, bought):
     # (c) No run could re-price the row; past 360 minutes it is refused anyway.
-    at = LATE_CREATED + timedelta(minutes=age)
-    row = _late_row(created=LATE_CREATED, tip=at + timedelta(minutes=30))
+    at = LAST_RUN_CREATED + timedelta(minutes=age)
+    row = _late_row(created=LAST_RUN_CREATED, tip=at + timedelta(minutes=30))
     result, _ = _overnight(monkeypatch, tmp_path, [row], [_run(_RUN_0030), *_EVENING_RUNS], at=at)
     assert bool(_BuyExecutor.executed) is bought
     assert result.rejected_stale_model == (0 if bought else 1)
@@ -984,20 +999,19 @@ def test_overnight_limit_is_six_hours(monkeypatch, tmp_path, age, bought):
 @pytest.mark.parametrize("status", ["completed", "started"])
 def test_next_date_0030_run_does_not_count_against_a_prior_slate_late_tip(monkeypatch, tmp_path, status):
     # (f) A 01:00 ET tip priced 21:10 ET by the 21:00 run (slate 2026-11-23). The 00:30 ET run belongs to
-    # 2026-11-24; its clear matches the row's UTC dates, but it forecasts the next slate, not this game.
-    created = datetime(2026, 11, 24, 2, 10, 54, tzinfo=UTC)
-    tip = datetime(2026, 11, 24, 6, 0, tzinfo=UTC)
+    # 2026-11-24; its clear matches the row's ET event date, but it forecasts the next slate, not this
+    # game, and restore reopens the same row.
     at = datetime(2026, 11, 24, 5, 35, tzinfo=UTC)  # 3 h 24 min after the pick
-    row = _late_row(created=created, tip=tip)
+    row = _late_row(created=LAST_RUN_CREATED, tip=POST_MIDNIGHT_TIP)
     result, _ = _overnight(monkeypatch, tmp_path, [row], [_run(_RUN_0030, status), *_EVENING_RUNS], at=at)
     assert len(_BuyExecutor.executed) == 1
     assert result.live_overnight_age_extended == 1
 
 
 def test_unreadable_run_history_keeps_the_three_hour_limit(monkeypatch, tmp_path):
-    # (d)
-    row = _late_row(created=LATE_CREATED, tip=LATE_TIP)
-    result, calls = _overnight(monkeypatch, tmp_path, [row], None)
+    # (d) The row (a') buys with a readable history.
+    row = _late_row(created=LAST_RUN_CREATED, tip=POST_MIDNIGHT_TIP)
+    result, calls = _overnight(monkeypatch, tmp_path, [row], None, at=OVERNIGHT_BUY_AT)
     assert not _BuyExecutor.executed
     assert result.rejected_stale_model == 1
     assert result.live_overnight_age_extended == 0
@@ -1008,14 +1022,15 @@ def test_unreadable_run_history_keeps_the_three_hour_limit(monkeypatch, tmp_path
     "runs",
     [
         [],  # an empty history is not "no run started after the pick"
-        [_run(_RUN_2100)],  # truncated: nothing at or before the pick, so the window is unproven
-        [{"status": "completed", "started_at_utc": "not a time"}, _run(_RUN_1800)],
+        [_run(_RUN_0030)],  # truncated: nothing at or before the pick, so the window is unproven
+        [{"status": "completed", "started_at_utc": "not a time"}, _run(_RUN_2100)],
         [_run("2026-11-24T02:00:01"), _run(_RUN_1800)],  # naive timestamp
     ],
 )
 def test_history_that_cannot_prove_the_window_keeps_the_three_hour_limit(monkeypatch, tmp_path, runs):
-    row = _late_row(created=LATE_CREATED, tip=LATE_TIP)
-    result, _ = _overnight(monkeypatch, tmp_path, [row], runs)
+    # The same row and buy time as (f), which buys with the full history.
+    row = _late_row(created=LAST_RUN_CREATED, tip=POST_MIDNIGHT_TIP)
+    result, _ = _overnight(monkeypatch, tmp_path, [row], runs, at=datetime(2026, 11, 24, 5, 35, tzinfo=UTC))
     assert not _BuyExecutor.executed
     assert result.rejected_stale_model == 1
 
@@ -1033,8 +1048,9 @@ def test_paper_cohort_age_limit_never_consults_run_history(monkeypatch, tmp_path
 
 
 def test_only_the_newest_open_row_of_a_slot_gets_the_extension(monkeypatch, tmp_path):
-    # The 21:00 ET run appends a new row when the line moves and leaves the old one open (event 303437,
-    # total 139.5 -> 138.5 at 02:10Z on 2026-11-24). The old line's row is not the freshest pick.
+    # A run appends a new row when the line moves and leaves the old one open (event 303437, total
+    # 139.5 -> 138.5 at 02:10Z on 2026-11-24). The 21:00 run is a lock skip here, so only the newer row
+    # keeps the old line's 19:44 ET row, which is not the freshest pick, from the extension.
     old = _late_row(created=LATE_CREATED, tip=LATE_TIP, pick_id="old")
     new = _late_row(
         created=datetime(2026, 11, 24, 2, 10, 54, tzinfo=UTC),
@@ -1043,7 +1059,8 @@ def test_only_the_newest_open_row_of_a_slot_gets_the_extension(monkeypatch, tmp_
         market_slug=_slug("spread", "248488", line="2pt5"),
     )
     new["line"] = -2.5
-    result, _ = _overnight(monkeypatch, tmp_path, [old, new], _EVENING_RUNS)
+    runs = [_run(_RUN_2100, "skipped"), _run(_RUN_1930), _run(_RUN_1800)]
+    result, _ = _overnight(monkeypatch, tmp_path, [old, new], runs)
     assert result.live_overnight_age_extended == 0
     assert result.rejected_stale_model == 1
     assert [ticket.pick_id for ticket, _row in _BuyExecutor.executed] == ["new"]
@@ -1051,14 +1068,16 @@ def test_only_the_newest_open_row_of_a_slot_gets_the_extension(monkeypatch, tmp_
 
 def test_run_history_is_read_once_per_cycle_and_only_when_a_row_needs_it(monkeypatch, tmp_path):
     rows = [
-        _late_row(created=LATE_CREATED, tip=LATE_TIP, pick_id="a", event="e1"),
-        _late_row(created=LATE_CREATED, tip=LATE_TIP, pick_id="b", event="e2"),
+        _late_row(created=LAST_RUN_CREATED, tip=POST_MIDNIGHT_TIP, pick_id="a", event="e1"),
+        _late_row(created=LAST_RUN_CREATED, tip=POST_MIDNIGHT_TIP, pick_id="b", event="e2"),
     ]
-    result, calls = _overnight(monkeypatch, tmp_path / "late", rows, _EVENING_RUNS)
+    result, calls = _overnight(monkeypatch, tmp_path / "late", rows, _EVENING_RUNS, at=OVERNIGHT_BUY_AT)
     assert calls == [1]
     assert result.live_overnight_age_extended == 2
-    fresh = _late_row(created=BUY_AT - timedelta(minutes=30), tip=LATE_TIP, pick_id="c", event="e3")
-    _result, calls = _overnight(monkeypatch, tmp_path / "fresh", [fresh], _EVENING_RUNS)
+    fresh = _late_row(
+        created=OVERNIGHT_BUY_AT - timedelta(minutes=30), tip=POST_MIDNIGHT_TIP, pick_id="c", event="e3"
+    )
+    _result, calls = _overnight(monkeypatch, tmp_path / "fresh", [fresh], _EVENING_RUNS, at=OVERNIGHT_BUY_AT)
     assert calls == []
 
 
@@ -1093,8 +1112,8 @@ def test_daily_run_history_reader_fails_closed_and_never_creates_runs_db(tmp_pat
 
 @pytest.mark.parametrize("run_date", ["2026-11-23", "2026-11-24"])
 def test_overnight_rule_mirrors_the_daily_clear(monkeypatch, run_date):
-    # The extension rests on _clear_today_open's date match. If that clear changes (for instance to
-    # compare ET dates), this fails, and the extension must be revisited rather than left open.
+    # The extension rests on _clear_today_open's ET-date match. If that clear changes, this fails, and the
+    # extension must be revisited rather than left open.
     from model_prediction.cli import commands
 
     class _Ledger:

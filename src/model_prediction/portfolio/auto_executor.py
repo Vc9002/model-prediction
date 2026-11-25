@@ -1008,13 +1008,20 @@ def _read_daily_run_history(paths: RuntimePaths | None = None) -> list[dict[str,
 def _daily_clear_retires(run_date: str, created_at_utc: str, event_start_utc: str) -> bool:
     """Whether a daily run for ``run_date`` (ET) supersedes, and so re-prices, this open row.
 
-    Mirrors ``cli.commands._clear_today_open(by_event_date=True)``, which prefix-matches the ET run
-    date against the row's raw UTC strings. A row written after 00:00Z for a game after 00:00Z
-    matches neither, so later same-date runs keep it and the ledger's duplicate key stops them
-    appending a fresh one at the same line. This deliberately repeats that ET-date-vs-UTC-string
-    comparison; ``test_overnight_rule_mirrors_the_daily_clear`` pins the two together.
+    Mirrors ``cli.commands._clear_today_open(by_event_date=True)``: the row matches when the ET
+    calendar date of its created or event timestamp equals the run date; a missing or naive timestamp
+    never matches. Since 2026-11-25 that clear compares parsed ET dates rather than raw UTC prefixes,
+    so every later run on the date a row was written re-prices it, including the 21:00 ET run for a
+    19:44 ET pick. ``test_overnight_rule_mirrors_the_daily_clear`` pins the two together.
     """
-    return created_at_utc.startswith(run_date) or event_start_utc.startswith(run_date)
+
+    def _et_date(value: str) -> str | None:
+        try:
+            return parse_utc(value).astimezone(EASTERN).date().isoformat()
+        except ValueError:
+            return None
+
+    return run_date in (_et_date(created_at_utc), _et_date(event_start_utc))
 
 
 class _OvernightAgeExtension:
@@ -1022,10 +1029,13 @@ class _OvernightAgeExtension:
 
     A row qualifies only when it is the freshest pick the scheduler could have produced: it is the
     newest open row of its (model, event, market) and no daily run that would re-price it has
-    started after it was written. Such a run counts whether it finished, failed or is still running;
-    a lock skip never forecast and does not count. Neither does a run on a later ET date than the
-    row's slate (the 00:30 run forecasts the next date). runs.db and the slot index are read lazily
-    on the first row that needs them, after the pass captured ``now``.
+    started after it was written. Every later run on the row's ET creation date re-prices it, so in
+    practice only a row written by the last run of its date (21:00 ET) qualifies. Such a run counts
+    whether it finished, failed or is still running; a lock skip never forecast and does not count.
+    Neither does a run on a later ET date than the row's slate: the 00:30 run forecasts the next
+    date, and when its clear matches a post-midnight tip by event date without re-forecasting it,
+    restore reopens the same row. runs.db and the slot index are read lazily on the first row that
+    needs them, after the pass captured ``now``.
     """
 
     def __init__(self, picks: list[dict[str, Any]]) -> None:

@@ -472,13 +472,31 @@ def _rolling_models_write_dir() -> Path:
     return rolling
 
 
+def _eastern_date(value: str) -> str | None:
+    """US-Eastern calendar date of a timezone-aware timestamp; None when it is missing or naive."""
+    try:
+        return parse_utc(value).astimezone(EASTERN).date().isoformat()
+    except ValueError:
+        return None
+
+
 def _clear_today_open(
     ledger, date_str: str, by_event_date: bool = False, leagues: set[str] | None = None
 ) -> list[str]:
     """Supersede open picks for a date before re-forecasting, via the audited path.
 
-    When by_event_date is True, also removes open picks whose event_start_utc
-    matches date_str — used for flat ledger to prevent duplicate forecast runs.
+    ``date_str`` is the run's US-Eastern date (run_daily.ps1 Get-NewYorkDate). A row
+    matches when the ET calendar date of its created_at_utc equals it or, with
+    by_event_date, the ET date of its event_start_utc does. Both are parsed
+    timestamps, never raw UTC string prefixes: a pick written after 19:00/20:00 ET
+    carries the next UTC date, so prefix matching never retired it and every later
+    same-day run hit the ledger's duplicate key instead of re-pricing it (found
+    2026-11-25: a 19:44 ET pick for a 23:30 ET tip kept its price through the
+    21:00 ET run). A post-midnight-ET tip that an ESPN slate lists on the previous
+    date is matched through its creation date by that slate's later runs; the next
+    date's 00:30 run matches it by event date without re-forecasting it, and
+    ``_restore_unreplaced`` reopens it. A missing or naive timestamp never matches.
+    ``portfolio.auto_executor._daily_clear_retires`` mirrors this predicate.
     All retirements go through ``PickLedger.supersede_open_rows`` so they hold
     the ledger lock and append ``pick_superseded`` audit events. The replaced
     rows stay in the canonical store with status ``superseded`` (hidden from
@@ -519,7 +537,7 @@ def _clear_today_open(
             continue
         created = str(row.get("created_at_utc", "") or "")
         event = str(row.get("event_start_utc", "") or "")
-        if not (created.startswith(date_str) or (by_event_date and event.startswith(date_str))):
+        if not (_eastern_date(created) == date_str or (by_event_date and _eastern_date(event) == date_str)):
             continue
         try:
             started = parse_utc(event) <= now

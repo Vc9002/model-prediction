@@ -2580,11 +2580,12 @@ def test_clear_today_open_by_event_date_matches_on_event_start_not_creation(tmp_
     (created 7/24 for a 7/25 game) must still be cleared by a 7/25 run when
     by_event_date=True, not silently frozen forever. Uses a far-future date
     so the event is guaranteed to still be "not yet started" regardless of
-    when this test actually runs."""
+    when this test actually runs. The run date is US-Eastern: 23:00Z on 7/25
+    is 19:00 EDT on 7/25 (00:00Z on 7/25 would be the evening of 7/24)."""
     ledger = _ledger(tmp_path)
     row = _log_pick(
         ledger,
-        event_start_utc="2030-07-25T00:00:00Z",
+        event_start_utc="2030-07-25T23:00:00Z",
         created_at=datetime(2030, 7, 24, 20, tzinfo=UTC),
     )
     # created_at-only matching (main ledger's old behavior) would miss this.
