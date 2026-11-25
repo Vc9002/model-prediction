@@ -14,7 +14,7 @@ from __future__ import annotations
 import ast
 import inspect
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -29,6 +29,11 @@ from model_prediction.portfolio.auto_buyer_ledger import (
     reconcile_pending_auto_buyer_fallbacks,
 )
 from model_prediction.portfolio.auto_executor import AutoExecutionConfig, AutoPolymarketBuyer, BuyCohort
+from model_prediction.run_supervisor import RunSupervisor
+from model_prediction.runtime_paths import RuntimePaths
+
+# The real reader, kept before the autouse fixture swaps it for a fail-closed stub.
+_REAL_READ_DAILY_RUN_HISTORY = getattr(auto_executor, "_read_daily_run_history", None)
 
 SPREAD_V7 = "ncaab-spread-v7"
 TOTAL_V6 = "ncaab-total-v6"
@@ -82,6 +87,8 @@ def _isolate(monkeypatch):
     monkeypatch.setattr(auto_executor, "calibrate_for_serving", _identity)
     monkeypatch.setattr(auto_executor, "PolymarketExecutor", _BuyExecutor)
     monkeypatch.setattr(auto_executor, "_load_pick_input_flags", lambda *_a, **_k: {})
+    # Never the real runs.db: an unreadable history keeps every live row at the 180-minute limit.
+    monkeypatch.setattr(auto_executor, "_read_daily_run_history", lambda *_a, **_k: None, raising=False)
     monkeypatch.setattr(auto_executor.time, "sleep", lambda *_a: None)
     monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", _no_default_executor)
     monkeypatch.setattr(auto_buyer_ledger, "log_auto_buyer_event", lambda *a, **k: None)
@@ -869,6 +876,256 @@ def test_paper_cohort_keeps_the_global_model_age_limit(tmp_path):
     result = buyer.evaluate_and_execute([row])
     assert result.rejected_stale_model == 0
     assert len(result.dry_run_orders) == 1
+
+
+# ---------------------------------------------------------------- D-03 overnight extension
+# Real timestamps from the 2026-11-23 slate (runs.db daily runs, ledger_records ncaab-spread-v7, event 248488).
+
+_RUN_1800 = "2026-11-23T23:00:01.836968+00:00"  # 18:00 ET 11-23
+_RUN_1930 = "2026-11-24T00:30:01.874923+00:00"  # 19:30 ET 11-23
+_RUN_2100 = "2026-11-24T02:00:01.853271+00:00"  # 21:00 ET 11-23
+_RUN_0030 = "2026-11-24T05:30:01.873477+00:00"  # 00:30 ET 11-24, the next slate date
+LATE_CREATED = datetime(2026, 11, 24, 0, 44, 16, 895371, tzinfo=UTC)  # 19:44 ET, written by the 19:30 run
+LATE_TIP = datetime(2026, 11, 24, 4, 30, tzinfo=UTC)  # 23:30 ET 11-23
+BUY_AT = datetime(2026, 11, 24, 3, 56, tzinfo=UTC)  # 22:56 ET, 34 minutes before the tip
+
+
+class _AdvancingClock:
+    """Each call is 1 ms after the previous one, so no two captures share an instant."""
+
+    def __init__(self, start: datetime) -> None:
+        self.now = start
+
+    def __call__(self) -> datetime:
+        self.now += timedelta(milliseconds=1)
+        return self.now
+
+
+def _run(started: str, status: str = "completed") -> dict[str, Any]:
+    return {
+        "run_id": f"daily-{started}",
+        "worker": "daily",
+        "status": status,
+        "started_at_utc": started,
+        "exit_code": {"completed": 0, "failed": 1, "skipped": 75}.get(status),
+    }
+
+
+_EVENING_RUNS = [_run(_RUN_2100), _run(_RUN_1930), _run(_RUN_1800)]
+
+
+def _late_row(
+    *, created: datetime, tip: datetime, pick_id: str = "late", event: str = "248488", **kw: Any
+) -> dict[str, Any]:
+    row = _row(SPREAD_V7, pick_id=pick_id, event=event, **kw)
+    row["created_at_utc"] = iso_utc(created)
+    row["event_start_utc"] = iso_utc(tip)
+    row["market_quote_observed_at_utc"] = iso_utc(created - timedelta(minutes=1))
+    return row
+
+
+def _overnight(
+    monkeypatch, tmp_path, rows, runs, *, at: datetime = BUY_AT, **overrides: Any
+) -> tuple[Any, list[int]]:
+    calls: list[int] = []
+
+    def _history(*_a: Any, **_k: Any) -> list[dict[str, Any]] | None:
+        calls.append(1)
+        return None if runs is None else [dict(r) for r in runs]
+
+    monkeypatch.setattr(auto_executor, "_read_daily_run_history", _history)
+    monkeypatch.setattr(auto_executor, "utc_now", _AdvancingClock(at))
+    result = _buyer(tmp_path, max_model_age_minutes=720.0, **overrides).evaluate_and_execute(rows)
+    return result, calls
+
+
+def test_late_tip_the_2100_run_could_not_reprice_is_bought_at_the_overnight_limit(monkeypatch, tmp_path):
+    # (a) The 21:00 ET run (--date 2026-11-23) clears rows whose UTC created or event date starts with
+    # 2026-11-23; this row's are both 2026-11-24, so the run kept it (same line: duplicate key) and the
+    # 19:44 ET pick is the freshest the scheduler could produce. 3 h 12 min old at the buy.
+    row = _late_row(created=LATE_CREATED, tip=LATE_TIP)
+    result, calls = _overnight(monkeypatch, tmp_path, [row], _EVENING_RUNS)
+    assert len(_BuyExecutor.executed) == 1
+    assert result.rejected_stale_model == 0
+    assert result.live_overnight_age_extended == 1
+    assert calls == [1]
+    summary = auto_executor._cohort_pass_summary("LIVE_EXECUTION", (SPREAD_LIVE,), result, executing=True)
+    assert summary["live_overnight_age_extended"] == 1
+
+
+@pytest.mark.parametrize(
+    ("status", "bought"), [("completed", False), ("failed", False), ("started", False), ("skipped", True)]
+)
+def test_a_run_that_would_reprice_the_row_keeps_the_three_hour_limit(monkeypatch, tmp_path, status, bought):
+    # (b) Priced 18:16 ET (23:16Z, UTC date 2026-11-23): the 21:00 ET run's clear retires it, so a 21:00
+    # run that started after the pick (finished, failed or still running) could have re-priced it. A lock
+    # skip never forecast. The 19:30 run is a skip here so the 21:00 run alone decides.
+    row = _late_row(created=datetime(2026, 11, 23, 23, 16, 30, tzinfo=UTC), tip=LATE_TIP)
+    runs = [_run(_RUN_2100, status), _run(_RUN_1930, "skipped"), _run(_RUN_1800)]
+    result, _ = _overnight(monkeypatch, tmp_path, [row], runs)
+    assert bool(_BuyExecutor.executed) is bought
+    assert result.rejected_stale_model == (0 if bought else 1)
+    assert result.live_overnight_age_extended == (1 if bought else 0)
+
+
+@pytest.mark.parametrize(("age", "bought"), [(359.0, True), (361.0, False)])
+def test_overnight_limit_is_six_hours(monkeypatch, tmp_path, age, bought):
+    # (c) No run could re-price the row; past 360 minutes it is refused anyway.
+    at = LATE_CREATED + timedelta(minutes=age)
+    row = _late_row(created=LATE_CREATED, tip=at + timedelta(minutes=30))
+    result, _ = _overnight(monkeypatch, tmp_path, [row], [_run(_RUN_0030), *_EVENING_RUNS], at=at)
+    assert bool(_BuyExecutor.executed) is bought
+    assert result.rejected_stale_model == (0 if bought else 1)
+
+
+@pytest.mark.parametrize("status", ["completed", "started"])
+def test_next_date_0030_run_does_not_count_against_a_prior_slate_late_tip(monkeypatch, tmp_path, status):
+    # (f) A 01:00 ET tip priced 21:10 ET by the 21:00 run (slate 2026-11-23). The 00:30 ET run belongs to
+    # 2026-11-24; its clear matches the row's UTC dates, but it forecasts the next slate, not this game.
+    created = datetime(2026, 11, 24, 2, 10, 54, tzinfo=UTC)
+    tip = datetime(2026, 11, 24, 6, 0, tzinfo=UTC)
+    at = datetime(2026, 11, 24, 5, 35, tzinfo=UTC)  # 3 h 24 min after the pick
+    row = _late_row(created=created, tip=tip)
+    result, _ = _overnight(monkeypatch, tmp_path, [row], [_run(_RUN_0030, status), *_EVENING_RUNS], at=at)
+    assert len(_BuyExecutor.executed) == 1
+    assert result.live_overnight_age_extended == 1
+
+
+def test_unreadable_run_history_keeps_the_three_hour_limit(monkeypatch, tmp_path):
+    # (d)
+    row = _late_row(created=LATE_CREATED, tip=LATE_TIP)
+    result, calls = _overnight(monkeypatch, tmp_path, [row], None)
+    assert not _BuyExecutor.executed
+    assert result.rejected_stale_model == 1
+    assert result.live_overnight_age_extended == 0
+    assert calls == [1]
+
+
+@pytest.mark.parametrize(
+    "runs",
+    [
+        [],  # an empty history is not "no run started after the pick"
+        [_run(_RUN_2100)],  # truncated: nothing at or before the pick, so the window is unproven
+        [{"status": "completed", "started_at_utc": "not a time"}, _run(_RUN_1800)],
+        [_run("2026-11-24T02:00:01"), _run(_RUN_1800)],  # naive timestamp
+    ],
+)
+def test_history_that_cannot_prove_the_window_keeps_the_three_hour_limit(monkeypatch, tmp_path, runs):
+    row = _late_row(created=LATE_CREATED, tip=LATE_TIP)
+    result, _ = _overnight(monkeypatch, tmp_path, [row], runs)
+    assert not _BuyExecutor.executed
+    assert result.rejected_stale_model == 1
+
+
+def test_paper_cohort_age_limit_never_consults_run_history(monkeypatch, tmp_path):
+    # (e) A paper cohort keeps the global 720-minute limit and never reads runs.db.
+    row = _late_row(created=BUY_AT - timedelta(minutes=600), tip=LATE_TIP)
+    result, calls = _overnight(
+        monkeypatch, tmp_path, [row], None, mode="paper", execute_live=False, cohorts=(SPREAD_PAPER,)
+    )
+    assert result.rejected_stale_model == 0
+    assert len(result.dry_run_orders) == 1
+    assert result.live_overnight_age_extended == 0
+    assert calls == []
+
+
+def test_only_the_newest_open_row_of_a_slot_gets_the_extension(monkeypatch, tmp_path):
+    # The 21:00 ET run appends a new row when the line moves and leaves the old one open (event 303437,
+    # total 139.5 -> 138.5 at 02:10Z on 2026-11-24). The old line's row is not the freshest pick.
+    old = _late_row(created=LATE_CREATED, tip=LATE_TIP, pick_id="old")
+    new = _late_row(
+        created=datetime(2026, 11, 24, 2, 10, 54, tzinfo=UTC),
+        tip=LATE_TIP,
+        pick_id="new",
+        market_slug=_slug("spread", "248488", line="2pt5"),
+    )
+    new["line"] = -2.5
+    result, _ = _overnight(monkeypatch, tmp_path, [old, new], _EVENING_RUNS)
+    assert result.live_overnight_age_extended == 0
+    assert result.rejected_stale_model == 1
+    assert [ticket.pick_id for ticket, _row in _BuyExecutor.executed] == ["new"]
+
+
+def test_run_history_is_read_once_per_cycle_and_only_when_a_row_needs_it(monkeypatch, tmp_path):
+    rows = [
+        _late_row(created=LATE_CREATED, tip=LATE_TIP, pick_id="a", event="e1"),
+        _late_row(created=LATE_CREATED, tip=LATE_TIP, pick_id="b", event="e2"),
+    ]
+    result, calls = _overnight(monkeypatch, tmp_path / "late", rows, _EVENING_RUNS)
+    assert calls == [1]
+    assert result.live_overnight_age_extended == 2
+    fresh = _late_row(created=BUY_AT - timedelta(minutes=30), tip=LATE_TIP, pick_id="c", event="e3")
+    _result, calls = _overnight(monkeypatch, tmp_path / "fresh", [fresh], _EVENING_RUNS)
+    assert calls == []
+
+
+def test_daily_run_history_reader_fails_closed_and_never_creates_runs_db(tmp_path):
+    assert _REAL_READ_DAILY_RUN_HISTORY is not None
+    paths = RuntimePaths.for_test(tmp_path)
+    assert _REAL_READ_DAILY_RUN_HISTORY(paths) is None
+    assert not paths.runs_db.exists()
+    # A separate root: the captured log record's traceback keeps the failed connection open on Windows.
+    corrupt = RuntimePaths.for_test(tmp_path / "corrupt")
+    corrupt.runs_db.write_bytes(b"not a sqlite database " * 64)
+    assert _REAL_READ_DAILY_RUN_HISTORY(corrupt) is None
+    supervisor = RunSupervisor(paths=paths)
+    for run_id, worker, started in (
+        ("daily-a", "daily", _RUN_1930),
+        ("daily-b", "daily", _RUN_2100),
+        ("buyer-a", "auto-buyer", "2026-11-24T03:00:00+00:00"),
+    ):
+        supervisor._insert_run(
+            {
+                "run_id": run_id,
+                "worker": worker,
+                "command": "[]",
+                "status": "completed",
+                "started_at_utc": started,
+            }
+        )
+    supervisor.close()
+    history = _REAL_READ_DAILY_RUN_HISTORY(paths)
+    assert [r["run_id"] for r in history] == ["daily-b", "daily-a"]
+
+
+@pytest.mark.parametrize("run_date", ["2026-11-23", "2026-11-24"])
+def test_overnight_rule_mirrors_the_daily_clear(monkeypatch, run_date):
+    # The extension rests on _clear_today_open's date match. If that clear changes (for instance to
+    # compare ET dates), this fails, and the extension must be revisited rather than left open.
+    from model_prediction.cli import commands
+
+    class _Ledger:
+        def __init__(self, rows: list[dict[str, Any]]) -> None:
+            self._rows = rows
+
+        def rows(self) -> list[dict[str, Any]]:
+            return [dict(r) for r in self._rows]
+
+        def supersede_open_rows(self, ids: list[str], **_k: Any) -> list[str]:
+            return list(ids)
+
+    created_values = ["2026-11-23T23:16:30.495832Z", "2026-11-24T00:44:16.895371Z", "2026-11-24T05:48:02Z"]
+    event_values = ["2026-11-23T23:30:00Z", "2026-11-24T04:30:00Z", "2026-11-24T06:00:00+00:00"]
+    rows = [
+        {
+            "pick_id": f"{i}-{j}",
+            "status": "open",
+            "league": "ncaab",
+            "created_at_utc": c,
+            "event_start_utc": e,
+        }
+        for i, c in enumerate(created_values)
+        for j, e in enumerate(event_values)
+    ]
+    monkeypatch.setattr(commands, "utc_now", lambda: datetime(2026, 11, 23, 12, tzinfo=UTC))
+    retired = commands._clear_today_open(_Ledger(rows), run_date, by_event_date=True)
+    expected = [
+        r["pick_id"]
+        for r in rows
+        if auto_executor._daily_clear_retires(run_date, r["created_at_utc"], r["event_start_utc"])
+    ]
+    assert 0 < len(expected) < len(rows)
+    assert sorted(retired) == sorted(expected)
 
 
 # ---------------------------------------------------------------- B7 identity calibration

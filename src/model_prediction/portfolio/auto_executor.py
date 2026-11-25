@@ -474,6 +474,8 @@ class AutoExecutionResult:
     rejected_daily_loss_breaker: int = 0
     rejected_quarantined_model: int = 0
     rejected_live_calibration: int = 0
+    # Live rows aged 180-360 minutes that passed the model-age gate by the D-03 overnight extension.
+    live_overnight_age_extended: int = 0
     cohort_matched: int = 0
     quarantined_models: list[str] = field(default_factory=list)
     submitted_orders: list[dict[str, Any]] = field(default_factory=list)
@@ -882,12 +884,119 @@ LIVE_MAX_PRICE_DEVIATION = 0.02
 # D-03 (operator, 2026-11-25): a live cohort buys only a pick whose model timestamp is at most this
 # old. The global max_model_age_minutes (720) still governs paper and legacy passes.
 LIVE_COHORT_MAX_MODEL_AGE_MINUTES = 180.0
+# D-03 overnight extension (operator, 2026-11-25): a live row up to this old is still bought when no
+# daily run that could have re-priced it has started since it was written. The last daily run is
+# 21:00 ET and tips run past midnight, so late tips otherwise never have a pick under 180 minutes.
+LIVE_COHORT_OVERNIGHT_MAX_MODEL_AGE_MINUTES = 360.0
+# Daily runs read per cycle: about two days of the 11-a-day schedule. The extension also requires a
+# run at or before the pick, so a truncated history fails closed.
+_DAILY_RUN_HISTORY_LIMIT = 40
 # game_exposure key suffix for a pick's still-pending (unfilled) exposure; see _build_bought_index.
 _PENDING_EXPOSURE_KEY_SUFFIX = "#pending"
 # fallback_status values that need the operator's eye but leave the placed IOC itself intact.
 _FALLBACK_ALARM_STATUSES = frozenset(
     {"rejected", "submit_unknown", "cancelled_unverified_gtd", "unverified_gtd_cancel_failed"}
 )
+
+
+def _read_daily_run_history(paths: RuntimePaths | None = None) -> list[dict[str, Any]] | None:
+    """Recent daily runs from runs.db, newest first; None when runs.db cannot be read."""
+    from model_prediction.run_supervisor import RunSupervisor
+
+    paths = paths or _paths
+    # RunSupervisor.conn creates a missing runs.db, and an empty history would read as "no run
+    # started after the pick".
+    if not paths.runs_db.is_file():
+        return None
+    supervisor = RunSupervisor(paths=paths)
+    try:
+        return supervisor.latest_runs(worker="daily", limit=_DAILY_RUN_HISTORY_LIMIT)
+    except (sqlite3.Error, OSError):
+        logger.warning("daily run history unreadable; live picks keep the 180-minute limit", exc_info=True)
+        return None
+    finally:
+        supervisor.close()
+
+
+def _daily_clear_retires(run_date: str, created_at_utc: str, event_start_utc: str) -> bool:
+    """Whether a daily run for ``run_date`` (ET) supersedes, and so re-prices, this open row.
+
+    Mirrors ``cli.commands._clear_today_open(by_event_date=True)``, which prefix-matches the ET run
+    date against the row's raw UTC strings. A row written after 00:00Z for a game after 00:00Z
+    matches neither, so later same-date runs keep it and the ledger's duplicate key stops them
+    appending a fresh one at the same line. This deliberately repeats that ET-date-vs-UTC-string
+    comparison; ``test_overnight_rule_mirrors_the_daily_clear`` pins the two together.
+    """
+    return created_at_utc.startswith(run_date) or event_start_utc.startswith(run_date)
+
+
+class _OvernightAgeExtension:
+    """D-03 overnight extension for live rows aged 180-360 minutes, evaluated once per pass.
+
+    A row qualifies only when it is the freshest pick the scheduler could have produced: it is the
+    newest open row of its (model, event, market) and no daily run that would re-price it has
+    started after it was written. Such a run counts whether it finished, failed or is still running;
+    a lock skip never forecast and does not count. Neither does a run on a later ET date than the
+    row's slate (the 00:30 run forecasts the next date). runs.db and the slot index are read lazily
+    on the first row that needs them, after the pass captured ``now``.
+    """
+
+    def __init__(self, picks: list[dict[str, Any]]) -> None:
+        self._picks = picks
+        self._loaded = False
+        self._runs: list[tuple[datetime, str]] | None = None
+        self._newest_by_slot: dict[tuple[str, str, str], datetime] = {}
+
+    @staticmethod
+    def _slot(row: dict[str, Any]) -> tuple[str, str, str]:
+        model_id = str(row.get("model_id") or row.get("model_version") or "")
+        return (model_id, str(row.get("event_id") or ""), str(row.get("market_type") or "").lower())
+
+    def _load(self) -> None:
+        self._loaded = True
+        history = _read_daily_run_history()
+        if history is not None:
+            try:
+                self._runs = [
+                    (parse_utc(str(run["started_at_utc"])), str(run.get("status") or "")) for run in history
+                ]
+            except (KeyError, TypeError, ValueError):
+                self._runs = None
+        for pick in self._picks:
+            if pick.get("status") != "open":
+                continue
+            try:
+                created = parse_utc(str(pick.get("created_at_utc") or ""))
+            except (TypeError, ValueError):
+                continue
+            slot = self._slot(pick)
+            if slot not in self._newest_by_slot or created > self._newest_by_slot[slot]:
+                self._newest_by_slot[slot] = created
+
+    def allows(self, row: dict[str, Any]) -> bool:
+        if not self._loaded:
+            self._load()
+        created_raw = str(row.get("created_at_utc") or "")
+        try:
+            created = parse_utc(created_raw)
+        except (TypeError, ValueError):
+            return False
+        # An empty or truncated history cannot show what ran after the pick.
+        if not self._runs or not any(started <= created for started, _status in self._runs):
+            return False
+        if self._newest_by_slot.get(self._slot(row), created) > created:
+            return False
+        slate_date = created.astimezone(EASTERN).date()
+        event_raw = str(row.get("event_start_utc") or "")
+        for started, status in self._runs:
+            if started <= created or status == "skipped":
+                continue
+            run_date = started.astimezone(EASTERN).date()
+            if run_date > slate_date:
+                continue
+            if _daily_clear_retires(run_date.isoformat(), created_raw, event_raw):
+                return False
+        return True
 
 
 class LiveAutoBuyerAlarm(RuntimeError):
@@ -1486,6 +1595,7 @@ def _cohort_pass_summary(
         "total_evaluated": res.total_evaluated,
         "cohort_matched": res.cohort_matched,
         **{name: value for name, value in vars(res).items() if name.startswith("rejected_")},
+        "live_overnight_age_extended": res.live_overnight_age_extended,
         "quarantined_models": res.quarantined_models,
         "total_spend_usd": res.total_spend_usd,
         "orders_count": len(orders),
@@ -2573,6 +2683,7 @@ class AutoPolymarketBuyer:
         committed_spend = today_spend_usd
         bought_index = self._build_bought_index()
         live_calibration_alarmed: set[str] = set()
+        overnight_age = _OvernightAgeExtension(picks)
         input_flags = _load_pick_input_flags(
             [str(row.get("pick_id") or "") for row in picks if row.get("status") == "open"]
         )
@@ -2710,7 +2821,13 @@ class AutoPolymarketBuyer:
             max_model_age_minutes = self.config.max_model_age_minutes
             if live_cohort:
                 # D-03: real money buys only a recent model call, whatever the global (paper) limit.
+                overnight_limit = min(max_model_age_minutes, LIVE_COHORT_OVERNIGHT_MAX_MODEL_AGE_MINUTES)
                 max_model_age_minutes = min(max_model_age_minutes, LIVE_COHORT_MAX_MODEL_AGE_MINUTES)
+                if max_model_age_minutes * 60 < model_age_seconds <= overnight_limit * 60 and (
+                    overnight_age.allows(row)
+                ):
+                    max_model_age_minutes = overnight_limit
+                    result.live_overnight_age_extended += 1
             if (self.config.require_model_timestamp or live_cohort) and (
                 model_age_seconds < 0 or model_age_seconds > max_model_age_minutes * 60
             ):
