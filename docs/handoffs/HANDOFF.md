@@ -7,9 +7,48 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 
 ## Next action
 
+0. **LIVE auto-buyer, real money (top priority), section 0 below.**
 1. **Operator, hardware (blocks trust in everything else):** run a real RAM test, see section 1.
 2. Check the first scheduled daily runs after the daily-speed merge, section 2.
 3. Decide whether to fetch 2014-2021 player boxes to confirm NCAAB P1 (player availability), section 4.
+
+## 0. LIVE auto-buyer cohorts (enabled 2026-11-25 ~08:22Z, REAL MONEY)
+
+State (`E:/model-prediction-runtime/auto_buyer_state.json`, v1230): `enabled` true, global `mode` paper, `whitelist_models` [],
+cohorts: LIVE `ncaab-spread-v7` 5-12% and `ncaab-total-v6` 5-12% (widened from 5-8%); PAPER `ncaab-moneyline-v7m` >=12% and
+`nba-spread-margin-v9` >=12%. $5/unit, $25/game shared, $500/day spend (100U), $250/day loss stop, buy window 35 min
+(`max_event_lookahead_hours` 0.583333), `edge_scaling_min_fraction` 0.5. Backups `auto_buyer_state.pre_*_20261125T08*.json`.
+Kill switch: `toggle_auto_buyer(False)` or a JSON `false` (never the string). Code: quick-261125-31d (79250d80..88c39d83,
+ea251bb9, 6ad66968); plan/summary in `.planning/quick/261125-31d-*`. Operator decisions and evidence: memory
+`project_auto-buyer-cohorts-2026-11-25.md`.
+
+Do in this order (operator: "all of these, start with the highest priority"):
+1. **Review cycle 1 fixes (in flight when the session ended; check `git log` for quick-261125-31d commits after 6ad66968).**
+   The executor was told to work in a separate git worktree and cherry-pick complete, tested commits only, never during
+   :00/:15/:30/:45 +-5 min. If nothing landed, redo them: (a) top-level `enabled` read as `is True` everywhere incl. daily.py
+   and `toggle_auto_buyer`; (b) resting fallback exposure counted in the daily spend cap (in-cycle and `_today_auto_buyer_totals`);
+   (c) live reconcile/settle runs whenever the live book has pending fallbacks, regardless of `enabled` or live cohorts parsing,
+   and daily.py `_auto_buyer_will_run` matches; (d) cohort sport allow-list nba/ncaab/nfl/mlb/wnba and MLB-ML block kept;
+   (e) 25% ceiling on every cohort, reject max > 0.25 at parse; (f) paper cohort pass `auto_quarantine_underperforming=False`;
+   (g) dashboard `/api/auto-buyer/run` takes daily.lock non-blocking; (h) disabled cycles skip cohort passes (no quote polling).
+   Then critical-reviewer cycle 2.
+2. **Resting orders can fill after tip-off** (cancelled only at the next 15-min cycle). Use an expiring order at tip-off if the
+   Polymarket US client supports it, else a tip-off cancel job, else IOC-only for live cohorts. Switching the buyer off must also
+   cancel resting live orders.
+3. **Line matching:** confirm whether `_decorate_pick` buys the logged line, nearest, or main line; add a depth/spread guard for thin
+   alternate rungs; confirm no double-buy of a game-side across superseded lines. A read-only investigation agent was running
+   on questions 2-4 + Telegram; rerun it if its report is lost.
+4. **Calibration:** confirm what `calibrate_for_serving` serves for ncaab-spread-v7 / ncaab-total-v6 (expected identity) and that
+   the 4x/day calibrate job cannot silently change it; pin identity for live cohorts or alert on change.
+5. **Telegram:** remove best-pick messages entirely; Telegram becomes auto-buyer alerts only (live order placed/filled/rested/
+   cancelled, loss stop, rejections/errors, cycle crash, low cash).
+6. **Tracking (all requested):** live fill log per cohort (fill vs pick price, fill rate, resting filled/cancelled); CLV per live
+   fill vs pre-tip close; skip reasons per cycle; line-move log (decision line, bought line, closing line; NCAAB closing lines are
+   not stored today); daily dashboard ($ and U per cohort, cumulative, max drawdown, loss-stop hits); paper copy of the live cohorts.
+- Noted, not decided: buy-time rule "live edge >= window min only" (picks whose edge grew above the window went 5-2); per-game
+  totals moved out of 5-8% went 33-17 (window widened to 5-12% on that). Sizing-curve non-monotonic fix (option B, one line
+  1U@2%..2U@8%) awaits operator. Another session has uncommitted edits in `auto_executor.py` (NCAAF block, NBA spread 3.5% floor):
+  never commit or revert them.
 
 ## 1. Suspected bad RAM (open, operator action)
 
