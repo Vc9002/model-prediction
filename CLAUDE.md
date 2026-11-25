@@ -20,7 +20,7 @@ cohorts), and this paragraph is the single place that decision is recorded:
   scheduled auto-buyer buys paper for everything except cohorts the operator
   explicitly sets to `mode: live` in the runtime `auto_buyer_state.json`
   `cohorts` list (2026-11-25: `ncaab-spread-v7` saved and live-ask edge 5-12%,
-  `ncaab-total-v6` 5-8%; $5 per unit, $25 per game across both, $500 spend and
+  `ncaab-total-v6` 5-12%; $5 per unit, $25 per game across both, $500 spend and
   $250 loss per day). Whenever that list exists the legacy whitelist buys
   paper only; code defaults are never live.
 - **A real-money execution path exists and stays gated.** Order submission to
