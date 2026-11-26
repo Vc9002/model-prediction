@@ -968,6 +968,19 @@ def test_live_game_cap_is_fee_inclusive_and_the_ticket_stays_shares_times_limit(
     assert _BuyExecutor.executed == [] and later.rejected_budget == 1
 
 
+def test_a_live_topup_keeps_the_game_within_its_cap_fee_included(tmp_path, buyer_env):
+    # The game-room check leaves out the pick's own filled cost (the top-up math subtracts it), so
+    # the top-up's own fee must still fit what is left of $25 after that filled cost and its fee.
+    held = _partial_row("oid-partial", shares=25.0, cost_usd=12.5, fee_usd=0.4375, primary_fee_usd=0.4375)
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [held])
+    pick = _pick(SPREAD_V7, pick_id="p1", event="g1", model_probability=0.57, ask=0.50, units=5.0)
+    _live_buyer(tmp_path).evaluate_and_execute([pick])
+    assert len(_BuyExecutor.executed) == 1
+    merged = _ledger(tmp_path / "auto_buyer_ledger.jsonl")[0]
+    assert merged["shares"] > 25.0
+    assert merged["cost_incl_fee_usd"] <= 25.0
+
+
 def test_live_daily_spend_includes_recorded_fees_but_paper_spend_does_not(tmp_path, frozen_now):
     row = {
         "pick_id": "d1",

@@ -3742,9 +3742,12 @@ class AutoPolymarketBuyer:
             # ticket itself stays shares x limit (the executor recomputes and checks exactly that).
             fee_usd = modeled_taker_fee_usd(shares, limit_price)
             fee_in_caps = self.config.mode == "live"
+            # A top-up's own filled cost is outside game_other_spend (the top-up math subtracts it
+            # from the target) but is on the game all the same.
+            own_filled = filled_cost if is_topup else 0.0
             room = self.config.max_daily_spend_usd - committed_spend
             if game:
-                room = min(room, self.config.max_game_stake_usd - game_other_spend)
+                room = min(room, self.config.max_game_stake_usd - game_other_spend - own_filled)
             # (The 10-cent slack is the game check's own rounding tolerance below.)
             if fee_in_caps and actual_cost + fee_usd > room and actual_cost <= room + 0.10:
                 shares = math.floor(room / (limit_price + taker_fee_per_share(limit_price)) * 100) / 100
@@ -3759,7 +3762,7 @@ class AutoPolymarketBuyer:
             if committed_spend + all_in_cost > self.config.max_daily_spend_usd:
                 result.rejected_budget += 1
                 continue
-            if game and game_other_spend + all_in_cost > self.config.max_game_stake_usd + 0.10:
+            if game and game_other_spend + own_filled + all_in_cost > self.config.max_game_stake_usd + 0.10:
                 result.rejected_budget += 1
                 continue
 
