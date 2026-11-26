@@ -65,6 +65,10 @@ logger = logging.getLogger(__name__)
 
 _MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9_\-]+)")
 _MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9_\-]+)\)\.?\s*$")
+# The NFL shadow writer's "ask 0.51 (slug); model edge ..." shape has the slug mid-sentence. Only a token with
+# a contract prefix counts (the prefixes cli/settle.py::_extract_market_slug accepts): a bare "(home)" or
+# "(anchor-blended)" is not a contract and must not refuse a correct manual BUY.
+_MARKET_SLUG_INLINE_RE = re.compile(r"\(((?:aec|asc|tsc|atc|mkt)-[a-z0-9_\-]+)\)")
 _LIVE_QUOTE_MAXIMUM_AGE_SECONDS = 300
 
 # Operator decision 2026-11-25 (quick-261125-hih B1): an ambiguous order POST (sent, then a read
@@ -91,6 +95,8 @@ _GTD_READBACK_RETRY_DELAYS = (0.0, 0.5, 1.0, 2.0)
 _GOOD_TILL_DATE_SPELLINGS = frozenset({_GOOD_TILL_DATE, "GOOD_TILL_DATE"})
 # An adopted fallback must have been created at or after its intent, give or take clock skew.
 _ADOPTION_CLOCK_SKEW_SECONDS = 5.0
+# (lower bound, divisor to seconds), largest first: ns, then us, then ms; below 1e11 is already seconds.
+_EPOCH_UNIT_BANDS = ((1e17, 1e9), (1e14, 1e6), (1e11, 1e3))
 _AUDIT_ERRORS = (OSError, TimeoutError, ValueError, TypeError, RuntimeError)
 
 
@@ -99,8 +105,12 @@ def _is_order_not_found(error: BaseException) -> bool:
 
 
 def _exchange_time(value: Any) -> datetime | None:
-    """An exchange timestamp: RFC 3339 text (what the POST sends), or epoch seconds or milliseconds,
-    which some order payloads echo instead. None when absent or unreadable."""
+    """An exchange timestamp: RFC 3339 text (what the POST sends), or an epoch in seconds, milliseconds,
+    microseconds or nanoseconds, which some order payloads echo instead. None when absent or unreadable.
+
+    The unit is read from the magnitude (2026 is ~1.8e9 s, ~1.8e12 ms, ~1.8e15 us, ~1.8e18 ns). Anything
+    unreadable is None, which makes the read-back a mismatch and cancels the fallback by id; an exception
+    here escaped ``_submit`` after both POSTs had succeeded, before the ``order_executed`` audit."""
     if value is None or value == "":
         return None
     try:
@@ -108,10 +118,22 @@ def _exchange_time(value: Any) -> datetime | None:
     except (TypeError, ValueError):
         number = None
     if number is not None and math.isfinite(number):
-        return datetime.fromtimestamp(number / 1000.0 if number > 1e11 else number, tz=UTC)
+        # fromtimestamp accepts a negative epoch on Linux, and a pre-1970 expiry is never real.
+        if number <= 0:
+            return None
+        for lower_bound, divisor in _EPOCH_UNIT_BANDS:
+            if number >= lower_bound:
+                seconds = number / divisor
+                break
+        else:
+            seconds = number
+        try:
+            return datetime.fromtimestamp(seconds, tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            return None
     try:
         return parse_utc(str(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -149,7 +171,7 @@ def _earliest_event_start(pick_row: dict[str, Any], live_snapshot: dict[str, Any
     """The earlier of the row's and the exchange's event start; None when neither parses."""
     starts: list[datetime] = []
     for raw in (pick_row.get("event_start_utc"), (live_snapshot or {}).get("event_start_utc")):
-        with suppress(TypeError, ValueError):
+        with suppress(TypeError, ValueError, OverflowError):
             starts.append(parse_utc(str(raw or "")))
     return min(starts) if starts else None
 
@@ -166,7 +188,7 @@ def _exchange_event_start(live_snapshot: dict[str, Any] | None) -> datetime | No
         return None
     try:
         return parse_utc(str(raw))
-    except ValueError as error:
+    except (ValueError, OverflowError) as error:
         raise ExecutionGateError(
             f"REFUSED: live quote has an unreadable event_start_utc ({raw!r}); nothing was sent."
         ) from error
@@ -485,6 +507,8 @@ def _extract_market_slug(rationale: str) -> str | None:
     match = _MARKET_SLUG_RE.search(rationale)
     if match is None:
         match = _MARKET_SLUG_LEGACY_RE.search(rationale)
+    if match is None:
+        match = _MARKET_SLUG_INLINE_RE.search(rationale)
     return match.group(1) if match else None
 
 
@@ -1060,11 +1084,11 @@ class PolymarketExecutor:
             return None
         try:
             expiry = parse_utc(str(ticket.resting_expires_at_utc))
-        except ValueError:
+        except (TypeError, ValueError, OverflowError):
             return None
         exchange_start = (live_snapshot or {}).get("event_start_utc")
         if exchange_start:
-            with suppress(TypeError, ValueError):
+            with suppress(TypeError, ValueError, OverflowError):
                 clamp = parse_utc(str(exchange_start)) - timedelta(
                     seconds=_FALLBACK_EXCHANGE_START_LEAD_SECONDS
                 )

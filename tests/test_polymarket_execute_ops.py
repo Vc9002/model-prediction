@@ -4,6 +4,7 @@ read-only balance call. Every exchange call is a FakeExchange (no network, no sl
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ from test_live_order_safety import (  # the shared fake exchange and order build
 
 from model_prediction.audit import AuditLog
 from model_prediction.data_sources import polymarket_execute as pe
+from model_prediction.domain import iso_utc
 
 
 class SequencedExchange(FakeExchange):
@@ -237,6 +239,130 @@ def test_short_tif_spelling_and_epoch_expiry_are_read_as_gtd(tmp_path, exchange)
     result = _execute(tmp_path, exchange)
     assert exchange.cancels() == []
     assert result["fallback_status"] == "resting"
+
+
+# ------------------------------------------------------------------ 2026-11-26 audit B1: epoch units, overflow, slugs
+
+_ECHO_INSTANT = datetime(2026, 11, 27, 0, 30, tzinfo=UTC)
+_ECHO_SECONDS = int(_ECHO_INSTANT.timestamp())
+
+
+@pytest.mark.parametrize("scale", [1, 10**3, 10**6, 10**9], ids=["seconds", "millis", "micros", "nanos"])
+def test_exchange_time_reads_an_epoch_in_every_unit_as_the_same_instant(scale):
+    """A nanosecond echo used to be divided by 1000 only, then fromtimestamp raised OSError on Windows."""
+    for value in (_ECHO_SECONDS * scale, float(_ECHO_SECONDS * scale), str(_ECHO_SECONDS * scale)):
+        assert pe._exchange_time(value) == _ECHO_INSTANT
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        0,
+        -1,
+        -1.5e18,
+        1e30,
+        float("nan"),
+        float("inf"),
+        "nan",
+        "garbage",
+        "",
+        None,
+        "0001-01-01T00:00:00+05:00",
+    ],
+)
+def test_exchange_time_is_none_for_anything_unreadable(value):
+    assert pe._exchange_time(value) is None
+
+
+def test_exchange_time_still_reads_rfc3339_text():
+    assert pe._exchange_time("2026-11-27T00:30:00Z") == _ECHO_INSTANT
+
+
+def test_a_nanosecond_goodtilltime_echo_verifies_the_fallback_as_resting(tmp_path, exchange):
+    def fallback(body):
+        status, order = exchange.default_post(body)
+        seconds = int(pe.parse_utc(body["goodTillTime"]).timestamp())
+        exchange.readback_overrides[order["id"]] = {"tif": GTD, "goodTillTime": seconds * 10**9}
+        return status, order
+
+    exchange.post_script = [exchange.default_post, fallback]
+    result = _execute(tmp_path, exchange)
+    assert exchange.cancels() == []
+    assert result["fallback_status"] == "resting"
+    assert result["fallback_verified_via"] == "order_readback"
+
+
+def test_an_out_of_range_goodtilltime_echo_cancels_the_fallback_and_still_audits_the_buy(tmp_path, exchange):
+    """OSError out of fromtimestamp escaped _submit after both POSTs succeeded: no order_executed audit."""
+
+    def fallback(body):
+        status, order = exchange.default_post(body)
+        exchange.readback_overrides[order["id"]] = {"tif": GTD, "goodTillTime": 1e30}
+        return status, order
+
+    exchange.post_script = [exchange.default_post, fallback]
+    result = _execute(tmp_path, exchange)
+    assert exchange.cancels() == [result["fallback_order_id"]]
+    assert result["fallback_status"] == "cancelled_unverified_gtd"
+    events = [e for e in AuditLog(tmp_path / "audit.jsonl").events() if e["event_type"] == "order_executed"]
+    assert len(events) == 1
+
+
+_OVERFLOWING_START = "0001-01-01T00:00:00+05:00"
+
+
+def test_exchange_event_start_refuses_a_start_that_overflows_utc():
+    with pytest.raises(pe.ExecutionGateError, match="unreadable event_start_utc"):
+        pe._exchange_event_start({"event_start_utc": _OVERFLOWING_START})
+
+
+def test_earliest_event_start_skips_a_start_that_overflows_utc():
+    good = _start(minutes=10)
+    row = {"event_start_utc": _OVERFLOWING_START}
+    assert pe._earliest_event_start(row, {"event_start_utc": iso_utc(good)}) == pe.parse_utc(iso_utc(good))
+    assert pe._earliest_event_start(row, None) is None
+
+
+def test_fallback_expiry_survives_an_overflowing_ticket_or_exchange_start(tmp_path):
+    start = _start()
+    client = _executor(tmp_path, _snapshot(start))
+    assert (
+        client._fallback_expiry(_ticket(start, resting_expires_at_utc=_OVERFLOWING_START), _snapshot(start))
+        is None
+    )
+    ticket = _ticket(start)
+    snap = _snapshot(start, event_start_utc=_OVERFLOWING_START)
+    assert client._fallback_expiry(ticket, snap) == pe.parse_utc(ticket.resting_expires_at_utc)
+
+
+# _extract_market_slug: the explicit token, the end-anchored legacy form, and the NFL shadow inline form.
+
+_INLINE_SLUG = "aec-nfl-kc-buf-2026-11-30"
+
+
+def test_extract_market_slug_reads_the_nfl_shadow_inline_form():
+    text = f"Learned LR call at threshold 0.6; executable ask 0.5100 ({_INLINE_SLUG}); model edge vs ask +0.0300."
+    assert pe._extract_market_slug(text) == _INLINE_SLUG
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "challenger (home) call; model edge vs ask +0.0300.",
+        "challenger (anchor-blended): fair margin +3.1; model edge vs ask +0.0300.",
+        "edge (v5) note",
+        "plain text with no slug",
+    ],
+)
+def test_extract_market_slug_ignores_parenthesised_words_that_are_not_contracts(text):
+    assert pe._extract_market_slug(text) is None
+
+
+def test_extract_market_slug_prefers_the_explicit_token_then_the_end_anchored_form():
+    both = f"auto_buy market_slug=asc-cbb-a-b-2026-11-25 ({_INLINE_SLUG}); edge."
+    assert pe._extract_market_slug(both) == "asc-cbb-a-b-2026-11-25"
+    anchored = f"edge ({_INLINE_SLUG}); more text (tsc-nfl-kc-buf-2026-11-30-44pt5)."
+    assert pe._extract_market_slug(anchored) == "tsc-nfl-kc-buf-2026-11-30-44pt5"
 
 
 # ------------------------------------------------------------------ item 2: refusals and balance

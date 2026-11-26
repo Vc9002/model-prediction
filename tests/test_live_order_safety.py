@@ -470,7 +470,9 @@ def test_exchange_start_earlier_than_the_row_start_in_the_past_sends_nothing(tmp
     assert _audit_types(tmp_path) == []
 
 
-@pytest.mark.parametrize("bad_start", ["2099-01-01T00:00:00", "not-a-time", 12345, "20261126"])
+@pytest.mark.parametrize(
+    "bad_start", ["2099-01-01T00:00:00", "not-a-time", 12345, "20261126", "0001-01-01T00:00:00+05:00"]
+)
 def test_unreadable_or_naive_exchange_start_sends_nothing(tmp_path, exchange, bad_start):
     start = _start()
     with pytest.raises(pe.ExecutionGateError, match="unreadable event_start_utc"):
@@ -491,6 +493,22 @@ def test_absent_exchange_start_keeps_the_row_only_check(tmp_path, exchange, abse
     )
     assert result["status"] == "submitted"
     assert len(exchange.order_posts()) == 1
+
+
+def test_a_ticket_for_another_market_than_the_inline_slug_in_the_rationale_sends_nothing(tmp_path, exchange):
+    """The NFL shadow writer puts the priced contract in parentheses mid-sentence ("... ask 0.51 (aec-...);
+    model edge ..."); only an end-anchored form was read, so a manual BUY on another market passed."""
+    start = _start()
+    rationale = (
+        "Learned LR call at threshold 0.6000; executable ask 0.5100 "
+        "(aec-nfl-kc-buf-2026-11-30); model edge vs ask +0.0300."
+    )
+    with pytest.raises(pe.ExecutionGateError, match="actually priced against"):
+        _executor(tmp_path, _snapshot(start)).execute(
+            _ticket(start), _pick_row(start, rationale=rationale), execute_flag=True, user_command=True
+        )
+    assert exchange.calls == []
+    assert _audit_types(tmp_path) == []
 
 
 def test_exchange_start_crossed_during_the_intent_append_sends_nothing(tmp_path, exchange, monkeypatch):
