@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -148,6 +149,8 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setattr(telegram_control, "_build_executor", lambda _paths: exchange)
     monkeypatch.setattr(telegram_control, "CANCEL_LOCK_WAIT_SECONDS", 0.3)
     monkeypatch.setattr(telegram_control, "TOGGLE_RETRY_DELAY_SECONDS", 0.0)
+    # main() ends the process when a kill-switch sweep thread is still running; a test must never inherit one.
+    monkeypatch.setattr(telegram_control, "_ABANDONED", [])
     return type("Env", (), {"root": root.resolve(), "exchange": exchange})()
 
 
@@ -273,15 +276,91 @@ def test_liveoff_succeeds_even_when_the_exchange_cancel_fails(env):
     result = _run("live-off")
     assert result["ok"] is True
     assert _state(env)["live_enabled"] is False
-    assert "NOT cancelled" in result["message"] or "failed" in result["message"].lower()
+    assert "1 NOT cancelled" in result["message"]
+    assert result["cancel_failed"] is True
 
 
-def test_pause_turns_the_master_switch_off(env):
+def test_liveoff_replies_while_a_slow_cancel_sweep_is_still_running(env, monkeypatch):
+    """The switch is saved first; a sweep that outlives the wait is reported as pending, not waited for."""
     _write_state(env, LIVE_STATE)
+    _write_ledger(env.root / "auto_buyer_ledger.jsonl", [_row("ioc-1", fallback="gtd-1")])
+    env.exchange.orders = [_order("gtd-1")]
+    release = threading.Event()
+    real_cancel = env.exchange.cancel
+
+    def _slow_cancel(*args, **kwargs):
+        release.wait(5)
+        return real_cancel(*args, **kwargs)
+
+    env.exchange.cancel = _slow_cancel
+    monkeypatch.setattr(telegram_control, "SWEEP_WAIT_SECONDS", 0.3)
+    try:
+        result = _run("live-off")
+    finally:
+        release.set()
+    assert result["ok"] is True
+    assert _state(env)["live_enabled"] is False
+    assert "still running" in result["message"] and "/orders" in result["message"]
+
+
+def test_a_kill_switch_that_cannot_be_written_is_not_reported_as_done(env, monkeypatch):
+    _write_state(env, LIVE_STATE)
+
+    def _hang(_enabled=None, **_kw):
+        threading.Event().wait(3)
+        raise OSError("never saved")
+
+    monkeypatch.setattr(auto_executor, "toggle_live_trading", _hang)
+    monkeypatch.setattr(telegram_control, "SWEEP_WAIT_SECONDS", 0.2)
+    result = _run("live-off")
+    assert result["ok"] is False and "ALARM" in result["message"]
+
+
+def test_the_live_switch_audit_line_names_telegram_as_its_source(env):
+    _write_state(env, LIVE_STATE)
+    assert _run("live-off")["ok"] is True
+    lines = [
+        json.loads(x)
+        for x in (env.root / "audit.jsonl").read_text(encoding="utf-8").splitlines()
+        if x.strip()
+    ]
+    switch = [x for x in lines if "auto_buyer_live_switch_updated" in json.dumps(x)]
+    assert len(switch) == 1
+    assert switch[0]["payload"]["source"] == "telegram" and switch[0]["payload"]["live_enabled"] is False
+
+
+def test_pause_turns_real_money_off_and_then_the_master_switch_off(env, monkeypatch):
+    path = _write_state(env, LIVE_STATE)
+    seen: list[Any] = []
+    real = auto_executor.toggle_auto_buyer
+
+    def _spy(enabled=None):
+        seen.append((enabled, json.loads(path.read_text(encoding="utf-8")).get("live_enabled")))
+        return real(enabled)
+
+    monkeypatch.setattr(auto_executor, "toggle_auto_buyer", _spy)
     result = _run("pause")
     assert result["ok"] is True
-    assert _state(env)["enabled"] is False
-    assert "paused" in result["message"].lower()
+    state = _state(env)
+    assert state["enabled"] is False and state["live_enabled"] is False
+    assert seen == [(False, False)], "real money must already be off when the master write happens"
+    assert "Real money OFF" in result["message"] and "paused" in result["message"].lower()
+    after = _run("status")
+    assert after["live_enabled"] is False and "Real money switch: OFF" in after["message"]
+    # a later master-on (the dashboard, or /resume) can no longer bring real money back by itself
+    auto_executor.toggle_auto_buyer(True)
+    assert _run("status")["live_trading_active"] is False
+
+
+def test_pause_from_an_already_live_off_state_skips_the_live_write(env, monkeypatch):
+    _write_state(env, {**LIVE_STATE, "live_enabled": False})
+    calls: list[Any] = []
+    real = auto_executor.toggle_live_trading
+    monkeypatch.setattr(
+        auto_executor, "toggle_live_trading", lambda *a, **k: calls.append(a) or real(*a, **k)
+    )
+    assert _run("pause")["ok"] is True
+    assert calls == []
 
 
 def test_resume_turns_paper_on_and_leaves_live_off_even_if_live_was_on(env):
@@ -313,7 +392,7 @@ def test_resume_switches_live_off_before_the_master_comes_on(env, monkeypatch):
 def test_resume_does_not_enable_the_master_when_the_live_off_write_fails(env, monkeypatch):
     path = _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": True})
 
-    def _fail(_enabled=None):
+    def _fail(_enabled=None, **_kw):
         raise OSError("disk full")
 
     monkeypatch.setattr(auto_executor, "toggle_live_trading", _fail)
@@ -426,6 +505,8 @@ def test_orders_lists_numbered_cents_and_marks_ledger_known_vs_manual(env):
     # a short intent is quoted in the long coordinate: 0.40 long is 60 cents for the short side
     assert known["price_cents"] == 52.0 and manual["price_cents"] == 60.0
     assert [o["n"] for o in result["orders"]] == [1, 2]
+    assert all(o["text"].startswith(f"{o['n']}. {o['short_id']} ") for o in result["orders"])
+    assert result["header"].startswith("Open live orders: 2") and result["footer"].startswith("/cancel")
     text = result["message"]
     assert "52¢" in text and "60¢" in text and "manual" in text
     assert re.search(r"(?<![\w.])[+-]\d{3}\b", text) is None
@@ -456,6 +537,9 @@ def test_orders_unions_the_ledger_markets_when_the_account_read_misses_an_order(
     env.exchange.open_orders = _empty_account_read  # an endpoint that silently returns nothing without slugs
     result = _run("orders")
     assert [o["id"] for o in result["orders"]] == ["GTD9ABCDEFGH"]
+    # an order only the ledger-market read found proves the account-wide read was incomplete
+    assert result["scope"] == "partial" and "incomplete" in result["note"]
+    assert "(partial read)" in result["message"]
 
 
 def test_orders_reports_a_partial_scope_when_the_account_read_is_refused(env):
@@ -498,7 +582,8 @@ def test_cancel_exact_id_cancels_exactly_that_one_order(env):
     assert result["ok"] is True
     assert env.exchange.cancel_calls == [("DYR1NJ7G15QX", SLUG_B)]
     assert {o["id"] for o in env.exchange.orders} == {"DYR1NJ7G15P7", "EXY4MKLP9902"}
-    assert "52¢" in result["message"] or "cancelled" in result["message"].lower()
+    assert "Cancelled DYR1NJ7G15QX" in result["message"] and "ORDER_STATE_CANCELED" in result["message"]
+    assert result["outcome"] == "cancelled"
 
 
 def test_cancel_never_cancels_more_than_one_order_whatever_the_id(env):
@@ -702,5 +787,170 @@ def test_no_message_contains_american_odds_or_secrets(env, monkeypatch):
     blob = json.dumps(
         [_run("status"), _run("orders"), _run("pause"), _run("resume"), _run("live-off"), _run("live-on")]
     )
+    assert "SUPERSECRETVALUE" not in blob
+    assert re.search(r"(?<![\w.:-])[+-]\d{3}(?!\d)", re.sub(r"\d{4}-\d{2}-\d{2}", "", blob)) is None
+
+
+# ------------------------------------------------------------------ fix round 1 (critical review 2026-11-26)
+
+
+def test_resume_skips_the_live_write_when_real_money_is_already_off(env, monkeypatch):
+    _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": False})
+    calls: list[Any] = []
+    real = auto_executor.toggle_live_trading
+    monkeypatch.setattr(
+        auto_executor, "toggle_live_trading", lambda *a, **k: calls.append(a) or real(*a, **k)
+    )
+    result = _run("resume")
+    assert result["ok"] is True and calls == []
+    assert _state(env)["enabled"] is True and _state(env)["live_enabled"] is False
+
+
+def test_cancel_exact_refuses_a_prefix_even_when_it_is_unique(env):
+    _write_state(env, LIVE_STATE)
+    _three_orders(env)
+    result = _run("cancel", "EXY4", "--exact")
+    assert result["ok"] is False and "full order id" in result["message"]
+    assert env.exchange.cancel_calls == [] and len(env.exchange.orders) == 3
+
+
+def test_cancel_exact_cancels_the_full_id_only_if_it_is_open_right_now(env):
+    _write_state(env, LIVE_STATE)
+    _three_orders(env)
+    assert _run("cancel", "EXY4MKLP9902", "--exact")["ok"] is True
+    assert [c[0] for c in env.exchange.cancel_calls] == ["EXY4MKLP9902"]
+    gone = _run("cancel", "EXY4MKLP9902", "--exact")
+    assert gone["ok"] is False and len(env.exchange.cancel_calls) == 1
+
+
+def test_cancel_exact_does_not_hit_a_newer_order_sharing_the_prefix(env):
+    """The operator copied DYQRQ2SG15P9 from an older /orders; a newer DYQRQNF015P8 shares the prefix."""
+    _write_state(env, LIVE_STATE)
+    env.exchange.orders = [_order("DYQRQ2SG15P9"), _order("DYQRQNF015P8", SLUG_B)]
+    result = _run("cancel", "DYQRQ", "--exact")
+    assert result["ok"] is False and env.exchange.cancel_calls == []
+    assert _run("cancel", "DYQRQ2SG15P9", "--exact")["ok"] is True
+    assert [o["id"] for o in env.exchange.orders] == ["DYQRQNF015P8"]
+
+
+@pytest.mark.parametrize("extra", [["--force"], ["--exact", "--exact"], ["x"]])
+def test_cancel_rejects_unknown_extra_arguments(env, extra):
+    _write_state(env, LIVE_STATE)
+    _three_orders(env)
+    result = _run("cancel", "EXY4MKLP9902", *extra)
+    assert result["ok"] is False and env.exchange.cancel_calls == []
+
+
+def test_cancel_reports_cancelled_for_expired_too(env):
+    _write_state(env, LIVE_STATE)
+    _three_orders(env)
+    real_snapshots = env.exchange.order_snapshots
+
+    def _expired(order_ids):
+        out = real_snapshots(order_ids)
+        for o in out["orders"]:
+            o["order_state"] = "ORDER_STATE_EXPIRED"
+        return out
+
+    env.exchange.order_snapshots = _expired
+    result = _run("cancel", "EXY4MKLP9902", "--exact")
+    assert result["ok"] is True and result["outcome"] == "cancelled"
+
+
+def test_cancel_with_an_unreadable_followup_is_unconfirmed_and_not_memoised(env):
+    _write_state(env, LIVE_STATE)
+    _three_orders(env)
+
+    def _down(_ids):
+        raise ExecutionGateError("REFUSED: Polymarket US order request failed (ConnectError).")
+
+    env.exchange.order_snapshots = _down
+    result = _run("cancel", "EXY4MKLP9902", "--exact")
+    assert result["ok"] is False and result["outcome"] == "unconfirmed"
+    assert "unconfirmed" in result["message"].lower() and "/orders" in result["message"]
+    assert not (env.root / auto_buyer_cancel_worker.MEMO_FILE_NAME).exists()
+
+
+def test_cancel_of_an_order_that_filled_is_not_reported_as_cancelled(env):
+    _write_state(env, LIVE_STATE)
+    _three_orders(env)
+    real_snapshots = env.exchange.order_snapshots
+
+    def _filled(order_ids):
+        out = real_snapshots(order_ids)
+        for o in out["orders"]:
+            o["order_state"] = "ORDER_STATE_FILLED"
+        return out
+
+    env.exchange.order_snapshots = _filled
+    result = _run("cancel", "EXY4MKLP9902", "--exact")
+    assert result["ok"] is False and result["outcome"] == "filled"
+    assert "FILLED" in result["message"] and "Cancelled" not in result["message"]
+
+
+def test_liveon_with_no_live_cohort_says_no_real_order_will_be_placed(env):
+    state = {**LIVE_STATE, "live_enabled": False, "cohorts": [{**LIVE_STATE["cohorts"][0], "mode": "paper"}]}
+    _write_state(env, state)
+    result = _run("live-on", "--confirmed")
+    assert result["ok"] is True and result["live_trading_active"] is False
+    assert "no real order will be placed" in result["message"]
+
+
+def test_liveon_in_legacy_live_mode_is_called_out_as_ungoverned(env):
+    state = {k: v for k, v in LIVE_STATE.items() if k != "cohorts"}
+    _write_state(env, {**state, "mode": "live", "live_enabled": False})
+    result = _run("live-on", "--confirmed")
+    assert result["ok"] is True and result["live_trading_active"] is True
+    assert "legacy live mode" in result["message"] and "ungoverned" in result["message"]
+    assert "no real order will be placed" not in result["message"]
+
+
+def test_the_cli_arms_an_overall_deadline_and_it_prints_one_json_object(env, monkeypatch, capsys):
+    armed: list[tuple[float, Any]] = []
+
+    class _Timer:
+        def __init__(self, interval, function):
+            armed.append((interval, function))
+            self.daemon = False
+
+        def start(self):
+            pass
+
+        def cancel(self):
+            armed.append(("cancelled", None))
+
+    monkeypatch.setattr(telegram_control.threading, "Timer", _Timer)
+    _write_state(env, LIVE_STATE)
+    assert telegram_control.main(["status"]) == 0
+    assert armed[0][0] == telegram_control.CLI_DEADLINE_SECONDS == 150.0
+    assert armed[-1][0] == "cancelled"
+    capsys.readouterr()
+    exits: list[int] = []
+    monkeypatch.setattr(telegram_control.os, "_exit", exits.append)
+    armed[0][1]()
+    out = json.loads(capsys.readouterr().out)
+    assert out["ok"] is False and "UNKNOWN" in out["message"] and exits == [1]
+
+
+def test_cancel_and_liveon_messages_have_no_american_odds_or_secrets_even_on_exchange_errors(
+    env, monkeypatch
+):
+    monkeypatch.setenv("POLYMARKET_SECRET_KEY", "SUPERSECRETVALUE")
+    _write_state(env, {**LIVE_STATE, "live_enabled": False})
+    _three_orders(env)
+    ok_cancel = _run("cancel", "EXY4MKLP9902", "--exact")
+    env.exchange.cancel_error = ExecutionGateError(
+        "REFUSED by Polymarket US (500): upstream", status_code=500
+    )
+    failed_cancel = _run("cancel", "DYR1NJ7G15P7", "--exact")
+    env.exchange.cancel_error = None
+    live_on = _run("live-on", "--confirmed")
+    env.exchange.open_orders = lambda _s: (_ for _ in ()).throw(
+        ExecutionGateError("REFUSED: down (ConnectError).")
+    )
+    list_down = _run("cancel", "DYR1NJ7G15QX", "--exact")
+    results = [ok_cancel, failed_cancel, live_on, list_down]
+    assert [r["ok"] for r in results] == [True, False, True, False]
+    blob = json.dumps(results)
     assert "SUPERSECRETVALUE" not in blob
     assert re.search(r"(?<![\w.:-])[+-]\d{3}(?!\d)", re.sub(r"\d{4}-\d{2}-\d{2}", "", blob)) is None

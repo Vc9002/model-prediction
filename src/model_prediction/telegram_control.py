@@ -28,6 +28,7 @@ import json
 import os
 import re
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -53,7 +54,15 @@ TOGGLE_RETRY_DELAY_SECONDS = 0.4
 # nothing did.
 _FALLBACK_VERIFIED_VIA = frozenset({"order_readback", "open_orders"})
 _MUTATING = frozenset({"live-off", "pause", "resume", "live-on", "cancel"})
-USAGE = "usage: status | live-off | pause | resume | live-on --confirmed | orders | cancel ID"
+USAGE = "usage: status | live-off | pause | resume | live-on --confirmed | orders | cancel ID [--exact]"
+
+# The CLI ends itself with a JSON answer after this long; the bot's own timeout is longer, so the bot never kills
+# it in the middle of a state write.
+CLI_DEADLINE_SECONDS = 150.0
+# How long a kill switch waits for its resting-order cancel sweep AFTER the switch itself is saved. A sweep that
+# outlives it is reported as still running (the cancel worker's backstop keeps cancelling).
+SWEEP_WAIT_SECONDS = 45.0
+_CANCELLED_STATES = frozenset({"ORDER_STATE_CANCELED", "ORDER_STATE_EXPIRED"})
 
 _sleep = time.sleep
 
@@ -166,12 +175,42 @@ def _retry_toggle(ctx: _Context, call: Any, value: bool) -> dict[str, Any]:
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+_ABANDONED: list[threading.Thread] = []
+
+
+def _toggle(ctx: _Context, call: Any, value: bool, *, sweep: bool) -> dict[str, Any]:
+    """Run a switch write. The toggles save first and then sweep the ledger's resting orders; with ``sweep`` the
+    caller waits for the sweep at most ``SWEEP_WAIT_SECONDS``, so a slow exchange never delays the reply (or the
+    bot's timeout) once the switch itself is saved. The result then carries a pending sweep, and the caller still
+    re-reads the state file, so an unsaved switch is never reported as done."""
+    box: dict[str, Any] = {}
+
+    def work() -> None:
+        try:
+            box["state"] = _retry_toggle(ctx, call, value)
+        except BaseException as exc:  # noqa: BLE001 -- handed to the caller below
+            box["error"] = exc
+
+    worker = threading.Thread(target=work, name="telegram-control-toggle", daemon=True)
+    worker.start()
+    worker.join(SWEEP_WAIT_SECONDS if sweep else None)
+    if "error" in box:
+        raise box["error"]
+    if "state" in box:
+        return box["state"]
+    _ABANDONED.append(worker)
+    return {"kill_switch_cancel": {"status": "pending"}}
+
+
 def _toggle_live(ctx: _Context, value: bool) -> dict[str, Any]:
-    return _retry_toggle(ctx, ctx.executor_module.toggle_live_trading, value)
+    def call(v: bool) -> dict[str, Any]:
+        return ctx.executor_module.toggle_live_trading(v, source="telegram")
+
+    return _toggle(ctx, call, value, sweep=not value)
 
 
 def _toggle_master(ctx: _Context, value: bool) -> dict[str, Any]:
-    return _retry_toggle(ctx, ctx.executor_module.toggle_auto_buyer, value)
+    return _toggle(ctx, ctx.executor_module.toggle_auto_buyer, value, sweep=not value)
 
 
 def _kill_switch_note(state: dict[str, Any]) -> tuple[str, bool]:
@@ -179,6 +218,11 @@ def _kill_switch_note(state: dict[str, Any]) -> tuple[str, bool]:
     summary = state.get("kill_switch_cancel")
     if not isinstance(summary, dict):
         return "", False
+    if summary.get("status") == "pending":
+        return (
+            " The switch is saved; the cancel sweep of resting live orders is still running, see /orders.",
+            False,
+        )
     if summary.get("status") == "error":
         return f" Cancelling resting live orders FAILED ({summary.get('error')}); check /orders.", True
     cancelled = len(summary.get("cancelled") or [])
@@ -258,36 +302,68 @@ def _cmd_live_off(ctx: _Context, _args: list[str]) -> dict[str, Any]:
     )
 
 
+def _live_flag_is_off(raw: dict[str, Any] | None) -> bool:
+    # Strict: a missing key follows the master switch, so only an explicit false counts as off.
+    return raw is not None and raw.get("live_enabled") is False
+
+
 def _cmd_pause(ctx: _Context, _args: list[str]) -> dict[str, Any]:
+    """Real money off FIRST, then the master. Pausing the master alone left ``live_enabled`` true, so any later
+    master-on (the dashboard) would have brought real money back with no code."""
+    notes: list[str] = []
+    failed = False
+    if not _live_flag_is_off(_raw_state(ctx)):
+        try:
+            note, bad = _kill_switch_note(_toggle_live(ctx, False))
+        except Exception as exc:  # noqa: BLE001 -- the master switch is still tried: it stops live too
+            note, bad = f" Real money was NOT confirmed off first ({_error_text(exc)}).", True
+        notes.append(note)
+        failed = failed or bad
     try:
-        state = _toggle_master(ctx, False)
+        note, bad = _kill_switch_note(_toggle_master(ctx, False))
     except Exception as exc:  # noqa: BLE001 -- reported: the switch is NOT confirmed off
         return _fail(f"The buyer was NOT confirmed paused ({_error_text(exc)}). Check /status now.")
+    notes.append(note)
+    failed = failed or bad
     raw = _raw_state(ctx)
-    if raw is None or raw.get("enabled") is True:
-        return _fail("ALARM: the state file still reads the buyer ENABLED after /pause. Check /status now.")
-    note, cancel_failed = _kill_switch_note(state)
+    if raw is None or raw.get("enabled") is True or ctx.ledger_module.live_switch_on(raw):
+        return _fail(
+            "ALARM: the state file still reads the buyer or real money ON after /pause. Check /status now."
+        )
+    if not _live_flag_is_off(raw):
+        # The master is off, but a later master-on (the dashboard) would bring real money back with no code.
+        return _fail(
+            "Auto-buyer paused, but the real-money flag could NOT be set off: switching the master back on "
+            "would restore real money. Send /liveoff now." + "".join(notes),
+            enabled=False,
+            live_enabled=True,
+            live_trading_active=False,
+        )
     return _ok(
-        "Auto-buyer paused: paper and live are both off."
-        + note
+        "Real money OFF and auto-buyer paused: paper and live are both off."
+        + "".join(notes)
         + " /resume brings paper back (live stays off).",
         enabled=False,
+        live_enabled=False,
         live_trading_active=False,
-        cancel_failed=cancel_failed,
+        cancel_failed=failed,
     )
 
 
 def _cmd_resume(ctx: _Context, _args: list[str]) -> dict[str, Any]:
-    if _raw_state(ctx) is None:
+    raw = _raw_state(ctx)
+    if raw is None:
         return _fail("Refused: there is no auto-buyer state file to resume.")
     # Live goes off BEFORE the master comes on, so no moment exists with both on that the operator did not ask for.
-    try:
-        _toggle_live(ctx, False)
-    except Exception as exc:  # noqa: BLE001 -- the master stays as it was
-        return _fail(f"Not resumed: real money could not be switched off first ({_error_text(exc)}).")
-    raw = _raw_state(ctx)
-    if raw is None or raw.get("live_enabled") is not False:
-        return _fail("Not resumed: the state file does not read real money OFF after the first step.")
+    # An already-off flag needs no write, which also spares a second cancel sweep.
+    if not _live_flag_is_off(raw):
+        try:
+            _toggle_live(ctx, False)
+        except Exception as exc:  # noqa: BLE001 -- the master stays as it was
+            return _fail(f"Not resumed: real money could not be switched off first ({_error_text(exc)}).")
+        raw = _raw_state(ctx)
+        if not _live_flag_is_off(raw):
+            return _fail("Not resumed: the state file does not read real money OFF after the first step.")
     try:
         _toggle_master(ctx, True)
     except Exception as exc:  # noqa: BLE001 -- reported; live is already off
@@ -332,16 +408,21 @@ def _cmd_live_on(ctx: _Context, args: list[str]) -> dict[str, Any]:
         "daily_loss_usd": status.get("max_daily_loss_usd"),
     }
     cohorts = [str(label) for label in status.get("live_cohorts") or []]
+    active = bool(status.get("live_trading_active"))
     verified = any(
         str(r.get("fallback_verified_via") or "") in _FALLBACK_VERIFIED_VIA for r in _ledger_rows(ctx)
     )
+    if cohorts:
+        who = "Live cohorts: " + ", ".join(cohorts) + "."
+    elif active:
+        who = "No governed live cohort, but legacy live mode (mode live) is on: it is ungoverned by cohorts."
+    else:
+        who = "No live cohort is active, so no real order will be placed."
     parts = [
         ("Real money was already ON." if already else "Real money is now ON.")
         + f" Caps: {_usd(caps['daily_spend_usd'])}/day spend, {_usd(caps['per_game_usd'])}/game, "
         f"{_usd(caps['daily_loss_usd'])}/day loss.",
-        "Live cohorts: "
-        + (", ".join(cohorts) if cohorts else "none active, so no real order will be placed.")
-        + ".",
+        who,
     ]
     if not verified:
         parts.append(
@@ -351,7 +432,7 @@ def _cmd_live_on(ctx: _Context, args: list[str]) -> dict[str, Any]:
     return _ok(
         " ".join(parts),
         live_enabled=True,
-        live_trading_active=bool(status.get("live_trading_active")),
+        live_trading_active=active,
         caps=caps,
         live_cohorts=cohorts,
         fallback_verified=verified,
@@ -422,8 +503,12 @@ def _list_open_orders(ctx: _Context, executor: Any) -> _Listing:
     if ledger_slugs:
         try:
             for order in executor.open_orders(ledger_slugs):
-                if order.get("id"):
-                    by_id.setdefault(str(order["id"]), order)
+                if order.get("id") and str(order["id"]) not in by_id:
+                    by_id[str(order["id"])] = order
+                    if account_error is None:
+                        # An order only the ledger-market read found: the account-wide read missed it.
+                        scope = "partial"
+                        note = "the account-wide read was incomplete (the ledger-market read found more)"
         except Exception as exc:  # the account read alone may still be complete
             if account_error is not None:
                 raise
@@ -507,25 +592,45 @@ def _cmd_orders(ctx: _Context, _args: list[str]) -> dict[str, Any]:
             f"{n}. {item['short_id']} {item['intent']} {qty} sh @ {cents}¢, {age} min, "
             f"{'ledger' if item['known'] else 'manual'}\n   {item['label']}"
         )
+    for item, text in zip(items, lines, strict=True):
+        item["text"] = text  # the bot lays the list out itself so it can truncate on an order boundary
     header = f"Open live orders: {len(items)}" + ("" if listing.scope == "account" else " (partial read)")
     if listing.note:
         header += f"\nNote: {listing.note}."
     body = "\n".join(lines) if lines else "None resting."
     footer = "\n/cancel <id> cancels exactly one order." if items else ""
-    return _ok(f"{header}\n{body}{footer}", orders=items, scope=listing.scope, note=listing.note)
+    return _ok(
+        f"{header}\n{body}{footer}",
+        orders=items,
+        scope=listing.scope,
+        note=listing.note,
+        header=header,
+        footer=footer.strip(),
+    )
 
 
 # ------------------------------------------------------------------ cancel
 
 
-def _resolve_order(ident: str, listing: _Listing) -> tuple[dict[str, Any] | None, str]:
-    """The ONE open order ``ident`` names, or (None, why not). Matches only against the fresh listing."""
+def _resolve_order(
+    ident: str, listing: _Listing, *, exact_only: bool = False
+) -> tuple[dict[str, Any] | None, str]:
+    """The ONE open order ``ident`` names, or (None, why not). Matches only against the fresh listing.
+
+    ``exact_only`` (the bot always sets it) refuses prefix matching: the operator picked the id from an
+    earlier /orders reply, and a newer order can share its prefix (ids are time-ordered).
+    """
     if not _ID_PATTERN.fullmatch(ident):
         return None, f"Refused: give one order id or a prefix of at least {MIN_PREFIX} letters or digits."
     wanted = ident.casefold()
     exact = [o for o in listing.orders if str(o.get("id")).casefold() == wanted]
     if len(exact) == 1:
         return exact[0], ""
+    if exact_only:
+        return None, (
+            f"Refused: {ident} is not an open order id right now (a full order id is required). "
+            "Nothing was cancelled."
+        )
     if listing.scope != "account":
         return None, (
             "Refused: the account-wide order read failed, so only a full order id can be cancelled "
@@ -578,13 +683,14 @@ def _cmd_cancel(ctx: _Context, args: list[str]) -> dict[str, Any]:
     import model_prediction.auto_buyer_cancel_worker as worker
 
     ident = args[0].strip()
+    exact_only = "--exact" in args[1:]
     lock = acquire_lock(ctx.paths.lock_root / worker.LOCK_FILE_NAME, wait_seconds=CANCEL_LOCK_WAIT_SECONDS)
     if lock is None:
         return _fail("Not cancelled: the cancel worker is running. Retry in a minute.")
     try:
         executor = _build_executor(ctx.paths)
         listing = _list_open_orders(ctx, executor)  # fresh read, now, not the earlier /orders
-        order, why = _resolve_order(ident, listing)
+        order, why = _resolve_order(ident, listing, exact_only=exact_only)
         if order is None:
             return _fail(why)
         order_id = str(order["id"])
@@ -600,23 +706,37 @@ def _cmd_cancel(ctx: _Context, args: list[str]) -> dict[str, Any]:
                 f"Cancel of {what} FAILED ({_error_text(exc)}). It may still be resting; check /orders."
             )
         state = _read_state_once(executor, order_id)
-        if state is not None and state not in ctx.ledger_module._TERMINAL_ORDER_STATES:
-            return _fail(
-                f"Cancel of {what} was sent and accepted, but the order still reads {state}; "
-                "NOT confirmed. Send /orders to check.",
+        terminal = ctx.ledger_module._TERMINAL_ORDER_STATES
+        note = _memoise_cancelled(ctx, order_id) if state in terminal else ""
+        if state in _CANCELLED_STATES:
+            return _ok(
+                f"Cancelled {what}. Exchange now reads {state}. The ledger restates fills on its next "
+                f"reconcile.{note}",
                 order_id=order_id,
                 state=state,
+                outcome="cancelled",
             )
-        note = _memoise_cancelled(ctx, order_id) if state is not None else ""
-        suffix = (
-            f" Exchange now reads {state}."
-            if state is not None
-            else " Accepted; the follow-up read was unavailable, send /orders to confirm."
-        )
-        return _ok(
-            f"Cancelled {what}.{suffix} The ledger restates fills on its next reconcile.{note}",
+        if state == "ORDER_STATE_FILLED":
+            return _fail(
+                f"{what} is FILLED, not cancelled: it filled before the cancel landed. Send /status.{note}",
+                order_id=order_id,
+                state=state,
+                outcome="filled",
+            )
+        if state is None:
+            return _fail(
+                f"Cancel of {what} was sent, but the follow-up read was unavailable: UNCONFIRMED. "
+                "Send /orders to check whether it is still open.",
+                order_id=order_id,
+                state=None,
+                outcome="unconfirmed",
+            )
+        return _fail(
+            f"Cancel of {what} was sent and accepted, but the order still reads {state}; "
+            "NOT confirmed. Send /orders to check.",
             order_id=order_id,
             state=state,
+            outcome="terminal_other" if state in terminal else "still_open",
         )
     finally:
         release_lock(lock)
@@ -640,7 +760,8 @@ def _check_usage(command: str, args: list[str]) -> str | None:
     if command not in _HANDLERS:
         return f"Unknown command {command!r}. {USAGE}"
     if command == "cancel":
-        return None if len(args) == 1 else f"cancel takes exactly one order id. {USAGE}"
+        ok = len(args) == 1 or (len(args) == 2 and args[1] == "--exact")
+        return None if ok else f"cancel takes one order id and optionally --exact. {USAGE}"
     if command == "live-on":
         return None if all(a == "--confirmed" for a in args) else f"live-on takes only --confirmed. {USAGE}"
     return None if not args else f"{command} takes no arguments. {USAGE}"
@@ -687,11 +808,34 @@ def run_command(command: str, args: list[str]) -> dict[str, Any]:
     return result
 
 
+def _deadline_exit() -> None:
+    """Last resort: answer with one JSON object and end the process. The kill switches write their state first,
+    so what can still be unknown at this point is the cancel sweep or the follow-up read."""
+    print(
+        json.dumps(
+            _fail(
+                f"The control command ran past {CLI_DEADLINE_SECONDS:g} s: the outcome is UNKNOWN. "
+                "Send /status (and /orders)."
+            )
+        ),
+        flush=True,
+    )
+    os._exit(1)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    timer = threading.Timer(CLI_DEADLINE_SECONDS, _deadline_exit)
+    timer.daemon = True
+    timer.start()
     result = _fail(USAGE) if not args else run_command(args[0], args[1:])
+    timer.cancel()
     print(json.dumps(result, default=str), flush=True)
-    return 0 if result.get("ok") else 1
+    code = 0 if result.get("ok") else 1
+    if any(t.is_alive() for t in _ABANDONED):
+        # A cancel sweep is still running in a daemon thread; leave it to the cancel worker's backstop.
+        os._exit(code)
+    return code
 
 
 if __name__ == "__main__":

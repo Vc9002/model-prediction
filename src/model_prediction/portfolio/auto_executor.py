@@ -1798,7 +1798,7 @@ def _cancel_resting_after_switch_off(state: dict[str, Any], *, reason: str) -> N
         state["kill_switch_cancel"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"[:300]}
 
 
-def toggle_live_trading(enabled: bool | None = None) -> dict[str, Any]:
+def toggle_live_trading(enabled: bool | None = None, *, source: str = "dashboard") -> dict[str, Any]:
     """Turn only the real-money book ON or OFF (``live_enabled``); the paper books are untouched.
 
     The master ``enabled`` still stops everything. Turning live off saves first and then cancels the
@@ -1815,7 +1815,7 @@ def toggle_live_trading(enabled: bool | None = None) -> dict[str, Any]:
         AuditLog(DATA / "audit.jsonl").append(
             "auto_buyer_live_switch_updated",
             "auto_buyer.live_enabled",
-            {"live_enabled": enabled, "source": "dashboard"},
+            {"live_enabled": enabled, "source": source},
         )
     except (OSError, RuntimeError, TypeError, ValueError):
         pass
