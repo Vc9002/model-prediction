@@ -30,14 +30,15 @@ messages, `/open`, `/today`) lives outside the repo in the Rainmeter `@Resources
 1. **Operator decisions waiting:** (a) total v6 loss-limit options if live comes back (cap same-slate overs, narrow to 5-8%, flat 1U);
    (b) the NCAAB injury P1 sealed one-shot `scripts/ncaab_research/confirmation/confirm_p1_261122.py read` needs a yes; (c) removals:
    legacy `ncaab_spread_v6_live_bucket` (state key, `enabled: false`) and its code, the empty whitelist pass, tennis/NCAAF gates, dead
-   state keys; (d) unpin Telegram message 142.
+   state keys, and the unused `manual-bet-sync` worker (last run 2026-10-04); (d) unpin Telegram message 142; (e) when a pinned
+   recorded market has no qualifying pregame snapshot, `_pick_quote` falls back to name matching. Recommended: refuse instead.
 2. **Before any live re-enable:** the first live GTD fallback (11-26 00:01 UTC, total v6 over, 20 shares) was cancelled
    `cancelled_unverified_gtd` on a 404 read-back, before the retry fix. No fallback has been read back through the new path
    (`fallback_verified_via` is empty), so whether the exchange echoes `tif`/`goodTillTime` is unproven. The dashboard is on the current code (restarted after Task 3 at 19:25 ET
    and after each later batch; listener PID 27384 since 00:10:50 ET).
-3. **Cleanup batch is in progress** in a parallel worktree (unused `force` param, unread `p_info`/index keys, duplicate assert, dead
-   start-time check, dead audit dedup, always-true `hasattr`, unused `manual-bet-sync` worker, stale comments, American-odds comments and
-   xlsx column, `not_authorized` label, runtime-root clutter). `git log` first; do not redo it.
+3. **Cleanup batch landed** (ac9a5b82, critical-reviewed PASS WITH NITS). Two low-risk nits open: compute the P1
+   `_p1_in_progress` live set before `PlayerBoxIndex.load` (college_basketball_forward.py ~466-469, a raise reloads the
+   season index per game); catch `AttributeError` for a non-object `.parse_failed` marker (ncaab_boxscores.py ~365-370).
 4. **Early December:** re-test spread v7 once teams have 8+ games (same v7-id-only rule); read the pre-registered afternoon test
    (`docs/research/ncaab_spread_v7_afternoon_test.md`, one cut 17:00 ET) forward only; review cohorts on the paper twins and Flat rows,
    since live is paused.
