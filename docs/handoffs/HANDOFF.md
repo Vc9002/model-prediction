@@ -7,15 +7,17 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 
 ## Next action
 
-0. **Auto-buyer (LIVE ON since 11-26 12:41 ET, $50/day loss stop; operator decisions and open items), section 0 below.**
+0. **Auto-buyer (LIVE OFF, PAPER ON since 11-26 ~12:55 ET; $50/day loss stop saved for live; open items), section 0 below.**
 1. **Operator, hardware (blocks trust in everything else):** run a real RAM test, see section 1.
 2. Check the first scheduled daily runs after the daily-speed merge, section 2.
 3. NCAAB P1 (player availability) confirmation read is DONE (11-26, CONFIRMED, small; behind the market line). Promotion into v7
    needs a walk-forward ablation and an operator decision, section 4.
 
-## 0. Auto-buyer: LIVE ON (11-26 12:41 ET), $50/day loss stop
+## 0. Auto-buyer: LIVE OFF, PAPER ON (11-26 ~12:55 ET); $50/day loss stop saved
 
-**LIVE BACK ON 2026-11-26 17:41Z at the operator's request:** `live_enabled: true`, `max_daily_loss_usd` 250 -> 50 for every day
+**LIVE OFF AGAIN ~17:55Z at the operator's request** ("actually turn live off and keep paper on"; state v1329): `live_enabled: false`,
+`enabled: true`; no live order was placed while it was on (0 ledger rows, 0 resting). The $50/day stop below stays saved.
+**Briefly LIVE 2026-11-26 17:41Z at the operator's request:** `live_enabled: true`, `max_daily_loss_usd` 250 -> 50 for every day
 (operator: "for everyday stop loss of 50"); state v1327, backup `auto_buyer_state.pre_loss50_live_on_20261126T174152Z.json`.
 First run 17:42Z clean, 0 orders; live cash $95.95. Cohorts unchanged (decision (a) not taken); GTD read-back still unverified.
 Earlier history: the operator turned live off
