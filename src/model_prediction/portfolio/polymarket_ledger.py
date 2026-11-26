@@ -10,12 +10,12 @@ import hashlib
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from ..config import PROJECT_ROOT
-from ..domain import utc_now
+from ..domain import EASTERN, utc_now
 from ..ledger import FIELDNAMES
 from ..pricing import american_to_decimal
 from ..xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
@@ -41,6 +41,48 @@ _ESPN_TEAM_SUBSTRING_FIELDS = ("displayName", "name", "abbreviation")
 
 # Polymarket US contract slugs; manual-sync rows carry one in event_id.
 _CONTRACT_SLUG_RE = re.compile(r"^(aec|asc|tsc|atc|mkt)-")
+
+
+# Sentinel: the nearest exact game by start time is the one still being played.
+_PENDING_EXACT = "pending"
+
+
+def _espn_event_start(event: dict[str, Any]) -> datetime | None:
+    """Scheduled start of a scoreboard event, or None when ESPN omits or garbles it."""
+    raw = event.get("date") or (event.get("competitions") or [{}])[0].get("date")
+    try:
+        parsed = datetime.fromisoformat(str(raw))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def _row_start_is_genuine(row: dict[str, Any], start_dt: datetime) -> bool:
+    """False for the synced noon-UTC placeholder and the position-update-time fallback: neither
+    says which game of a doubleheader the bet was on."""
+    utc_start = start_dt.astimezone(UTC)
+    if (utc_start.hour, utc_start.minute, utc_start.second) == (12, 0, 0):
+        return False
+    return "event_start_utc defaulted" not in str(row.get("note") or "")
+
+
+def _nearest_exact_game(
+    start_dt: datetime,
+    finished: list[tuple[str, int, int, bool, bool, datetime | None]],
+    pending_starts: list[datetime | None],
+) -> Any:
+    """Pick between exact games when some are final and some are not, by the start closest to the
+    row's real start. Returns the finished candidate, ``_PENDING_EXACT`` when the unfinished game
+    is the nearer one, or None when a start is missing or two games tie (grading would be a guess).
+    """
+    contenders: list[tuple[datetime | None, Any]] = [(c[5], c) for c in finished]
+    contenders += [(s, _PENDING_EXACT) for s in pending_starts]
+    if any(event_start is None for event_start, _ in contenders):
+        return None
+    ranked = sorted(contenders, key=lambda item: abs((item[0] - start_dt).total_seconds()))
+    if abs((ranked[0][0] - start_dt).total_seconds()) == abs((ranked[1][0] - start_dt).total_seconds()):
+        return None
+    return ranked[0][1]
 
 
 def _espn_team_names(team: dict[str, Any], fields: tuple[str, ...]) -> set[str]:
@@ -299,7 +341,9 @@ def settle_ledger_rows_against_espn(
             espn_leagues = league_map.get(lg, (lg.lower(),))
             check_tennis = lg in ("TENNIS", "WTA", "ATP")
 
-        game_day = start_dt.date().isoformat()
+        # Eastern like settle.py: a night game's 00:30Z start belongs to the previous evening's slate.
+        # The synced noon-UTC placeholder is 7-8am Eastern, the same calendar day as before.
+        game_day = start_dt.astimezone(EASTERN).date().isoformat()
         away_name = str(row.get("away_team") or "").casefold().strip()
         home_name = str(row.get("home_team") or "").casefold().strip()
         slug = str(row.get("market_slug") or "")
@@ -363,15 +407,16 @@ def settle_ledger_rows_against_espn(
                 logger.warning("polymarket tennis scoreboard lookup failed", exc_info=True)
 
         if match_found is None:
-            # (event id, away score, home score, exact, secondary): every scoreboard event the row's
-            # two names match, across all leagues. Taking the first substring hit graded "Michigan"
+            # (event id, away score, home score, exact, secondary, scheduled start): every scoreboard
+            # event the row's two names match, across all leagues. Taking the first substring hit graded "Michigan"
             # against "Michigan State @ Ohio State" whenever that game was listed first.
             # ``secondary`` marks an event from a league other than the row's own (an NBA row also
             # searches NCAAB/WNCAAB).
-            candidates: list[tuple[str, int, int, bool, bool]] = []
+            candidates: list[tuple[str, int, int, bool, bool, datetime | None]] = []
             ambiguous: list[tuple[str, bool]] = []  # (event id, secondary)
             primary_lg = espn_leagues[0] if lg and lg != "POLYMARKET" else None
             primary_unfinished = False
+            pending_exact_starts: list[datetime | None] = []
             for espn_lg in espn_leagues:
                 secondary = primary_lg is not None and espn_lg != primary_lg
                 try:
@@ -436,6 +481,8 @@ def settle_ledger_rows_against_espn(
                             # league's result may stand in for it.
                             if not secondary:
                                 primary_unfinished = True
+                                if exact_normal or exact_inverted:
+                                    pending_exact_starts.append(_espn_event_start(event))
                             continue
                         if is_ambiguous:
                             ambiguous.append((event_id or "?", secondary))
@@ -450,7 +497,7 @@ def settle_ledger_rows_against_espn(
                                 a_score = int(c_away.get("score", 0))
                         except (ValueError, TypeError):
                             continue
-                        candidate = (event_id, a_score, h_score, exact, secondary)
+                        candidate = (event_id, a_score, h_score, exact, secondary, _espn_event_start(event))
                         if candidate not in candidates:
                             candidates.append(candidate)
                 except (KeyError, TypeError, ValueError, OSError):
@@ -468,11 +515,29 @@ def settle_ledger_rows_against_espn(
                 ambiguous_ids = [event_id for event_id, _ in ambiguous]
 
             exact_hits = [c for c in candidates if c[3]]
-            if len(exact_hits) == 1:
+            guess = False
+            if pending_exact_starts:
+                # The row's own exact game is still being played. A final game of the same names that
+                # is not exact (Michigan State for a Michigan row) never stands in for it; the row
+                # waits on the normal open / 48h path. With a final exact game too (doubleheader), only
+                # a real row start can say which of the two the bet was on.
+                if exact_hits:
+                    picked = (
+                        _nearest_exact_game(start_dt, exact_hits, pending_exact_starts)
+                        if _row_start_is_genuine(row, start_dt)
+                        else None
+                    )
+                    if picked is None:
+                        guess = True
+                    elif picked is not _PENDING_EXACT:
+                        match_found = (picked[1], picked[2])
+            elif len(exact_hits) == 1:
                 match_found = (exact_hits[0][1], exact_hits[0][2])
             elif not exact_hits and len(candidates) == 1 and not ambiguous_ids:
                 match_found = (candidates[0][1], candidates[0][2])
-            elif candidates or ambiguous_ids:
+            else:
+                guess = bool(candidates or ambiguous_ids)
+            if guess:
                 # Several different games match the row's names, or one event matches in both
                 # orientations, and none is the only exact one: grading any of them is a guess,
                 # so the row stays open.
@@ -482,7 +547,9 @@ def settle_ledger_rows_against_espn(
                     away_name,
                     home_name,
                     game_day,
-                    [c[0] or "?" for c in candidates] + ambiguous_ids,
+                    [c[0] or "?" for c in candidates]
+                    + ambiguous_ids
+                    + ["(unfinished exact game)"] * len(pending_exact_starts),
                     row.get("pick_id"),
                 )
 

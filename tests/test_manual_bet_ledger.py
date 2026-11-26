@@ -256,12 +256,15 @@ def _espn_team(location, mascot, abbreviation, score, home_away):
     }
 
 
-def _espn_event(event_id, away, home, completed=True):
-    return {
+def _espn_event(event_id, away, home, completed=True, start=None):
+    event = {
         "id": event_id,
         "status": {"type": {"completed": completed}},
         "competitions": [{"competitors": [home, away]}],
     }
+    if start:
+        event["date"] = start
+    return event
 
 
 class _FakeScoreboard:
@@ -666,3 +669,132 @@ def test_single_non_exact_candidate_is_blocked_by_a_separate_ambiguous_event(tmp
     row = read_manual_bets(data_root=tmp_path)[0]
     assert row["status"] == "open"
     assert any("ambiguous scoreboard match" in r.message and "'2'" in r.message for r in caplog.records)
+
+
+def _recent_utc(days_back, hour, minute=0):
+    from datetime import timedelta
+
+    from model_prediction.domain import utc_now
+
+    return (utc_now() - timedelta(days=days_back)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
+def _iso_z(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _recent_college_row(tmp_path, start):
+    # Within the 48h unresolved-void window, so "open" means "not graded" and not "voided".
+    record_manual_bet({**_COLLEGE_BET, "event_start_utc": _iso_z(start)}, data_root=tmp_path)
+
+
+def _michigan_ohio_state(event_id, score_pair, completed=True, start=None):
+    return _espn_event(
+        event_id,
+        _espn_team("Michigan", "Wolverines", "MICH", score_pair[0], "away"),
+        _espn_team("Ohio State", "Buckeyes", "OSU", score_pair[1], "home"),
+        completed=completed,
+        start=start,
+    )
+
+
+def test_finished_non_exact_game_does_not_settle_a_row_whose_exact_game_is_unfinished(tmp_path):
+    _recent_college_row(tmp_path, _recent_utc(1, 18))
+    finished_namesake = _espn_event(
+        "ms",
+        _espn_team("Michigan State", "Spartans", "MSU", 10, "away"),
+        _espn_team("Ohio State", "Buckeyes", "OSU", 20, "home"),
+    )
+    real_game_live = _michigan_ohio_state("mi", (0, 0), completed=False)
+    res = settle_manual_bets(
+        data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [finished_namesake, real_game_live]})
+    )
+    assert res["settled_count"] == 0
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert row["status"] == "open" and row["result"] == ""
+
+    real_game_final = _michigan_ohio_state("mi", (30, 20))
+    res = settle_manual_bets(
+        data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [finished_namesake, real_game_final]})
+    )
+    assert res["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"]) == ("30", "20")
+
+
+def test_doubleheader_with_a_placeholder_start_is_not_graded_off_the_finished_game(tmp_path, caplog):
+    _recent_college_row(tmp_path, _recent_utc(1, 12))  # the synced noon-UTC placeholder
+    game1 = _michigan_ohio_state("g1", (30, 20), start="2026-01-01T17:00Z")
+    game2 = _michigan_ohio_state("g2", (0, 0), completed=False, start="2026-01-01T23:00Z")
+    with caplog.at_level("WARNING"):
+        res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [game1, game2]}))
+    assert res["settled_count"] == 0
+    assert res["open_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert row["status"] == "open" and row["result"] == ""
+    assert any("ambiguous scoreboard match" in r.message for r in caplog.records)
+
+
+def _doubleheader(tmp_path, row_start, game1_start, game2_start, game1_final=True, game2_final=False):
+    _recent_college_row(tmp_path, row_start)
+    game1 = _michigan_ohio_state("g1", (30, 20), completed=game1_final, start=_iso_z(game1_start))
+    game2 = _michigan_ohio_state("g2", (7, 14), completed=game2_final, start=_iso_z(game2_start))
+    return settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [game1, game2]}))
+
+
+def test_doubleheader_with_a_real_start_nearest_the_unfinished_game_waits_for_it(tmp_path):
+    res = _doubleheader(tmp_path, _recent_utc(1, 22, 55), _recent_utc(1, 17), _recent_utc(1, 23))
+    assert res["settled_count"] == 0
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert row["status"] == "open" and row["result"] == ""
+
+
+def test_doubleheader_with_a_real_start_nearest_the_finished_game_settles_on_it(tmp_path):
+    res = _doubleheader(tmp_path, _recent_utc(1, 17, 5), _recent_utc(1, 17), _recent_utc(1, 23))
+    assert res["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"]) == ("30", "20")
+
+
+def test_doubleheader_without_scoreboard_start_times_stays_open_as_ambiguous(tmp_path):
+    _recent_college_row(tmp_path, _recent_utc(1, 17, 5))
+    game1 = _michigan_ohio_state("g1", (30, 20))
+    game2 = _michigan_ohio_state("g2", (0, 0), completed=False)
+    res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [game1, game2]}))
+    assert res["settled_count"] == 0
+    assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
+
+
+class _DayScoreboard:
+    """Serves events only for one scoreboard day and records every day asked for."""
+
+    def __init__(self, day, events_by_league):
+        self.day = day
+        self.events_by_league = events_by_league
+        self.days = []
+
+    def scoreboard(self, league, day):
+        self.days.append(day)
+        return {"events": self.events_by_league.get(league, []) if str(day) == self.day else []}
+
+
+def test_night_game_with_a_utc_start_after_midnight_queries_its_eastern_scoreboard_day(tmp_path):
+    from datetime import timedelta
+
+    start = _recent_utc(1, 0, 30)  # 00:30Z is 7:30pm / 8:30pm ET the evening before
+    _recent_college_row(tmp_path, start)
+    eastern_day = (start - timedelta(days=1)).date().isoformat()
+    espn = _DayScoreboard(eastern_day, {"NCAAF": [_michigan_ohio_state("mi", (30, 20))]})
+    res = settle_manual_bets(data_root=tmp_path, espn_client=espn)
+    assert res["settled_count"] == 1
+    assert set(espn.days) == {eastern_day}
+
+
+def test_noon_utc_placeholder_row_still_queries_the_slug_date(tmp_path):
+    start = _recent_utc(1, 12)
+    _recent_college_row(tmp_path, start)
+    day = start.date().isoformat()
+    espn = _DayScoreboard(day, {"NCAAF": [_michigan_ohio_state("mi", (30, 20))]})
+    res = settle_manual_bets(data_root=tmp_path, espn_client=espn)
+    assert res["settled_count"] == 1
+    assert set(espn.days) == {day}
