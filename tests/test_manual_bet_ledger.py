@@ -756,13 +756,15 @@ def test_doubleheader_with_a_real_start_nearest_the_finished_game_settles_on_it(
     assert (row["away_score"], row["home_score"]) == ("30", "20")
 
 
-def test_doubleheader_without_scoreboard_start_times_stays_open_as_ambiguous(tmp_path):
+def test_doubleheader_without_scoreboard_start_times_stays_open_as_ambiguous(tmp_path, caplog):
     _recent_college_row(tmp_path, _recent_utc(1, 17, 5))
     game1 = _michigan_ohio_state("g1", (30, 20))
     game2 = _michigan_ohio_state("g2", (0, 0), completed=False)
-    res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [game1, game2]}))
+    with caplog.at_level("WARNING"):
+        res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [game1, game2]}))
     assert res["settled_count"] == 0
     assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
+    assert any("ambiguous scoreboard match" in r.message for r in caplog.records)
 
 
 class _DayScoreboard:
@@ -798,3 +800,105 @@ def test_noon_utc_placeholder_row_still_queries_the_slug_date(tmp_path):
     res = settle_manual_bets(data_root=tmp_path, espn_client=espn)
     assert res["settled_count"] == 1
     assert set(espn.days) == {day}
+
+
+def test_doubleheader_row_whose_start_fell_back_to_the_position_update_stays_open(tmp_path):
+    # The sync's fallback start is a position-update time, not a kickoff: it cannot say which game
+    # of the doubleheader the bet was on, even though it is not the noon-UTC placeholder. The
+    # bet's note lands in the ledger's ``rationale`` column.
+    record_manual_bet(
+        {
+            **_COLLEGE_BET,
+            "event_start_utc": _iso_z(_recent_utc(1, 18, 47)),
+            "note": "no date found in market slug -- event_start_utc defaulted to last position update time",
+        },
+        data_root=tmp_path,
+    )
+    game1 = _michigan_ohio_state("g1", (30, 20), start=_iso_z(_recent_utc(1, 17, 5)))
+    game2 = _michigan_ohio_state("g2", (7, 14), completed=False, start=_iso_z(_recent_utc(1, 23, 5)))
+    res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [game1, game2]}))
+    assert res["settled_count"] == 0
+    assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
+
+
+def test_doubleheader_settles_on_the_nearest_game_once_both_are_final(tmp_path):
+    res = _doubleheader(
+        tmp_path, _recent_utc(1, 22, 55), _recent_utc(1, 17), _recent_utc(1, 23), game2_final=True
+    )
+    assert res["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"]) == ("7", "14")
+
+
+def test_doubleheader_row_waits_then_settles_on_its_own_game_when_that_one_ends(tmp_path):
+    _recent_college_row(tmp_path, _recent_utc(1, 22, 55))
+    starts = (_iso_z(_recent_utc(1, 17)), _iso_z(_recent_utc(1, 23)))
+    game1 = _michigan_ohio_state("g1", (30, 20), start=starts[0])
+    live = _michigan_ohio_state("g2", (0, 0), completed=False, start=starts[1])
+    assert (
+        settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [game1, live]}))[
+            "settled_count"
+        ]
+        == 0
+    )
+    final = _michigan_ohio_state("g2", (7, 14), start=starts[1])
+    assert (
+        settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [game1, final]}))[
+            "settled_count"
+        ]
+        == 1
+    )
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"]) == ("7", "14")
+
+
+def test_both_final_doubleheader_with_a_placeholder_start_stays_ambiguous(tmp_path, caplog):
+    with caplog.at_level("WARNING"):
+        res = _doubleheader(
+            tmp_path, _recent_utc(1, 12), _recent_utc(1, 17), _recent_utc(1, 23), game2_final=True
+        )
+    assert res["settled_count"] == 0
+    assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
+    assert any("ambiguous scoreboard match" in r.message for r in caplog.records)
+
+
+def test_doubleheader_with_a_start_equidistant_from_both_games_stays_ambiguous(tmp_path, caplog):
+    with caplog.at_level("WARNING"):
+        res = _doubleheader(
+            tmp_path, _recent_utc(1, 20), _recent_utc(1, 17), _recent_utc(1, 23), game2_final=True
+        )
+    assert res["settled_count"] == 0
+    assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
+    assert any("ambiguous scoreboard match" in r.message for r in caplog.records)
+
+
+class _TourDayScoreboard:
+    def __init__(self):
+        self.calls = []
+
+    def scoreboard(self, league, day):
+        self.calls.append((league, str(day)))
+        return {"events": []}
+
+
+def test_tennis_row_queries_the_eastern_evening_of_a_utc_early_morning_start(tmp_path):
+    from datetime import timedelta
+
+    from model_prediction.tennis_forward import TENNIS_TOURS
+
+    start = _recent_utc(1, 1)  # 01:00Z is 8-9pm Eastern the evening before
+    record_manual_bet(
+        {
+            **_COLLEGE_BET,
+            "league": "TENNIS",
+            "away_team": "Jannik Sinner",
+            "home_team": "Carlos Alcaraz",
+            "event_start_utc": _iso_z(start),
+        },
+        data_root=tmp_path,
+    )
+    espn = _TourDayScoreboard()
+    settle_manual_bets(data_root=tmp_path, espn_client=espn)
+    expected = (start - timedelta(days=1)).strftime("%Y%m%d")
+    tour_days = {day for league, day in espn.calls if league in TENNIS_TOURS}
+    assert tour_days == {expected}

@@ -63,7 +63,10 @@ def _row_start_is_genuine(row: dict[str, Any], start_dt: datetime) -> bool:
     utc_start = start_dt.astimezone(UTC)
     if (utc_start.hour, utc_start.minute, utc_start.second) == (12, 0, 0):
         return False
-    return "event_start_utc defaulted" not in str(row.get("note") or "")
+    # record_manual_bet stores the bet's note under ``rationale``; a ledger row has no ``note``
+    # column, but a dict handed in directly may.
+    notes = f"{row.get('rationale') or ''} {row.get('note') or ''}"
+    return "event_start_utc defaulted" not in notes
 
 
 def _nearest_exact_game(
@@ -71,18 +74,25 @@ def _nearest_exact_game(
     finished: list[tuple[str, int, int, bool, bool, datetime | None]],
     pending_starts: list[datetime | None],
 ) -> Any:
-    """Pick between exact games when some are final and some are not, by the start closest to the
-    row's real start. Returns the finished candidate, ``_PENDING_EXACT`` when the unfinished game
-    is the nearer one, or None when a start is missing or two games tie (grading would be a guess).
+    """Pick between several exact games (doubleheader) by the start closest to the row's real
+    start. Returns the finished candidate, ``_PENDING_EXACT`` when an unfinished game is the
+    nearer one, or None when a start is missing or two games tie (grading would be a guess).
     """
-    contenders: list[tuple[datetime | None, Any]] = [(c[5], c) for c in finished]
-    contenders += [(s, _PENDING_EXACT) for s in pending_starts]
-    if any(event_start is None for event_start, _ in contenders):
+    contenders: list[tuple[float, Any]] = []
+    for candidate in finished:
+        if candidate[5] is None:
+            return None
+        contenders.append((abs((candidate[5] - start_dt).total_seconds()), candidate))
+    for pending_start in pending_starts:
+        if pending_start is None:
+            return None
+        contenders.append((abs((pending_start - start_dt).total_seconds()), _PENDING_EXACT))
+    if len(contenders) < 2:
         return None
-    ranked = sorted(contenders, key=lambda item: abs((item[0] - start_dt).total_seconds()))
-    if abs((ranked[0][0] - start_dt).total_seconds()) == abs((ranked[1][0] - start_dt).total_seconds()):
+    contenders.sort(key=lambda item: item[0])
+    if contenders[0][0] == contenders[1][0]:
         return None
-    return ranked[0][1]
+    return contenders[0][1]
 
 
 def _espn_team_names(team: dict[str, Any], fields: tuple[str, ...]) -> set[str]:
@@ -361,7 +371,7 @@ def settle_ledger_rows_against_espn(
                 from ..tennis_forward import TENNIS_TOURS
 
                 for tour in TENNIS_TOURS:
-                    sb = espn.scoreboard(tour, start_dt.strftime("%Y%m%d"))
+                    sb = espn.scoreboard(tour, start_dt.astimezone(EASTERN).strftime("%Y%m%d"))
                     for event in sb.get("events", []):
                         for grp in event.get("groupings", []):
                             for comp in grp.get("competitions", []):
@@ -516,21 +526,40 @@ def settle_ledger_rows_against_espn(
 
             exact_hits = [c for c in candidates if c[3]]
             guess = False
-            if pending_exact_starts:
+            if pending_exact_starts and not exact_hits:
                 # The row's own exact game is still being played. A final game of the same names that
                 # is not exact (Michigan State for a Michigan row) never stands in for it; the row
-                # waits on the normal open / 48h path. With a final exact game too (doubleheader), only
-                # a real row start can say which of the two the bet was on.
-                if exact_hits:
-                    picked = (
-                        _nearest_exact_game(start_dt, exact_hits, pending_exact_starts)
-                        if _row_start_is_genuine(row, start_dt)
-                        else None
+                # waits on the normal open / 48h path.
+                logger.info(
+                    "row %s waits for its unfinished exact game (%s @ %s on %s)",
+                    row.get("pick_id"),
+                    away_name,
+                    home_name,
+                    game_day,
+                )
+            elif pending_exact_starts or len(exact_hits) > 1:
+                # Several exact games on one day (doubleheader): only a real row start can say which
+                # one the bet was on. A placeholder or fallback start, a tie, or a game without a
+                # scheduled start leaves the row ambiguous. Known and accepted: a placeholder start
+                # with one exact game final and the other postponed (never final) stays ambiguous
+                # with no 48h void; settle it with the manual override.
+                picked = (
+                    _nearest_exact_game(start_dt, exact_hits, pending_exact_starts)
+                    if _row_start_is_genuine(row, start_dt)
+                    else None
+                )
+                if picked is None:
+                    guess = True
+                elif picked is _PENDING_EXACT:
+                    logger.info(
+                        "row %s waits for the unfinished exact game nearest its start (%s @ %s on %s)",
+                        row.get("pick_id"),
+                        away_name,
+                        home_name,
+                        game_day,
                     )
-                    if picked is None:
-                        guess = True
-                    elif picked is not _PENDING_EXACT:
-                        match_found = (picked[1], picked[2])
+                else:
+                    match_found = (picked[1], picked[2])
             elif len(exact_hits) == 1:
                 match_found = (exact_hits[0][1], exact_hits[0][2])
             elif not exact_hits and len(candidates) == 1 and not ambiguous_ids:
