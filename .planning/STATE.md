@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-20 after initialization)
 Phase: 1 of 4 (Portfolio Circuit Breaker)
 Plan: None yet in current phase
 Status: Ready to plan
-Last activity: 2026-11-25 - Completed quick task 261125-31d: auto-buyer per-model cohorts (2 live, 2 paper), enabled
+Last activity: 2026-11-26 - Completed quick task 261125-hih: live auto-buyer safety (Tasks 1-4); the operator then turned live OFF and paper ON
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -147,6 +147,7 @@ None yet.
 | 60 | daily_lock passes explicit std handles so supervisor daily logs are no longer empty | 2026-11-24 | 127dbde8 | — |
 | 261125-1bw | Moneylines and NCAAF Overs sized by edge; one stake rule for Flat, qualified and downgraded Main | 2026-11-25 | f5efea7f | [261125-1bw-remove-the-1u-cap-so-moneylines-and-ncaa](./quick/261125-1bw-remove-the-1u-cap-so-moneylines-and-ncaa/) |
 | 261125-31d | Auto-buyer per-model cohorts: live ncaab spread v7 + total v6 5-12%, paper ML v7m and NBA spread v9 12%+ | 2026-11-25 | 7ffe43a4 | [261125-31d-auto-buyer-per-model-cohorts-paper-ml-v7](./quick/261125-31d-auto-buyer-per-model-cohorts-paper-ml-v7/) |
+| 261125-hih | Live auto-buyer safety: idempotent order POSTs, intent audited before send, GTD fallback with read-back, kill-switch cancels, cancel-only backstop task (registered 2026-11-26 00:18 ET), drawdown report, wrong-team spread refusal; live later switched OFF and paper ON by the operator | 2026-11-26 | eb82edd5 | [261125-hih-live-auto-buyer-safety-no-duplicate-orde](./quick/261125-hih-live-auto-buyer-safety-no-duplicate-orde/) |
 
 ## Milestone History
 

@@ -142,7 +142,7 @@ flowchart TD
 
 4. **Live auto-buyer safety follow-ups (quick-261125-hih, open)**:
    - **Unknown-row resolution tooling.** An `ORDER_STATE_SUBMIT_UNKNOWN` row, or a row whose GTD fallback leg is `fallback_submit_unknown`, stays open, blocks its pick and game market, and counts toward the caps until the operator resolves it by hand (procedure in `docs/DEBUG.md`, 2026-11-25 "Live auto-buyer safety"). Build a read-only matcher against exchange positions and activity, plus a governed resolve command.
-   - **Telegram wiring.** Alert on `portfolio/auto_buyer_drawdown.py::live_cohort_drawdown_report` warnings and on `last_run.alarms`. It is the single entry point; nothing calls it from Telegram yet.
+   - **Telegram wiring (done 2026-11-26, outside the repo).** Buyer-only alerts, health alerts, edit-in-place results, `/open` and `/today` run from the Rainmeter `@Resources` scripts. Whether they read `live_cohort_drawdown_report` is not recorded here.
    - **Total position key.** How the exchange keys a `tsc-` total position is unverified (no position snapshot is stored). Confirm it on the first live total position; dedup handles any full total slug meanwhile.
    - **Same-key retry of ambiguous order POSTs.** `ORDER_POST_RETRY_AMBIGUOUS_WITH_SAME_KEY` ships False. Turning it on is an operator decision, once a real fallback has shown the exchange honours `Idempotency-Key`.
 
@@ -247,14 +247,65 @@ Found and left for a decision:
 - **Auto-buyer lock wait.** `FORECAST_LOCK_WAIT_SECONDS = 1200` was sized for a 30-minute
   trigger; the task now fires every 15 minutes, so a waiting cycle swallows the next trigger.
   Harmless today (the result is the same skip), but the comment and the bound are stale.
+  Superseded 2026-11-26 by the buyer's own `auto_buyer.lock` (35eaade9): the worker no longer waits
+  on `daily.lock`, its lock wait is 600 s and a timeout exits 75.
 
 #### 7. Live auto-buyer cohort reviews (OPEN, quick-261125-31d)
 
+Status 2026-11-26: **live is OFF** (`live_enabled: false`, `enabled: true`) after the live book went
+7-17, -$74.90 (spread v7 5-11, total v6 2-6). Paper twins of both live cohorts now run, so these
+reviews read the twins and the Flat cohort until live is turned back on (an operator decision).
+
 - Review live cohort ncaab-spread-v7 5-12% after 30 settled live orders: realised ROI and CLV on
   fills vs the Flat cohort (70 settled units>0 rows, 42-28 at 2026-11-25); retire or widen only by
-  operator decision.
-- Same review for live cohort ncaab-total-v6 5-8% after 30 settled live orders (Flat cohort 21
-  settled units>0 rows, 16-5 at 2026-11-25).
+  operator decision. Live has 16 settled orders (5-11) and is paused, so use the twin. Judge ONLY
+  `ncaab-spread-v7` rows from 2026-11-21 on.
+- Same review for live cohort ncaab-total-v6 5-12% after 30 settled live orders (Flat cohort 21
+  settled units>0 rows, 16-5 at 2026-11-25). Live has 8 settled orders (2-6).
+
+#### 8. Live auto-buyer open items after 2026-11-25/26 (OPEN)
+
+Landed and closed in `docs/DEBUG.md` "2026-11-25/26": hih Tasks 1-4, the wrong-team spread
+refusal (both copies) and the recorded-market pin, late-tip age plus the ET-date re-price clear,
+B7 on the pick's own calibration, settle of reverse-listed games, the ops batch (own
+`auto_buyer.lock`, failure alarms and balance check, backups, one dashboard, IOC finality, tip
+cross-check, SQLite-only live picks, GTD read-back retry), the buyer fixes and fee accounting, the
+independent live/paper switches, the tracking and daily report, the paper twins, the one spread-side
+resolver, edge on the sent price, the NCAAB P1 shadow feature, and the buyer-only and health Telegram
+alerts (outside the repo).
+
+Still open:
+
+- **Cleanup batch (in progress, parallel worktree).** The ~15 items from the 11-25 review that need
+  no operator decision: unused `force` param, unread `p_info` and index keys, duplicate assert, dead
+  start-time check, dead audit dedup, always-true `hasattr`, unused `manual-bet-sync` worker, stale
+  "30-minute" / "GTC" / "paper only" comments, American-odds comments and xlsx column,
+  `not_authorized` fallback label, runtime-root clutter. Check `git log` before re-doing any of it.
+- **Removals that need an operator yes.** The legacy `ncaab_spread_v6_live_bucket` (still in the
+  state file, `enabled: false`) and its code path; the empty legacy whitelist pass; the tennis and
+  NCAAF buyer gates; dead state keys.
+- **Total v6 loss limits (operator choice).** Total v6 has no proven edge and about 78% of its picks
+  are overs, so a slate of same-direction overs loses together. Options: cap same-slate overs; narrow
+  the window to 5-8%; flat 1U stakes. None is built.
+- **Spread v7 re-test once teams have 8+ games (early December).** Same population rule: v7-id rows
+  from 2026-11-21 on, executable quotes only. The model-minus-market coefficient was about -0.2 on the
+  current sample, and shrink-to-market fits lambda 0, so no challenger exists.
+- **Afternoon test.** Pre-registered one cut at 17:00 ET in
+  `docs/research/ncaab_spread_v7_afternoon_test.md`; read it forward only, never change it after the
+  first look. Treat the current gap as probably noise.
+- **NCAAB injury (P1) confirmation one-shot.** The shadow feature is built and inert; the backfill
+  ran (1,419 boxes, 0 missing). The sealed confirmation
+  `scripts/ncaab_research/confirmation/confirm_p1_261122.py read` needs an operator yes. Expect a small
+  accuracy gain, not a tradeable edge.
+- **GTD fallback read-back unverified.** The first live fallback (2026-11-26 00:01 UTC) was cancelled
+  as `cancelled_unverified_gtd` on a 404 before the retry fix. No fallback has been confirmed through
+  the retry path (`fallback_verified_via`), so whether the exchange echoes `tif`/`goodTillTime` is
+  unproven. If live is turned back on, check the first fallback first.
+- **Dashboard restart after Task 3 not confirmed in the record.** The LIVE label, drawdown block and
+  the Live (real money) toggle reach the page only after a restart. Check the dashboard's start time.
+- **Unpin Telegram message 142 (operator).**
+- **Turning live back on** is the dashboard "Live (real money)" toggle; the buy window stays on gross
+  edge, fees are recorded and never gate.
 
 ---
 

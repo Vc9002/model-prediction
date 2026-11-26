@@ -1,10 +1,363 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-25/26 — Live auto-buyer day one: fixes, ops batch, switches, tracking, research (quick-261125-hih Task 4 and follow-ups)
+
+State at 2026-11-26 ~05:00 UTC (runtime `auto_buyer_state.json`, read-only): `enabled: true`,
+`live_enabled: false`, `mode: paper`. **Live is OFF, paper is ON.** The two live cohorts stay
+configured and skipped (`LIVE_DISABLED`, `skipped: live_enabled is not true`). Paper twins of both
+were added (`paper_twin: true`, approved 2026-11-26): `ncaab-spread-v7` and `ncaab-total-v6`,
+saved edge [5%, 12%). The live book's whole record since approval, from the cycle's own drawdown
+report (`last_run.live_drawdown`): **7-17, -$74.90**, cost $177.01, ROI -42.3%:
+`ncaab-spread-v7` 5-11, -$45.23 (ROI -40.7%, current drawdown $53.45); `ncaab-total-v6` 2-6,
+-$29.67 (ROI -45.0%). The 5-11 spread record fired the advisory last-30 ROI warning (-10% with at
+least 15 settled). The operator turned live OFF on those numbers; nothing was disabled in code.
+Turning live back on is the dashboard "Live (real money)" toggle, an operator decision.
+
+The commits listed here are on `refactor/cleanup-2026-11-11`, not pushed. The 11-25 entry below
+("Live auto-buyer safety") covers Tasks 1-3, 7f77fb44 and 1e49d24c in detail; this entry adds
+what landed after it and the operator state. Every behaviour change below went through the
+critical-reviewer loop; the per-task red/green output is in the quick-task SUMMARY and the commit
+messages, not repeated here.
+
+### Operator decisions (2026-11-25/26)
+
+- Spread v7 stays live at current stakes, **judged only on `ncaab-spread-v7` rows from 2026-11-21
+  on**. The `ncaab-spread-v6` id rows written 11-16 to 11-21 are never pooled (they flip the 5-12%
+  result).
+- The buy window stays on **gross** edge. Fees are recorded on every fill and shown as `net_edge`,
+  but never gate a buy.
+- After the 7-17 live record (above): live OFF, paper ON, paper twins added.
+- Paper cohorts were swapped (23:40 ET 11-25): `nba-spread-margin-v9` paper replaced by paper
+  `nba-anchor-v10` spread and total, saved edge [0, 25%), plus paper `nba-elo-trend-lr-v5`
+  moneyline [5%, 25%). NBA totals were blocked in code for every cohort since 2026-11-13;
+  7f0e7517 re-opens them for **paper cohorts only** (live stays blocked). 4df5b515 pins that the
+  v10 spread/total and NBA ML paper cohorts buy near-zero-edge rows end to end. The paper cohort
+  list at the 05:00 UTC cycle: ML v7m 12%+, spread v7 and total v6 twins, v10 spread and total,
+  ML v5.
+
+### quick-261125-hih Task 4 (coordinator; done)
+
+- `ModelPrediction-AutoBuyerCancel` was registered 2026-11-26 00:18 ET through UAC (S4U, every
+  2 min from 08:00 for 18 h) with `scripts/register_auto_buyer_cancel_task.ps1`, not the whole
+  `register_windows_tasks.ps1`. Its first run was clean.
+- The drawdown thresholds run on the code defaults (`drawdown_warning_usd` 100, `_units` 20); the
+  state file carries no override keys.
+- **First live GTD fallback was not verified.** A live `ncaab-total-v6` over (20 shares, $9.80,
+  executed 2026-11-26 00:01 UTC, tip 00:30 UTC) rested its remainder as GTD at 00:28:30 UTC and the
+  read-back answered `404 Order not found`, so it was cancelled as `cancelled_unverified_gtd`
+  (fail-safe worked; no resting order was left). That is the exact failure the ops batch's item 8
+  (below) retries. **No fallback has been read back through the new retry path yet** (no
+  `fallback_verified_via` value in the live ledger), so whether the exchange echoes `tif` and
+  `goodTillTime` on `GET /v1/order/{id}` is still unproven.
+- Not recorded in this entry because it was not confirmed to the doc writer: the dashboard restart
+  after Task 3. Check `runs.db` and the dashboard's own start time before relying on the LIVE label.
+
+### Defects found and fixed, by group
+
+**Wrong-team spread mapping (real-money wrong side)**
+
+- **Trace.** `_spread_side_for_row` (894f9542, `dashboard/backtests.py`) and the executor's own
+  `_resolve_spread_side` (3c1dfd4a, `polymarket_execute.py`) treated any market team that did not
+  match the picked team as the opponent. Polymarket abbreviates schools ("UCA"), which matched
+  neither Central Arkansas nor Jacksonville, so "Central Arkansas -3.5" mapped to the short side of
+  `asc-cbb-cark-jax-2026-11-21-pos-3pt5` (Jacksonville -3.5), and the live re-check passed it. Both
+  now require the market team to match exactly one of the row's away/home teams, else refuse. This
+  was the second line of defence failing in the same way, which is why the fix landed in both
+  copies.
+- **Follow-ups (later commits).** 7de8fdfe replaced the two hand-kept copies and their 42-entry
+  alias table with one stdlib-only `polymarket_matching.match_spread_side` (parity test over real
+  team strings). 9398ea7b stopped re-matching by name at all for NCAAB: the forecast row's
+  rationale ends `market_slug=<slug> token_side=<long|short>` (the side is the slate side's own
+  `is_long`, fixed at pick time) and `_pick_quote` quotes that market and side; name matching is
+  the fallback only when the recorded market was never captured. 13 aliases were added (UCA, NAU,
+  EIU, UML, Tenn. State, Ore. State, UNCW, FDU, USC Upstate, St. Thomas (MN), ARK-Pine Bluff,
+  Mich. State, Penn), each checked against the same event's title, slug code and moneyline mascot.
+  Joined to the snapshot of its recorded slug, the NCAAB spread ledger went from 1120 agree / 45
+  refused to 1164 agree / 1 refused (an 11-13 row whose forecast took UConn for Central
+  Connecticut), zero wrong-side answers either way.
+- **Weak guards found while testing the pin (3385dbd7, f7eaaa9a).** The pin's guards were weaker
+  than the name path: the event-id check was skipped when either id was empty; half-game contracts
+  (`-1st-`, `-h1-`, `-f5-`) were not refused; a doubleheader's second contract was not refused. A
+  recorded market whose line disagrees with the row now refuses instead of falling back to a name
+  match that found a different market. Separately `team_matches`' mascot (last-token) rule skipped
+  the disqualifying-prefix guard, so bare "Arkansas" matched "UCA", "Illinois" matched "EIU",
+  "Michigan" matched "Mich. State" and so on. Over 650,324 real row-name x market-name pairs it lost
+  201 pairs and gained 0, all different schools. Proof on the real corpus (49,944 row x market
+  combinations): correct pins accepted 24,970 before and after; wrong pins accepted 2 before, 0
+  after. `tests/fixtures/ncaab_spread_side_triples.json` holds 602 real triples (150 random games
+  plus every aliased, UML/UMass, mislabelled and shared-place-name game); its expected sides come
+  from the market's own semantics (92,050 of 92,050 valid pre-start spread rows agree that the
+  long description is the line and the short is its negation), never from the code under test
+  (0ad1e461). a389afef fixed the same blind spot in settlement CLV: the close matcher had no alias
+  table (a "UCA" close stayed blank) and took the home side when both teams matched; it now uses
+  the shared alias table and gives no close for an ambiguous team. Accounting only.
+- **Edge on the price sent (f10bf007).** The order goes out at `round(clob_ask, 2)`, up to half a
+  cent above the ask, but the cohort window, floors, max edge, edge-scaled sizing and recorded edge
+  used the unrounded ask. A pick that cleared the 5% floor only against the unrounded ask (54.60%
+  vs 49.51%) was bought at 50 cents, where its edge is 4.60%. The limit price is computed first and
+  every edge check uses it, including the [5%, 12%) ceiling.
+
+**Late-tip pick age and the daily re-price (7f77fb44, cb8493b3)**
+
+- **Trace.** A live row older than 180 minutes is refused (D-03), the last daily run is 21:00 ET
+  and the buyer buys up to 35 minutes before tip, so a 23:30 ET tip (event 248488, 2026-11-23,
+  last priced 19:44 ET, 3 h 11 min old at its 22:55 ET window) was refused. The root cause was
+  upstream: `cli.commands._clear_today_open` compared the run's US-Eastern `--date` with the raw UTC
+  prefixes of `created_at_utc` and `event_start_utc`. A pick written after 19:00/20:00 ET carries the
+  next UTC date, so later same-day runs never retired it, and the ledger's duplicate key (event,
+  market, |line|, book, model) refused the same-line re-price. 23 rows from the 11-23 19:30 ET run
+  were never re-priced.
+- **Fix, in two steps.** 7f77fb44 (written before the root cause was fixed) extends the age limit
+  to 360 minutes for a row that is the freshest pick the scheduler could have produced: the newest
+  open row of its (model, event, market) and no daily run that would re-price it has started after
+  it was written (completed, failed and running runs count; lock skips and runs on a later ET date
+  do not; a missing runs.db keeps 180). cb8493b3 then fixed the clear itself: it matches the ET
+  calendar date of the parsed timestamps (`domain.EASTERN`, `parse_utc`), and a missing or naive
+  timestamp never matches. `_daily_clear_retires` (the extension's mirror) follows the same
+  predicate, so only rows from the last run of a date can use the extension. Post-midnight-ET tips
+  on an ESPN slate are matched by creation date by that slate's later runs; the 00:30 run still
+  matches them by event date without re-forecasting them.
+
+**B7 calibration guard reads the pick's own record (1e49d24c)**
+
+- The live gate checked the buyer's own `calibrate_for_serving` only. It now also refuses a pick
+  whose own record is not identity: `calibration_method` other than identity, a raw probability
+  that differs from the served one, or no raw probability. Alarm `live_calibration_not_identity`.
+
+**Settlement of reverse-listed games (8baae50b, d6152144)**
+
+- **Trace.** The ESPN fallback in `settle_auto_buyer_ledger` matched only the ledger's exact
+  away/home orientation, so a neutral-site game ESPN lists the other way round never settled from
+  scores (2026-11-25: ledger Liberty @ Princeton, ESPN Princeton @ Liberty). A reversed match is now
+  accepted and its scores swapped back into the ledger's orientation, so spread sides grade against
+  the right team.
+- **Review finding (d6152144).** In a home-and-home on consecutive days the first version let
+  yesterday's final settle today's in-progress game. A reversed candidate now needs the ESPN
+  event's own tip time within 12 hours of the row's start (missing date: no match) and is used only
+  when no exact-orientation candidate exists. d7cc13b7 closed the same hole for same-orientation
+  matches: they must be at the row's own tip time, and an undated exact match is used only when no
+  dated one exists.
+
+### Ops batch (35eaade9, 4e2433ed, 974bf2ec, 1cab7d57, b4be518d, f252f5af, 6ffea002)
+
+The worker's wait on `daily.lock` made the buyer miss windows and settle late (11-25: totals waited
+40 minutes behind a daily run that holds the lock for up to ~50). Eight changes:
+
+1. **Own lock.** New `auto_buyer_lock.py` (`auto_buyer.lock`). Holders: the worker (whole cycle),
+   daily steps 11b/12/12b (extracted into `_run_auto_buyer_steps`), `cli settle`'s Auto-Buyer block,
+   the dashboard run/settle/NCAAB-paper routes (non-blocking, 409). Lock order: supervisor lease,
+   `daily.lock`, `auto_buyer.lock`, state-file lock; nothing acquires leftward and every wait is
+   bounded. `write_versioned_state_file`'s compare-and-replace runs under a leaf `<state>.lock`. A
+   worker lock-wait timeout exits 75 (supervisor `skipped`, counted by system_health), not 0.
+   974bf2ec: the manual `--execute` script takes `auto_buyer.lock`, not `daily.lock`, because the
+   daily lock no longer excludes the scheduled worker. f252f5af: comments name the right lock. 6ffea002:
+   daily settle waits 90 s and daily buyer steps 300 s (were 600 s each) so they fit the supervisor
+   timeout. This also closes the ROADMAP "Auto-buyer lock wait" nit.
+2. **Failure alarms and a balance check.** Refusals carry the HTTP status
+   (`ExecutionGateError.status_code`, `classify_gate_refusal`). A live pass whose every exchange
+   answer is an auth/credential or balance refusal raises `LiveAutoBuyerAlarm` (worker exit 1). One
+   read-only `GET /v1/account/balances` per live cycle: an auth error or unknown balance skips live
+   buying with an alarm, and each live order must fit `buyingPower` minus this pass's committed
+   spend or the pass stops with `insufficient_cash`. 4e2433ed retries a 5xx or network failure of
+   that read twice (1 s, 3 s) before blocking; auth errors and a well-formed answer without buying
+   power are not retried.
+3. **Backups.** `backup_runtime_databases.py` copies the live and paper Auto-Buyer ledgers, the
+   state file and both cycle histories into `backups/auto_buyer/<stamp>/`, pruned by stamp after 30
+   days (copy only, under `auto_buyer.lock` when free).
+4. **One dashboard (b4be518d).** One dashboard is four processes (wscript `run_silent.vbs`,
+   powershell, venv python stub, python), all with `dashboard_server.py` in the command line; the
+   "3-4 processes" seen at each stop were that chain, not duplicates. The old stop script matched
+   any command line containing `dashboard_server`, which also killed agents' pytest runs of
+   `tests/test_dashboard_server.py`. It now stops the listener on 8765 and walks its parents up to
+   the wscript (`scripts/dashboard_process_chain.ps1`, tested over sample process tables); with no
+   listener it matches only command lines that launch `dashboard_server.py` as the script (6ffea002).
+   The first version's `SO_EXCLUSIVEADDRUSE` bind was reverted: with connections in TIME_WAIT it can
+   refuse a legitimate restart and the busy-port path exits 0, leaving the dashboard down.
+5. **IOC finality.** An IOC's `cumQuantity` is trusted only in a terminal state, or
+   `PARTIALLY_FILLED` with `leavesQuantity` 0 or absent (1cab7d57, 6ffea002); otherwise poll. A
+   synchronous "0" in NEW had rested a full-size fallback over a filling IOC. A polled partial that
+   still reports `leavesQuantity > 0` stays an unknown-fill primary.
+6. **Tip cross-check.** A live buy needs the row's tip time and the exchange snapshot's event
+   start within 5 minutes and neither passed (`rejected_tip_time_mismatch`).
+7. **SQLite-only live picks.** The cohort pass reads picks only from the canonical SQLite ledger
+   (`read_sqlite_authority_picks`); a read failure blocks the live pass with an alarm and paper
+   falls back to the dashboard reader. This removes the xlsx fallback for live.
+8. **GTD read-back retry.** A 404 "Order not found" is retried (0.5, 1, 2 s), then the market's open
+   orders are checked by id; the fallback is cancelled only when neither confirms GTD with the
+   requested expiry. The path that confirmed is recorded as `fallback_verified_via`. a7b4f9a5
+   restored the strict-versus-loose not-found tests after 3847e750 had accidentally shadowed the
+   original module-level `_is_order_not_found`; a test now pins no duplicate top-level defs
+   (ruff F811 skips underscore names). A fallback cancelled as `cancelled_unverified_gtd` stays in
+   the daily cap but no longer counts against buying power (6ffea002).
+
+### Buyer fixes (d7cc13b7, 2f47ef30, 6c598b19, 40273c7d, 0f088043, eaf34657, 0fd639c8, e202406a)
+
+- **Hand edits survive a running cycle (d7cc13b7 item 1).** The end-of-cycle save and the
+  toggle/mode/1U setters write only their own keys onto a fresh raw read, so a hand edit made
+  mid-cycle (which does not bump `_state_version`) survives. A state file that exists but does not
+  parse is never overwritten: the cycle treats it as the kill switch (cancels the live book's resting
+  orders) and raises `state_file_unreadable`. eaf34657 pins that a whole-state save refuses to
+  overwrite a malformed file.
+- **Dollar caps are authoritative (item 2).** Units are derived from `max_daily_spend_usd`,
+  `max_game_stake_usd`, `max_daily_loss_usd`. The 1U value cannot change while a live cohort is on,
+  and the live pass refuses (`live_caps_invalid`) unless all three dollar caps are written in the file.
+- **Loss stop (2f47ef30).** Manual rows (manual flag, `MANUAL-` ids, model `manual`) count in
+  neither spend nor P&L; a settled row belongs to the ET date of its `event_start_utc`; the live book
+  stops on gross realized loss (sum of negative rows) so morning wins no longer let afternoon losses
+  run past $250. The paper book keeps the net figure.
+- **Cohort cancel window (item 4).** A buy records `cohort_min_edge/max` on the row and the
+  resting-fallback adverse-move cancel uses it (the global window otherwise).
+- **Top-up merge (item 8).** A top-up names the partial it sized against (`topup_of_order_id`) and
+  merges into exactly that row; an unknown-fill top-up IOC is marked `fallback_is_topup_ioc` so
+  reconcile restates it on the merged baseline and never cancels it as a resting leg.
+- **Stuck cancels (item 9).** A cancel that fails twice for an order the exchange cannot read is
+  flagged `cancel_abandoned_at_utc`, alarmed once and not re-sent. 3847e750 narrowed this: only a
+  genuine not-found (404, or a 4xx other than 429 with gRPC code 5, reported as `not_found_order_ids`)
+  abandons a row, never a 429, 5xx or timeout; the backstop skips abandoned rows in cancel-all mode
+  too (`abandoned_skipped`), so the master-ON/live-OFF backstop does not exit 1 every 2 minutes.
+- **Settle takes the lock (6c598b19).** `POST /api/auto-buyer/settle` takes the writer lock
+  non-blocking (409 when held); `cli settle --all-unsettled` waits up to 300 s and then skips the
+  auto-buyer settle, reporting it; a parent holding the lock is honoured
+  (`MODEL_PREDICTION_DAILY_LOCK_HELD=1`).
+- **Fees (40273c7d, 0f088043).** The order read-back carries no fee, so every fill is recorded with
+  a modeled Polymarket US taker fee, `0.07 x p x (1 - p)` a share, which reproduces the 2026-11-25
+  live fills to the cent (exchange position cost minus shares x limit); live rows are trued up to the
+  exchange position cost (`fee_source: exchange_position_cost`) once the open position or its
+  resolution matches the row share for share. Rows record `fee_usd`, `primary_fee_usd`, `fee_source`,
+  `avg_fill_price`, `cost_incl_fee_usd` and `net_edge` (reporting only). The live daily spend cap,
+  per-game cap and bought index count recorded fees, pending exposure counts limit plus modeled fee,
+  and an order the fee alone would carry past a cap shrinks to fit. P&L is fee-inclusive for every row
+  that records a fee; older rows keep their old P&L (settled history is never restated). 0f088043: a
+  live top-up's fee must fit the game cap after its own filled cost (a $12.94 all-in partial topped
+  up to 5U had ended at $25.42 on a $25 game).
+- **Backstop deadline (e202406a, 3847e750).** The 90 s run deadline plus one 46 s exchange call
+  exceeded the supervisor's 115 s kill; it is 60 s now, a test pins deadline + one call below the
+  timeout, and the worker checks the deadline before every exchange call (`MAX_EXCHANGE_CALL_SECONDS`
+  47). A run that skips ids at the deadline exits non-zero when the buyer is off or a skipped id's
+  game has started (`deadline_skipped_started`). a7b4f9a5: `PolymarketExecutor.cancel` takes
+  `stop_before` so the slug lookup and the POST are not two calls behind one check (up to ~153 s vs the
+  115 s kill); a not-found id is memoised for three days only after a second not-found at least
+  10 minutes after the first (a just-placed order can 404 briefly).
+  `register_auto_buyer_cancel_task.ps1` now replaces the task with `Register-ScheduledTask -Force`
+  instead of unregistering first, so a failed registration cannot delete it. 0fd639c8: the live-fix
+  tests never write the repo `data/` tree.
+
+### Live and paper switches (76f0b63c, ca5fd59e, e06ef7a6, 3847e750)
+
+- `enabled` stays the master: false stops live and paper. `live_enabled` (strict `is True`; absent
+  follows `enabled`) stops only the live book: the live cohort pass and any legacy live mode do not
+  buy, the mid-pass recheck halts, and the live book's resting orders are cancelled by id exactly like
+  the kill switch (toggle, cycle reconcile with `cancel_all_resting`, daily step 12b, the backstop
+  worker; the manual buy script refuses). Paper cohorts, paper twins and paper ledgers keep running.
+- `POST /api/auto-buyer/live-toggle` flips only `live_enabled`. The dashboard has a separate "Live
+  (real money)" button that reads a fresh status first, refuses when it is unavailable, and names REAL
+  MONEY when turning live on (off needs no confirm); the confirm shows the hard dollar caps.
+  `auto_buyer_status()` exposes `live_enabled` and an effective `live_trading_active`.
+- 3847e750 review fixes: `toggle_live_trading` requires an explicit bool (`ValueError`, route 400), so
+  a bare call cannot turn live on; `wants_execution = live_on and execute_override is not False`, so
+  `execute_override` cannot bypass the switches; a pass-level test shows the real recheck halting a
+  pass when `live_enabled` flips off mid-pass.
+
+### Tracking (62848c71, 31200d50, db1a29e5, 415266fe, f34943e5)
+
+- **What exists.** `portfolio/auto_buyer_tracking.py`: one JSONL record per live order attempt
+  (`logs/auto_buyer_live_fills.jsonl`, written through a wrapper that re-raises unchanged and never
+  raises its own failure) and a per-pass cohort skip recorder that attributes each moved `rejected_*`
+  counter to its row. Every record carries tip time ET/UTC, the 5 PM ET window and the saved-edge
+  bucket. `portfolio/auto_buyer_report.py`, the `auto-buyer-report` CLI and the read-only
+  `/api/auto-buyer/daily-report` give per-cohort day and cumulative record, P&L net of fees, ROI, max
+  drawdown, close CLV, line moves, terminal skip reasons, loss-stop cycles, the tip-time split and the
+  twin comparison. The pre-registration is `docs/research/ncaab_spread_v7_afternoon_test.md`.
+- **Defects found in review.** (a) An open row keeps matching after tip, so every later cycle logged
+  it as started and the report counted `rejected_started` for nearly every pick: the terminal skip
+  reason is now the last skip before tip. (b) The fill-log wrapper built its record outside its
+  swallow, so a malformed executor result could raise after an order existed; the whole record is now
+  built inside it. (c) The report read whole logs; it now prefilters by date and scans only the report
+  date's snapshot files. (d) **CLV anchor (db1a29e5).** `executed_at_utc` is the pass's `now`, but the
+  same pass captured fresh snapshots (stamped at fetch time) before posting, so pre-order quotes read
+  as "after the buy" and the 300 s independence flag was wrong. The live path now stamps
+  `submitted_at_utc` immediately before the send (paper: after the quote resolves) and stores it with
+  the pricing quote's observed time; the report anchors on it, else the fill log's `sent_utc`, else the
+  pass start (flagged, never independent), floored at the pricing quote. A resting fallback fill is
+  anchored on submit and flagged; zero-fill and void rows get no CLV.
+- **Skip log (415266fe).** One file per tip date (`logs/auto_buyer_skip_reasons/<date>.jsonl`); a
+  dedup rejection of a pick already in the book's own ledger is no longer written every cycle;
+  `finish()` names the row a pass stopped on and every cohort row not reached as `halted:<reason>`; a
+  gate refusal records its detail; a live pass skipped by the master or live switch, the cap check or a
+  blocked pick read records `pass_skipped:<kind>`. f34943e5: the report also reads the legacy single
+  skip log for tip dates up to 2026-11-25.
+- **Paper twins.** A `paper_twin: true` cohort may overlap a live cohort of the same model (same-book
+  overlaps still drop both) and no longer indexes the real-money audit log, dashboard orders or
+  `polymarket_picks.xlsx`, so it can copy every live buy. 415266fe made the twins their own paper
+  buyer whose daily totals, per-game exposure and dedup read only the twin group's rows. f34943e5
+  made it isolated both ways: plain paper cohorts read the complement (`LedgerScope.others`), so twin
+  spend or losses no longer stop the plain NBA cohorts and the outcome does not depend on which buyer
+  runs first. A labelled row is the twin group's if its label is a current twin label, or if the label
+  is no current plain cohort's and its model and market are a twin's (a window edit changes the label,
+  which had orphaned the old rows and let the twin re-buy the same pick). A top-up merge keeps the
+  earliest `submitted_at_utc` and `quote_observed_at_utc` and sets `anchor_topped_up`, which the report
+  marks as an uncertain anchor.
+
+### NCAAB P1 player-availability shadow feature (9efb85af, 50ad838f, d445f435)
+
+- **Inert by construction.** `data_sources/ncaab_boxscores` now also writes the per-athlete box
+  (schema `ncaab-player-boxes-v1`, `observed_at` stamped after the fetch) from the same summary fetch;
+  `features/ncaab_player_availability` computes the P1 inputs (`avail_top7_prev1`,
+  `top7_minutes_share_out_3plus`) and the pinned `411f2a19` adjustment, PIT on full tip timestamps and
+  box `observed_at`, current season only, fail-closed (`INSUFFICIENT_HISTORY`,
+  `PREV_GAME_BOX_MISSING`, `BOX_QUALITY`, `STALE`). `learned_forward._compute_features` has a branch
+  gated by its own feature names that no artifact lists. `college_basketball_forward` attaches
+  `shadow_p1_status/_adjustment/_inputs` to v7 spread and moneyline snapshots only, after every served
+  number is fixed. Tests: parity with the research parser on real 2026-27 ESPN boxes; a served pick is
+  unchanged with no boxes, a +25 pt shadow, or a raising shadow.
+- **Review fixes.** 50ad838f: the index read a whole season of raw records into memory (hundreds of MB
+  by March on a host with low-memory crashes); each file is reduced to its two team sides as it is
+  read. d445f435: `NO_CALL_AVAILABILITY_BOX_COVERAGE` when more than one prior same-season game has
+  no usable box or under 80% do (coverage goes into `shadow_p1_inputs`); a game still in progress
+  after the last final makes the previous game STALE; first-seen box records are written to a temp
+  file, fsynced and hard-linked (an unparseable existing record is quarantined and re-captured); an
+  httpx error on one fetch no longer aborts the day; a player parse that keeps failing stops
+  refetching after two attempts; new `ncaab-player-box-backfill --since D [--until D]`.
+- **Backfill run by the coordinator:** 1,419 boxes, 0 missing.
+
+### Telegram (outside the repo)
+
+Telegram v1-v5 lives in the Rainmeter `@Resources` folder, not in this repository, so no commit
+here records it: buyer-only alerts, health alerts, edit-in-place result messages, and the `/open` and
+`/today` commands. Backups of the edited scripts are named
+`*.pre-telegram-buyer.bak` and `*.pre-telegram-v2.bak` (per HANDOFF). In-repo, the entry point for
+drawdown figures is `portfolio/auto_buyer_drawdown.py::live_cohort_drawdown_report`. Operator action
+still open: unpin Telegram message 142 (the old best-pick card).
+
+### Research results (read-only analysis; nothing here changed a serving model)
+
+- **Spread v7 has no market-relative skill.** The coefficient of (actual minus line) on (model minus
+  market) is about -0.2. Pooling the v6-id rows flips the live 5-12% result, which is why the
+  analysis scope is v7-id rows only.
+- **Shrink-to-market for v7: lambda fits to 0, so no challenger was built.**
+- **Total v6: no proven edge.** About 78% of its picks are overs.
+- **Rest and back-to-back: dropped.** **Elo blend: dropped.** (Both on evidence.)
+- **Injury P1: a small real signal, not tradeable.** It is built as the inert shadow feature above.
+  The sealed confirmation (`scripts/ncaab_research/confirmation/confirm_p1_261122.py read`) is a
+  one-shot and needs an operator yes.
+- **The afternoon gap is probably noise.** The cut is a single one at 17:00 ET, pre-registered in
+  `docs/research/ncaab_spread_v7_afternoon_test.md`; read it forward, after the registered sample.
+
+### Known limits and what stays open
+
+- Whether the exchange echoes `tif`/`goodTillTime` on `GET /v1/order/{id}` is still unproven (see
+  Task 4 above).
+- The live book is OFF, so the 30-settled-order reviews cannot accrue on live fills; the paper twins
+  carry the comparison (paper rows record the same modeled fee but are never trued up to an exchange
+  position cost).
+- The remaining open items are in ROADMAP "Live auto-buyer open items after 2026-11-25/26" and
+  `docs/handoffs/HANDOFF.md` section 0.
+
 ## 2026-11-25 — Live auto-buyer safety (quick-261125-hih)
 
 State: Tasks 1-3 landed (14bc409f, c2af49a8, 3c1dfd4a, 0db5d783, 327b8ccc, 7f77fb44, 1e49d24c,
 plus the Task 3 commit). Task 4 (register the backstop task, restart the dashboard, read back the
-first GTD fallback) is the orchestrator's. Plan and per-task evidence:
+first GTD fallback) was the orchestrator's and is done (see the 2026-11-25/26 entry above). Plan and per-task evidence:
 `.planning/quick/261125-hih-live-auto-buyer-safety-no-duplicate-orde/`. Two NCAAB cohorts trade real
 money from the scheduler (`ncaab-spread-v7` and `ncaab-total-v6`, saved and live-ask edge 5-12%,
 $5/unit, $25/game, $500/day spend, $250/day settled-loss stop).

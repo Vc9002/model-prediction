@@ -7,76 +7,56 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 
 ## Next action
 
-0. **LIVE auto-buyer, real money (top priority), section 0 below.**
+0. **Auto-buyer (live OFF, paper ON; operator decisions and open items), section 0 below.**
 1. **Operator, hardware (blocks trust in everything else):** run a real RAM test, see section 1.
 2. Check the first scheduled daily runs after the daily-speed merge, section 2.
 3. Decide whether to fetch 2014-2021 player boxes to confirm NCAAB P1 (player availability), section 4.
 
-## 0. LIVE auto-buyer (REAL MONEY), state at 2026-11-25 19:00 ET
+## 0. Auto-buyer: LIVE OFF, PAPER ON, state at 2026-11-26 ~05:00 UTC
 
-Cohorts unchanged: LIVE `ncaab-spread-v7` and `ncaab-total-v6` (saved and live-ask edge 5-12%); PAPER `ncaab-moneyline-v7m`
-(>=12%); 23:40 ET operator swap: paper `nba-spread-margin-v9` replaced by paper `nba-anchor-v10` spread and total [0, 25%)
-(NBA totals paper-only in code, 7f0e7517) plus paper `nba-elo-trend-lr-v5` moneyline [5%, 25%). $5/unit, $25/game, $500/day spend, $250/day loss stop, 35-min buy window. Operator
-decisions: spread v7 stays live at current stakes, judged ONLY on `ncaab-spread-v7` rows from 11-21 on (memory
-`feedback_spread-v7-scope-v7-id-only.md`); buy window stays on GROSS edge (fees recorded, not gated). Kill switch: use the
-dashboard toggle (a hand edit of `enabled` can be overwritten by a running cycle until the fix below lands).
+**State (runtime `auto_buyer_state.json`):** `enabled: true`, `live_enabled: false`, `mode: paper`. The operator turned live off
+after the live book's record since approval reached 7-17, -$74.90 (`ncaab-spread-v7` 5-11 -$45.23, `ncaab-total-v6` 2-6
+-$29.67). Live cohorts stay configured and skipped (`LIVE_DISABLED`). Paper cohorts: `ncaab-moneyline-v7m` 12%+; paper twins
+(`paper_twin: true`, approved 11-26) of spread v7 and total v6 at saved edge [5%, 12%); `nba-anchor-v10` spread and total
+[0, 25%) and `nba-elo-trend-lr-v5` moneyline [5%, 25%) (NBA totals paper-only in code, 7f0e7517). $5/unit, $25/game, $500/day spend,
+$250/day loss stop, 35-min buy window. Switches: `enabled` is the master (false stops both books); `live_enabled` stops only the live
+book and cancels its resting orders by id; the dashboard has a separate "Live (real money)" button. Operator decisions: spread v7
+is judged ONLY on `ncaab-spread-v7` rows from 11-21 on (memory `feedback_spread-v7-scope-v7-id-only.md`); the buy window stays on
+GROSS edge (fees recorded and shown as `net_edge`, never gating). Telegram (buyer-only alerts, health alerts, edit-in-place
+messages, `/open`, `/today`) lives outside the repo in the Rainmeter `@Resources` folder; backups `*.pre-telegram-buyer.bak`,
+`*.pre-telegram-v2.bak`.
 
-**Landed 11-25 (refactor/cleanup-2026-11-11, not pushed):** 894f9542 + 3c1dfd4a (wrong-team spread mapping refused, both
-copies); quick-261125-hih Task 1 14bc409f + fixes c2af49a8, 0db5d783 (idempotent POSTs, intent before send, submit_unknown,
-GTD fallback, strict ledger write); Task 2 327b8ccc (total dedup key, same-contract top-up, robust reconcile, kill-switch
-cancels, 3 h live age, calibration gate); 7f77fb44 (overnight age extension for late tips); 1e49d24c (B7 reads the pick's own
-calibration); 8baae50b + d6152144 (settle ESPN reverse-listed games, date-checked). Every one critical-reviewed. Telegram is
-buyer-alerts-only (outside the repo, Rainmeter `@Resources`, backups `*.pre-telegram-buyer.bak`).
+**Next action first:**
+1. **Operator decisions waiting:** (a) total v6 loss-limit options if live comes back (cap same-slate overs, narrow to 5-8%, flat 1U);
+   (b) the NCAAB injury P1 sealed one-shot `scripts/ncaab_research/confirmation/confirm_p1_261122.py read` needs a yes; (c) removals:
+   legacy `ncaab_spread_v6_live_bucket` (state key, `enabled: false`) and its code, the empty whitelist pass, tennis/NCAAF gates, dead
+   state keys; (d) unpin Telegram message 142.
+2. **Before any live re-enable:** the first live GTD fallback (11-26 00:01 UTC, total v6 over, 20 shares) was cancelled
+   `cancelled_unverified_gtd` on a 404 read-back, before the retry fix. No fallback has been read back through the new path
+   (`fallback_verified_via` is empty), so whether the exchange echoes `tif`/`goodTillTime` is unproven. Check the dashboard was restarted
+   after the Task 3 changes (LIVE label, Live toggle); that was not confirmed.
+3. **Cleanup batch is in progress** in a parallel worktree (unused `force` param, unread `p_info`/index keys, duplicate assert, dead
+   start-time check, dead audit dedup, always-true `hasattr`, unused `manual-bet-sync` worker, stale comments, American-odds comments and
+   xlsx column, `not_authorized` label, runtime-root clutter). `git log` first; do not redo it.
+4. **Early December:** re-test spread v7 once teams have 8+ games (same v7-id-only rule); read the pre-registered afternoon test
+   (`docs/research/ncaab_spread_v7_afternoon_test.md`, one cut 17:00 ET) forward only; review cohorts on the paper twins and Flat rows,
+   since live is paused.
 
-**In flight when this was written (agents in worktrees under `E:/MP-wt/`; check `git log` and `git worktree list`):**
-hih Task 3 (`hih-t3`: cancel worker every 2 min, dashboard refused-toggle + LIVE label, drawdown warning, docs); daily
-re-price fix (`reprice`: `cli/commands.py::_clear_today_open` compares the ET run date with raw UTC string prefixes, so
-evening/late picks are never re-priced; also update `auto_executor._daily_clear_retires` and its parity test); Telegram v2
-(review fixes, health alerts, edit-in-place results, `/open`, `/today`; backups `*.pre-telegram-v2.bak`).
-
-**Queued, in this order (operator said go ahead on all of it):**
-1. **hih Task 4:** register ONLY the new cancel-worker task (never re-run the whole `register_windows_tasks.ps1`: it flips
-   S4U tasks to Interactive), add the drawdown state keys with a backup, restart the dashboard, read back the first live GTD
-   fallback (if the exchange does not echo tif/goodTillTime, every fallback is cancelled and the buyer runs IOC-only).
-2. **Buyer fixes:**
-   - kill-switch hand edit overwritten by a running cycle (save only owned keys onto a fresh read; refuse to save over an
-     unparseable file);
-   - the 1U value scales the live caps (cap live in dollars);
-   - the loss stop counts manual rows, nets wins against losses, and keys by settle day;
-   - resting-fallback cancel uses the global 3.5% floor, not the cohort window;
-   - fee accounting (record fee and average fill price; fee-inclusive cost, caps and P&L);
-   - settle route and `cli settle` without daily.lock;
-   - same-orientation ESPN rematch has no date check (yesterday's final can settle today's game);
-   - two older top-up merge issues (an unknown top-up IOC reconciled as a fallback; merge picks the first same-pick row);
-   - a started fallback with a permanently missing id gets a failing cancel every reconcile.
-3. **Operations:**
-   - the buyer shares daily.lock, so it misses windows and settles late (11-25: totals waited 40 min);
-   - failure alerts and a balance check before buying;
-   - nightly backup of `auto_buyer_ledger.jsonl` and `auto_buyer_state.json`;
-   - 3-4 `dashboard_server` processes found on every restart;
-   - IOC fill trusted in a non-terminal state;
-   - tip time not cross-checked against Polymarket's start;
-   - live pass can fall back to xlsx picks.
-4. **Tracking:** live fill log, CLV at the real pre-tip close (the buyer's own close equals entry), skip reasons, line-move
-   log, daily dashboard, paper copy of the live cohorts, tip time for the pre-registered afternoon test (one cut, 5 PM ET).
-5. **Improvements:**
-   - save the market slug at forecast time;
-   - merge the duplicate spread-side resolvers (`dashboard/backtests.py` and `polymarket_execute.py`);
-   - compute edge on the limit price, not the raw ask;
-   - add team-name aliases (UCA, NAU, EIU, UML, Tenn. State, Ore. State).
-6. **Cleanup** (~15 items from the 11-25 review): unused `force` param, unread `p_info` and index keys, duplicate assert,
-   dead start-time check, dead audit dedup, always-true hasattr, legacy v6 live bucket and the empty whitelist pass, unused
-   `manual-bet-sync` worker, dead state keys, stale "30-minute"/"GTC"/"paper only" comments, American-odds comments and
-   xlsx column, `not_authorized` fallback label, runtime-root clutter. Tennis/NCAAF branches only with operator approval.
-7. **Research:**
-   - v7 shrink-to-market challenger;
-   - total v6 market-skill check;
-   - re-test spread v7 once teams have 8+ games;
-   - NCAAB injury (P1) shadow feature, whose one-shot confirmation needs an operator yes; command in the 11-25 transcript:
-     `scripts/ncaab_research/confirmation/confirm_p1_261122.py read`.
-   - Dropped on evidence: rest/back-to-back, more Elo.
-
-**Operator:** unpin Telegram message 142 (old best-pick card).
+**Landed 11-25/26 (refactor/cleanup-2026-11-11, not pushed; every change critical-reviewed; full traces in `docs/DEBUG.md` "2026-11-25/26"):**
+- hih Tasks 1-3 (14bc409f, c2af49a8, 0db5d783, 327b8ccc, 34199a47, d0390627, 8d7bfd0d, eb82edd5) and Task 4 (coordinator: task
+  `ModelPrediction-AutoBuyerCancel` registered 11-26 00:18 ET via UAC, S4U, every 2 min from 08:00 for 18 h; first run clean).
+- Fixes: wrong-team spread refused in both copies (894f9542, 3c1dfd4a); late-tip age extension (7f77fb44) and the ET-date daily
+  re-price clear (cb8493b3); B7 on the pick's own calibration (1e49d24c); ESPN reverse-listed settlement (8baae50b, d6152144).
+- Ops batch 35eaade9..f252f5af and 6ffea002: own `auto_buyer.lock`, failure alarms and balance check, backups, dashboard stop script,
+  IOC finality, tip cross-check, SQLite-only live picks, GTD read-back retry.
+- Buyer fixes (d7cc13b7, 2f47ef30, 6c598b19, 40273c7d, 0f088043, e202406a) and the live/paper switch (76f0b63c, 3847e750, a7b4f9a5).
+- Tracking (62848c71, 31200d50, db1a29e5, 415266fe, f34943e5): live fill log, skip log, close-CLV daily report, paper twins.
+- Improvements: one spread-side resolver (7de8fdfe), edge on the sent price (f10bf007), recorded market pin and 13 aliases
+  (9398ea7b), pin guards and the mascot-rule fix (3385dbd7, f7eaaa9a, a389afef, 0ad1e461).
+- NCAAB P1 shadow feature, inert (9efb85af, 50ad838f, d445f435); the coordinator ran the backfill: 1,419 boxes, 0 missing.
+- Research (nothing served changed): spread v7 no market-relative skill (model-minus-market coefficient about -0.2); v7 shrink-to-market
+  lambda 0, no challenger built; total v6 no proven edge, about 78% overs; rest/back-to-back and Elo blend dropped; injury P1 a small real
+  signal, not tradeable; afternoon gap probably noise.
 
 
 ## 1. Suspected bad RAM (open, operator action)
@@ -129,7 +109,7 @@ evening/late picks are never re-priced; also update `auto_executor._daily_clear_
 
 ## 4. NCAAB
 
-- Serving: moneyline `ncaab-moneyline-v7m`, spread `ncaab-spread-v7`, total `ncaab-total-v6` (buyer state blacklists v7 and v7m; NCAAB buyer stays disabled by operator state).
+- Serving: moneyline `ncaab-moneyline-v7m`, spread `ncaab-spread-v7`, total `ncaab-total-v6` (buyer state blacklists v7 and v7m; the legacy global NCAAB buyer stays disabled by operator state; the cohorts in section 0 override it).
 - **Addendum v4 scorecards read 2026-11-22** (22,947 D1 games with a closing spread, 2023-2026, leave-one-season-out; `outputs/ncaab/research_261120/`):
   **P1 player availability is DEV_ELIGIBLE** vs served v7: spread corr delta +0.0065 (K-adj CI +0.0013..+0.0121), margin RMSE -0.017 pt,
   moneyline log loss -0.00065 (K-adj CI -0.0011..-0.0002), cover log loss -0.0008 (K-adj CI includes zero). Still **no edge**: its
