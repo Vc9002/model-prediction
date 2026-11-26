@@ -693,6 +693,22 @@ def test_a_resting_fallback_fill_is_anchored_on_submit_and_flagged(tmp_path):
     assert whole["resting_fallback_fill"] is False and whole["close_independent_of_buy"] is True
 
 
+def test_a_topped_up_row_is_anchored_on_its_first_send_and_never_independent(tmp_path):
+    buy = {
+        "executed_at_utc": "2026-11-25T20:30:00Z",
+        "submitted_at_utc": "2026-11-25T20:41:00Z",
+        "anchor_topped_up": True,
+    }
+    snaps = [_open("2026-11-25T20:50:00Z", 0.55)]
+    row = _pq(_mini(tmp_path / "a", buy, snaps))
+    assert row["buy_anchor_utc"] == "2026-11-25T20:41:00Z"
+    # Later legs filled at times the row does not record, so the close is not provably after them.
+    assert row["close_anchor_uncertain"] is True
+    assert row["close_independent_of_buy"] is False
+    whole = _pq(_mini(tmp_path / "b", {**buy, "anchor_topped_up": False}, snaps))
+    assert whole["close_anchor_uncertain"] is False and whole["close_independent_of_buy"] is True
+
+
 @pytest.mark.parametrize(
     "unfilled",
     [
@@ -762,9 +778,7 @@ def test_report_can_trim_rows_to_the_report_date(runtime):
 
 def test_skip_reasons_read_only_the_report_dates_file(runtime, monkeypatch):
     legacy = runtime / "logs" / "auto_buyer_skip_reasons.jsonl"
-    _jsonl(
-        legacy, [{"book": "live", "pick_id": "legacy", "tip_date_et": DATE, "reason": "rejected_low_edge"}]
-    )
+    _jsonl(legacy, [{"book": "live", "pick_id": "legacy", "tip_date_et": "2026-11-26", "reason": "x"}])
     other_day = report_mod.skip_log_path(runtime, "2026-11-24")
     assert other_day.exists()
     opened: list[Path] = []
@@ -774,8 +788,36 @@ def test_skip_reasons_read_only_the_report_dates_file(runtime, monkeypatch):
     )
     report = report_mod.build_auto_buyer_report(runtime, DATE)
     assert report_mod.skip_log_path(runtime, DATE) in opened
-    assert other_day not in opened and legacy not in opened
+    assert other_day not in opened
+    # A pick of a later tip date is not this date's, wherever its record sits.
     assert "legacy" not in json.dumps(report["skip_reasons"])
+    # From the first per-date file on, the single legacy log is never opened.
+    opened.clear()
+    report_mod.build_auto_buyer_report(runtime, "2026-11-26")
+    assert legacy not in opened
+
+
+def test_a_date_before_the_per_date_files_reads_the_legacy_skip_log_by_tip_date(runtime):
+    legacy = runtime / "logs" / "auto_buyer_skip_reasons.jsonl"
+    base = {
+        "book": "live",
+        "cohort": LIVE_SPREAD_LABEL,
+        "tip_date_et": DATE,
+        "tip_utc": "2026-11-25T23:00:00Z",
+        "cycle_at_utc": "2026-11-25T22:00:00Z",
+    }
+    _jsonl(
+        legacy,
+        [
+            {**base, "pick_id": "old-pick", "reason": "legacy_only_reason"},
+            # A different tip date in the same file is not this report's.
+            {**base, "pick_id": "other-day", "reason": "legacy_only_reason", "tip_date_et": "2026-11-24"},
+        ],
+    )
+    skipped = json.dumps(report_mod.build_auto_buyer_report(runtime, DATE)["skip_reasons"])
+    assert "legacy_only_reason" in skipped
+    terminal = report_mod._terminal_skips(runtime, DATE)
+    assert ("live", "old-pick") in terminal and ("live", "other-day") not in terminal
 
 
 def test_a_fill_log_outcome_is_the_reason_a_pick_with_an_order_attempt_went_unbought(runtime):

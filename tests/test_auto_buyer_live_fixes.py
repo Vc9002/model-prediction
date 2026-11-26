@@ -558,6 +558,60 @@ def test_topup_merges_into_the_partial_row_the_index_chose(tmp_path):
     assert rows[1]["shares"] == 8.0 and "ioc-topup" in rows[1]["order_ids"]
 
 
+def test_topup_keeps_the_earliest_send_time_and_flags_the_anchor(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(
+        j_path,
+        [
+            _partial_row(
+                "oid-partial",
+                submitted_at_utc="2026-11-25T21:40:05Z",
+                quote_observed_at_utc="2026-11-25T21:39:50Z",
+            )
+        ],
+    )
+    auto_buyer_ledger.record_auto_buy_execution(
+        _topup_payload(
+            shares=2.0,
+            cost_usd=1.0,
+            fill_known=True,
+            fallback_order_id=None,
+            fallback_status="no_remainder",
+            submitted_at_utc="2026-11-25T21:55:00Z",
+            quote_observed_at_utc="2026-11-25T21:54:40Z",
+        ),
+        order_id="ioc-topup",
+        order_state="ORDER_STATE_FILLED",
+        jsonl_path=j_path,
+    )
+    (row,) = _ledger(j_path)
+    # The report anchors CLV on the first leg's send; a later leg must not move it past the first fill.
+    assert row["submitted_at_utc"] == "2026-11-25T21:40:05Z"
+    assert row["quote_observed_at_utc"] == "2026-11-25T21:39:50Z"
+    assert row["anchor_topped_up"] is True
+
+
+def test_topup_into_a_row_without_a_send_time_takes_the_topups_but_is_still_flagged(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_partial_row("oid-partial")])
+    auto_buyer_ledger.record_auto_buy_execution(
+        _topup_payload(
+            shares=2.0,
+            cost_usd=1.0,
+            fill_known=True,
+            fallback_order_id=None,
+            fallback_status="no_remainder",
+            submitted_at_utc="2026-11-25T21:55:00Z",
+        ),
+        order_id="ioc-topup",
+        order_state="ORDER_STATE_FILLED",
+        jsonl_path=j_path,
+    )
+    (row,) = _ledger(j_path)
+    assert row["submitted_at_utc"] == "2026-11-25T21:55:00Z"
+    assert row["anchor_topped_up"] is True
+
+
 def test_topup_whose_partial_row_is_gone_gets_its_own_row(tmp_path):
     j_path = tmp_path / "auto_buyer_ledger.jsonl"
     _write_ledger(j_path, [_partial_row("oid-other")])

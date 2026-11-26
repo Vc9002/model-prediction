@@ -48,6 +48,10 @@ LIVE_FILL_LOG_NAME = "auto_buyer_live_fills.jsonl"
 # loses no skip logged the evening before.
 SKIP_LOG_DIR = "auto_buyer_skip_reasons"
 UNDATED_SKIP_FILE = "undated"
+# Before the per-date files (2026-11-25 and earlier) every record went to one file; the report still
+# reads it, filtered by tip date, for those dates only.
+LEGACY_SKIP_LOG_NAME = "auto_buyer_skip_reasons.jsonl"
+LEGACY_SKIP_LOG_LAST_DATE = "2026-11-25"
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # The started gate counts a stale open row twice; the second name says why it was skipped.
 _SECONDARY_REASONS = frozenset({"rejected_stale_open"})

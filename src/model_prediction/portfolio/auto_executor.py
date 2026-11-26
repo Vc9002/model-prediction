@@ -19,7 +19,7 @@ import os
 import sqlite3
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from dataclasses import fields as dataclass_fields
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -340,20 +340,36 @@ class LedgerScope:
     """The paper-book rows one pass counts as its own for daily totals, per-game exposure and dedup.
 
     A twin copies a live cohort, whose books never see paper fills; the twin group therefore reads
-    only its own rows, not the other paper cohorts'. A row carries the cohort label it was bought
-    under; one written before the label existed is owned on model and market, or the twin would
-    re-buy it.
+    only its own rows, not the other paper cohorts'. The other paper cohorts get the complement
+    (``others``), so neither side's spend, losses or game exposure can block the other. A row
+    carries the cohort label it was bought under. The label embeds the edge window, so a label
+    that is no current cohort's (the operator edited a window) is owned by model and market, like
+    a row written before the label existed, or the twin would re-buy its own pick.
     """
 
     labels: frozenset[str]
     model_markets: frozenset[tuple[str, str]]
+    # Labels of the current non-twin paper cohorts: a row labelled with one of these is theirs even
+    # when its model and market also name a twin.
+    plain_labels: frozenset[str] = frozenset()
+    # The complement view: every paper row the twin group does not own.
+    complement: bool = False
 
-    def owns(self, row: dict[str, Any]) -> bool:
+    def _twin_owns(self, row: dict[str, Any]) -> bool:
         label = row.get("cohort")
         if isinstance(label, str) and label.strip():
-            return label in self.labels
+            if label in self.labels:
+                return True
+            if label in self.plain_labels:
+                return False
         model = str(row.get("model_id") or row.get("model_version") or "")
         return (model, str(row.get("market_type") or "").lower()) in self.model_markets
+
+    def owns(self, row: dict[str, Any]) -> bool:
+        return self._twin_owns(row) != self.complement
+
+    def others(self) -> LedgerScope:
+        return replace(self, complement=not self.complement)
 
 
 def _cohort_edge(value: Any) -> float | None:
@@ -2113,10 +2129,13 @@ def _evaluate_paper_cohorts(
     scope = LedgerScope(
         labels=frozenset(c.label for c in twins),
         model_markets=frozenset((c.model_id, c.market) for c in twins),
+        plain_labels=frozenset(c.label for c in plain),
     )
     plain_rows = [dict(r) for r in picks if any(_row_in_cohort(r, c) for c in plain)]
     twin_rows = [dict(r) for r in picks if not any(_row_in_cohort(r, c) for c in plain)]
-    parts = [run(plain, plain_rows)] if plain else []
+    # The plain buyer reads the complement, so twin spend or losses never stop it (and its fills
+    # never stop the twin): isolation runs both ways, and neither depends on which buyer runs first.
+    parts = [run(plain, plain_rows, ledger_scope=scope.others())] if plain else []
     parts.append(run(twins, twin_rows, ledger_scope=scope))
     return _merge_results(parts)
 

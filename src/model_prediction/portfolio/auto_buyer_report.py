@@ -39,6 +39,8 @@ from .auto_buyer_tracking import (
     AT_OR_AFTER_CUTOFF,
     BEFORE_CUTOFF,
     EASTERN,
+    LEGACY_SKIP_LOG_LAST_DATE,
+    LEGACY_SKIP_LOG_NAME,
     LIVE_FILL_LOG_NAME,
     edge_bucket,
     in_preregistered_band,
@@ -391,10 +393,13 @@ def _base_rows(
                     "submitted_at_utc": raw.get("submitted_at_utc"),
                     "buy_anchor_utc": iso_utc(anchor) if anchor is not None else None,
                     "buy_anchor_source": anchor_source,
-                    # A pass-start anchor can sit before the order's own quote capture, and a resting
-                    # fallback fills at an unrecorded time after submit: the close is not provably
-                    # after the fill, so neither counts as an independent close.
-                    "close_anchor_uncertain": anchor_source == "pass_start" or fallback_fill,
+                    # A pass-start anchor can sit before the order's own quote capture, a resting
+                    # fallback fills at an unrecorded time after submit, and a top-up leg fills after
+                    # the first send the row keeps: the close is not provably after the fill, so none
+                    # of them counts as an independent close.
+                    "close_anchor_uncertain": anchor_source == "pass_start"
+                    or fallback_fill
+                    or raw.get("anchor_topped_up") is True,
                     "event_start_utc": raw.get("event_start_utc"),
                     **tip_fields(raw.get("event_start_utc")),
                     "pick_line": pick.get("line"),
@@ -552,9 +557,15 @@ def _terminal_skips(runtime_root: Path, report_date: str) -> dict[tuple[str, str
 
     An open row keeps matching its cohort after tip, so every later cycle logs it as started; the
     last pre-tip record says why it was never bought. A pick with no pre-tip record keeps its latest.
+    Dates up to LEGACY_SKIP_LOG_LAST_DATE also read the one pre-split log.
     """
     terminal: dict[tuple[str, str], tuple[bool, datetime, dict[str, Any]]] = {}
-    for record in _read_jsonl(skip_log_path(runtime_root, report_date)):
+    records = _read_jsonl(skip_log_path(runtime_root, report_date))
+    if report_date <= LEGACY_SKIP_LOG_LAST_DATE:
+        # Listed first so a per-date record wins a tie on the same cycle.
+        legacy = tracking_log_path(runtime_root, LEGACY_SKIP_LOG_NAME)
+        records = _read_jsonl(legacy, contains=(report_date,)) + records
+    for record in records:
         if record.get("tip_date_et") != report_date:
             continue
         cycle = _time(record.get("cycle_at_utc"))

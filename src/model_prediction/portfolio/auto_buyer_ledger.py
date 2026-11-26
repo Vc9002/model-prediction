@@ -124,6 +124,23 @@ _EXECUTION_PASSTHROUGH_FIELDS = (
     "quote_observed_at_utc",
 )
 
+# Send and quote times a top-up merge keeps at the EARLIEST of the row's and the top-up leg's.
+_TOPUP_EARLIEST_FIELDS = ("submitted_at_utc", "quote_observed_at_utc")
+
+
+def _earliest_utc(*values: Any) -> str | None:
+    """The earliest parseable timestamp among ``values`` as given; None when none parses."""
+    parsed: list[tuple[datetime, str]] = []
+    for value in values:
+        if not value:
+            continue
+        try:
+            parsed.append((parse_utc(str(value)), str(value)))
+        except (TypeError, ValueError):
+            continue
+    return min(parsed, key=lambda pair: pair[0])[1] if parsed else None
+
+
 # Polymarket US taker fee per share: coefficient x p x (1 - p) on the price paid. The research code
 # documents 0.06 (docs.polymarket.us/fees, effective 2026-07-01), but the live NCAAB fills of
 # 2026-11-25 cost 0.07 x p x (1 - p) to the cent: exchange position cost minus shares x limit was
@@ -602,10 +619,20 @@ def record_auto_buy_execution(
             else:
                 rec.pop("fallback_is_topup_ioc", None)
             rec["fill_known"] = bool(order_payload.get("fill_known", True))
+            # The report anchors the close on when the first leg was sent; a later leg's send time
+            # would move the anchor past the first fill. The earliest time wins, and the row says its
+            # anchor now spans several legs.
+            earliest = {
+                name: _earliest_utc(rec.get(name), order_payload.get(name)) for name in _TOPUP_EARLIEST_FIELDS
+            }
             # The fallback fields now describe the top-up's own legs.
             for field_name in _EXECUTION_PASSTHROUGH_FIELDS:
                 if order_payload.get(field_name) is not None:
                     rec[field_name] = order_payload[field_name]
+            for field_name, value in earliest.items():
+                if value is not None:
+                    rec[field_name] = value
+            rec["anchor_topped_up"] = True
             # Always written, never popped: a stale True from an earlier, operator-resolved leg would
             # re-hold a row whose new top-up has no fallback (fallback_order_id None) -- silently,
             # since a fully filled top-up raises no alarm. An explicit False must also win over

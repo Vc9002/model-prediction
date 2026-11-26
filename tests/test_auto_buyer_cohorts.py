@@ -1743,9 +1743,12 @@ def test_parse_names_the_paper_twins():
 
 def test_ledger_scope_owns_labelled_rows_and_unlabelled_rows_of_its_model_and_market():
     scope = auto_executor.LedgerScope(
-        labels=frozenset({TWIN_LABEL}), model_markets=frozenset({(SPREAD_V7, "spread")})
+        labels=frozenset({TWIN_LABEL}),
+        model_markets=frozenset({(SPREAD_V7, "spread")}),
+        plain_labels=frozenset({ML_V7M_PAPER.label}),
     )
     assert scope.owns({"cohort": TWIN_LABEL, "model_id": "anything"})
+    # A current plain cohort's label is theirs even on a twin's model and market.
     assert not scope.owns({"cohort": ML_V7M_PAPER.label, "model_id": SPREAD_V7, "market_type": "spread"})
     # Written before the label existed: owned on model and market, or the twin would re-buy it.
     assert scope.owns({"model_id": SPREAD_V7, "market_type": "Spread"})
@@ -1839,3 +1842,200 @@ def test_dedup_of_a_pick_the_book_already_holds_is_not_logged_but_a_rival_pick_i
     assert FakeExecutor.executed == []
     assert result.rejected_dedup == 2
     assert [(r["pick_id"], r["reason"]) for r in result.cohort_skips] == [("rival", "rejected_dedup")]
+
+
+# ------------------------------------------- isolation runs both ways between twins and plain cohorts
+
+PAPER_LEDGER = "paper_auto_buyer"
+
+
+def _ml_row(**extra: Any) -> dict[str, Any]:
+    return _row(
+        ML_V7M,
+        pick_id="ml1",
+        event="g1",
+        market="moneyline",
+        edge="0.15",
+        model_probability=0.66,
+        ask=0.51,
+        **extra,
+    )
+
+
+def _spread_row() -> dict[str, Any]:
+    return _row(SPREAD_V7, pick_id="spread9", event="g1", edge="0.09", model_probability=0.60, ask=0.51)
+
+
+def _paper_ledger_rows(tmp_path) -> list[dict[str, Any]]:
+    return _ledger_rows(tmp_path / PAPER_LEDGER / "auto_buyer_ledger.jsonl")
+
+
+@pytest.mark.parametrize(
+    ("prior", "reason"),
+    [
+        ({"cost_usd": 600.0}, "rejected_budget"),
+        ({"settled_at_utc": "NOW", "result": "loss", "pnl_usd": -250.0}, "rejected_daily_loss_breaker"),
+        # The twin's open position on the very game and side the plain cohort wants.
+        ({"cost_usd": 25.0, "event_id": "g1"}, "rejected_dedup"),
+        # The other side of that game at the per-game cap: the cap is not shared with the twin.
+        ({"cost_usd": 25.0, "event_id": "g1", "selection": "away"}, "rejected_budget"),
+    ],
+)
+def test_twins_at_their_cap_never_block_a_plain_paper_cohort(monkeypatch, tmp_path, prior, reason):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    prior = {k: (iso_utc(utc_now()) if v == "NOW" else v) for k, v in prior.items()}
+    spread = _spread_row()
+    _write_ledger(
+        tmp_path / PAPER_LEDGER / "auto_buyer_ledger.jsonl",
+        [_paper_row(spread, pick_id="twin-held", cohort=TWIN_LABEL, model_id=SPREAD_V7, **prior)],
+    )
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), [_ml_row()])
+    summary = auto_executor.run_auto_buyer_cycle()
+    bought = [r["pick_id"] for r in _paper_ledger_rows(tmp_path) if r.get("cohort") == ML_V7M_PAPER.label]
+    assert bought == ["ml1"]
+    assert summary["cohort_passes"]["paper"][reason] == 0
+
+
+def test_plain_cohorts_at_their_loss_stop_never_block_the_twin(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    _write_ledger(
+        tmp_path / PAPER_LEDGER / "auto_buyer_ledger.jsonl",
+        [
+            _paper_row(
+                _ml_row(),
+                cohort=ML_V7M_PAPER.label,
+                model_id=ML_V7M,
+                settled_at_utc=iso_utc(utc_now()),
+                result="loss",
+                pnl_usd=-300.0,
+                cost_usd=300.0,
+            )
+        ],
+    )
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), [_spread_row()])
+    summary = auto_executor.run_auto_buyer_cycle()
+    bought = [r["pick_id"] for r in _paper_ledger_rows(tmp_path) if r.get("cohort") == TWIN_LABEL]
+    assert bought == ["spread9"]
+    assert summary["cohort_passes"]["paper"]["rejected_daily_loss_breaker"] == 0
+
+
+def test_global_pass_and_unlabelled_other_model_rows_still_count_for_the_plain_cohorts(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    ml = _ml_row()
+    # A legacy-pass row (no cohort label, another model) and an unlabelled older twin-model row.
+    _write_ledger(
+        tmp_path / PAPER_LEDGER / "auto_buyer_ledger.jsonl",
+        [
+            _paper_row(
+                ml,
+                pick_id="legacy-nba",
+                event_id="g8",
+                model_id=NBA_SPREAD,
+                market_type="spread",
+                cost_usd=200.0,
+                market_slug="legacy-slug",
+            ),
+            _paper_row(_spread_row(), pick_id="old-twin", event_id="g7", model_id=SPREAD_V7, cost_usd=400.0),
+        ],
+    )
+    scope = auto_executor.LedgerScope(
+        labels=frozenset({TWIN_LABEL}),
+        model_markets=frozenset({(SPREAD_V7, "spread")}),
+        plain_labels=frozenset({ML_V7M_PAPER.label}),
+    ).others()
+    plain_spend = _REAL_TODAY_TOTALS(tmp_path / PAPER_LEDGER, live_book=False, row_scope=scope.owns)[0]
+    assert plain_spend == pytest.approx(200.0)
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), [ml])
+    summary = auto_executor.run_auto_buyer_cycle()
+    # The $200 legacy row is counted and the $400 twin row is not, so the plain cohort still buys.
+    assert summary["cohort_passes"]["paper"]["rejected_budget"] == 0
+    bought = [r["pick_id"] for r in _paper_ledger_rows(tmp_path) if r.get("cohort") == ML_V7M_PAPER.label]
+    assert bought == ["ml1"]
+
+
+def test_a_legacy_row_over_the_cap_still_stops_the_plain_cohorts(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    ml = _ml_row()
+    _write_ledger(
+        tmp_path / PAPER_LEDGER / "auto_buyer_ledger.jsonl",
+        [
+            _paper_row(
+                ml,
+                pick_id="legacy-nba",
+                event_id="g8",
+                model_id=NBA_SPREAD,
+                market_type="spread",
+                cost_usd=600.0,
+                market_slug="legacy-slug",
+            )
+        ],
+    )
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), [ml])
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert summary["cohort_passes"]["paper"]["rejected_budget"] == 1
+    assert len(_paper_ledger_rows(tmp_path)) == 1
+
+
+def test_the_complement_scope_is_the_exact_opposite_of_the_twin_scope():
+    scope = auto_executor.LedgerScope(
+        labels=frozenset({TWIN_LABEL}),
+        model_markets=frozenset({(SPREAD_V7, "spread")}),
+        plain_labels=frozenset({ML_V7M_PAPER.label}),
+    )
+    rows = [
+        {"cohort": TWIN_LABEL},
+        {"cohort": ML_V7M_PAPER.label},
+        {"cohort": ML_V7M_PAPER.label, "model_id": SPREAD_V7, "market_type": "spread"},
+        {"cohort": "ncaab-spread-v7:spread:[0.05,0.1):paper", "model_id": SPREAD_V7, "market_type": "spread"},
+        {"cohort": "gone:moneyline:[0,1):paper", "model_id": ML_V7M, "market_type": "moneyline"},
+        {"model_id": SPREAD_V7, "market_type": "spread"},
+        {"model_id": NBA_SPREAD, "market_type": "spread"},
+        {},
+    ]
+    assert [scope.owns(r) for r in rows] == [True, False, False, True, False, True, False, False]
+    assert [scope.others().owns(r) for r in rows] == [not scope.owns(r) for r in rows]
+    assert scope.others().others() == scope
+
+
+def test_a_complement_scope_is_still_refused_on_a_live_config():
+    scope = auto_executor.LedgerScope(labels=frozenset(), model_markets=frozenset()).others()
+    with pytest.raises(ValueError, match="paper"):
+        AutoExecutionConfig(mode="live", execute_live=True, ledger_scope=scope)
+    with pytest.raises(ValueError, match="paper"):
+        AutoExecutionConfig(mode="live", ledger_scope=scope, dedup_own_ledger_only=True)
+
+
+def test_editing_a_twins_window_does_not_re_buy_the_pick_it_already_holds(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    spread = _spread_row()
+    # Bought under the twin's earlier window: the label no longer names any current cohort.
+    _write_ledger(
+        tmp_path / PAPER_LEDGER / "auto_buyer_ledger.jsonl",
+        [
+            _paper_row(
+                spread,
+                model_id=SPREAD_V7,
+                cohort="ncaab-spread-v7:spread:[0.05,0.1):paper",
+                cost_usd=5.0,
+            )
+        ],
+    )
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), [spread])
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert summary["cohort_passes"]["paper"]["rejected_dedup"] == 1
+    assert [r["pick_id"] for r in _paper_ledger_rows(tmp_path)] == ["spread9"]
+
+
+def test_one_plain_row_and_one_twin_row_are_each_bought_once_and_both_counted(monkeypatch, tmp_path):
+    rows = [_spread_row(), _ml_row()]
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), rows)
+    summary = auto_executor.run_auto_buyer_cycle()
+    paper = _paper_ledger_rows(tmp_path)
+    assert sorted((r["pick_id"], r["cohort"]) for r in paper) == [
+        ("ml1", ML_V7M_PAPER.label),
+        ("spread9", TWIN_LABEL),
+    ]
+    # Every input row is evaluated exactly once across the two buyers.
+    assert summary["cohort_passes"]["paper"]["total_evaluated"] == len(rows)
+    auto_executor.run_auto_buyer_cycle()
+    assert len(_paper_ledger_rows(tmp_path)) == 2
