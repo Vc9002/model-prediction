@@ -40,7 +40,6 @@ import math
 import os
 import re
 import time
-import unicodedata
 import uuid
 from collections.abc import Callable
 from contextlib import suppress
@@ -53,6 +52,10 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from ..audit import AuditLog
 from ..domain import iso_utc, parse_utc, utc_now
+from ..polymarket_matching import lines_match as _lines_match
+from ..polymarket_matching import match_spread_side
+from ..polymarket_matching import participant_matches as _participant_matches
+from ..polymarket_matching import team_matches as _team_name_matches  # noqa: F401 -- re-exported for tests
 from ..runtime_paths import RuntimePaths, load_dotenv_into_environ
 
 _paths = RuntimePaths.resolve()
@@ -172,129 +175,6 @@ def _response_order_id(response: Any) -> str | None:
     return str(order_id) if order_id else None
 
 
-# Mirror of dashboard/backtests.py _TEAM_NAME_ALIASES: ESPN-style names that
-# share no word with Polymarket US's name for the same team. Keep in sync.
-_TEAM_NAME_ALIASES = {
-    "app state mountaineers": "appalachian state",
-    "app state": "appalachian state",
-    "central connecticut blue devils": "central connecticut state",
-    "central connecticut": "central connecticut state",
-    "grambling tigers": "grambling state",
-    "long island university sharks": "liu",
-    "long island university": "liu",
-    "massachusetts minutemen": "umass",
-    "massachusetts": "umass",
-    "miami hurricanes": "miami fl",
-    "se louisiana lions": "southeastern louisiana",
-    "san jose state spartans": "san jose state",
-    "san jos� state spartans": "san jose state",
-    "ul monroe warhawks": "louisiana monroe",
-    "ul monroe": "louisiana monroe",
-    "nm state": "new mexico state",
-    "nm state aggies": "new mexico state",
-    "k-state": "kansas state",
-    "k state": "kansas state",
-    "k state wildcats": "kansas state",
-    "ole miss": "mississippi",
-    "ole miss rebels": "mississippi",
-    "sam houston": "sam houston state",
-    "sam houston bearkats": "sam houston state",
-    "jax state": "jacksonville state",
-    "jax state gamecocks": "jacksonville state",
-    "fiu": "florida international",
-    "fiu panthers": "florida international",
-    "fau": "florida atlantic",
-    "fau owls": "florida atlantic",
-    "usf": "south florida",
-    "usf bulls": "south florida",
-    "ucf": "central florida",
-    "ucf knights": "central florida",
-    "pitt": "pittsburgh",
-    "pitt panthers": "pittsburgh",
-    "la tech": "louisiana tech",
-    "la tech bulldogs": "louisiana tech",
-    "nc state": "north carolina state",
-    "nc state wolfpack": "north carolina state",
-    "uconn": "connecticut",
-    "uconn huskies": "connecticut",
-}
-
-_DISQUALIFYING_TEAM_PREFIXES = frozenset(
-    {"western", "eastern", "northern", "southern", "central", "middle", "north", "south", "east", "west"}
-)
-_DISQUALIFYING_TEAM_SUFFIXES = frozenset(
-    {"state", "tech", "a&m", "am", "christian", "baptist", "methodist", "valley"}
-)
-
-
-def _normalize_name_tokens(name: str) -> str:
-    folded = "".join(ch for ch in unicodedata.normalize("NFKD", name) if not unicodedata.combining(ch))
-    cleaned = re.sub(r"[(),.\-_]", " ", folded)
-    normalized = " ".join(cleaned.casefold().split())
-    return _TEAM_NAME_ALIASES.get(normalized, normalized)
-
-
-def _team_name_matches(team_name: str, side_description: str) -> bool:
-    """Same loose match dashboard_server.py's _pick_quote already uses to
-    resolve a row's home/away team to a market side's long/short
-    description -- duplicated rather than imported because dashboard_server
-    deliberately has zero imports from this package (see DEBUG.md)."""
-    team = _normalize_name_tokens(team_name)
-    description = _normalize_name_tokens(side_description)
-    if not team or not description:
-        return False
-    if team == description:
-        return True
-    shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
-    l_tokens = longer.split()
-    s_tokens = shorter.split()
-    s_len = len(s_tokens)
-    for i in range(len(l_tokens) - s_len + 1):
-        if l_tokens[i : i + s_len] == s_tokens:
-            if i > 0 and l_tokens[i - 1] in _DISQUALIFYING_TEAM_PREFIXES:
-                continue
-            if i + s_len < len(l_tokens) and l_tokens[i + s_len] in _DISQUALIFYING_TEAM_SUFFIXES:
-                continue
-            return True
-    # Franchise mascot / distinctive token match (e.g. "DEN Nuggets" vs "Denver Nuggets", "GS Warriors" vs "Golden State Warriors")
-    t_tokens = team.split()
-    d_tokens = set(description.split())
-    if t_tokens and d_tokens:
-        mascot = t_tokens[-1]
-        if (
-            len(mascot) > 3
-            and mascot not in {"club", "city", "team", "state", "united"}
-            and mascot in d_tokens
-        ):
-            return True
-    return False
-
-
-def _tennis_player_matches(player_name: str, exchange_name: str) -> bool:
-    """Match a tennis player when one source includes an omitted middle name or inverted names."""
-    player_tokens = re.findall(r"\w+", player_name.casefold())
-    exchange_tokens = re.findall(r"\w+", exchange_name.casefold())
-    return (
-        len(player_tokens) >= 2
-        and len(exchange_tokens) >= 2
-        and (
-            (player_tokens[0] == exchange_tokens[0] and player_tokens[-1] == exchange_tokens[-1])
-            or set(player_tokens) == set(exchange_tokens)
-        )
-    )
-
-
-def _participant_matches(pick_row: dict[str, Any], participant: str, side_description: str) -> bool:
-    if _team_name_matches(participant, side_description):
-        return True
-    sport = str(pick_row.get("league") or pick_row.get("sport") or "").casefold()
-    return sport == "tennis" and _tennis_player_matches(participant, side_description)
-
-
-def _lines_match(a: float, b: float) -> bool:
-    return abs(a - b) < 1e-6
-
-
 def _row_selected_team(pick_row: dict[str, str]) -> str | None:
     home_team = str(pick_row.get("home_team", ""))
     away_team = str(pick_row.get("away_team", ""))
@@ -361,25 +241,18 @@ def _resolve_spread_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> 
     market_line = snapshot.get("line")
     if market_team is None or market_line is None:
         raise ExecutionGateError("REFUSED: live spread market has no team/line to verify against.")
-    # The market team must be exactly one of the row's two teams (same rule as 894f9542 in
-    # dashboard/backtests.py::_spread_side_for_row). Real-money bug 2026-11-25: Polymarket's "UCA"
-    # matched neither "Central Arkansas" nor "Jacksonville", so it was taken for the opponent and a
-    # "Central Arkansas -3.5" pick resolved to the short side, Jacksonville -3.5. A team matching
-    # both ("Louisiana" vs "Louisiana-Monroe") is the same hazard.
-    market_is_away = _participant_matches(pick_row, str(pick_row.get("away_team") or ""), str(market_team))
-    market_is_home = _participant_matches(pick_row, str(pick_row.get("home_team") or ""), str(market_team))
-    if market_is_away == market_is_home:
+    # Shared with dashboard/backtests.py::_spread_side_for_row: the market team must be exactly one
+    # of the row's two teams (the 2026-11-25 "UCA" wrong-side bug), then the line or its negation.
+    # No event-title check here: the live snapshot carries no title, and the ticket names the slug.
+    match = match_spread_side(pick_row, row_line, market_team, market_line)
+    if match.market_team in ("both", "neither"):
         raise ExecutionGateError(
             f"REFUSED: live spread market team {market_team!r} matches "
-            f"{'both' if market_is_away else 'neither'} of the row's teams "
+            f"{match.market_team} of the row's teams "
             f"({pick_row.get('away_team')!r} @ {pick_row.get('home_team')!r}); cannot tell long from short."
         )
-    selection = str(pick_row.get("selection") or "").casefold()
-    is_market_team = market_is_home if selection == "home" else market_is_away
-    if is_market_team and _lines_match(row_line, float(market_line)):
-        return "long"
-    if not is_market_team and _lines_match(row_line, -float(market_line)):
-        return "short"
+    if match.side is not None:
+        return match.side
     raise ExecutionGateError(
         "REFUSED: could not unambiguously resolve the picked team/line to a live market side "
         f"(row selection={selected_team!r} line={row_line}, live team={market_team!r} line={market_line})."

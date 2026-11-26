@@ -9,9 +9,7 @@ from __future__ import annotations
 
 import json
 import re
-import unicodedata
 from datetime import UTC, datetime
-from functools import lru_cache
 from pathlib import Path
 
 try:
@@ -29,6 +27,10 @@ from model_prediction.dashboard.common import (
     _read_json,
     _today,
 )
+from model_prediction.polymarket_matching import lines_match as _lines_match
+from model_prediction.polymarket_matching import match_spread_side
+from model_prediction.polymarket_matching import participant_matches as _participant_matches
+from model_prediction.polymarket_matching import team_matches as _team_matches  # noqa: F401 -- re-export
 
 # ── SECTION: Backtests & Odds ───────────────────────────────────────
 
@@ -183,131 +185,7 @@ def market_snapshots(sport: str, day: str) -> dict:
     return {"sport": sport, "date": day, "markets": rows, "count": len(rows)}
 
 
-_RE_NAME_PUNCT = re.compile(r"[(),.\-_]")
 _RE_VS_SPLIT = re.compile(r"\s+(?:vs\.?|@)\s+", re.IGNORECASE)
-
-
-# ESPN-style full names -> Polymarket US names (normalized). The loose
-# containment match below cannot bridge these (no shared word), which left
-# every game involving them with no executable quote ("no exact executable
-# Polymarket US market mapping"). Found 2026-10-23 on NCAAF spreads: 35 of 273
-# games failed to match. Keys/values are post-normalization; a copy lives in
-# polymarket_execute.py (the dashboard deliberately imports nothing from it).
-_TEAM_NAME_ALIASES = {
-    "app state mountaineers": "appalachian state",
-    "app state": "appalachian state",
-    "central connecticut blue devils": "central connecticut state",
-    "central connecticut": "central connecticut state",
-    "grambling tigers": "grambling state",
-    "long island university sharks": "liu",
-    "long island university": "liu",
-    "massachusetts minutemen": "umass",
-    "massachusetts": "umass",
-    "miami hurricanes": "miami fl",
-    "se louisiana lions": "southeastern louisiana",
-    "san jose state spartans": "san jose state",
-    "san jos� state spartans": "san jose state",
-    "ul monroe warhawks": "louisiana monroe",
-    "ul monroe": "louisiana monroe",
-    "nm state": "new mexico state",
-    "nm state aggies": "new mexico state",
-    "k-state": "kansas state",
-    "k state": "kansas state",
-    "k state wildcats": "kansas state",
-    "ole miss": "mississippi",
-    "ole miss rebels": "mississippi",
-    "sam houston": "sam houston state",
-    "sam houston bearkats": "sam houston state",
-    "jax state": "jacksonville state",
-    "jax state gamecocks": "jacksonville state",
-    "fiu": "florida international",
-    "fiu panthers": "florida international",
-    "fau": "florida atlantic",
-    "fau owls": "florida atlantic",
-    "usf": "south florida",
-    "usf bulls": "south florida",
-    "ucf": "central florida",
-    "ucf knights": "central florida",
-    "pitt": "pittsburgh",
-    "pitt panthers": "pittsburgh",
-    "la tech": "louisiana tech",
-    "la tech bulldogs": "louisiana tech",
-    "nc state": "north carolina state",
-    "nc state wolfpack": "north carolina state",
-    "uconn": "connecticut",
-    "uconn huskies": "connecticut",
-}
-
-_DISQUALIFYING_TEAM_PREFIXES = frozenset(
-    {"western", "eastern", "northern", "southern", "central", "middle", "north", "south", "east", "west"}
-)
-_DISQUALIFYING_TEAM_SUFFIXES = frozenset(
-    {"state", "tech", "a&m", "am", "christian", "baptist", "methodist", "valley"}
-)
-
-
-@lru_cache(maxsize=4096)
-def _normalize_name_tokens(name: str) -> str:
-    folded = unicodedata.normalize("NFKD", name)
-    folded = "".join(ch for ch in folded if not unicodedata.combining(ch))
-    normalized = " ".join(_RE_NAME_PUNCT.sub(" ", folded).casefold().split())
-    return _TEAM_NAME_ALIASES.get(normalized, normalized)
-
-
-def _team_matches(team_name: str, side_description: str) -> bool:
-    team = _normalize_name_tokens(team_name)
-    description = _normalize_name_tokens(side_description)
-    if not team or not description:
-        return False
-    if team == description:
-        return True
-    shorter, longer = (description, team) if len(description) <= len(team) else (team, description)
-    l_tokens = longer.split()
-    s_tokens = shorter.split()
-    s_len = len(s_tokens)
-    for i in range(len(l_tokens) - s_len + 1):
-        if l_tokens[i : i + s_len] == s_tokens:
-            if i > 0 and l_tokens[i - 1] in _DISQUALIFYING_TEAM_PREFIXES:
-                continue
-            if i + s_len < len(l_tokens) and l_tokens[i + s_len] in _DISQUALIFYING_TEAM_SUFFIXES:
-                continue
-            return True
-    # Franchise mascot / distinctive token match (e.g. "DEN Nuggets" vs "Denver Nuggets", "GS Warriors" vs "Golden State Warriors")
-    t_tokens = [tok for tok in _RE_NAME_PUNCT.sub(" ", team).split() if tok]
-    d_tokens = set(_RE_NAME_PUNCT.sub(" ", description).split())
-    if t_tokens and d_tokens:
-        mascot = t_tokens[-1]
-        if (
-            len(mascot) > 3
-            and mascot not in {"club", "city", "team", "state", "united"}
-            and mascot in d_tokens
-        ):
-            return True
-    return False
-
-
-_RE_WORD = re.compile(r"\w+")
-
-
-def _tennis_player_matches(player_name: str, exchange_name: str) -> bool:
-    """Match a tennis player when one source includes an omitted middle name or inverted names."""
-    player_tokens = _RE_WORD.findall(player_name.casefold())
-    exchange_tokens = _RE_WORD.findall(exchange_name.casefold())
-    return (
-        len(player_tokens) >= 2
-        and len(exchange_tokens) >= 2
-        and (
-            (player_tokens[0] == exchange_tokens[0] and player_tokens[-1] == exchange_tokens[-1])
-            or set(player_tokens) == set(exchange_tokens)
-        )
-    )
-
-
-def _participant_matches(row: dict, participant: str, exchange_name: str) -> bool:
-    if _team_matches(participant, exchange_name):
-        return True
-    sport = str(row.get("league") or row.get("sport") or "").casefold()
-    return sport == "tennis" and _tennis_player_matches(participant, exchange_name)
 
 
 def _event_participant_indexes(row: dict, participant: str, title: str) -> set[int]:
@@ -315,10 +193,6 @@ def _event_participant_indexes(row: dict, participant: str, title: str) -> set[i
     if len(sides) < 2:
         sides = [title]
     return {index for index, side in enumerate(sides) if _participant_matches(row, participant, side)}
-
-
-def _lines_match(a: float | None, b: float | None) -> bool:
-    return a is not None and b is not None and abs(a - b) < 1e-6
 
 
 def _row_selected_team(row: dict) -> str | None:
@@ -367,13 +241,9 @@ def _spread_side_for_row(row: dict, snapshot: dict) -> str | None:
     picks, or None if it doesn't match at all (including belonging to a
     different game -- see _row_matches_snapshot_event).
 
-    Duplicated from polymarket_execute.py's _resolve_spread_side (same "zero
-    imports from that package" rule _team_matches's docstring already
-    follows) -- a spread market's own line/team always describe its LONG
-    side; SHORT is always the exact negation. A row's line is selection-
-    relative, so it only matches the market's long side when the picked
-    team IS the market's own team; for the opponent, the row's line must
-    equal the negation instead. Found 2026-08-04: this matching never
+    The long/short decision is polymarket_matching.match_spread_side, the
+    same code the execution gate's _resolve_spread_side runs. Found
+    2026-08-04: this matching never
     existed in dashboard_server.py at all -- _pick_quote returned None for
     every spread row unconditionally, so a real, sized MLB spread pick could
     never be previewed or ordered even when the exact market genuinely
@@ -386,22 +256,7 @@ def _spread_side_for_row(row: dict, snapshot: dict) -> str | None:
     market_line = snapshot.get("line")
     if not selected_team or row_line is None or market_team is None or market_line is None:
         return None
-    # The market team must be exactly one of the row's two teams. Real-money
-    # bug 2026-11-25: Polymarket's "UCA" matched neither "Central Arkansas" nor
-    # "Jacksonville", so it was assumed to be the opponent and a "Central
-    # Arkansas -3.5" pick mapped to the short side, Jacksonville -3.5. A team
-    # matching both ("Louisiana" vs "Louisiana-Monroe") is the same hazard.
-    market_is_away = _participant_matches(row, str(row.get("away_team") or ""), str(market_team))
-    market_is_home = _participant_matches(row, str(row.get("home_team") or ""), str(market_team))
-    if market_is_away == market_is_home:
-        return None
-    selection = str(row.get("selection") or "").casefold()
-    is_market_team = market_is_home if selection == "home" else market_is_away
-    if is_market_team and _lines_match(row_line, float(market_line)):
-        return "long"
-    if not is_market_team and _lines_match(row_line, -float(market_line)):
-        return "short"
-    return None
+    return match_spread_side(row, row_line, market_team, market_line).side
 
 
 def _total_side_for_row(row: dict, snapshot: dict) -> str | None:
