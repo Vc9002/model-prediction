@@ -930,3 +930,216 @@ def test_the_dashboard_drawdown_alert_counts_unreadable_rows_at_the_states_own_c
     alert = dashboard_status._auto_buyer_daily_loss_alert()
     assert seen == {"unreadable_spend_usd": 500.0, "unreadable_loss_usd": 25.0}
     assert alert is not None and alert["level"] == "warn" and "$-25.00" in alert["text"]
+
+
+# ----------------------------------------------------------------------------- B6 review: pending exposure
+# An order that may be live must never read as 0 because a field is NaN, garbage or overflowing: that let
+# the buyer buy MORE (daily spend and per-game cap under-counted) or raised OverflowError out of the scan.
+
+_OPEN = {"status": "open", "fallback_reconciled": False}
+_EXPOSURE_ROWS = {
+    "submit_unknown": (
+        {**_OPEN, "submit_unknown": True, "requested_cost_usd": 7.5, "entry_price": 0.5},
+        ["requested_cost_usd"],
+        7.5,
+    ),
+    "fallback_unknown": (
+        {**_OPEN, "fallback_submit_unknown": True, "fallback_resting_shares": 10.0, "entry_price": 0.5},
+        ["fallback_resting_shares", "entry_price"],
+        5.0,
+    ),
+    "own_primary": (
+        {
+            **_OPEN,
+            "order_id": "a",
+            "fallback_order_id": "a",
+            "fallback_resting_shares": 10.0,
+            "shares": 4.0,
+            "entry_price": 0.5,
+        },
+        ["fallback_resting_shares", "shares", "entry_price"],
+        3.0,
+    ),
+    "resting_fallback": (
+        {
+            **_OPEN,
+            "order_id": "a",
+            "fallback_order_id": "b",
+            "fallback_resting_shares": 10.0,
+            "fallback_filled_shares": 4.0,
+            "entry_price": 0.5,
+        },
+        ["fallback_resting_shares", "fallback_filled_shares", "entry_price"],
+        3.0,
+    ),
+}
+_BAD_AMOUNTS = [
+    pytest.param(float("nan"), id="nan"),
+    pytest.param(float("inf"), id="inf"),
+    pytest.param("abc", id="garbage"),
+    pytest.param(10**400, id="overflow"),
+    pytest.param({"v": 1}, id="dict"),
+]
+
+
+@pytest.mark.parametrize("kind", list(_EXPOSURE_ROWS))
+def test_a_readable_pending_row_costs_exactly_what_it_always_did(kind):
+    row, _fields, expected = _EXPOSURE_ROWS[kind]
+    assert auto_executor._pending_exposure(row, unreadable_usd=25.0) == (expected, False)
+    assert auto_executor._pending_exposure_cost(row) == expected
+    # A settled row with no pending order costs nothing, whatever its other fields hold.
+    done = {"status": "settled", "fallback_reconciled": True, "entry_price": "abc", "shares": float("nan")}
+    assert auto_executor._pending_exposure(done, unreadable_usd=25.0) == (0.0, False)
+
+
+@pytest.mark.parametrize("bad", _BAD_AMOUNTS)
+@pytest.mark.parametrize(
+    ("kind", "field"),
+    [(kind, field) for kind, (_row, fields, _cost) in _EXPOSURE_ROWS.items() for field in fields],
+)
+def test_an_unreadable_pending_field_counts_at_the_cap_not_as_zero(kind, field, bad):
+    row = {**_EXPOSURE_ROWS[kind][0], field: bad}
+    assert auto_executor._pending_exposure(row, unreadable_usd=25.0) == (25.0, True)
+    assert auto_executor._pending_exposure_cost(row) == float("inf")  # no cap known: refuse outright
+    # And the fee-inclusive form agrees.
+    assert auto_executor._pending_exposure(row, with_fee=True, unreadable_usd=25.0) == (25.0, True)
+
+
+@pytest.mark.parametrize("kind", list(_EXPOSURE_ROWS))
+def test_an_absent_pending_field_is_still_zero(kind):
+    row, fields, _cost = _EXPOSURE_ROWS[kind]
+    for field in fields:
+        value, unreadable = auto_executor._pending_exposure({**row, field: None}, unreadable_usd=25.0)
+        assert unreadable is False and value >= 0.0
+
+
+@pytest.mark.parametrize("bad", _BAD_AMOUNTS)
+def test_the_daily_spend_counts_an_unreadable_pending_row_at_the_cap_and_names_it(tmp_path, bad):
+    row = _today_row(
+        pick_id="pend",
+        order_id="a",
+        fallback_order_id="a",
+        fallback_reconciled=False,
+        status="open",
+        cost_usd=5.0,
+        shares=4.0,
+        entry_price=0.5,
+        fallback_resting_shares=bad,
+    )
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [row])
+    named: list[str] = []
+    spend, _pnl = _REAL_TODAY_TOTALS(
+        tmp_path, live_book=True, unreadable_spend_usd=500.0, unreadable_rows=named
+    )
+    assert spend >= 500.0
+    assert named == ["pend (pending_exposure)"]
+
+
+@pytest.mark.usefixtures("decorate")
+@pytest.mark.parametrize("bad", [float("nan"), "abc", 10**400])
+def test_a_game_with_an_unreadable_pending_order_reads_as_full_and_the_refusal_names_the_row(tmp_path, bad):
+    held = _held_spread_on_g1(
+        cost_usd=1.0,
+        order_id="a",
+        fallback_order_id="a",
+        fallback_reconciled=False,
+        fill_known=False,
+        entry_price=0.5,
+        fallback_resting_shares=bad,
+    )
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [held])
+    more = _row(TOTAL_V6, pick_id="t1", event="g1", market="total", model_probability=0.57, ask=0.51)
+    result = _live_buyer(tmp_path, cohorts=(SPREAD_V7_LIVE, TOTAL_V6_LIVE)).evaluate_and_execute([more])
+    assert FakeExecutor.executed == []
+    assert result.rejected_budget == 1
+    (record,) = result.cohort_skips
+    assert "held (pending_exposure)" in record["detail"]
+
+
+@pytest.mark.usefixtures("decorate")
+@pytest.mark.parametrize("bad", [float("nan"), "abc", 10**400])
+def test_a_game_cap_refusal_names_a_row_whose_cost_is_unreadable(tmp_path, bad):
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_held_spread_on_g1(cost_usd=bad)])
+    more = _row(TOTAL_V6, pick_id="t1", event="g1", market="total", model_probability=0.57, ask=0.51)
+    result = _live_buyer(tmp_path, cohorts=(SPREAD_V7_LIVE, TOTAL_V6_LIVE)).evaluate_and_execute([more])
+    assert FakeExecutor.executed == []
+    (record,) = result.cohort_skips
+    assert "held (cost_usd)" in record["detail"]
+
+
+@pytest.mark.parametrize("bad", [float("nan"), "abc", 10**400])
+def test_an_unreadable_share_count_locks_the_row_instead_of_raising_or_reading_as_dead(tmp_path, bad):
+    """OverflowError escaped the scan raw; NaN or garbage must not let a row that may hold shares read as a
+    dead one or as a partial fill to top up."""
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_held_spread_on_g1(cost_usd=1.0, shares=bad)])
+    index = _live_buyer(tmp_path)._build_bought_index()
+    assert "held" in index["pick_ids"] and "held" not in index["partially_filled"]
+
+
+@pytest.mark.parametrize("bad", [float("nan"), "abc", 10**400])
+def test_an_unreadable_manual_exit_count_is_a_sale_lockout_not_a_top_up(tmp_path, bad):
+    held = _held_spread_on_g1(
+        cost_usd=10.0, order_state="ORDER_STATE_PARTIALLY_FILLED", fallback_reconciled=True
+    )
+    _write_ledger(tmp_path / "control" / "auto_buyer_ledger.jsonl", [held])
+    assert "held" in _live_buyer(tmp_path / "control")._build_bought_index()["partially_filled"]  # control
+    _write_ledger(tmp_path / "bad" / "auto_buyer_ledger.jsonl", [{**held, "manual_exit_shares": bad}])
+    index = _live_buyer(tmp_path / "bad")._build_bought_index()
+    assert "held" in index["pick_ids"] and "held" not in index["partially_filled"]
+
+
+def test_the_row_fee_survives_an_overflowing_value_as_zero():
+    from model_prediction.portfolio.auto_buyer_ledger import row_fee_usd
+
+    assert row_fee_usd({"fee_usd": 10**400}) == 0.0
+    assert row_fee_usd({"fee_usd": 0.07}) == 0.07
+
+
+@pytest.mark.usefixtures("decorate")
+def test_the_breaker_detail_names_only_the_loss_rows_not_the_spend_rows(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            _today_row(pick_id="spend-bad", status="open", cost_usd="abc"),
+            {**_settled_today(float("nan")), "pick_id": "loss-bad"},
+        ],
+    )
+    row = _row(SPREAD_V7, pick_id="in", event="g1", edge="0.07", model_probability=0.58, ask=0.51)
+    result = _live_buyer(tmp_path, max_daily_loss_usd=20.0).evaluate_and_execute([row])
+    (record,) = result.cohort_skips
+    assert record["reason"] == "rejected_daily_loss_breaker"
+    assert "loss-bad (pnl_usd)" in record["detail"] and "spend-bad" not in record["detail"]
+
+
+def test_a_pending_cost_that_overflows_from_readable_inputs_counts_at_the_cap():
+    row = {**_EXPOSURE_ROWS["fallback_unknown"][0], "fallback_resting_shares": 1e308, "entry_price": 10.0}
+    assert auto_executor._pending_exposure(row, unreadable_usd=25.0) == (25.0, True)
+
+
+@pytest.mark.usefixtures("decorate")
+def test_the_budget_detail_names_only_the_spend_rows_not_the_loss_rows(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            _today_row(pick_id="spend-bad", status="open", cost_usd="abc"),
+            {**_settled_today(float("nan")), "pick_id": "loss-bad"},
+        ],
+    )
+    row = _row(SPREAD_V7, pick_id="in", event="g1", edge="0.07", model_probability=0.58, ask=0.51)
+    result = _live_buyer(tmp_path).evaluate_and_execute([row])
+    assert result.rejected_budget == 1
+    (record,) = result.cohort_skips
+    assert "spend-bad (cost_usd)" in record["detail"] and "loss-bad" not in record["detail"]
+
+
+def test_an_overflow_inside_the_ledger_scan_fails_the_index_closed_not_raw(monkeypatch, tmp_path):
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_held_spread_on_g1(cost_usd=1.0)])
+
+    def _boom(_row: dict[str, Any]) -> str:
+        raise OverflowError("int too large to convert to float")
+
+    monkeypatch.setattr(auto_executor, "_game_key", _boom)
+    with pytest.raises(auto_executor.BoughtIndexUnavailableError):
+        _live_buyer(tmp_path)._build_bought_index()

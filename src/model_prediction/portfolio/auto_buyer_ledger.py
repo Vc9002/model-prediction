@@ -168,7 +168,7 @@ def row_fee_usd(row: dict[str, Any]) -> float:
     """The row's recorded fee; 0.0 for a row written before fees were recorded."""
     try:
         fee = float(row.get("fee_usd") or 0.0)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return 0.0
     return fee if math.isfinite(fee) else 0.0
 
@@ -1040,6 +1040,7 @@ def reconcile_pending_auto_buyer_fallbacks(
     reconciled_filled = cancelled_expired = still_pending = errors = 0
     cancel_failed: list[str] = []
     cancel_abandoned: list[str] = []
+    fill_unreadable: list[str] = []
     changed = False
 
     def _cancel_order(
@@ -1068,6 +1069,19 @@ def reconcile_pending_auto_buyer_fallbacks(
         if after.get("status") != "live":
             return None
         return next((o for o in after.get("orders", []) if str(o.get("order_id")) == order_id), None)
+
+    def _flag_unreadable_fill(row: dict[str, Any], order_id: str) -> None:
+        """Stamp the first sight of a TERMINAL order whose fill count cannot be read, and list its id once.
+
+        The row stays unreconciled (its shares are unknown), so without this nothing would ever say so:
+        the cycle alarms from ``fill_unreadable`` exactly as it does from ``cancel_abandoned``, once per row.
+        """
+        nonlocal changed
+        if row.get("fill_unreadable_at_utc"):
+            return
+        row["fill_unreadable_at_utc"] = iso_utc(now)
+        fill_unreadable.append(order_id)
+        changed = True
 
     def _restate(row: dict[str, Any], fallback_filled: float) -> tuple[float, float, float]:
         """Fold a readable fill count into the row; returns (fallback_filled, new_shares, primary)."""
@@ -1129,6 +1143,7 @@ def reconcile_pending_auto_buyer_fallbacks(
         row["fallback_reconciled"] = True
         row["fill_known"] = True
         row.pop("cancel_requested_at_utc", None)
+        row.pop("fill_unreadable_at_utc", None)  # readable now: a later unreadable read alarms afresh
         if row.get("fallback_order_id") == row.get("order_id"):
             requested_total = float(row.get("fallback_resting_shares") or 0.0)
         else:
@@ -1171,8 +1186,9 @@ def reconcile_pending_auto_buyer_fallbacks(
             if live_filled is None:
                 # Present but unreadable cumQuantity: the fill is UNKNOWN, never a known zero. Nothing is
                 # restated and the row is never closed or voided on it. A terminal order has nothing left
-                # to cancel, so the row waits for a readable read (alarmed every pass through the error
-                # count); a live one still falls through, because a cancel does not need the fill count.
+                # to cancel, so the row waits for a readable read: stamped and alarmed once by the cycle
+                # (``fill_unreadable``), logged and counted in ``errors`` every pass. A live one still falls
+                # through, because a cancel does not need the fill count.
                 logger.warning(
                     "Order %s (%s) reports an unreadable cumQuantity %r; its fill is unknown, so the row "
                     "is left unreconciled.",
@@ -1182,6 +1198,7 @@ def reconcile_pending_auto_buyer_fallbacks(
                 )
                 errors += 1
                 if state in _TERMINAL_ORDER_STATES:
+                    _flag_unreadable_fill(r, fid)
                     still_pending += 1
                     continue
             else:
@@ -1304,6 +1321,7 @@ def reconcile_pending_auto_buyer_fallbacks(
                 after.get("cum_quantity") if after else None,
             )
             r["cancel_requested_at_utc"] = iso_utc(now)
+            _flag_unreadable_fill(r, fid)
             errors += 1
             still_pending += 1
             continue
@@ -1343,6 +1361,9 @@ def reconcile_pending_auto_buyer_fallbacks(
     if cancel_abandoned:
         # Newly flagged this run only, so the cycle raises its alarm once per row.
         summary["cancel_abandoned"] = cancel_abandoned
+    if fill_unreadable:
+        # Newly stamped this run only, so the cycle raises its alarm once per row.
+        summary["fill_unreadable"] = fill_unreadable
     if snapshot_error:
         summary["snapshot_error"] = snapshot_error
     return summary

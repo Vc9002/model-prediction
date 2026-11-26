@@ -1226,8 +1226,18 @@ def _append_auto_buyer_cycle_history(
         logger.warning("Failed to append auto_buyer_cycle_history.jsonl: %s", exc)
 
 
-def _pending_exposure_cost(row: dict[str, Any], *, with_fee: bool = False) -> float:
-    """Dollars an open order of this row may still add on the exchange, beyond its recorded fill.
+def _pending_exposure_cost(
+    row: dict[str, Any], *, with_fee: bool = False, unreadable_usd: float = math.inf
+) -> float:
+    """``_pending_exposure`` without the unreadable flag; see there."""
+    return _pending_exposure(row, with_fee=with_fee, unreadable_usd=unreadable_usd)[0]
+
+
+def _pending_exposure(
+    row: dict[str, Any], *, with_fee: bool = False, unreadable_usd: float = math.inf
+) -> tuple[float, bool]:
+    """(dollars an open order of this row may still add on the exchange beyond its recorded fill, whether
+    an unreadable field made that figure ``unreadable_usd``).
 
     One helper for the daily cap, the per-game cap and the pending-orders check (C6), so none of
     them double-counts: reconcile folds a resting fallback's partial fill into ``cost_usd`` (and
@@ -1236,28 +1246,45 @@ def _pending_exposure_cost(row: dict[str, Any], *, with_fee: bool = False) -> fl
     unknown fallback leg its remainder: either may exist on the exchange. ``with_fee`` (the live
     book's fee-inclusive caps) adds the modeled taker fee of the pending shares, the same fee the
     order was sized with, so a game sized to its $25 cap reads as full while its order rests.
+
+    A field the branch needs that is present but not a finite number (NaN, garbage text, an overflowing
+    int) makes the order's size unknowable, and an order that may be live must never read as 0: the row
+    then counts ``unreadable_usd`` (callers pass the cap they enforce; infinity refuses outright) and the
+    flag is True. An absent or falsy field stays the 0.0 it always was, and readable rows are unchanged.
     """
+    price = _readable_money(row.get("entry_price"))  # None: present but unreadable
     try:
-        price = float(row.get("entry_price") or 0.0)
-        resting = float(row.get("fallback_resting_shares") or 0.0)
         if row.get("submit_unknown") is True:
             if str(row.get("status") or "open").lower() != "open":
-                return 0.0
-            cost = float(row.get("requested_cost_usd") or 0.0)
+                return 0.0, False
+            requested = _readable_money(row.get("requested_cost_usd"))
+            if requested is None:
+                return unreadable_usd, True
+            cost = requested
         elif is_fallback_submit_unknown(row):
+            resting = _readable_money(row.get("fallback_resting_shares"))
+            if resting is None or price is None:
+                return unreadable_usd, True
             cost = resting * price
         elif not row.get("fallback_order_id") or row.get("fallback_reconciled"):
-            return 0.0
-        elif str(row.get("fallback_order_id")) == str(row.get("order_id") or ""):
-            # An unknown-fill primary: reconcile restates its fills into ``shares``.
-            cost = max(0.0, resting - float(row.get("shares") or 0.0)) * price
+            return 0.0, False
         else:
-            cost = max(0.0, resting - float(row.get("fallback_filled_shares") or 0.0)) * price
-        if with_fee and price > 0:
+            resting = _readable_money(row.get("fallback_resting_shares"))
+            # An unknown-fill primary: reconcile restates its fills into ``shares``.
+            own = str(row.get("fallback_order_id")) == str(row.get("order_id") or "")
+            filled = _readable_money(row.get("shares" if own else "fallback_filled_shares"))
+            if resting is None or filled is None or price is None:
+                return unreadable_usd, True
+            cost = max(0.0, resting - filled) * price
+        if with_fee and (price is None or price > 0):
+            if price is None:
+                return unreadable_usd, True
             cost += cost / price * taker_fee_per_share(price)
-    except (TypeError, ValueError):
-        return 0.0
-    return cost if math.isfinite(cost) and cost > 0 else 0.0
+    except (TypeError, ValueError, OverflowError):
+        return unreadable_usd, True
+    if not math.isfinite(cost):
+        return unreadable_usd, True
+    return (cost if cost > 0 else 0.0), False
 
 
 def _live_buying_still_enabled() -> bool:
@@ -1437,6 +1464,10 @@ def _cap_or_inf(cap: Any) -> float:
     return value if math.isfinite(value) and value >= 0 else math.inf
 
 
+def _unreadable_game_detail(names: list[str]) -> str:
+    return f"game cap counted rows with an unreadable amount at the cap: {', '.join(names[:10])}"
+
+
 def _row_filled_cost(row: dict[str, Any], fee_in_caps: bool, unreadable_usd: float) -> float:
     """The row's filled cost for the per-game cap: ``cost_usd`` (plus its fee on the live book).
 
@@ -1533,7 +1564,12 @@ def _today_auto_buyer_totals(
                 spend += spend_if_unreadable
             else:
                 fee = row_fee_usd(row) if live_book else 0.0
-                spend += cost + fee + _pending_exposure_cost(row, with_fee=live_book)
+                pending, pending_unreadable = _pending_exposure(
+                    row, with_fee=live_book, unreadable_usd=spend_if_unreadable
+                )
+                if pending_unreadable:
+                    _warn_unreadable_row_counted(row, "pending_exposure", "daily spend", unreadable_rows)
+                spend += cost + fee + pending
 
         result = str(row.get("result") or "").lower()
         if not row.get("settled_at_utc") or result not in ("win", "loss", "push"):
@@ -2722,6 +2758,20 @@ def run_auto_buyer_cycle(
                 order_ids=[order_id],
             )
         )
+    for order_id in reconciliation_summary.get("fill_unreadable") or []:
+        # Raised once per row, like the abandoned cancel: reconcile lists an id only on the run that first
+        # stamps it. The alarm is raised after the cycle's buying, state and history are done, so a row
+        # that is merely unreadable never stops a cycle; it fails the worker run so the operator is told.
+        live_alarms.append(
+            _alarm(
+                "fallback_fill_unreadable",
+                pick_id="",
+                market_slug="",
+                detail=f"order {order_id} is terminal on the exchange but its cumQuantity cannot be read; "
+                "its fill is unknown, so the row stays unreconciled and unsettled until it is resolved by hand",
+                order_ids=[order_id],
+            )
+        )
     # The cycle held its state snapshot for minutes; only the keys it owns are written, onto a
     # fresh read, so an operator's change in that window (a hand-set `enabled: false`) wins.
     owned: dict[str, Any] = {"last_run": run_summary}
@@ -3079,6 +3129,8 @@ class AutoPolymarketBuyer:
             # book's fills would block the other book's cohort on the same game and side.
             auto_ledger_files = [auto_ledger_files[0] if self.config.mode == "live" else auto_ledger_files[1]]
         game_exposure: dict[str, dict[str, float]] = {}
+        # Rows counted at the per-game cap for an unreadable amount, by game, to name in a refusal.
+        unreadable_game_rows: dict[str, list[str]] = {}
         # The live book's caps are fee-inclusive (2026-11-25); paper sizing is unchanged.
         fee_in_caps = self.config.mode == "live"
         for auto_ledger_file, source_label in auto_ledger_files:
@@ -3118,8 +3170,15 @@ class AutoPolymarketBuyer:
                     # Per-game exposure before the dead-row filter below: a zero-fill primary whose
                     # IOC was cancelled can still have its fallback resting on the book.
                     game = _game_key(r)
-                    pending_cost = _pending_exposure_cost(r, with_fee=fee_in_caps)
+                    pending_cost, pending_unreadable = _pending_exposure(
+                        r, with_fee=fee_in_caps, unreadable_usd=self.config.max_game_stake_usd
+                    )
                     filled_cost_r = _row_filled_cost(r, fee_in_caps, self.config.max_game_stake_usd)
+                    if game and (pending_unreadable or _readable_money(r.get("cost_usd")) is None):
+                        # Named in the per-game refusal's skip detail (see the buy loop).
+                        unreadable_game_rows.setdefault(game, []).append(
+                            f"{r.get('pick_id')} ({'pending_exposure' if pending_unreadable else 'cost_usd'})"
+                        )
                     if game and filled_cost_r + pending_cost > 0:
                         by_pick = game_exposure.setdefault(game, {})
                         pick_key = str(r.get("pick_id") or r.get("order_id") or "")
@@ -3133,7 +3192,10 @@ class AutoPolymarketBuyer:
                     status = str(r.get("status") or "").lower()
                     order_st = str(r.get("order_state") or "").upper()
                     result_st = str(r.get("result") or "").lower()
-                    shares_cnt = float(r.get("shares") or 0.0)
+                    readable_shares = _readable_money(r.get("shares"))
+                    # NaN for an unreadable count: not zero (never a dead row) and not above zero (never
+                    # a partial fill to top up), so the row falls through to the lockout.
+                    shares_cnt = math.nan if readable_shares is None else readable_shares
                     if pending_cost <= 0 and (
                         status in {"expired", "cancelled", "rejected"}
                         or (
@@ -3159,9 +3221,12 @@ class AutoPolymarketBuyer:
                     # The operator selling out of a position overrides the model: the
                     # row must fall through to the hard lockout below and never count
                     # as a partial fill, or the next cycle "tops up" the shares just sold.
+                    exit_shares = _readable_money(r.get("manual_exit_shares"))
+                    # An unreadable exit count may mean a sale: the hard lockout, never a top-up.
                     operator_sold = (
                         str(r.get("settlement_source") or "") == "manual_sell"
-                        or float(r.get("manual_exit_shares") or 0.0) > 0
+                        or exit_shares is None
+                        or exit_shares > 0
                     )
 
                     # Detect partially filled orders whose resting fallbacks are not active
@@ -3233,7 +3298,7 @@ class AutoPolymarketBuyer:
                         bought_matchup_markets.add(m_key)
                         if sel:
                             bought_matchup_selections.add((*m_key, sel.strip().lower()))
-            except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+            except (OSError, ValueError, KeyError, TypeError, OverflowError, RuntimeError) as exc:
                 logger.warning(
                     "Failed to read auto-buyer ledger %s (%s) for bought-index build: %s",
                     auto_ledger_file,
@@ -3254,7 +3319,15 @@ class AutoPolymarketBuyer:
                             held_events.add(event_key_from_slug(str(pos_slug)))
                         if qty > 0:
                             held_slugs.add(str(pos_slug))
-            except (OSError, ValueError, KeyError, TypeError, ExecutionGateError, RuntimeError) as exc:
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                TypeError,
+                OverflowError,
+                ExecutionGateError,
+                RuntimeError,
+            ) as exc:
                 logger.warning(
                     "Failed to read live Polymarket account positions for bought-index build: %s", exc
                 )
@@ -3303,6 +3376,7 @@ class AutoPolymarketBuyer:
             "partially_filled": partially_filled,
             "partial_contracts": partial_contracts,
             "game_exposure": game_exposure,
+            "unreadable_game_rows": unreadable_game_rows,
             "ledger_pick_ids": ledger_pick_ids,
         }
 
@@ -3487,11 +3561,15 @@ class AutoPolymarketBuyer:
             unreadable_rows=unreadable_rows,
             **({"row_scope": scope.owns} if scope is not None else {}),
         )
-        unreadable_detail = (
-            f"ledger rows counted for an unreadable field: {', '.join(unreadable_rows[:10])}"
-            if unreadable_rows
-            else None
-        )
+
+        def _named_detail(fields: tuple[str, ...]) -> str | None:
+            named = [n for n in unreadable_rows if n.rsplit("(", 1)[-1].rstrip(")") in fields]
+            return f"ledger rows counted for an unreadable field: {', '.join(named[:10])}" if named else None
+
+        # Only the rows that moved the figure being refused: spend fields for the budget, loss fields for
+        # the breaker.
+        unreadable_detail = _named_detail(("settled_at_utc", "pnl_usd"))
+        unreadable_spend_detail = _named_detail(("executed_at_utc", "cost_usd", "pending_exposure"))
 
         # Drawdown circuit breaker: once today's realized loss (gross on the live book) crosses
         # the configured threshold, stop considering new buys for the rest of the calendar day.
@@ -4036,8 +4114,11 @@ class AutoPolymarketBuyer:
                     if key != pick_id
                 )
                 game_room = round(self.config.max_game_stake_usd - game_other_spend, 2)
+                game_unreadable = bought_index.get("unreadable_game_rows", {}).get(game)
                 if game_room < 0.50:
                     result.rejected_budget += 1
+                    if game_unreadable:
+                        skip_log.note(detail=_unreadable_game_detail(game_unreadable))
                     continue
                 target_spend = min(target_spend, game_room)
 
@@ -4125,11 +4206,13 @@ class AutoPolymarketBuyer:
                 committed_spend + all_in_cost > self.config.max_daily_spend_usd
             ):
                 result.rejected_budget += 1
-                if unreadable_detail:
-                    skip_log.note(detail=unreadable_detail)
+                if unreadable_spend_detail:
+                    skip_log.note(detail=unreadable_spend_detail)
                 continue
             if game and game_other_spend + own_filled + all_in_cost > self.config.max_game_stake_usd + 0.10:
                 result.rejected_budget += 1
+                if bought_index.get("unreadable_game_rows", {}).get(game):
+                    skip_log.note(detail=_unreadable_game_detail(bought_index["unreadable_game_rows"][game]))
                 continue
 
             ticket_pick_id = pick_id

@@ -883,6 +883,22 @@ def test_a_newly_abandoned_cancel_raises_a_live_alarm(cycle, monkeypatch):
     auto_executor.run_auto_buyer_cycle()
 
 
+def test_a_newly_unreadable_fill_raises_a_live_alarm_once_naming_the_order(cycle, monkeypatch):
+    """The alarm channel is the abandoned cancel's: raised after the cycle's buying, state and history,
+    so a row that is merely unreadable never stops a cycle, only fails the worker run to tell the operator."""
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    _write_state(cycle, {**LIVE_STATE, "enabled": False})
+    cycle["reconcile_result"] = {"fill_unreadable": ["ioc-9"]}
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+        auto_executor.run_auto_buyer_cycle()
+    assert [a["alarm"] for a in raised.value.alarms] == ["fallback_fill_unreadable"]
+    assert raised.value.alarms[0]["order_ids"] == ["ioc-9"]
+    assert "ioc-9" in raised.value.alarms[0]["detail"]
+    # Reconcile lists an id only on the run that first stamps it, so the next run is quiet.
+    cycle["reconcile_result"] = {}
+    auto_executor.run_auto_buyer_cycle()
+
+
 # ---------------------------------------------------------------- 3. daily loss stop
 
 

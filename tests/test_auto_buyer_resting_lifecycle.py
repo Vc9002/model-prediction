@@ -1505,7 +1505,9 @@ def test_reconcile_keeps_an_unknown_fill_row_when_the_terminal_read_has_an_unrea
     exchange = _Exchange({"uk": ("ORDER_STATE_CANCELED", cum), "ok": ("ORDER_STATE_FILLED", 10.0)})
     summary = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
     row, other_row = _ledger(j_path)
-    assert row == before
+    stamp = row.pop("fill_unreadable_at_utc")  # stamped on first sight, see the alarm tests below
+    assert stamp and row == before
+    assert summary["fill_unreadable"] == ["uk"]
     assert row["fill_known"] is False and row["status"] == "open" and row["result"] == "open"
     assert exchange.cancelled == []
     assert summary["errors"] == 1 and summary["still_pending"] == 1
@@ -1557,3 +1559,72 @@ def test_post_cancel_reread_with_an_unreadable_fill_keeps_the_row_pending(tmp_pa
     assert row["fallback_reconciled"] is False and row["result"] == "open" and row["shares"] == 2.0
     assert row["cancel_requested_at_utc"]
     assert summary["still_pending"] == 1 and summary["errors"] == 1
+
+
+# ------------------------------------------- B6 review: a stuck unreadable fill is stamped and alarmed once
+
+
+def test_first_sight_of_a_terminal_unreadable_fill_stamps_the_row_and_lists_its_order_once(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row()])
+    exchange = _Exchange({"uk": ("ORDER_STATE_CANCELED", "abc")})
+    first = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert first["fill_unreadable"] == ["uk"]
+    row = _ledger(j_path)[0]
+    stamp = row["fill_unreadable_at_utc"]
+    assert stamp and row["fill_known"] is False and row["fallback_reconciled"] is False
+    assert row["status"] == "open" and row["result"] == "open"
+    # The second pass keeps the row pending and counted, but neither re-stamps nor lists it again.
+    second = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert "fill_unreadable" not in second
+    assert second["errors"] == 1 and second["still_pending"] == 1
+    assert _ledger(j_path)[0]["fill_unreadable_at_utc"] == stamp
+
+
+def test_a_post_cancel_unreadable_terminal_read_is_stamped_and_listed_once(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(primary_shares=2.0)])
+    exchange = _Exchange(
+        {"gtd-1": ("ORDER_STATE_NEW", 0.0)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", "abc")}
+    )
+    first = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert first["fill_unreadable"] == ["gtd-1"]
+    assert _ledger(j_path)[0]["fill_unreadable_at_utc"]
+    second = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert "fill_unreadable" not in second
+
+
+def test_a_later_readable_read_closes_the_row_and_clears_the_stamp(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row()])
+    reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path, executor=_Exchange({"uk": ("ORDER_STATE_CANCELED", "abc")})
+    )
+    assert _ledger(j_path)[0]["fill_unreadable_at_utc"]
+    reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path, executor=_Exchange({"uk": ("ORDER_STATE_CANCELED", 3.0)})
+    )
+    row = _ledger(j_path)[0]
+    assert "fill_unreadable_at_utc" not in row and row["fallback_reconciled"] is True and row["shares"] == 3.0
+    # Unreadable again later: a fresh row state, a fresh alarm.
+    _write_ledger(j_path, [_unknown_fill_row()])
+    again = reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path, executor=_Exchange({"uk": ("ORDER_STATE_CANCELED", "abc")})
+    )
+    assert again["fill_unreadable"] == ["uk"]
+
+
+def test_a_non_terminal_unreadable_read_with_no_cancel_reason_stays_pending_without_a_cancel(tmp_path):
+    """The game has not started and nothing asks for a cancel: the row waits, counted as an error, with no
+    cancel sent and no stamp (a live order's count may well read next pass)."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(start_minutes=120.0, primary_shares=2.0)])
+    exchange = _Exchange({"gtd-1": ("ORDER_STATE_NEW", "abc")})
+    summary = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert exchange.cancelled == []
+    assert summary["errors"] == 1 and summary["still_pending"] == 1
+    assert "fill_unreadable" not in summary
+    row = _ledger(j_path)[0]
+    assert (
+        "fill_unreadable_at_utc" not in row and row["shares"] == 2.0 and row["fallback_reconciled"] is False
+    )
