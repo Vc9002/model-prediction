@@ -104,7 +104,7 @@ def test_dashboard_decoration_preserves_zero_unit_research_no_call(monkeypatch, 
         "research_pnl_units": None,
         "result": None,
     }
-    patch_dash("_pick_quote", lambda _: None)
+    patch_dash("_pick_quote", lambda _row, _refusals=None: None)
     monkeypatch.setattr(
         dashboard_server,
         "_order_readiness",

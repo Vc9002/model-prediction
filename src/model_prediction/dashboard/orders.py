@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover
 
 from model_prediction.dashboard.backtests import (
     _pick_quote,
-    _pick_quote_refusal,
+    _recorded_market,
 )
 from model_prediction.dashboard.common import (
     _CACHE,
@@ -375,10 +375,12 @@ def _decorate_pick(
 ) -> dict:
     # Settled picks can never be executed — skip the expensive snapshot scan.
     settled = str(row.get("status") or "").lower() == "settled"
-    quote = None if settled else _pick_quote(row)
     # A row that recorded its market is refused, never name-matched, when that market does not
-    # qualify; say so instead of the generic "no mapping" so the buyer's skip log can name it.
-    refusal = _pick_quote_refusal(row) if quote is None and not settled else None
+    # qualify; say so instead of the generic "no mapping" so the buyer's skip log can name it. The
+    # reason comes from the same resolver pass as the quote.
+    refusals: list[str] = []
+    quote = None if settled else _pick_quote(row, refusals)
+    refusal = refusals[0] if quote is None and refusals else None
     ready, reason = _order_readiness(row, quote)
     if refusal and reason == _NO_MARKET_MAPPING_REASON:
         reason = refusal
@@ -1044,6 +1046,10 @@ def _action_command(name: str, payload: dict) -> list[str]:
             elif sport == "cfb":
                 sport = "ncaaf"
             slug = str(quote.get("market_slug") or "").strip()
+            if not slug:
+                # A pinned row with no usable quote is blocked by its recorded market: re-capture that.
+                recorded = _recorded_market(row)
+                slug = recorded[0] if recorded else ""
             try:
                 game_day = (
                     datetime.fromisoformat(str(row.get("event_start_utc") or ""))

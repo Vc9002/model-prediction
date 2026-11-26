@@ -6,9 +6,10 @@ exchange abbreviated a school ("UCA" for Central Arkansas, 2026-11-25). The NCAA
 knew the market and side: the slate's sides carry the exchange's own away/home ordering. It now
 writes ``market_slug=<slug> token_side=<long|short>`` into the row's rationale (the established
 place a row records its market, and a column the buyer's dashboard rows carry), and _pick_quote uses
-that market and side when present. Name matching is the fallback only when the recorded market was
-never captured; a captured market that does not line up with the row (another game, a half-game
-contract, a different line) refuses it, as does a decisive name match that disagrees.
+that market and side when present. A row that recorded its market never falls back to name matching
+(operator decision 2026-11-26): a market that was never captured, one captured but not usable, one
+that does not line up with the row (another game, a half-game contract, a different line) and a
+decisive name match that disagrees all refuse it, each with a reason. Only unpinned rows name-match.
 """
 
 from __future__ import annotations
@@ -176,13 +177,19 @@ def test_recorded_market_and_side_are_used_when_names_cannot_match(snapshots) ->
     assert (quote["market_slug"], quote["side"], quote["ask"]) == (_NEG, "long", 0.50)
 
 
-def test_recorded_market_missing_from_the_snapshots_falls_back_to_name_matching(snapshots) -> None:
+def test_recorded_market_missing_from_the_snapshots_is_refused_not_name_matched(snapshots) -> None:
+    """Operator decision 2026-11-26 (intended behaviour change; this test used to pin the fallback).
+    A row that recorded its market has, by definition, a slug the day file lacks when that market was
+    never captured, so name matching can only quote a DIFFERENT contract (the 11-25 UCA failure mode)."""
     snapshots(_REAL_UCA)
+    gone = "asc-cbb-cark-jax-2026-11-21-neg-3pt5-gone"
+    row = _pinned("away", -3.5, gone, "long")
 
-    quote = backtests._pick_quote(_pinned("away", -3.5, "asc-cbb-cark-jax-2026-11-21-neg-3pt5-gone", "long"))
-
-    assert quote is not None
-    assert (quote["market_slug"], quote["side"]) == (_NEG, "long")
+    assert backtests._pick_quote(_row("away", -3.5))["market_slug"] == _NEG  # name matching would find it
+    assert backtests._pick_quote(row) is None
+    assert backtests._pick_quote_refusal(row) == (
+        f"recorded market {gone}: never captured for this day; not name-matched"
+    )
 
 
 def test_recorded_market_whose_line_disagrees_with_the_row_is_refused(snapshots) -> None:
@@ -458,13 +465,121 @@ def test_captured_total_pin_that_nothing_qualifies_is_refused_not_name_matched(s
     assert _TOTAL in backtests._pick_quote_refusal(_total_row("under", 140.5, "short"))
 
 
-def test_never_captured_pin_keeps_the_name_matching_fallback_and_has_no_refusal(snapshots) -> None:
-    """The only fallback left: no snapshot of the recorded slug exists at all (a row from before the pin)."""
+def test_never_captured_pin_is_refused_with_a_reason_and_not_name_matched(snapshots) -> None:
+    """Operator decision 2026-11-26: no snapshot of the recorded slug exists in the day file (or its
+    neighbours). The same-teams contract below is what name matching would have quoted."""
     snapshots([_name_candidate()])
-    row = _pinned("away", -3.5, "asc-cbb-cark-jax-2026-11-21-never-neg-3pt5", "long")
+    slug = "asc-cbb-cark-jax-2026-11-21-never-neg-3pt5"
+    row = _pinned("away", -3.5, slug, "long")
 
-    assert backtests._pick_quote(row)["market_slug"] == _ALT
-    assert backtests._pick_quote_refusal(row) is None
+    assert backtests._pick_quote(_row("away", -3.5))["market_slug"] == _ALT  # name matching would find it
+    assert backtests._pick_quote(row) is None
+    assert backtests._pick_quote_refusal(row) == (
+        f"recorded market {slug}: never captured for this day; not name-matched"
+    )
+
+
+def test_pinned_row_with_no_day_file_at_all_is_refused_with_a_reason(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(backtests, "_resolve_snapshot_path", lambda _sport, _day: tmp_path / "absent.jsonl")
+
+    assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
+    assert "never captured" in backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long"))
+    assert backtests._pick_quote_refusal(_row("away", -3.5)) is None  # an unpinned row has no pin to blame
+
+
+@pytest.fixture
+def day_files(monkeypatch, tmp_path: Path):
+    """Snapshot files keyed by ET day, as the capture writes them (the exchange start's ET date)."""
+
+    def write(by_day: dict[str, list[dict]]) -> None:
+        paths = {}
+        for day, items in by_day.items():
+            path = tmp_path / f"snap-{day}.jsonl"
+            path.write_text("\n".join(json.dumps(item) for item in items) + "\n", encoding="utf-8")
+            paths[day] = path
+        monkeypatch.setattr(
+            backtests,
+            "_resolve_snapshot_path",
+            lambda _sport, day: paths.get(day, tmp_path / f"snap-{day}-absent.jsonl"),
+        )
+
+    return write
+
+
+@pytest.mark.parametrize("capture_day", ["2026-11-20", "2026-11-22"])
+def test_pin_captured_in_an_adjacent_day_file_is_quoted_not_refused(day_files, capture_day) -> None:
+    """The row's ET day is 2026-11-21 but a midnight straddle can file the capture under the next or
+    previous ET day; the exact recorded slug is looked up there before refusing. The row's own day file
+    holds a same-teams contract that must NOT be what gets quoted."""
+    day_files(
+        {
+            "2026-11-21": [_name_candidate()],
+            capture_day: [_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51)],
+        }
+    )
+
+    quote = backtests._pick_quote(_pinned("away", -3.5, _NEG, "long"))
+
+    assert quote is not None
+    assert (quote["market_slug"], quote["side"], quote["ask"]) == (_NEG, "long", 0.50)
+    assert backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long")) is None
+
+
+def test_pin_absent_from_the_row_day_and_its_neighbours_is_refused(day_files) -> None:
+    far_slug = "asc-cbb-cark-jax-2026-11-21-far-neg-3pt5"
+    day_files(
+        {
+            "2026-11-21": [_name_candidate()],
+            "2026-11-22": [_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51)],
+            "2026-11-19": [_spread(far_slug, _UNKNOWN, -3.5, 0.5, 0.5)],
+        }
+    )
+
+    far = _pinned("away", -3.5, far_slug, "long")  # captured two days away: not a neighbour
+
+    assert backtests._pick_quote(far) is None
+    assert "never captured" in backtests._pick_quote_refusal(far)
+
+
+def test_adjacent_day_pin_that_nothing_qualifies_is_still_refused(day_files) -> None:
+    day_files(
+        {
+            "2026-11-21": [_name_candidate()],
+            "2026-11-22": [_spread(_NEG, _UNKNOWN, -3.5, 0.97, 0.03, observed_at_utc=_POST_TIP)],
+        }
+    )
+    row = _pinned("away", -3.5, _NEG, "long")
+
+    assert backtests._pick_quote(row) is None
+    assert "no qualifying pregame snapshot" in backtests._pick_quote_refusal(row)
+
+
+def test_pin_without_an_executable_ask_on_its_side_is_refused_with_a_reason(snapshots) -> None:
+    """The pinned snapshot qualifies and lines up, but the recorded side has no usable ask: a bare
+    None would read as the generic "no mapping" in the buyer's skip log."""
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 1.0, 0.51)])
+    row = _pinned("away", -3.5, _NEG, "long")
+
+    assert backtests._pick_quote(row) is None
+    assert backtests._pick_quote_refusal(row) == f"recorded market {_NEG}: no executable ask on long"
+
+
+@pytest.mark.parametrize("observed", ["not-a-time", "", None])
+def test_unreadable_observed_time_disqualifies_the_pinned_snapshot(snapshots, observed) -> None:
+    """Fail closed: a snapshot whose observation time cannot be read cannot be shown to be pregame.
+    Before, it was accepted and then crashed _quote_from_snapshot with UnboundLocalError."""
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, observed_at_utc=observed)])
+    row = _pinned("away", -3.5, _NEG, "long")
+
+    assert backtests._pick_quote(row) is None
+    assert "no qualifying pregame snapshot" in backtests._pick_quote_refusal(row)
+
+
+@pytest.mark.parametrize("observed", ["not-a-time", "", None])
+def test_unreadable_observed_time_disqualifies_the_name_matched_snapshot(snapshots, observed) -> None:
+    snapshots([_spread(_NEG, "UCA", -3.5, 0.50, 0.51, observed_at_utc=observed)])
+
+    assert backtests._pick_quote(_row("away", -3.5)) is None
 
 
 def test_stale_but_pregame_pin_is_still_quoted_and_marked_not_fresh(snapshots) -> None:
@@ -490,8 +605,11 @@ def test_every_pin_refusal_carries_a_reason(snapshots) -> None:
 
 def test_decorated_pick_surfaces_the_pin_refusal_as_its_block_reason(monkeypatch) -> None:
     orders = importlib.import_module("model_prediction.dashboard.orders")
-    monkeypatch.setattr(orders, "_pick_quote", lambda _row: None)
-    monkeypatch.setattr(orders, "_pick_quote_refusal", lambda _row: "recorded market x: refused")
+
+    def refused(_row, refusals=None):
+        refusals.append("recorded market x: refused")
+
+    monkeypatch.setattr(orders, "_pick_quote", refused)
     row = {
         **_pinned("away", -3.5, _NEG, "long"),
         "status": "open",
@@ -506,7 +624,61 @@ def test_decorated_pick_surfaces_the_pin_refusal_as_its_block_reason(monkeypatch
     assert decorated["quote_refusal_reason"] == "recorded market x: refused"
     assert (decorated["buy_ready"], decorated["buy_block_reason"]) == (False, "recorded market x: refused")
 
-    monkeypatch.setattr(orders, "_pick_quote_refusal", lambda _row: None)
+    monkeypatch.setattr(orders, "_pick_quote", lambda _row, refusals=None: None)
     unmapped = orders._decorate_pick(row, {}, {}, set())
     assert unmapped["quote_refusal_reason"] is None
     assert unmapped["buy_block_reason"] == "no exact executable Polymarket US market mapping"
+
+
+def test_decorating_a_refused_pinned_pick_resolves_the_quote_once(monkeypatch, snapshots) -> None:
+    """The quote and its refusal reason come from one resolver pass, not two."""
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.97, 0.03, observed_at_utc=_POST_TIP)])
+    real = backtests._resolve_pick_quote
+    calls: list[int] = []
+
+    def counting(row, refusals):
+        calls.append(1)
+        return real(row, refusals)
+
+    monkeypatch.setattr(backtests, "_resolve_pick_quote", counting)
+    row = {
+        **_pinned("away", -3.5, _NEG, "long"),
+        "status": "open",
+        "units": 1.0,
+        "pick_id": "p1",
+        "pick_tag": "qualified",
+    }
+
+    decorated = orders._decorate_pick(row, {}, {}, set())
+
+    assert len(calls) == 1
+    assert "no qualifying pregame snapshot" in decorated["quote_refusal_reason"]
+    assert decorated["buy_block_reason"] == decorated["quote_refusal_reason"]
+
+
+def test_scan_prices_recaptures_the_blocking_pinned_slug(monkeypatch) -> None:
+    """A pinned row with no usable quote still names its recorded slug, so "scan prices" re-captures
+    exactly the contract that is blocking it."""
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    row = {
+        **_pinned("away", -3.5, _NEG, "long"),
+        "status": "open",
+        "pick_id": "p1",
+    }
+    unpinned = {**_row("home", 3.5), "event_id": "999999", "status": "open", "pick_id": "p2"}
+    monkeypatch.setattr(orders, "_resolve_runner", lambda: ["model-prediction"])
+    monkeypatch.setattr(orders, "_load_archive", lambda: {"pick_ids": []})
+    monkeypatch.setattr(orders, "_all_ledger_rows_for_price_scan", lambda: [row, unpinned])
+    monkeypatch.setattr(orders, "_pick_quote", lambda _row, refusals=None: None)
+
+    command = orders._action_command("refresh_prices", {"date": "2026-11-21"})
+
+    assert command == [
+        "model-prediction",
+        "polymarket-ledger-prices",
+        "--date",
+        "2026-11-21",
+        "--contract",
+        f"ncaab@2026-11-21={_NEG}",
+    ]

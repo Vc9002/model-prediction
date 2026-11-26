@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 try:
@@ -406,7 +406,8 @@ def _pinned_snapshot(
         if snapshot.get("market_slug") != slug or snapshot.get("timestamp_valid") is False:
             continue
         observed = snapshot.get("_observed_dt")
-        if observed is not None and observed >= event_start:
+        # Fail closed: an unreadable observation time cannot be shown to precede the start.
+        if observed is None or observed >= event_start:
             continue
         if snapshot.get("market_type") != market_type:
             continue
@@ -444,7 +445,6 @@ def _pinned_side(row: dict, snapshot: dict, side: str, market_type: str) -> str:
     There is no third answer: once the recorded market is in the snapshots, anything that does
     not line up (a missing or different event id, another game's title, a half-game contract, a
     line the row does not carry) is a wrong pin or a wrong row, not a reason to match by name.
-    Only a market that was never captured falls back to name matching, in the caller.
 
     Name matching is only a cross-check here: a decisive name answer that disagrees with the
     recorded side refuses the row; an indecisive one (an abbreviation no alias knows) does not."""
@@ -498,7 +498,7 @@ def _quote_from_snapshot(snapshot: dict, side_name: str, event_start: datetime) 
         observed_at = datetime.fromisoformat(observed)
         age_seconds = max(0, int((datetime.now(UTC) - observed_at).total_seconds()))
     except ValueError:
-        age_seconds = 10**9
+        return None  # callers already skip these; never quote a price whose age is unknown
     return {
         "market_slug": snapshot.get("market_slug"),
         "side": side_name,
@@ -517,9 +517,11 @@ def _quote_from_snapshot(snapshot: dict, side_name: str, event_start: datetime) 
     }
 
 
-def _pick_quote(row: dict) -> dict | None:
-    """Last valid pregame executable side quote, or None; see _resolve_pick_quote."""
-    return _resolve_pick_quote(row, [])
+def _pick_quote(row: dict, refusals: list[str] | None = None) -> dict | None:
+    """Last valid pregame executable side quote, or None; see _resolve_pick_quote.
+
+    Pass ``refusals`` to also receive why a recorded market was refused, from the same single pass."""
+    return _resolve_pick_quote(row, [] if refusals is None else refusals)
 
 
 def _pick_quote_refusal(row: dict) -> str | None:
@@ -533,6 +535,19 @@ def _pick_quote_refusal(row: dict) -> str | None:
     refusals: list[str] = []
     _resolve_pick_quote(row, refusals)
     return refusals[0] if refusals else None
+
+
+def _day_snapshots(odds_sport: str, sport: str, day: str) -> list[dict]:
+    """The stored snapshots for one ET day, under the odds sport's folder then the league's."""
+    path = _resolve_snapshot_path(odds_sport, day)
+    if path in _MISSING_PATHS or not path.exists():
+        _MISSING_PATHS.add(path)
+        path = _resolve_snapshot_path(sport, day)
+    return _load_snapshot_file(path)
+
+
+def _has_slug(snapshots: list[dict], slug: str) -> bool:
+    return any(snapshot.get("market_slug") == slug for snapshot in snapshots)
 
 
 def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
@@ -556,10 +571,12 @@ def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
     ``market_slug=... token_side=...``, 2026-11-25) is quoted on exactly that market and side, or
     refused when the captured market does not line up with the row (_pinned_side). Once the
     recorded slug has any stored snapshot (operator decision 2026-11-26) the row is also refused when
-    none of them qualifies (all post-tip, timestamp-invalid or of another market type): name matching
-    could only quote a different contract than the one the forecast priced. Name matching is the
-    fallback only for a recorded slug that was never captured (rows from before the pin existed
-    behave the same way).
+    none of them qualifies (all post-tip, timestamp-invalid, unreadable-time or of another market
+    type), and so is a recorded slug that was never captured: the slug is absent from the day file by
+    definition, so name matching could only quote a different contract than the one the forecast
+    priced. Captures are filed under the exchange start's ET date, which can differ from the row's
+    across midnight, so the adjacent day files are searched for the exact slug before refusing.
+    Only rows without a pin name-match.
 
     A refusal of a recorded market appends its reason to ``refusals``; callers that only need the
     quote ignore it.
@@ -580,24 +597,25 @@ def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
         if sport in ("cs2", "lol", "dota2", "valorant", "r6", "rainbow_six", "cod", "ow", "rl")
         else ("ncaaf" if sport in ("cfb", "college_football") else sport)
     )
-    path = _resolve_snapshot_path(odds_sport, day)
-    if path in _MISSING_PATHS or not path.exists():
-        if path not in _MISSING_PATHS:
-            _MISSING_PATHS.add(path)
-        path = _resolve_snapshot_path(sport, day)
-    snapshots = _load_snapshot_file(path)
+    snapshots = _day_snapshots(odds_sport, sport, day)
+    recorded = _recorded_market(row) if market_type in ("moneyline", "spread", "total") else None
+    if recorded is not None and not _has_slug(snapshots, recorded[0]):
+        row_day = event_start.astimezone(EASTERN).date()
+        for offset in (-1, 1):
+            neighbour = _day_snapshots(odds_sport, sport, (row_day + timedelta(days=offset)).isoformat())
+            if _has_slug(neighbour, recorded[0]):
+                snapshots = neighbour
+                break
+        else:
+            refusals.append(f"recorded market {recorded[0]}: never captured for this day; not name-matched")
+            return None
     if not snapshots:
         return None
-    recorded = _recorded_market(row) if market_type in ("moneyline", "spread", "total") else None
     pinned = _pinned_snapshot(snapshots, recorded[0], event_start, market_type) if recorded else None
-    if (
-        recorded is not None
-        and pinned is None
-        and any(snapshot.get("market_slug") == recorded[0] for snapshot in snapshots)
-    ):
+    if recorded is not None and pinned is None:
         refusals.append(
             f"recorded market {recorded[0]}: stored snapshots but no qualifying pregame snapshot "
-            f"(post-tip, timestamp-invalid or another market type); not name-matched"
+            f"(post-tip, timestamp-invalid, unreadable time or another market type); not name-matched"
         )
         return None
     latest: dict[str, dict] = {}
@@ -605,8 +623,8 @@ def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
         if snapshot.get("timestamp_valid") is False:
             continue
         snapshot_observed = snapshot.get("_observed_dt")
-        if snapshot_observed is not None and snapshot_observed >= event_start:
-            continue
+        if snapshot_observed is None or snapshot_observed >= event_start:
+            continue  # unreadable observation time: cannot be shown to be pregame
         snapshot_market_type = snapshot.get("market_type")
         if market_type == "moneyline":
             if snapshot_market_type not in {"moneyline", "team_win"}:
@@ -683,7 +701,10 @@ def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
                 f"(same teams twice); not guessed"
             )
             return None
-        return _quote_from_snapshot(pinned, pinned_side, event_start)
+        quote = _quote_from_snapshot(pinned, pinned_side, event_start)
+        if quote is None:
+            refusals.append(f"recorded market {recorded[0]}: no executable ask on {pinned_side}")
+        return quote
     if not latest:
         return None
     if len(latest) > 1:

@@ -531,7 +531,7 @@ def test_resting_order_preview_and_submit_persist_exchange_id(
     }
     patch_dash("ORDERS_FILE", tmp_path / "orders.json")
     patch_dash("read_picks", lambda: [pick])
-    patch_dash("_pick_quote", lambda row: quote)
+    patch_dash("_pick_quote", lambda row, refusals=None: quote)
     patch_dash("_unit_value_usd", lambda: 7.5)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
@@ -583,7 +583,7 @@ def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: P
     }
     patch_dash("ORDERS_FILE", tmp_path / "orders.json")
     patch_dash("read_picks", lambda: [pick])
-    patch_dash("_pick_quote", lambda row: quote)
+    patch_dash("_pick_quote", lambda row, refusals=None: quote)
     patch_dash("_unit_value_usd", lambda: 7.5)
     monkeypatch.setenv("POLYMARKET_KEY_ID", "test-key")
     monkeypatch.setenv("POLYMARKET_SECRET_KEY", "test-secret")
@@ -818,7 +818,7 @@ def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: 
     patch_dash("read_picks", lambda: [pick])
     patch_dash(
         "_pick_quote",
-        lambda row: {
+        lambda row, refusals=None: {
             "market_slug": "nfl-example",
             "side": "long",
             "ask": 0.60,
@@ -870,7 +870,7 @@ def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch, patch
     patch_dash("read_picks", lambda: [pick])
     patch_dash(
         "_pick_quote",
-        lambda row: {
+        lambda row, refusals=None: {
             "market_slug": "nfl-example",
             "side": "long",
             "ask": 0.60,
