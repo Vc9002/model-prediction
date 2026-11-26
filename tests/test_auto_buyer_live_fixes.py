@@ -677,13 +677,18 @@ def test_a_rate_limited_or_timed_out_read_never_abandons_a_row(tmp_path):
 
 def test_an_abandoned_cancel_resumes_when_the_order_reappears(tmp_path):
     j_path = tmp_path / "auto_buyer_ledger.jsonl"
-    _write_ledger(j_path, [_fallback_row(cancel_abandoned_at_utc=iso_utc(utc_now()))])
+    stamp = iso_utc(utc_now())
+    _write_ledger(
+        j_path, [_fallback_row(cancel_abandoned_at_utc=stamp, cancel_abandoned_alarmed_at_utc=stamp)]
+    )
     exchange = _Exchange(
         {"gtd-1": ("ORDER_STATE_NEW", 0.0)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", 0.0)}
     )
     reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
     assert exchange.cancel_calls == ["gtd-1"]
-    assert "cancel_abandoned_at_utc" not in _ledger(j_path)[0]
+    row = _ledger(j_path)[0]
+    # The flag and the cycle's marker go together, so a later abandonment alarms afresh.
+    assert "cancel_abandoned_at_utc" not in row and "cancel_abandoned_alarmed_at_utc" not in row
 
 
 def test_a_cancel_that_fails_while_the_order_is_readable_is_never_abandoned(tmp_path):
@@ -871,15 +876,44 @@ def test_paper_unit_change_still_scales_the_unit_caps_without_a_live_cohort(cycl
 # ---------------------------------------------------------------- 9. the cycle alarms once
 
 
-def test_a_newly_abandoned_cancel_raises_a_live_alarm(cycle, monkeypatch):
+class _UnreadableFillExchange:
+    """Every order is terminal on the exchange, with a cumQuantity that cannot be read."""
+
+    def order_snapshots(self, order_ids: list[str]) -> dict[str, Any]:
+        orders = [
+            {"order_id": oid, "order_state": "ORDER_STATE_CANCELED", "cum_quantity": "abc"}
+            for oid in order_ids
+        ]
+        return {"status": "live", "orders": orders, "unavailable_order_ids": []}
+
+
+def _unknown_fill_row() -> dict[str, Any]:
+    return _fallback_row("uk", order_id="uk", order_ids=["uk"], fill_known=False)
+
+
+def _alarm_kinds(raised: Any) -> list[str]:
+    return [a["alarm"] for a in raised.value.alarms]
+
+
+def test_a_newly_abandoned_cancel_raises_a_live_alarm_once(cycle, monkeypatch):
+    """The ONCE is the cycle's own marker on the row (cancel_abandoned_alarmed_at_utc), set and persisted
+    before the raise, so a reconcile run by another caller cannot consume it."""
     monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
     _write_state(cycle, {**LIVE_STATE, "enabled": False})
-    cycle["reconcile_result"] = {"cancel_abandoned": ["gtd-9"]}
+    j_path = cycle["state_file"].parent.parent / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row("gtd-9", cancel_abandoned_at_utc=iso_utc(utc_now()))])
     with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
         auto_executor.run_auto_buyer_cycle()
-    assert [a["alarm"] for a in raised.value.alarms] == ["fallback_cancel_abandoned"]
+    assert _alarm_kinds(raised) == ["fallback_cancel_abandoned"]
     assert raised.value.alarms[0]["order_ids"] == ["gtd-9"]
-    cycle["reconcile_result"] = {}
+    assert _ledger(j_path)[0]["cancel_abandoned_alarmed_at_utc"]  # persisted before the raise
+    auto_executor.run_auto_buyer_cycle()  # the second cycle is quiet
+
+
+def test_a_summary_alone_never_alarms_the_ledger_marker_decides(cycle, monkeypatch):
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    _write_state(cycle, {**LIVE_STATE, "enabled": False})
+    cycle["reconcile_result"] = {"cancel_abandoned": ["gtd-9"], "fill_unreadable": ["ioc-9"]}
     auto_executor.run_auto_buyer_cycle()
 
 
@@ -888,15 +922,77 @@ def test_a_newly_unreadable_fill_raises_a_live_alarm_once_naming_the_order(cycle
     so a row that is merely unreadable never stops a cycle, only fails the worker run to tell the operator."""
     monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
     _write_state(cycle, {**LIVE_STATE, "enabled": False})
-    cycle["reconcile_result"] = {"fill_unreadable": ["ioc-9"]}
+    j_path = cycle["state_file"].parent.parent / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row() | {"fill_unreadable_at_utc": iso_utc(utc_now())}])
     with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
         auto_executor.run_auto_buyer_cycle()
-    assert [a["alarm"] for a in raised.value.alarms] == ["fallback_fill_unreadable"]
-    assert raised.value.alarms[0]["order_ids"] == ["ioc-9"]
-    assert "ioc-9" in raised.value.alarms[0]["detail"]
-    # Reconcile lists an id only on the run that first stamps it, so the next run is quiet.
-    cycle["reconcile_result"] = {}
+    assert _alarm_kinds(raised) == ["fallback_fill_unreadable"]
+    assert raised.value.alarms[0]["order_ids"] == ["uk"]
+    assert "uk" in raised.value.alarms[0]["detail"]
+    assert _ledger(j_path)[0]["fill_unreadable_alarmed_at_utc"]
+    auto_executor.run_auto_buyer_cycle()  # quiet the second time
+
+
+def test_a_row_stamped_by_a_non_cycle_reconcile_still_alarms_in_the_next_cycle_exactly_once(
+    cycle, monkeypatch
+):
+    """The daily job (steps 11b/12b) and `cli settle` run the same reconcile and throw its summary away. The
+    first one to read the stuck IOC stamps the row; the cycle must still alarm, once."""
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    _write_state(cycle, {**LIVE_STATE, "enabled": False})
+    j_path = cycle["state_file"].parent.parent / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row()])
+    stamped = reconcile_pending_auto_buyer_fallbacks(
+        data_root=j_path.parent, executor=_UnreadableFillExchange()
+    )
+    assert stamped["fill_unreadable"] == ["uk"]  # the daily job's reconcile consumed the summary list
+    assert _ledger(j_path)[0]["fill_unreadable_at_utc"]
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+        auto_executor.run_auto_buyer_cycle()
+    assert _alarm_kinds(raised) == ["fallback_fill_unreadable"]
+    assert raised.value.alarms[0]["order_ids"] == ["uk"]
     auto_executor.run_auto_buyer_cycle()
+    # A later reconcile that keeps reading it unreadable neither re-stamps nor re-alarms.
+    reconcile_pending_auto_buyer_fallbacks(data_root=j_path.parent, executor=_UnreadableFillExchange())
+    auto_executor.run_auto_buyer_cycle()
+
+
+def test_a_settlement_failure_does_not_lose_the_unreadable_fill_alarm(cycle, monkeypatch):
+    """Reconcile succeeded and stamped the row, then settlement raised a caught type: the summary was
+    overwritten with an error dict and the alarm never fired. Separate try blocks keep the summary, and the
+    alarm reads the ledger regardless."""
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    _write_state(cycle, {**LIVE_STATE, "enabled": False})
+    j_path = cycle["state_file"].parent.parent / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row() | {"fill_unreadable_at_utc": iso_utc(utc_now())}])
+    cycle["reconcile_result"] = {"fill_unreadable": ["uk"], "errors": 1}
+
+    def _settle_fails(*_a: Any, **_k: Any) -> dict[str, Any]:
+        raise OSError("ledger busy")
+
+    monkeypatch.setattr(auto_buyer_ledger, "settle_auto_buyer_ledger", _settle_fails)
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+        auto_executor.run_auto_buyer_cycle()
+    assert _alarm_kinds(raised) == ["fallback_fill_unreadable"]
+    reconciliation = raised.value.run_summary["reconciliation"]
+    assert reconciliation["status"] == "error" and "ledger busy" in reconciliation["error"]
+    assert reconciliation["fill_unreadable"] == ["uk"] and reconciliation["errors"] == 1
+
+
+def test_an_alarm_whose_marker_cannot_be_persisted_still_fires_and_repeats(cycle, monkeypatch):
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    _write_state(cycle, {**LIVE_STATE, "enabled": False})
+    j_path = cycle["state_file"].parent.parent / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row() | {"fill_unreadable_at_utc": iso_utc(utc_now())}])
+
+    def _no_write(*_a: Any, **_k: Any) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(auto_buyer_ledger, "_write_jsonl_atomic", _no_write)
+    for _ in range(2):  # never dropped for a write error; re-alarms next run
+        with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+            auto_executor.run_auto_buyer_cycle()
+        assert _alarm_kinds(raised) == ["fallback_fill_unreadable"]
 
 
 # ---------------------------------------------------------------- 3. daily loss stop

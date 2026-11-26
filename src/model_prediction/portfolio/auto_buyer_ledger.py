@@ -1143,7 +1143,9 @@ def reconcile_pending_auto_buyer_fallbacks(
         row["fallback_reconciled"] = True
         row["fill_known"] = True
         row.pop("cancel_requested_at_utc", None)
-        row.pop("fill_unreadable_at_utc", None)  # readable now: a later unreadable read alarms afresh
+        # Readable now: a later unreadable read alarms afresh (stamp and the cycle's marker go together).
+        row.pop("fill_unreadable_at_utc", None)
+        row.pop("fill_unreadable_alarmed_at_utc", None)
         if row.get("fallback_order_id") == row.get("order_id"):
             requested_total = float(row.get("fallback_resting_shares") or 0.0)
         else:
@@ -1280,6 +1282,7 @@ def reconcile_pending_auto_buyer_fallbacks(
                 continue
             # The order is readable again: cancel it normally.
             r.pop("cancel_abandoned_at_utc", None)
+            r.pop("cancel_abandoned_alarmed_at_utc", None)
             changed = True
         if not _cancel_order(fid, market_slug, r, reason=cancel_reason):
             errors += 1
@@ -1367,6 +1370,54 @@ def reconcile_pending_auto_buyer_fallbacks(
     if snapshot_error:
         summary["snapshot_error"] = snapshot_error
     return summary
+
+
+# (flag reconcile stamps, marker only the cycle sets once it has alarmed) -> summary key
+_LEDGER_ALARM_FLAGS = (
+    ("fill_unreadable_at_utc", "fill_unreadable_alarmed_at_utc", "fill_unreadable"),
+    ("cancel_abandoned_at_utc", "cancel_abandoned_alarmed_at_utc", "cancel_abandoned"),
+)
+
+
+def claim_unalarmed_ledger_flags(
+    data_root: Path | str | None = None, *, now: datetime | None = None
+) -> dict[str, list[str]]:
+    """Order ids of live-ledger rows that carry a reconcile flag the cycle has not alarmed yet.
+
+    Reconcile runs from several callers (the buyer cycle, the daily job's steps 11b and 12b, ``cli
+    settle``) and stamps ``fill_unreadable_at_utc`` / ``cancel_abandoned_at_utc`` on whichever reads the
+    row first; only the cycle can raise an alarm, so the flag cannot decide "alarm once" (a daily run
+    would stamp the row and swallow the alarm). The ONCE belongs to this cycle-owned marker: every flagged
+    row without ``*_alarmed_at_utc`` is returned and marked, and the marker is persisted before the caller
+    raises, so a crash after this call cannot re-alarm forever. A failed write returns the ids anyway (an
+    alarm is never dropped for a write error; the row re-alarms next run). Reconcile clears flag and
+    marker together when the row resolves.
+    """
+    j_path, _ = resolve_auto_buyer_paths(data_root=data_root)
+    claimed: dict[str, list[str]] = {key: [] for _flag, _marker, key in _LEDGER_ALARM_FLAGS}
+    if not j_path.exists():
+        return claimed
+    records = read_auto_buyer_ledger(jsonl_path=j_path)
+    stamp = iso_utc(now or utc_now())
+    changed = False
+    for r in records:
+        for flag, marker, key in _LEDGER_ALARM_FLAGS:
+            if r.get(flag) and not r.get(marker):
+                order_id = str(r.get("fallback_order_id") or r.get("order_id") or "")
+                if order_id and order_id not in claimed[key]:
+                    claimed[key].append(order_id)
+                r[marker] = stamp
+                changed = True
+    if changed:
+        try:
+            _write_jsonl_atomic(j_path, records)
+        except (OSError, ValueError) as err:
+            logger.error(
+                "Failed to persist the alarmed markers in %s (the alarms still fire, and repeat next run): %s",
+                j_path,
+                err,
+            )
+    return {key: ids for key, ids in claimed.items() if ids}
 
 
 def cancel_resting_live_fallbacks(

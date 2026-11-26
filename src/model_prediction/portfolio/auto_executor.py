@@ -2480,16 +2480,12 @@ def run_auto_buyer_cycle(
     # cancelling a resting fallback at game start or on an adverse move only ever reduces risk.
     reconciliation_summary: dict[str, Any] = {}
     if manage_live_book:
-        try:
-            from .auto_buyer_ledger import (
-                reconcile_pending_auto_buyer_fallbacks,
-                settle_auto_buyer_ledger,
-            )
+        from .auto_buyer_ledger import (
+            reconcile_pending_auto_buyer_fallbacks,
+            settle_auto_buyer_ledger,
+        )
 
-            # D-02: while disabled, every cycle cancels the live book's resting fallbacks by id.
-            reconciliation_summary = reconcile_pending_auto_buyer_fallbacks(cancel_all_resting=not live_on)
-            settle_auto_buyer_ledger()
-        except (
+        _precycle_errors = (
             OSError,
             ValueError,
             KeyError,
@@ -2497,11 +2493,31 @@ def run_auto_buyer_cycle(
             RuntimeError,
             OverflowError,
             ExecutionGateError,
-        ) as exc:
+        )
+        try:
+            # D-02: while disabled, every cycle cancels the live book's resting fallbacks by id.
+            reconciliation_summary = reconcile_pending_auto_buyer_fallbacks(cancel_all_resting=not live_on)
+        except _precycle_errors as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
             if buying_live:
                 raise RuntimeError("Live auto-buyer stopped: pre-cycle reconciliation failed") from exc
             reconciliation_summary = {"status": "error", "error": str(exc)[:200]}
+        else:
+            # A separate try, so a settlement failure keeps what reconcile just reported (the unreadable-fill
+            # and abandoned-cancel lists stay in the summary; their alarms read the ledger regardless).
+            try:
+                settle_auto_buyer_ledger()
+            except _precycle_errors as exc:
+                logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
+                if buying_live:
+                    raise RuntimeError(
+                        "Live auto-buyer stopped: pre-cycle reconciliation failed (settlement step)"
+                    ) from exc
+                reconciliation_summary = {
+                    **reconciliation_summary,
+                    "status": "error",
+                    "error": str(exc)[:200],
+                }
     # Not an elif of the live branch: a live cohort and paper books can run in one cycle.
     if record_paper and (global_mode == "paper" or paper_cohorts):
         try:
@@ -2746,8 +2762,13 @@ def run_auto_buyer_cycle(
         *(res.alarms if should_execute else []),
         *cohort_passes.get("live", {}).get("alarms", []),
     ]
-    for order_id in reconciliation_summary.get("cancel_abandoned") or []:
-        # Raised once: reconcile lists a row here only on the run that first flags it.
+    # The ONCE is this cycle's own marker on the ledger row, never the reconcile summary: the daily job
+    # and cli settle run the same reconcile, stamp the row first and discard the list, and a settlement
+    # failure used to overwrite the summary. The summary keys stay in the run summary for visibility.
+    from .auto_buyer_ledger import claim_unalarmed_ledger_flags
+
+    ledger_alarms = claim_unalarmed_ledger_flags(DATA)
+    for order_id in ledger_alarms.get("cancel_abandoned") or []:
         live_alarms.append(
             _alarm(
                 "fallback_cancel_abandoned",
@@ -2758,10 +2779,9 @@ def run_auto_buyer_cycle(
                 order_ids=[order_id],
             )
         )
-    for order_id in reconciliation_summary.get("fill_unreadable") or []:
-        # Raised once per row, like the abandoned cancel: reconcile lists an id only on the run that first
-        # stamps it. The alarm is raised after the cycle's buying, state and history are done, so a row
-        # that is merely unreadable never stops a cycle; it fails the worker run so the operator is told.
+    for order_id in ledger_alarms.get("fill_unreadable") or []:
+        # Raised after the cycle's buying, state and history are done, so a row that is merely unreadable
+        # never stops a cycle; it fails the worker run so the operator is told (once, via the marker).
         live_alarms.append(
             _alarm(
                 "fallback_fill_unreadable",

@@ -1007,10 +1007,25 @@ def test_an_unreadable_pending_field_counts_at_the_cap_not_as_zero(kind, field, 
 
 @pytest.mark.parametrize("kind", list(_EXPOSURE_ROWS))
 def test_an_absent_pending_field_is_still_zero(kind):
+    """An absent (None) field is the 0.0 it always was: each field's absence gives the exact figure the old
+    code produced (price 0 or an unfilled remainder of the whole resting size, never a cap)."""
     row, fields, _cost = _EXPOSURE_ROWS[kind]
+    expected = {
+        "submit_unknown": {"requested_cost_usd": 0.0},
+        "fallback_unknown": {"fallback_resting_shares": 0.0, "entry_price": 0.0},
+        "own_primary": {"fallback_resting_shares": 0.0, "shares": 5.0, "entry_price": 0.0},
+        "resting_fallback": {
+            "fallback_resting_shares": 0.0,
+            "fallback_filled_shares": 5.0,
+            "entry_price": 0.0,
+        },
+    }[kind]
+    assert set(expected) == set(fields)
     for field in fields:
-        value, unreadable = auto_executor._pending_exposure({**row, field: None}, unreadable_usd=25.0)
-        assert unreadable is False and value >= 0.0
+        assert auto_executor._pending_exposure({**row, field: None}, unreadable_usd=25.0) == (
+            expected[field],
+            False,
+        )
 
 
 @pytest.mark.parametrize("bad", _BAD_AMOUNTS)
@@ -1143,3 +1158,31 @@ def test_an_overflow_inside_the_ledger_scan_fails_the_index_closed_not_raw(monke
     monkeypatch.setattr(auto_executor, "_game_key", _boom)
     with pytest.raises(auto_executor.BoughtIndexUnavailableError):
         _live_buyer(tmp_path)._build_bought_index()
+
+
+@pytest.mark.parametrize("live", [True, False])
+def test_precycle_settlement_failure_is_handled_like_a_reconcile_failure_and_keeps_the_summary(
+    monkeypatch, tmp_path, live
+):
+    from model_prediction.portfolio import auto_buyer_ledger
+
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_pending_fallback_row()])
+    _cycle_harness(monkeypatch, tmp_path, _state([_entry()], enabled=live), _mixed_rows())
+    monkeypatch.setattr(
+        auto_buyer_ledger,
+        "reconcile_pending_auto_buyer_fallbacks",
+        lambda **_kwargs: {"reconciled_filled": 0, "errors": 1, "fill_unreadable": ["x"]},
+    )
+    monkeypatch.setattr(
+        auto_buyer_ledger,
+        "settle_auto_buyer_ledger",
+        lambda *_a, **_k: (_ for _ in ()).throw(OSError("ledger busy")),
+    )
+    if live:
+        with pytest.raises(RuntimeError, match="pre-cycle reconciliation failed"):
+            auto_executor.run_auto_buyer_cycle()
+    else:
+        summary = auto_executor.run_auto_buyer_cycle()
+        assert summary["reconciliation"]["status"] == "error"
+        assert summary["reconciliation"]["fill_unreadable"] == ["x"]
+    assert FakeExecutor.executed == []

@@ -1628,3 +1628,35 @@ def test_a_non_terminal_unreadable_read_with_no_cancel_reason_stays_pending_with
     assert (
         "fill_unreadable_at_utc" not in row and row["shares"] == 2.0 and row["fallback_reconciled"] is False
     )
+
+
+def test_closing_a_row_clears_both_the_unreadable_stamp_and_the_cycles_alarmed_marker(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    stamp = iso_utc(utc_now())
+    _write_ledger(
+        j_path, [_unknown_fill_row(fill_unreadable_at_utc=stamp, fill_unreadable_alarmed_at_utc=stamp)]
+    )
+    reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path, executor=_Exchange({"uk": ("ORDER_STATE_CANCELED", 3.0)})
+    )
+    row = _ledger(j_path)[0]
+    assert row["fallback_reconciled"] is True
+    assert "fill_unreadable_at_utc" not in row and "fill_unreadable_alarmed_at_utc" not in row
+
+
+def test_claiming_ledger_alarms_marks_each_flagged_row_once_and_leaves_others_alone(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    stamp = iso_utc(utc_now())
+    flagged = _unknown_fill_row(fill_unreadable_at_utc=stamp)
+    abandoned = _fallback_row("gtd-2", cancel_abandoned_at_utc=stamp)
+    done = _fallback_row("gtd-3", cancel_abandoned_at_utc=stamp, cancel_abandoned_alarmed_at_utc=stamp)
+    plain = _fallback_row("gtd-4")
+    _write_ledger(j_path, [flagged, abandoned, done, plain])
+    first = auto_buyer_ledger.claim_unalarmed_ledger_flags(tmp_path)
+    assert first == {"fill_unreadable": ["uk"], "cancel_abandoned": ["gtd-2"]}
+    rows = {r["pick_id"]: r for r in _ledger(j_path)}
+    assert rows["pick-uk"]["fill_unreadable_alarmed_at_utc"]
+    assert rows["pick-gtd-2"]["cancel_abandoned_alarmed_at_utc"]
+    assert rows["pick-gtd-3"]["cancel_abandoned_alarmed_at_utc"] == stamp  # untouched
+    assert "fill_unreadable_alarmed_at_utc" not in rows["pick-gtd-4"]
+    assert auto_buyer_ledger.claim_unalarmed_ledger_flags(tmp_path) == {}
