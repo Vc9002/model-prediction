@@ -363,18 +363,21 @@ def settle_ledger_rows_against_espn(
                 logger.warning("polymarket tennis scoreboard lookup failed", exc_info=True)
 
         if match_found is None:
-            # (event id, away score, home score, exact): every scoreboard event the row's two names
-            # match, across all leagues. Taking the first substring hit graded "Michigan" against
-            # "Michigan State @ Ohio State" whenever that game was listed first.
-            candidates: list[tuple[str, int, int, bool]] = []
-            ambiguous_ids: list[str] = []
+            # (event id, away score, home score, exact, secondary): every scoreboard event the row's
+            # two names match, across all leagues. Taking the first substring hit graded "Michigan"
+            # against "Michigan State @ Ohio State" whenever that game was listed first.
+            # ``secondary`` marks an event from a league other than the row's own (an NBA row also
+            # searches NCAAB/WNCAAB).
+            candidates: list[tuple[str, int, int, bool, bool]] = []
+            ambiguous: list[tuple[str, bool]] = []  # (event id, secondary)
+            primary_lg = espn_leagues[0] if lg and lg != "POLYMARKET" else None
+            primary_unfinished = False
             for espn_lg in espn_leagues:
+                secondary = primary_lg is not None and espn_lg != primary_lg
                 try:
                     sb = espn.scoreboard(espn_lg, game_day)
                     for event in sb.get("events", []):
-                        status_type = event.get("status", {}).get("type", {})
-                        if not status_type.get("completed", False):
-                            continue
+                        completed = event.get("status", {}).get("type", {}).get("completed", False)
                         comps = event.get("competitions", [{}])[0].get("competitors", [])
                         if len(comps) != 2:
                             continue
@@ -394,10 +397,14 @@ def settle_ledger_rows_against_espn(
                         # match (Kansas away at Kansas State against a Kansas State @ Kansas row).
                         exact_normal = home_name in h_exact and away_name in a_exact
                         exact_inverted = home_name in a_exact and away_name in h_exact
-                        if exact_normal and exact_inverted:
-                            ambiguous_ids.append(event_id or "?")
+                        if secondary and not (exact_normal or exact_inverted):
+                            # Another league's event needs an exact name match: college abbreviations
+                            # ("MINN", "WASH") are substrings of full NBA/MLB names.
                             continue
-                        if exact_normal or exact_inverted:
+                        is_ambiguous = False
+                        if exact_normal and exact_inverted:
+                            is_ambiguous = True
+                        elif exact_normal or exact_inverted:
                             inverted = exact_inverted
                             exact = True
                         else:
@@ -417,13 +424,22 @@ def settle_ledger_rows_against_espn(
                             )
                             normal = h_match_normal and a_match_normal
                             flipped = h_match_inverted and a_match_inverted
-                            if normal and flipped:
-                                ambiguous_ids.append(event_id or "?")
-                                continue
                             if not normal and not flipped:
                                 continue
-                            inverted = flipped
-                            exact = False
+                            if normal and flipped:
+                                is_ambiguous = True
+                            else:
+                                inverted = flipped
+                                exact = False
+                        if not completed:
+                            # The row's own league has a matching game that is not final yet: no other
+                            # league's result may stand in for it.
+                            if not secondary:
+                                primary_unfinished = True
+                            continue
+                        if is_ambiguous:
+                            ambiguous.append((event_id or "?", secondary))
+                            continue
                         try:
                             if inverted:
                                 # c_away is the row's home team, c_home is the row's away team
@@ -434,12 +450,22 @@ def settle_ledger_rows_against_espn(
                                 a_score = int(c_away.get("score", 0))
                         except (ValueError, TypeError):
                             continue
-                        candidate = (event_id, a_score, h_score, exact)
+                        candidate = (event_id, a_score, h_score, exact, secondary)
                         if candidate not in candidates:
                             candidates.append(candidate)
                 except (KeyError, TypeError, ValueError, OSError):
                     logger.debug("Scoreboard lookup failed for %s on %s", espn_lg, game_day, exc_info=True)
                     continue
+
+            primary_hits = [c for c in candidates if not c[4]]
+            primary_ambiguous = [event_id for event_id, secondary in ambiguous if not secondary]
+            if primary_hits or primary_ambiguous or primary_unfinished:
+                # Never grade off another league while the row's own league has a matching event,
+                # final or not.
+                candidates = primary_hits
+                ambiguous_ids = primary_ambiguous
+            else:
+                ambiguous_ids = [event_id for event_id, _ in ambiguous]
 
             exact_hits = [c for c in candidates if c[3]]
             if len(exact_hits) == 1:

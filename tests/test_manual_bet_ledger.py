@@ -241,7 +241,8 @@ def test_sync_manual_bets_from_polymarket_imports_unmatched_positions(tmp_path, 
 
 
 def _espn_team(location, mascot, abbreviation, score, home_away):
-    # The real ESPN scoreboard shape: displayName is "location mascot", location is the school only.
+    # The real ESPN scoreboard shape: displayName is "location mascot", location is the school only,
+    # shortDisplayName is the abbreviated school ("Kansas St").
     return {
         "homeAway": home_away,
         "score": str(score),
@@ -250,15 +251,15 @@ def _espn_team(location, mascot, abbreviation, score, home_away):
             "name": mascot,
             "abbreviation": abbreviation,
             "location": location,
-            "shortDisplayName": location,
+            "shortDisplayName": location.replace("State", "St"),
         },
     }
 
 
-def _espn_event(event_id, away, home):
+def _espn_event(event_id, away, home, completed=True):
     return {
         "id": event_id,
-        "status": {"type": {"completed": True}},
+        "status": {"type": {"completed": completed}},
         "competitions": [{"competitors": [home, away]}],
     }
 
@@ -470,7 +471,7 @@ def test_nba_row_does_not_settle_on_a_college_game_between_the_same_locations(tm
                 _espn_event(
                     "9",
                     _espn_team("Minnesota", "Golden Gophers", "MINN", 60, "away"),
-                    _espn_team("Indiana", "Hoosiers", "IND", 70, "home"),
+                    _espn_team("Indiana", "Hoosiers", "INDI", 70, "home"),
                 )
             ]
         }
@@ -546,3 +547,122 @@ def test_resettle_all_does_not_count_an_ambiguous_settled_row_as_open(tmp_path):
     res = settle_manual_bets(data_root=tmp_path, espn_client=espn, resettle_all=True)
     assert res["settled_count"] == 0 and res["open_count"] == 0
     assert read_manual_bets(data_root=tmp_path)[0]["status"] == "settled"
+
+
+def _nba_row(tmp_path, away, home):
+    from datetime import timedelta
+
+    from model_prediction.domain import utc_now
+
+    # Started 5h ago: inside the 48h unresolved-void window, so "open" means "not graded".
+    start = (utc_now() - timedelta(hours=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    record_manual_bet(
+        {**_COLLEGE_BET, "league": "NBA", "away_team": away, "home_team": home, "event_start_utc": start},
+        data_root=tmp_path,
+    )
+
+
+@pytest.mark.parametrize("nba_events", ["no_nba_event", "nba_unfinished"])
+def test_nba_row_is_not_graded_off_a_college_game_whose_abbreviations_sit_in_the_nba_names(
+    tmp_path, nba_events
+):
+    # "MINN" / "WASH" are substrings of "minnesota timberwolves" / "washington wizards".
+    _nba_row(tmp_path, "Minnesota Timberwolves", "Washington Wizards")
+    nba = []
+    if nba_events == "nba_unfinished":
+        nba = [
+            _espn_event(
+                "n1",
+                _espn_team("Minnesota", "Timberwolves", "MIN", 0, "away"),
+                _espn_team("Washington", "Wizards", "WSH", 0, "home"),
+                completed=False,
+            )
+        ]
+    college = _espn_event(
+        "c1",
+        _espn_team("Minnesota", "Golden Gophers", "MINN", 60, "away"),
+        _espn_team("Washington", "Huskies", "WASH", 70, "home"),
+    )
+    res = settle_manual_bets(
+        data_root=tmp_path, espn_client=_FakeScoreboard({"NBA": nba, "NCAAB": [college]})
+    )
+    assert res["settled_count"] == 0
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert row["status"] == "open" and row["result"] == ""
+
+
+def test_nba_row_settles_on_its_own_nba_game_once_final_not_on_the_college_one(tmp_path):
+    _nba_row(tmp_path, "Minnesota Timberwolves", "Washington Wizards")
+    nba = _espn_event(
+        "n1",
+        _espn_team("Minnesota", "Timberwolves", "MIN", 101, "away"),
+        _espn_team("Washington", "Wizards", "WSH", 99, "home"),
+    )
+    college = _espn_event(
+        "c1",
+        _espn_team("Minnesota", "Golden Gophers", "MINN", 60, "away"),
+        _espn_team("Washington", "Huskies", "WASH", 70, "home"),
+    )
+    res = settle_manual_bets(
+        data_root=tmp_path, espn_client=_FakeScoreboard({"NBA": [nba], "NCAAB": [college]})
+    )
+    assert res["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"], row["result"]) == ("101", "99", "loss")
+
+
+def test_mascot_only_nba_row_waits_for_its_own_game_and_ignores_an_exact_college_namesake(tmp_path):
+    # Buffalo Bulls @ Toledo Rockets matches 'Bulls' @ 'Rockets' exactly by mascot, but it is a
+    # NCAAB event and the NBA row's own Bulls @ Rockets game is the one that counts.
+    _nba_row(tmp_path, "Bulls", "Rockets")
+    college = _espn_event(
+        "c1",
+        _espn_team("Buffalo", "Bulls", "BUFF", 60, "away"),
+        _espn_team("Toledo", "Rockets", "TOL", 70, "home"),
+    )
+    nba_pending = _espn_event(
+        "n1",
+        _espn_team("Chicago", "Bulls", "CHI", 0, "away"),
+        _espn_team("Houston", "Rockets", "HOU", 0, "home"),
+        completed=False,
+    )
+    res = settle_manual_bets(
+        data_root=tmp_path, espn_client=_FakeScoreboard({"NBA": [nba_pending], "NCAAB": [college]})
+    )
+    assert res["settled_count"] == 0
+    assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
+
+    nba_final = _espn_event(
+        "n1",
+        _espn_team("Chicago", "Bulls", "CHI", 110, "away"),
+        _espn_team("Houston", "Rockets", "HOU", 100, "home"),
+    )
+    res = settle_manual_bets(
+        data_root=tmp_path, espn_client=_FakeScoreboard({"NBA": [nba_final], "NCAAB": [college]})
+    )
+    assert res["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"]) == ("110", "100")
+
+
+def test_single_non_exact_candidate_is_blocked_by_a_separate_ambiguous_event(tmp_path, caplog):
+    record_manual_bet({**_COLLEGE_BET, "event_start_utc": "2026-11-01T17:00:00Z"}, data_root=tmp_path)
+    one_sided = _espn_event(
+        "1",
+        _espn_team("Michigan State", "Spartans", "MSU", 10, "away"),
+        _espn_team("Ohio State", "Buckeyes", "OSU", 20, "home"),
+    )
+    # A joint listing whose names contain both row teams matches in both orientations, not exactly.
+    both_ways = _espn_event(
+        "2",
+        {"homeAway": "away", "score": "7", "team": {"displayName": "Michigan Ohio State Wolverines"}},
+        {"homeAway": "home", "score": "9", "team": {"displayName": "Michigan Ohio State Buckeyes"}},
+    )
+    with caplog.at_level("WARNING"):
+        res = settle_manual_bets(
+            data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAF": [one_sided, both_ways]})
+        )
+    assert res["settled_count"] == 0
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert row["status"] == "open"
+    assert any("ambiguous scoreboard match" in r.message and "'2'" in r.message for r in caplog.records)
