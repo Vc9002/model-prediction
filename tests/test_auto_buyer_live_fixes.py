@@ -173,6 +173,8 @@ def _quote_from_row(row: dict[str, Any]) -> dict[str, Any]:
             "fresh": True,
             "age_seconds": 5,
             "market_state": "MARKET_STATE_OPEN",
+            # The live tip-time cross-check wants the exchange's own start; it agrees with the row.
+            "event_start_utc": row.get("event_start_utc"),
         },
     }
 
