@@ -165,7 +165,7 @@ def _pick_row(start, **overrides: Any) -> dict[str, Any]:
     row = {
         "pick_id": "pick-1",
         "status": "open",
-        "rationale": f"auto_buy market_slug:{SLUG} (market_slug={SLUG})",
+        "rationale": f"auto_buy market_slug={SLUG}",
         "market_type": "spread",
         "home_team": "Home U",
         "away_team": "Away U",

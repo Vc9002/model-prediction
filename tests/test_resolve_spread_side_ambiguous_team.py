@@ -159,7 +159,7 @@ def test_execute_refuses_the_uca_ticket_and_sends_nothing(tmp_path, monkeypatch)
         "status": "open",
         "event_id": "ev-uca",
         "event_start_utc": iso_utc(start),
-        "rationale": f"auto_buy market_slug:{_UCA_SLUG}",
+        "rationale": f"auto_buy market_slug={_UCA_SLUG}",
     }
     sent: list[object] = []
     monkeypatch.setattr(pe.httpx, "request", lambda *a, **k: sent.append((a, k)))

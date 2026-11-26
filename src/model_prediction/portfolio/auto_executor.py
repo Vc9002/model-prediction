@@ -16,6 +16,7 @@ import json
 import logging
 import math
 import os
+import re
 import sqlite3
 import time
 from collections.abc import Callable
@@ -961,7 +962,7 @@ def _capture_missing_active_snapshot_slates(
             continue
         try:
             event_start = parse_utc(str(row.get("event_start_utc") or ""))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             continue
         seconds_until_start = (event_start - now).total_seconds()
         if seconds_until_start <= 0 or seconds_until_start > config.max_event_lookahead_hours * 3600:
@@ -1106,7 +1107,7 @@ def _daily_clear_retires(run_date: str, created_at_utc: str, event_start_utc: st
     def _et_date(value: str) -> str | None:
         try:
             return parse_utc(value).astimezone(EASTERN).date().isoformat()
-        except ValueError:
+        except (TypeError, ValueError, OverflowError):
             return None
 
     return run_date in (_et_date(created_at_utc), _et_date(event_start_utc))
@@ -1273,12 +1274,20 @@ def _alarm(
     }
 
 
+# The slug a forecast row recorded as the market it priced against. Twin of
+# dashboard/backtests.py::_RE_RECORDED_SLUG (kept in sync by hand: the dashboard imports this
+# module, so it cannot be imported from here). Only this explicit token is bound into the
+# executor's ticket-to-row check; the legacy "(slug)" forms are not contracts (NCAAF -home/-away
+# suffixes, "anchor-blended").
+_RECORDED_SLUG_RE = re.compile(r"\bmarket_slug=([a-z0-9_\-]+)")
+
+
 def _tip_time_refusal(row_start: datetime, exchange_start_raw: Any, now: datetime) -> str | None:
     """Why a live buy must not go out on these two start times, or None when they agree and neither
     has passed. A snapshot with no parseable start refuses (every NCAAB snapshot row carries one)."""
     try:
         exchange_start = parse_utc(str(exchange_start_raw or ""))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return "exchange snapshot has no event start; tip time unverified"
     gap = abs((exchange_start - row_start).total_seconds())
     if gap > TIP_TIME_TOLERANCE_SECONDS:
@@ -1395,6 +1404,11 @@ def _today_auto_buyer_totals(
     day it was bought for. For the live book (``live_book``) spend includes each row's recorded fee
     and the second value is minus the sum of today's losses alone: morning wins must not let
     afternoon losses run past the stop. The paper book keeps fee-exclusive spend and net P&L.
+
+    On the live book a row whose timestamp is present but unreadable counts toward today (spend: its
+    ``executed_at_utc``; loss: a settled row whose start and settlement are both unreadable), so a
+    corrupt value tightens the cap and the stop instead of hiding real spend. A blank or missing value
+    still counts for nothing, and the paper book never counts either, so a legacy row can't pin it.
     """
     from model_prediction.portfolio.auto_buyer_ledger import (
         is_manual_auto_buyer_record,
@@ -1406,8 +1420,11 @@ def _today_auto_buyer_totals(
             return None
         try:
             return parse_utc(str(raw)).astimezone(EASTERN).date()
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return None
+
+    def _unreadable(raw: Any) -> bool:
+        return raw is not None and bool(str(raw).strip()) and _et_date(raw) is None
 
     today = utc_now().astimezone(EASTERN).date()
     spend = 0.0
@@ -1419,14 +1436,19 @@ def _today_auto_buyer_totals(
             continue
         if row_scope is not None and not row_scope(row):
             continue
-        if _et_date(row.get("executed_at_utc")) == today:
+        executed_on = _et_date(row.get("executed_at_utc"))
+        if executed_on == today or (live_book and _unreadable(row.get("executed_at_utc"))):
             fee = row_fee_usd(row) if live_book else 0.0
             spend += float(row.get("cost_usd") or 0.0) + fee + _pending_exposure_cost(row, with_fee=live_book)
 
         result = str(row.get("result") or "").lower()
         if not row.get("settled_at_utc") or result not in ("win", "loss", "push"):
             continue
-        if (_et_date(row.get("event_start_utc")) or _et_date(row.get("settled_at_utc"))) != today:
+        settled_on = _et_date(row.get("event_start_utc")) or _et_date(row.get("settled_at_utc"))
+        both_unreadable = (
+            live_book and _unreadable(row.get("event_start_utc")) and _unreadable(row.get("settled_at_utc"))
+        )
+        if settled_on != today and not both_unreadable:
             continue
         try:
             pnl = float(row.get("pnl_usd") or 0.0)
@@ -3459,7 +3481,7 @@ class AutoPolymarketBuyer:
             # not consume the same evaluation path as actionable candidates.
             try:
                 row_event_start = parse_utc(str(row.get("event_start_utc") or ""))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 row_event_start = None
             if row_event_start is not None and now >= row_event_start:
                 result.rejected_stale_open += 1
@@ -3518,7 +3540,7 @@ class AutoPolymarketBuyer:
             event_start_str = str(row.get("event_start_utc") or "")
             try:
                 event_start = parse_utc(event_start_str)
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, OverflowError):
                 result.rejected_started += 1
                 continue
 
@@ -3708,6 +3730,17 @@ class AutoPolymarketBuyer:
                 if tip_refusal is not None:
                     logger.warning("Live buy refused for pick %s: %s", pick_id, tip_refusal)
                     result.rejected_tip_time_mismatch += 1
+                    continue
+            else:
+                # `now` was read before the slow quote step; a paper fill must not land on a game that
+                # tipped during it. Fidelity only: a missing or unreadable exchange start is not a
+                # refusal here, only a game that has started.
+                try:
+                    exchange_start = parse_utc(str(quote.get("event_start_utc") or ""))
+                except (TypeError, ValueError, OverflowError):
+                    exchange_start = None
+                if utc_now() >= min(event_start, exchange_start or event_start):
+                    result.rejected_started += 1
                     continue
 
             market_slug = str(quote["market_slug"])
@@ -4131,7 +4164,14 @@ class AutoPolymarketBuyer:
             exec_row = dict(row)
             exec_row["pick_id"] = ticket_pick_id
             exec_row["market_slug"] = market_slug
-            exec_row["rationale"] = f"auto_buy market_slug:{market_slug}"
+            # Bind the ticket to the market the row itself recorded, so a buy-time quote on any other
+            # slug is a gate refusal. A row that recorded none stays unbound, as before.
+            recorded_slug = _RECORDED_SLUG_RE.search(str(row.get("rationale") or ""))
+            exec_row["rationale"] = (
+                f"auto_buy market_slug={recorded_slug.group(1)}"
+                if recorded_slug
+                else "auto_buy; the row recorded no market_slug= token"
+            )
 
             # `timestamp_utc` is the pass start, before the slate capture and every quote refresh; this
             # is the send time the CLV report anchors on. It reaches only the fill log and the ledger
