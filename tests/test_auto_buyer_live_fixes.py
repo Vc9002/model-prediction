@@ -24,6 +24,9 @@ from model_prediction.portfolio.auto_buyer_ledger import (
 )
 from model_prediction.portfolio.auto_executor import AutoExecutionConfig, AutoPolymarketBuyer, BuyCohort
 
+# buyer_env stubs this to True; the pass-level recheck test puts the real one back.
+_REAL_STILL_ENABLED = auto_executor._live_buying_still_enabled
+
 SPREAD_V7 = "ncaab-spread-v7"
 TOTAL_V6 = "ncaab-total-v6"
 SPREAD_LIVE = BuyCohort(SPREAD_V7, "ncaab", "spread", 0.05, 0.12, "live")
@@ -204,7 +207,8 @@ def _live_buyer(tmp_path: Path, **overrides: Any) -> AutoPolymarketBuyer:
 
 class _Exchange:
     """Per-id reads and cancels only. ``states`` maps order id -> (state, cum); ids in
-    ``unavailable`` are reported the way ``order_snapshots`` reports a failed lookup."""
+    ``unavailable`` are reported the way ``order_snapshots`` reports a genuine not-found, ids in
+    ``flaky`` the way it reports an outage (a 429 or timeout: unavailable but NOT not-found)."""
 
     def __init__(
         self,
@@ -212,26 +216,35 @@ class _Exchange:
         *,
         after_cancel: dict[str, tuple[str, float]] | None = None,
         unavailable: tuple[str, ...] = (),
+        flaky: tuple[str, ...] = (),
         cancel_error: bool = False,
     ) -> None:
         self.states = dict(states or {})
         self.after_cancel = dict(after_cancel or {})
         self.unavailable = set(unavailable)
+        self.flaky = set(flaky)
         self.cancel_error = cancel_error
         self.cancel_calls: list[str] = []
         self.cancelled: list[str] = []
 
     def order_snapshots(self, order_ids: list[str]) -> dict[str, Any]:
-        orders, missing = [], []
+        orders, missing, not_found = [], [], []
         for oid in order_ids:
-            if oid in self.unavailable:
+            if oid in self.unavailable or oid in self.flaky:
                 missing.append(oid)
+                if oid in self.unavailable:
+                    not_found.append(oid)
                 continue
             source = self.after_cancel if oid in self.cancelled and oid in self.after_cancel else self.states
             if oid in source:
                 state, cum = source[oid]
                 orders.append({"order_id": oid, "order_state": state, "cum_quantity": cum})
-        return {"status": "live", "orders": orders, "unavailable_order_ids": missing}
+        return {
+            "status": "live",
+            "orders": orders,
+            "unavailable_order_ids": missing,
+            "not_found_order_ids": not_found,
+        }
 
     def cancel(self, order_id: str, user_command: bool, market_slug: str | None = None) -> dict[str, Any]:
         assert user_command is True
@@ -592,6 +605,18 @@ def test_cancel_of_a_permanently_missing_order_is_flagged_once_and_not_resent(tm
     row = _ledger(j_path)[0]
     assert row["cancel_abandoned_at_utc"]
     assert row["fallback_reconciled"] is False and row["status"] == "open"
+
+
+def test_a_rate_limited_or_timed_out_read_never_abandons_a_row(tmp_path):
+    """An outage reads as unavailable too, but only a genuine not-found may stop the cancels."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row()])
+    exchange = _Exchange(flaky=("gtd-1",), cancel_error=True)
+    for _ in range(4):
+        summary = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+        assert "cancel_abandoned" not in summary
+    assert exchange.cancel_calls == ["gtd-1"] * 4
+    assert "cancel_abandoned_at_utc" not in _ledger(j_path)[0]
 
 
 def test_an_abandoned_cancel_resumes_when_the_order_reappears(tmp_path):
@@ -1355,6 +1380,31 @@ def test_mid_pass_recheck_stops_live_submissions_when_the_live_switch_goes_off(c
     assert auto_executor._live_buying_still_enabled() is True
 
 
+def test_a_pass_stops_at_the_real_recheck_when_the_live_switch_flips_off_mid_pass(
+    tmp_path, buyer_env, monkeypatch
+):
+    """The real ``_live_buying_still_enabled`` (buyer_env stubs it True) reads the state file each
+    submission: the first order goes out, the switch flips, the second never reaches the exchange."""
+    state: dict[str, Any] = {"enabled": True, "live_enabled": True}
+    monkeypatch.setattr(auto_executor, "_live_buying_still_enabled", _REAL_STILL_ENABLED)
+    monkeypatch.setattr(auto_executor, "load_auto_buyer_state", lambda: dict(state))
+
+    class _FlipsOffAfterFirst(_BuyExecutor):
+        def execute(self, ticket: Any, pick_row: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+            output = super().execute(ticket, pick_row, **kwargs)
+            state["live_enabled"] = False
+            return output
+
+    monkeypatch.setattr(auto_executor, "PolymarketExecutor", _FlipsOffAfterFirst)
+    picks = [
+        _pick(SPREAD_V7, pick_id="p1", event="g1", model_probability=0.57, ask=0.50),
+        _pick(SPREAD_V7, pick_id="p2", event="g2", model_probability=0.57, ask=0.50),
+    ]
+    result = _live_buyer(tmp_path, recheck_enabled_before_submit=True).evaluate_and_execute(picks)
+    assert [t.pick_id for t, _ in _BuyExecutor.executed] == ["p1"]
+    assert result.live_halt_reason == "kill_switch"
+
+
 @pytest.mark.parametrize(
     ("state", "cancel_all"),
     [
@@ -1392,6 +1442,32 @@ def test_live_toggle_route_flips_only_the_live_switch(cycle):
     assert on_disk["live_enabled"] is False and on_disk["enabled"] is True
     code, body = _post("/api/auto-buyer/live-toggle", {"enabled": True})
     assert code == 200 and body["live_enabled"] is True
+
+
+@pytest.mark.parametrize(
+    "payload", [{}, {"confirm": True}, {"enabled": None}, {"confirm": True, "enabled": None}]
+)
+def test_live_toggle_route_refuses_a_bare_call_and_never_turns_live_on(cycle, payload):
+    """A flip with no explicit value could turn real money ON with no confirm."""
+    path = _write_state(cycle, {**LIVE_STATE, "live_enabled": False})
+    before = path.read_bytes()
+    code, body = _post("/api/auto-buyer/live-toggle", payload)
+    assert code == 400 and body["status"] == "refused"
+    assert "explicit enabled" in body["error"]
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "bare_state", [{}, {"live_enabled": False}, {"live_enabled": True}, {"live_enabled": "x"}]
+)
+def test_toggle_live_trading_requires_an_explicit_boolean(cycle, bare_state):
+    path = _write_state(cycle, {**LIVE_STATE, **bare_state})
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="live_enabled"):
+        auto_executor.toggle_live_trading()
+    with pytest.raises(ValueError, match="live_enabled"):
+        auto_executor.toggle_live_trading(None)
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize("payload", [{"enabled": "false"}, {"enabled": 0}])

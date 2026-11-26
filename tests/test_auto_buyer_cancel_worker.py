@@ -212,6 +212,42 @@ def test_missing_or_unreadable_state_counts_as_disabled(runtime, monkeypatch, ca
     assert out["enabled"] is False
 
 
+@pytest.mark.parametrize("enabled", [False, True])
+def test_abandoned_row_is_never_re_sent_in_either_mode_and_the_run_exits_zero(
+    runtime, monkeypatch, capsys, enabled
+):
+    """Master ON with live OFF runs cancel_all every 2 minutes: a row reconcile already abandoned
+    (the exchange cannot find it and refused the cancel twice) must not get a failing POST each run."""
+    _write(
+        runtime,
+        [_row("gtd-gone", start_seconds=-600.0, cancel_abandoned_at_utc=iso_utc(utc_now()))],
+        enabled=enabled,
+    )
+    (runtime / "auto_buyer_state.json").write_text(
+        json.dumps({"enabled": enabled, "live_enabled": False}), encoding="utf-8"
+    )
+    # `runtime` makes building any executor fail the test: nothing is due, so nothing may be sent.
+    for _ in range(3):
+        code, out = _run(capsys)
+        assert code == 0 and out["status"] == "ok" and out["candidates"] == 0
+        assert out["abandoned_skipped"] == ["gtd-gone"]
+
+
+def test_abandoned_row_is_skipped_but_a_normal_row_is_still_cancelled(runtime, monkeypatch, capsys):
+    _write(
+        runtime,
+        [
+            _row("gtd-gone", start_seconds=-600.0, cancel_abandoned_at_utc=iso_utc(utc_now())),
+            _row("gtd-2", start_seconds=36000.0),
+        ],
+        enabled=False,
+    )
+    exchange = _exchange(monkeypatch)
+    code, out = _run(capsys)
+    assert code == 0 and exchange.cancelled == ["gtd-2"]
+    assert out["abandoned_skipped"] == ["gtd-gone"]
+
+
 def test_memo_stops_a_resend_on_the_next_run(runtime, monkeypatch, capsys):
     _write(runtime, [_row("gtd-1", start_seconds=20.0), _row("gtd-2", start_seconds=10.0)])
     exchange = _exchange(monkeypatch, terminal=("gtd-2",))
@@ -331,6 +367,8 @@ def test_supervisor_registers_the_backstop_worker():
         worker.RUN_DEADLINE_SECONDS + worker.MAX_EXCHANGE_CALL_SECONDS
         < DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"]
     )
+    # 3 attempts x the 15 s request timeout plus the 0.5 s and 1.0 s back-offs: the bound must cover it.
+    assert worker.MAX_EXCHANGE_CALL_SECONDS >= 3 * 15 + 0.5 + 1.0
 
 
 def test_windows_task_script_registers_the_backstop_every_two_minutes():
@@ -531,8 +569,8 @@ def test_persistently_unreadable_state_is_retried_then_cancels_all(runtime, monk
 def test_run_deadline_stops_new_cancels_and_exits_cleanly(runtime, monkeypatch, capsys):
     _write(runtime, [_row("gtd-1", start_seconds=20.0), _row("gtd-2", start_seconds=25.0)])
     exchange = _exchange(monkeypatch)
-    # Clock reads: run start, before the order read, before cancel 1, before cancel 2.
-    ticks = iter([0.0, 10.0, 20.0, 100.0, 110.0, 120.0])
+    # Clock reads: run start, up front, before id 1, before id 1's cancel (it was read first), before id 2.
+    ticks = iter([0.0, 10.0, 20.0, 30.0, 100.0, 110.0, 120.0])
     monkeypatch.setattr(worker, "_monotonic", lambda: next(ticks))
     code, out = _run(capsys)
     assert code == 0
@@ -552,9 +590,98 @@ def test_deadline_before_the_order_read_sends_nothing(runtime, monkeypatch, caps
     assert out["deadline_skipped"] == ["gtd-1"]
 
 
-def _deadline_after_first(monkeypatch) -> None:
-    # Clock reads: run start, before the order read, before cancel 1, before cancel 2.
-    ticks = iter([0.0, 10.0, 20.0, 100.0, 110.0, 120.0])
+class _SlowExchange(_Strict):
+    """Every exchange call takes 46.5 s (15 s timeout x 3 attempts plus backoff) on a fake clock, and
+    a batch read takes that long PER id (the real ``order_snapshots`` GETs them one at a time)."""
+
+    CALL_SECONDS = 46.5
+
+    def __init__(self, clock: list[float], **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.clock = clock
+        self.started_at: list[float] = []
+
+    def order_snapshots(self, order_ids: list[str]) -> dict[str, Any]:
+        self.started_at.append(self.clock[0])
+        out = super().order_snapshots(order_ids)
+        self.clock[0] += self.CALL_SECONDS * len(order_ids)
+        return out
+
+    def cancel(self, order_id: str, *, user_command: bool, market_slug: str | None = None) -> dict[str, Any]:
+        self.started_at.append(self.clock[0])
+        out = super().cancel(order_id, user_command=user_command, market_slug=market_slug)
+        self.clock[0] += self.CALL_SECONDS
+        return out
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_slow_exchange_calls_never_start_past_the_run_deadline(runtime, monkeypatch, capsys, enabled):
+    """Three due ids and a slow exchange: no call may START at or after the deadline, or the run
+    outlives the supervisor's kill. The old batch read took 3 x 46.5 s before any cancel was tried."""
+    _write(
+        runtime,
+        [_row(f"gtd-{i}", start_seconds=20.0 if enabled else 36000.0) for i in (1, 2, 3)],
+        enabled=enabled,
+    )
+    clock = [0.0]
+    exchange = _SlowExchange(clock)
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: exchange)
+    monkeypatch.setattr(worker, "_monotonic", lambda: clock[0])
+    code, out = _run(capsys)
+    assert exchange.started_at and max(exchange.started_at) < worker.RUN_DEADLINE_SECONDS
+    assert clock[0] < DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"]
+    assert exchange.cancelled, "at least one cancel must be attempted before the deadline"
+    # cancel_all cancels two ids (no pre-read); the tip-off mode reads then cancels, so only one.
+    assert out["deadline_skipped"] == (["gtd-2", "gtd-3"] if enabled else ["gtd-3"])
+    # The skipped id is retried next run; while the buyer is off a skip is a failed run.
+    assert code == (0 if enabled else 1)
+
+
+def test_a_read_that_outlasts_the_deadline_is_never_followed_by_a_cancel(runtime, monkeypatch, capsys):
+    """The tip-off read-then-cancel checks the deadline between the two calls: a read begun under it
+    that ends past it must not be followed by a cancel that would run into the supervisor's kill."""
+    _write(runtime, [_row("gtd-1", start_seconds=20.0)])
+    clock = [0.0]
+    exchange = _SlowExchange(clock)
+    exchange.CALL_SECONDS = 70.0
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: exchange)
+    monkeypatch.setattr(worker, "_monotonic", lambda: clock[0])
+    code, out = _run(capsys)
+    assert exchange.cancelled == [] and out["deadline_skipped"] == ["gtd-1"]
+    # Its game has not started, so the next run (2 minutes on) retries it before the tip.
+    assert code == 0
+
+
+def test_cancel_all_cancels_first_and_classifies_a_failed_cancel_by_reading_that_one_id(
+    runtime, monkeypatch, capsys
+):
+    """No pre-read under cancel_all: cancelling a terminal order is harmless, and a failed cancel is
+    read once to tell a terminal order (memoised, not a failure) from a still-resting one (a failure)."""
+    _write(
+        runtime,
+        [_row(f"gtd-{i}", start_seconds=36000.0) for i in (1, 2, 3)],
+        enabled=False,
+    )
+    exchange = _Strict(terminal=("gtd-2",), fail_cancel=("gtd-1", "gtd-2"))
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: exchange)
+    code, out = _run(capsys)
+    assert exchange.calls == [
+        ("cancel", "gtd-1"),
+        ("order_snapshots", ["gtd-1"]),
+        ("cancel", "gtd-2"),
+        ("order_snapshots", ["gtd-2"]),
+        ("cancel", "gtd-3"),
+    ]
+    assert out["cancelled"] == ["gtd-3"] and out["already_terminal"] == ["gtd-2"]
+    assert [f["order_id"] for f in out["failed"]] == ["gtd-1"]
+    assert code == 1
+
+
+def _deadline_after_first(monkeypatch, *, pre_read: bool = False) -> None:
+    # Clock reads: run start, before the order read (up front), before id 1, [before id 1's cancel
+    # when it was read first], before id 2.
+    reads = [0.0, 10.0, 20.0] + ([30.0] if pre_read else []) + [100.0] * 20
+    ticks = iter(reads)
     monkeypatch.setattr(worker, "_monotonic", lambda: next(ticks))
 
 
@@ -562,7 +689,7 @@ def test_deadline_skip_of_a_started_game_exits_non_zero(runtime, monkeypatch, ca
     # gtd-2's game began 10 s ago and its fallback is still resting: skipping it must be visible.
     _write(runtime, [_row("gtd-1", start_seconds=-20.0), _row("gtd-2", start_seconds=-10.0)])
     exchange = _exchange(monkeypatch)
-    _deadline_after_first(monkeypatch)
+    _deadline_after_first(monkeypatch, pre_read=True)
     code, out = _run(capsys)
     assert exchange.cancelled == ["gtd-1"]
     assert out["deadline_skipped"] == ["gtd-2"] and out["deadline_skipped_started"] == ["gtd-2"]
@@ -586,6 +713,6 @@ def test_deadline_skip_under_the_kill_switch_exits_non_zero(runtime, monkeypatch
 def test_deadline_skip_of_a_game_not_yet_started_stays_ok_while_enabled(runtime, monkeypatch, capsys):
     _write(runtime, [_row("gtd-1", start_seconds=20.0), _row("gtd-2", start_seconds=25.0)])
     _exchange(monkeypatch)
-    _deadline_after_first(monkeypatch)
+    _deadline_after_first(monkeypatch, pre_read=True)
     code, out = _run(capsys)
     assert code == 0 and out["status"] == "ok" and out["deadline_skipped"] == ["gtd-2"]

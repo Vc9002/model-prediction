@@ -937,6 +937,30 @@ def test_order_snapshots_isolates_one_unreachable_order_from_the_rest(tmp_path, 
     assert result["unavailable_order_ids"] == ["order-bad"]
 
 
+def test_order_snapshots_names_only_a_genuine_not_found_as_not_found(tmp_path, monkeypatch) -> None:
+    """The backstop and reconcile abandon an order id the exchange "cannot find". A 429, a 5xx or a
+    timeout is an outage, not a missing order: those ids are unavailable but never not-found."""
+    client = executor(tmp_path, env=US_CREDS)
+    refusals = {
+        "o-404": ExecutionGateError("REFUSED by Polymarket US (404): gone", status_code=404),
+        "o-code5": ExecutionGateError(
+            'REFUSED by Polymarket US (400): {"code":5, "message":"Order not found"}', status_code=400
+        ),
+        "o-429": ExecutionGateError("REFUSED by Polymarket US (429): slow down", status_code=429),
+        "o-503": ExecutionGateError("REFUSED by Polymarket US (503): down", status_code=503),
+        "o-500-code5": ExecutionGateError('REFUSED by Polymarket US (500): {"code":5}', status_code=500),
+        "o-timeout": ExecutionGateError("REFUSED: Polymarket US order request failed (ReadTimeout)."),
+    }
+
+    def fake_request(method, path, payload=None):
+        raise refusals[path.rsplit("/", 1)[1]]
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    result = client.order_snapshots(list(refusals))
+    assert result["unavailable_order_ids"] == list(refusals)
+    assert result["not_found_order_ids"] == ["o-404", "o-code5"]
+
+
 def test_moneyline_resolves_binary_team_win_market() -> None:
     from model_prediction.data_sources.polymarket_execute import _resolve_moneyline_side
 

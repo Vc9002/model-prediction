@@ -43,11 +43,11 @@ MEMO_RETENTION = timedelta(days=3)
 # read as the kill switch and cancel every resting fallback; only a persistent failure does.
 STATE_READ_ATTEMPTS = 3
 STATE_READ_RETRY_SECONDS = 0.3
-# One exchange GET or cancel can take about 46 s (15 s timeout x 3 attempts plus backoff). The deadline
-# is only checked BEFORE a call starts, so a call begun just under it still runs to its end: the
-# deadline plus one full call must stay inside the supervisor's 115 s kill
+# One exchange GET or cancel can take 46.5 s (15 s timeout x 3 attempts plus 0.5 s and 1.0 s of backoff).
+# The deadline is only checked BEFORE a call starts, so a call begun just under it still runs to its
+# end: the deadline plus one full call must stay inside the supervisor's 115 s kill
 # (run_supervisor.DEFAULT_WORKER_TIMEOUTS). Ids not reached are retried on the next 2-minute run.
-MAX_EXCHANGE_CALL_SECONDS = 46.0
+MAX_EXCHANGE_CALL_SECONDS = 47.0
 RUN_DEADLINE_SECONDS = 60.0
 _sleep = time.sleep
 _monotonic = time.monotonic
@@ -124,7 +124,11 @@ def _run(paths: RuntimePaths) -> int:
             json.dumps({"status": "error", "enabled": enabled, "reason": reason, "error": error}), flush=True
         )
         return 1
-    done = [*summary.get("cancelled", []), *summary.get("already_terminal", [])]
+    done = [
+        *summary.get("cancelled", []),
+        *summary.get("already_terminal", []),
+        *summary.get("not_found", []),
+    ]
     result: dict[str, Any] = {"enabled": enabled, **summary}
     if summary.get("deadline_skipped"):
         result["note"] = "deadline"

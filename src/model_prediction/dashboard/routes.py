@@ -753,10 +753,18 @@ class Handler(BaseHTTPRequestHandler):
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/live-toggle":
             # Only the real-money book; the master toggle above still stops paper and live alike.
-            try:
-                self._send(toggle_live_trading(payload.get("enabled")))
-            except (OSError, RuntimeError, TypeError, ValueError) as error:
-                self._send({"status": "refused", "error": str(error)}, code=400)
+            # An explicit boolean is required: a bare call must never be able to turn real money ON.
+            live_value = payload.get("enabled")
+            if not isinstance(live_value, bool):
+                self._send(
+                    {"status": "refused", "error": "live-toggle needs an explicit enabled: true or false"},
+                    code=400,
+                )
+            else:
+                try:
+                    self._send(toggle_live_trading(live_value))
+                except (OSError, RuntimeError, TypeError, ValueError) as error:
+                    self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/unit-value":
             try:
                 self._send(set_auto_buyer_unit_value(payload.get("unit_value_usd")))

@@ -1759,14 +1759,13 @@ def toggle_live_trading(enabled: bool | None = None) -> dict[str, Any]:
     """Turn only the real-money book ON or OFF (``live_enabled``); the paper books are untouched.
 
     The master ``enabled`` still stops everything. Turning live off saves first and then cancels the
-    live book's resting orders by id, like the master kill switch. A bare toggle flips the effective
-    state (a saved non-boolean reads as off).
+    live book's resting orders by id, like the master kill switch. The value must be an explicit
+    boolean: a bare call used to flip the saved state, which could turn real money ON without the
+    operator's confirmation (the dashboard asks for it only when it sends ``enabled: true``).
     """
-    if enabled is not None and not isinstance(enabled, bool):
-        raise ValueError(f"Auto-Buyer live_enabled must be true or false, got {enabled!r}")
-    current = load_auto_buyer_state()
-    if enabled is None:
-        enabled = current.get(LIVE_ENABLED_STATE_KEY, True) is not True
+    if not isinstance(enabled, bool):
+        # ValueError, not TypeError: the dashboard route and its tests treat this as a refused value.
+        raise ValueError(f"Auto-Buyer live_enabled must be true or false, got {enabled!r}")  # noqa: TRY004
     _update_auto_buyer_state({LIVE_ENABLED_STATE_KEY: enabled, "updated_at_utc": iso_utc(utc_now())})
     state = load_auto_buyer_state()
     try:
@@ -2175,7 +2174,9 @@ def run_auto_buyer_cycle(
     live_cohorts = tuple(c for c in parsed_cohorts.active if c.mode == "live")
     paper_cohorts = tuple(c for c in parsed_cohorts.active if c.mode == "paper")
     global_mode = "paper" if governed else mode
-    wants_execution = live_on if execute_override is None else bool(execute_override)
+    # The override can only withhold execution (False). ``True`` used to make this true with the
+    # master or live switch off, a real-money path past both switches.
+    wants_execution = live_on and execute_override is not False
     # Explicit execution can request a one-off live cycle, but can never
     # override PAPER mode. Changing the saved mode is a separate action.
     should_execute = global_mode == "live" and wants_execution and not preview

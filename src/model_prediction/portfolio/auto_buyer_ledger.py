@@ -959,6 +959,9 @@ def reconcile_pending_auto_buyer_fallbacks(
     by_id: dict[str, dict[str, Any]] = {}
     # Ids the exchange could not return this read (a per-id lookup failed): see the abandon rule below.
     unavailable_ids: set[str] = set()
+    # The subset it answered with a genuine not-found. Only these may be abandoned: a 429 or a
+    # timeout makes an id unavailable too, and an outage must not stop the cancels of a live order.
+    not_found_ids: set[str] = set()
     try:
         snapshot = live_executor.order_snapshots(order_ids)
     except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
@@ -969,6 +972,7 @@ def reconcile_pending_auto_buyer_fallbacks(
         else:
             by_id = {str(item.get("order_id")): item for item in snapshot.get("orders", [])}
             unavailable_ids = {str(o) for o in snapshot.get("unavailable_order_ids") or []}
+            not_found_ids = {str(o) for o in snapshot.get("not_found_order_ids") or []}
 
     now = utc_now()
     reconciled_filled = cancelled_expired = still_pending = errors = 0
@@ -1186,8 +1190,8 @@ def reconcile_pending_auto_buyer_fallbacks(
             errors += 1
             cancel_failed.append(fid)
             still_pending += 1
-            if fid in unavailable_ids and (r.get("cancel_requested_at_utc") or r.get("cancel_failed_at_utc")):
-                # A second failed cancel of an id the exchange cannot even read: stop re-sending.
+            if fid in not_found_ids and (r.get("cancel_requested_at_utc") or r.get("cancel_failed_at_utc")):
+                # A second failed cancel of an id the exchange says does not exist: stop re-sending.
                 r["cancel_abandoned_at_utc"] = iso_utc(now)
                 cancel_abandoned.append(fid)
                 logger.error(
@@ -1270,11 +1274,16 @@ def cancel_resting_live_fallbacks(
 
     Due means every unreconciled true fallback when ``cancel_all`` (the kill switch), otherwise
     those whose event starts within ``start_lead_seconds`` (an unparseable start counts as due).
+    A row reconcile marked ``cancel_abandoned_at_utc`` (the exchange has no such order and refused
+    the cancel twice) is never due in either mode; it is listed in ``abandoned_skipped``. Without
+    that, the kill-switch backstop would POST a failing cancel for it every run, forever.
     Cancel-only: it reads the ledger and never writes it. There is no ledger lock, and its callers
     (the dashboard toggle, the backstop worker) do not hold auto_buyer.lock, so restating fills stays
     with ``reconcile_pending_auto_buyer_fallbacks`` under that lock. With nothing due it builds no
-    executor and makes no network call. It never calls a cancel-all or batch endpoint: one
-    ``order_snapshots`` read (failure tolerated) and one cancel per id.
+    executor and makes no network call. It never calls a cancel-all or batch endpoint, only per-id
+    calls, each preceded by a ``stop_before`` check: a tip-off run reads each id's state then
+    cancels it; under ``cancel_all`` it cancels first (cancelling a terminal order is harmless) and
+    reads that one id only if the cancel failed, so a terminal or missing order is not a failure.
     """
     j_path, _ = resolve_auto_buyer_paths(data_root=data_root)
     summary: dict[str, Any] = {
@@ -1290,12 +1299,16 @@ def cancel_resting_live_fallbacks(
     horizon = moment + timedelta(seconds=float(start_lead_seconds))
     due: dict[str, str | None] = {}
     started: set[str] = set()
+    abandoned: list[str] = []
     for r in read_auto_buyer_ledger(jsonl_path=j_path):
         fid = str(r.get("fallback_order_id") or "")
         if not fid or r.get("fallback_reconciled") or not _is_resting_fallback_leg(r):
             continue
-        if r.get("cancel_abandoned_at_utc") and not cancel_all:
-            # The exchange cannot find it and refused the cancel twice (reconcile alarmed).
+        if r.get("cancel_abandoned_at_utc"):
+            # The exchange cannot find it and refused the cancel twice (reconcile alarmed). Reconcile
+            # un-abandons it and cancels normally if the order ever reads again.
+            if fid not in abandoned:
+                abandoned.append(fid)
             continue
         if fid in skip_order_ids or _is_settled_auto_buyer_record(r):
             continue
@@ -1313,6 +1326,8 @@ def cancel_resting_live_fallbacks(
         if game_started:
             started.add(fid)
     summary["candidates"] = len(due)
+    if abandoned:
+        summary["abandoned_skipped"] = abandoned
     if not due:
         return summary
     if stop_before is not None and stop_before():
@@ -1321,29 +1336,54 @@ def cancel_resting_live_fallbacks(
         return summary
 
     live_executor = executor if executor is not None else _default_live_executor(j_path.parent)
-    terminal: set[str] = set()
-    try:
-        snapshot = live_executor.order_snapshots(sorted(due))
-        if snapshot.get("status") == "live":
-            terminal = {
-                str(o.get("order_id"))
-                for o in snapshot.get("orders", [])
-                if str(o.get("order_state") or "").upper() in _TERMINAL_ORDER_STATES
-            }
-    except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
-        logger.warning("Order snapshots failed before cancelling resting fallbacks: %s", exc)
+
+    def _read_state(order_id: str) -> tuple[str, bool]:
+        """(upper-cased order state or "", whether the exchange said the order does not exist)."""
+        try:
+            snapshot = live_executor.order_snapshots([order_id])
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
+            logger.warning("Order read failed for resting fallback %s: %s", order_id, exc)
+            return "", False
+        if snapshot.get("status") != "live":
+            return "", False
+        for o in snapshot.get("orders", []):
+            if str(o.get("order_id")) == order_id:
+                return str(o.get("order_state") or "").upper(), False
+        return "", order_id in {str(x) for x in snapshot.get("not_found_order_ids") or []}
+
+    def _skip(order_id: str) -> None:
+        summary.setdefault("deadline_skipped", []).append(order_id)
+        if order_id in started:
+            summary.setdefault("deadline_skipped_started", []).append(order_id)
+
     for fid, slug in due.items():
-        if fid in terminal:
-            summary["already_terminal"].append(fid)
-            continue
+        # Every exchange call is preceded by a deadline check: the real order read GETs one id at a
+        # time and a batch of them can outlast the run before a single cancel is tried.
         if stop_before is not None and stop_before():
-            summary.setdefault("deadline_skipped", []).append(fid)
-            if fid in started:
-                summary.setdefault("deadline_skipped_started", []).append(fid)
+            _skip(fid)
             continue
+        if not cancel_all:
+            state, _gone = _read_state(fid)
+            if state in _TERMINAL_ORDER_STATES:
+                summary["already_terminal"].append(fid)
+                continue
+            if stop_before is not None and stop_before():
+                _skip(fid)
+                continue
         try:
             _cancel_by_id(live_executor, fid, slug)
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
+            # A failed cancel is read once: a terminal order needs no cancel and an order the exchange
+            # does not know holds nothing, so neither is a failed run. Anything else is.
+            state, gone = ("", False)
+            if stop_before is None or not stop_before():
+                state, gone = _read_state(fid)
+            if state in _TERMINAL_ORDER_STATES:
+                summary["already_terminal"].append(fid)
+                continue
+            if gone:
+                summary.setdefault("not_found", []).append(fid)
+                continue
             logger.error("Failed to cancel resting live fallback %s (%s): %s", fid, reason, exc)
             summary["failed"].append({"order_id": fid, "error": f"{type(exc).__name__}: {exc}"[:300]})
             continue

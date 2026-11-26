@@ -330,6 +330,18 @@ _TERMINAL_ORDER_STATES = frozenset(
 )
 
 
+_GRPC_NOT_FOUND_BODY = re.compile(r'"code"\s*:\s*5\b')
+
+
+def _is_order_not_found(error: ExecutionGateError) -> bool:
+    """Whether a refused order GET means the exchange has no such order: 404, or another 4xx that
+    is not a rate limit and carries gRPC NOT_FOUND (code 5). Never a 429, a 5xx or a timeout."""
+    status = error.status_code
+    if status is None or status == 429 or status >= 500:
+        return False
+    return status == 404 or bool(_GRPC_NOT_FOUND_BODY.search(str(error)))
+
+
 def _ioc_fill_is_final(order: dict[str, Any], state: str) -> bool:
     """Whether an IOC's reported cumQuantity can no longer grow: a terminal state, or a partial fill
     that reports nothing left working (leavesQuantity 0). Anything else is still being processed."""
@@ -1466,17 +1478,25 @@ class PolymarketExecutor:
         ``unavailable_order_ids`` rather than raising, so a caller
         reconciling many pending rows in one batch (e.g. the daily
         unattended settle cycle) can still make progress on the rest.
+
+        ``not_found_order_ids`` is the subset of those the exchange answered with a genuine not-found
+        (HTTP 404, or a 4xx other than 429 whose body carries gRPC code 5). A 429, a 5xx or a
+        timeout is an outage, not evidence the order is gone, so callers that give up on an id
+        (abandoning a cancel) must test this list, never ``unavailable_order_ids``.
         """
         missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
         if missing:
             raise ExecutionGateError(f"REFUSED: {', '.join(missing)} is not set.")
         orders = []
         unavailable: list[str] = []
+        not_found: list[str] = []
         for order_id in dict.fromkeys(str(value) for value in order_ids if value):
             try:
                 response = self._request("GET", f"/v1/order/{order_id}")
-            except ExecutionGateError:
+            except ExecutionGateError as error:
                 unavailable.append(order_id)
+                if _is_order_not_found(error):
+                    not_found.append(order_id)
                 continue
             order = response.get("order") or response
             if not isinstance(order, dict):
@@ -1496,6 +1516,7 @@ class PolymarketExecutor:
             "status": "live",
             "orders": orders,
             "unavailable_order_ids": unavailable,
+            "not_found_order_ids": not_found,
             "observed_at_utc": iso_utc(utc_now()),
         }
 

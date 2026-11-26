@@ -34,7 +34,8 @@ def test_paper_mode_cannot_be_overridden_into_live_execution(tmp_path, monkeypat
 
     monkeypatch.setattr(auto_executor.AutoPolymarketBuyer, "evaluate_and_execute", evaluate)
     auto_executor.run_auto_buyer_cycle(execute_override=override)
-    expected_live = mode == "live" and (enabled if override is None else bool(override))
+    # An override can only withhold execution (False); it never adds a path past the master switch.
+    expected_live = mode == "live" and enabled and override is not False
     assert configs[0].execute_live is expected_live
     assert bool(reconciled) is expected_live
     # D-02: a cycle that is not enabled cancels every resting live fallback while it reconciles.
