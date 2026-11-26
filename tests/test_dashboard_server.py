@@ -521,6 +521,7 @@ def test_resting_order_preview_and_submit_persist_exchange_id(
         "record_type": "QUALIFIED_SHADOW_CALL",
         "pick_tag": "qualified",
         "units": 1.0,
+        "event_start_utc": "2099-01-01T00:00:00Z",
     }
     quote = {
         "market_slug": "nfl-example",
@@ -573,6 +574,7 @@ def test_submit_parses_success_after_interactive_prompt(monkeypatch, tmp_path: P
         "record_type": "QUALIFIED_SHADOW_CALL",
         "pick_tag": "qualified",
         "units": 1.0,
+        "event_start_utc": "2099-01-01T00:00:00Z",
     }
     quote = {
         "market_slug": "wnba-prompt",
@@ -814,6 +816,7 @@ def test_buy_at_current_ask_submits_marketable_ioc_limit(monkeypatch, tmp_path: 
         "record_type": "QUALIFIED_SHADOW_CALL",
         "pick_tag": "qualified",
         "units": 1.0,
+        "event_start_utc": "2099-01-01T00:00:00Z",
     }
     patch_dash("read_picks", lambda: [pick])
     patch_dash(
@@ -866,6 +869,7 @@ def test_resting_order_enforces_seven_fifty_per_unit_cost_cap(monkeypatch, patch
         "record_type": "QUALIFIED_SHADOW_CALL",
         "pick_tag": "qualified",
         "units": 1.0,
+        "event_start_utc": "2099-01-01T00:00:00Z",
     }
     patch_dash("read_picks", lambda: [pick])
     patch_dash(
@@ -896,6 +900,7 @@ def test_active_model_positive_edge_research_pick_is_manually_buyable(monkeypatc
         "model_version": "wnba-elo-trend-lr-v3",
         "model_probability": 0.58,
         "market_implied_probability": 0.48,
+        "event_start_utc": "2099-01-01T00:00:00Z",
     }
     patch_dash(
         "_config_payload",
@@ -1963,6 +1968,76 @@ def test_sell_refuses_once_the_game_has_already_started(monkeypatch, patch_dash)
 
     assert result["status"] == "refused"
     assert "already started" in result["error"]
+
+
+@pytest.mark.parametrize("bad_start", [None, "not-a-time", "2099-01-01T00:00:00"])
+def test_sell_refuses_when_the_row_start_is_unreadable(monkeypatch, patch_dash, bad_start) -> None:
+    """A resting sell is validated against a quote that is only meaningful pregame, so a row whose
+    start cannot be read is treated as started, with a reason that names the real problem."""
+    pick = {
+        "pick_id": "held-no-start",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+        "event_start_utc": bad_start,
+    }
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
+        "_decorate_pick",
+        lambda row: {
+            **row,
+            "buy_ready": True,
+            "buy_block_reason": "ready",
+            "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
+        },
+    )
+
+    result = dashboard_server.preview_order(
+        {"pick_id": "held-no-start", "action": "sell", "price": 0.50, "size_shares": 10}
+    )
+
+    assert result["status"] == "refused"
+    assert "start time unreadable" in result["error"]
+    assert "already started" not in result["error"]
+
+
+def test_submit_sell_refuses_when_the_start_became_unreadable(
+    monkeypatch, tmp_path: Path, patch_dash
+) -> None:
+    pick = {
+        "pick_id": "held-race-unreadable",
+        "status": "open",
+        "record_type": "QUALIFIED_SHADOW_CALL",
+        "units": 1.0,
+        "event_start_utc": "2099-01-01T00:00:00Z",
+    }
+    patch_dash("read_picks", lambda: [pick])
+    patch_dash(
+        "_decorate_pick",
+        lambda row: {
+            **row,
+            "buy_ready": True,
+            "buy_block_reason": "ready",
+            "quote": {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
+        },
+    )
+    patch_dash("ORDERS_FILE", tmp_path / "orders.json")
+
+    preview = dashboard_server.preview_order(
+        {"pick_id": "held-race-unreadable", "action": "sell", "price": 0.50, "size_shares": 10}
+    )
+    assert preview["status"] == "preview"
+
+    pick["event_start_utc"] = "garbage"
+    patch_dash(
+        "_pick_quote",
+        lambda row, refusals=None: {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
+    )
+
+    result = dashboard_server.submit_order({"nonce": preview["nonce"]})
+
+    assert result["status"] == "refused"
+    assert "start time unreadable" in result["error"]
 
 
 def test_sell_still_allowed_before_the_game_starts(monkeypatch, patch_dash) -> None:

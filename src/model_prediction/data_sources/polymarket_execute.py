@@ -154,6 +154,24 @@ def _earliest_event_start(pick_row: dict[str, Any], live_snapshot: dict[str, Any
     return min(starts) if starts else None
 
 
+def _exchange_event_start(live_snapshot: dict[str, Any] | None) -> datetime | None:
+    """The live quote's own event start, None when it carries none; raises when it carries one we cannot read.
+
+    ``gameStartTime`` is optional on the market endpoint (``PolymarketUSClient._build_snapshot`` copies it
+    straight through), so an absent start keeps the row-only check rather than refusing every such quote.
+    A start that is present but naive or unparseable is refused: guessing a timezone for it could place a
+    buy after the game began."""
+    raw = (live_snapshot or {}).get("event_start_utc")
+    if raw is None or raw == "":
+        return None
+    try:
+        return parse_utc(str(raw))
+    except ValueError as error:
+        raise ExecutionGateError(
+            f"REFUSED: live quote has an unreadable event_start_utc ({raw!r}); nothing was sent."
+        ) from error
+
+
 def _describe_prior_buy(event: dict[str, Any]) -> str:
     """Name the audit event that blocks a second buy: an order, an unknown outcome, or a dangling intent."""
     payload = event.get("payload") or {}
@@ -666,15 +684,16 @@ class PolymarketExecutor:
                 f"REFUSED: could not audit the order intent ({type(error).__name__}: {error}); nothing was sent."
             ) from error
         # The intent append can wait on the audit lock; the pregame check above ran before that wait.
-        with suppress(TypeError, ValueError):
-            if utc_now() >= parse_utc(str(pick_row.get("event_start_utc", ""))):
-                with suppress(*_AUDIT_ERRORS):
-                    self.audit.append(
-                        "order_rejected", ticket.pick_id, {"intent_id": intent_id, "error": "event started"}
-                    )
-                raise ExecutionGateError(
-                    "REFUSED: the event started while the order intent was being audited; nothing was sent."
+        # The earlier of the row's and the exchange's start counts, as it did before the wait.
+        earliest_start = _earliest_event_start(pick_row, live_snapshot)
+        if earliest_start is not None and utc_now() >= earliest_start:
+            with suppress(*_AUDIT_ERRORS):
+                self.audit.append(
+                    "order_rejected", ticket.pick_id, {"intent_id": intent_id, "error": "event started"}
                 )
+            raise ExecutionGateError(
+                "REFUSED: the event started while the order intent was being audited; nothing was sent."
+            )
         try:
             submission = self._submit(
                 ticket,
@@ -831,6 +850,11 @@ class PolymarketExecutor:
             raise ExecutionGateError(
                 f"REFUSED: could not fetch a live quote to verify this order ({type(error).__name__})."
             ) from error
+        # The exchange's own start can sit earlier than the row's ESPN time; the game has started when
+        # either says so. A quote that carries a start we cannot read proves nothing, so it refuses.
+        exchange_start = _exchange_event_start(snapshot)
+        if exchange_start is not None and utc_now() >= min(event_start, exchange_start):
+            raise ExecutionGateError("REFUSED: event has already started.")
         try:
             observed_at = parse_utc(str(snapshot["observed_at_utc"]))
         except (KeyError, ValueError) as error:

@@ -762,6 +762,57 @@ def test_quote_carries_the_exchange_start_and_readiness_uses_the_earlier_start(s
     assert exposed["event_start_utc"] == _EARLIER
 
 
+_FUTURE_START = "2099-01-01T00:00:00Z"
+_UNREADABLE_STARTS = [None, "", "not-a-time", "2099-01-01T00:00:00", 12345]
+
+
+@pytest.mark.parametrize("row_start", _UNREADABLE_STARTS)
+def test_a_row_without_a_readable_aware_start_counts_as_started(row_start) -> None:
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    row = {"event_start_utc": row_start}
+    quote = {"event_start_utc": _FUTURE_START}
+
+    assert orders._event_already_started(row) is True
+    assert orders._event_already_started(row, quote) is True
+    assert orders._event_already_started({}, quote) is True
+
+
+@pytest.mark.parametrize("quote_start", ["not-a-time", "2099-01-01T00:00:00", 12345])
+def test_a_provided_quote_start_that_is_unreadable_counts_as_started(quote_start) -> None:
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    row = {"event_start_utc": _FUTURE_START}
+
+    assert orders._event_already_started(row, {"event_start_utc": quote_start}) is True
+
+
+@pytest.mark.parametrize("quote", [None, {}, {"event_start_utc": None}, {"event_start_utc": ""}])
+def test_an_absent_quote_start_leaves_the_row_start_in_charge(quote) -> None:
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+
+    assert orders._event_already_started({"event_start_utc": _FUTURE_START}, quote) is False
+    assert orders._event_already_started({"event_start_utc": "2020-01-01T00:00:00Z"}, quote) is True
+
+
+def test_readiness_names_an_unreadable_start_instead_of_calling_the_game_started() -> None:
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    base = {**_pinned("away", -3.5, _NEG, "long"), "status": "open", "units": 1.0, "pick_tag": "qualified"}
+    quote = {"fresh": True, "market_state": "MARKET_STATE_OPEN", "ask": 0.5}
+
+    unreadable = (False, "event start time unreadable")
+    assert orders._order_readiness({**base, "event_start_utc": "garbage"}, quote) == unreadable
+    assert orders._order_readiness({**base, "event_start_utc": None}, quote) == unreadable
+    assert (
+        orders._order_readiness(
+            {**base, "event_start_utc": _FUTURE_START}, {**quote, "event_start_utc": "2099-01-01T00:00:00"}
+        )
+        == unreadable
+    )
+    # An unreadable start never hides a start that is plainly in the past.
+    assert orders._order_readiness(
+        {**base, "event_start_utc": "garbage"}, {**quote, "event_start_utc": "2020-01-01T00:00:00Z"}
+    ) == (False, "game has already started")
+
+
 @pytest.mark.parametrize(
     ("exchange_start", "quoted"),
     [("2026-11-21T21:04:00Z", True), ("2026-11-21T21:06:00Z", False), ("2026-11-21T22:00:00Z", False)],

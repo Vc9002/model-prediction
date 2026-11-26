@@ -458,6 +458,62 @@ def test_event_start_during_the_intent_append_sends_nothing(tmp_path, exchange, 
     assert _audit_types(tmp_path) == ["order_intent", "order_rejected"]
 
 
+def test_exchange_start_earlier_than_the_row_start_in_the_past_sends_nothing(tmp_path, exchange):
+    # The row's ESPN time is still ahead but the exchange already moved the game's start behind us.
+    row_start = _start(minutes=30)
+    exchange_start = utc_now() - timedelta(minutes=5)
+    with pytest.raises(pe.ExecutionGateError, match="already started"):
+        _executor(tmp_path, _snapshot(row_start, event_start_utc=iso_utc(exchange_start))).execute(
+            _ticket(row_start), _pick_row(row_start), execute_flag=True, user_command=True
+        )
+    assert exchange.order_posts() == []
+    assert _audit_types(tmp_path) == []
+
+
+@pytest.mark.parametrize("bad_start", ["2099-01-01T00:00:00", "not-a-time", 12345, "20261126"])
+def test_unreadable_or_naive_exchange_start_sends_nothing(tmp_path, exchange, bad_start):
+    start = _start()
+    with pytest.raises(pe.ExecutionGateError, match="unreadable event_start_utc"):
+        _executor(tmp_path, _snapshot(start, event_start_utc=bad_start)).execute(
+            _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+        )
+    assert exchange.order_posts() == []
+    assert _audit_types(tmp_path) == []
+
+
+@pytest.mark.parametrize("absent", [None, ""])
+def test_absent_exchange_start_keeps_the_row_only_check(tmp_path, exchange, absent):
+    # The market endpoint's gameStartTime is optional, so a quote without it is judged on the row alone.
+    start = _start()
+    exchange.ioc_fill = 10.0
+    result = _executor(tmp_path, _snapshot(start, event_start_utc=absent)).execute(
+        _ticket(start, resting_expires_at_utc=None), _pick_row(start), execute_flag=True, user_command=True
+    )
+    assert result["status"] == "submitted"
+    assert len(exchange.order_posts()) == 1
+
+
+def test_exchange_start_crossed_during_the_intent_append_sends_nothing(tmp_path, exchange, monkeypatch):
+    row_start = _start(minutes=30)
+    exchange_start = _start(minutes=10)
+    original = AuditLog.append
+
+    def slow_append(self, event_type, subject_id, payload, *args, **kwargs):
+        written = original(self, event_type, subject_id, payload, *args, **kwargs)
+        if event_type == "order_intent":
+            # The audit lock wait outlasted the exchange's start, well before the row's.
+            monkeypatch.setattr(pe, "utc_now", lambda: exchange_start + timedelta(seconds=1))
+        return written
+
+    monkeypatch.setattr(AuditLog, "append", slow_append)
+    with pytest.raises(pe.ExecutionGateError, match="event started"):
+        _executor(tmp_path, _snapshot(row_start, event_start_utc=iso_utc(exchange_start))).execute(
+            _ticket(row_start), _pick_row(row_start), execute_flag=True, user_command=True
+        )
+    assert exchange.order_posts() == []
+    assert _audit_types(tmp_path) == ["order_intent", "order_rejected"]
+
+
 def test_cancel_audit_failure_still_reports_cancelled(tmp_path, exchange, monkeypatch):
     monkeypatch.setattr(AuditLog, "append", _failing_append("order_cancelled"))
     result = _executor(tmp_path, _snapshot(_start())).cancel("ord-9", user_command=True, market_slug=SLUG)

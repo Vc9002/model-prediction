@@ -289,19 +289,50 @@ def _reconcile_orders_locked() -> None:
         _save_orders(payload)
 
 
-def _event_already_started(row: dict, quote: dict | None = None) -> bool:
-    """Whether the row's game has started, by the earlier of its start and the quote's exchange start.
+_START_UNREADABLE_REASON = "event start time unreadable"
 
-    The quote carries the exchange's own start for the contract; a game the exchange moved earlier
-    than the row's ESPN time has started when the exchange says so."""
-    starts = []
-    for raw in (row.get("event_start_utc"), (quote or {}).get("event_start_utc")):
-        try:
-            starts.append(datetime.fromisoformat(str(raw or "")))
-        except (ValueError, TypeError):
-            continue
+
+def _event_start_problem(row: dict, quote: dict | None = None) -> str | None:
+    """``"started"``, ``"unreadable"`` or None (pregame on every start we can read).
+
+    A game has started by the earlier of the row's start and the quote's exchange start: the quote
+    carries the exchange's own start for the contract, and a game the exchange moved earlier than the
+    row's ESPN time has started when the exchange says so. Fail closed on what cannot be read: a row
+    with no aware start, or a quote that carries a start (a null or blank one carries none) that is
+    unparseable or naive, is "unreadable" and blocks like a started game. A start that is plainly in
+    the past still reports "started", so the specific reason is never hidden behind the vaguer one."""
     now = datetime.now(UTC)
-    return any(start < now for start in starts if start.tzinfo is not None)
+    unreadable = False
+    for raw, required in ((row.get("event_start_utc"), True), ((quote or {}).get("event_start_utc"), False)):
+        if not required and (raw is None or raw == ""):
+            continue
+        try:
+            start = datetime.fromisoformat(str(raw or ""))
+        except (ValueError, TypeError):
+            start = None
+        if start is None or start.tzinfo is None:
+            unreadable = True
+        elif start < now:
+            return "started"
+    return "unreadable" if unreadable else None
+
+
+def _event_already_started(row: dict, quote: dict | None = None) -> bool:
+    """True when the game has started or its start cannot be read (see ``_event_start_problem``)."""
+    return _event_start_problem(row, quote) is not None
+
+
+def _sell_start_refusal(row: dict, quote: dict | None) -> dict | None:
+    """The refusal for a resting sell whose game started or whose start is unreadable, else None."""
+    problem = _event_start_problem(row, quote)
+    if problem == "started":
+        return {"status": "refused", "error": "game has already started; quote can no longer update"}
+    if problem == "unreadable":
+        return {
+            "status": "refused",
+            "error": f"{_START_UNREADABLE_REASON}; cannot confirm the game has not started",
+        }
+    return None
 
 
 def _is_manual_order(row: dict) -> bool:
@@ -331,8 +362,11 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     if quote.get("market_state") != "MARKET_STATE_OPEN":
         return False, "market is not open"
     # Block orders on past games
-    if _event_already_started(row, quote):
+    problem = _event_start_problem(row, quote)
+    if problem == "started":
         return False, "game has already started"
+    if problem:
+        return False, _START_UNREADABLE_REASON
     missing = [name for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY") if not os.environ.get(name)]
     if missing:
         return False, f"missing {' and '.join(missing)}"
@@ -597,8 +631,8 @@ def preview_order(payload: dict) -> dict:
         # update again. Validating a resting sell's "don't cross the bid"
         # check against that frozen number would be actively misleading,
         # not just imprecise, so this one case is still blocked.
-        if _event_already_started(row, quote):
-            return {"status": "refused", "error": "game has already started; quote can no longer update"}
+        if refusal := _sell_start_refusal(row, quote):
+            return refusal
         bid = quote.get("bid")
         if bid is not None and price <= float(bid):
             return {
@@ -683,8 +717,8 @@ def submit_order(payload: dict) -> dict:
         # progress has no live quote to validate against (_pick_quote only
         # ever returns pregame snapshots), so re-check here too rather than
         # trust that preview-time state still holds at submission time.
-        if _event_already_started(row, quote):
-            return {"status": "refused", "error": "game has already started; quote can no longer update"}
+        if refusal := _sell_start_refusal(row, quote):
+            return refusal
         bid = quote.get("bid")
         if bid is not None and ticket["price"] <= float(bid):
             return {"status": "refused", "error": "bid moved above your limit; preview the sell again"}
