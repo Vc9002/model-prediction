@@ -129,14 +129,21 @@ def team_matches(team_name: str, side_description: str) -> bool:
                 continue
             return True
     # Franchise mascot / distinctive token match (e.g. "DEN Nuggets" vs "Denver Nuggets", "GS Warriors" vs "Golden State Warriors")
+    # The prefix guard applies to the description's mascot token too, and a one-word team name has
+    # no mascot to match: a bare "Arkansas" is not "Central Arkansas" ("UCA"), nor "Illinois"
+    # "Eastern Illinois" ("EIU"). The team's own prefix is not checked: "Texas Southern Tigers"
+    # must still match the moneyline description "Tigers".
     t_tokens = team.split()
-    d_tokens = set(description.split())
-    if t_tokens and d_tokens:
+    d_list = description.split()
+    if len(t_tokens) > 1 and d_list:
         mascot = t_tokens[-1]
         if (
             len(mascot) > 3
             and mascot not in {"club", "city", "team", "state", "united"}
-            and mascot in d_tokens
+            and any(
+                token == mascot and (j == 0 or d_list[j - 1] not in _DISQUALIFYING_TEAM_PREFIXES)
+                for j, token in enumerate(d_list)
+            )
         ):
             return True
     return False

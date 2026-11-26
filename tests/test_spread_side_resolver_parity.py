@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import importlib
 import itertools
+import json
+from pathlib import Path
 
 import pytest
 
@@ -109,3 +111,100 @@ def test_gate_names_the_team_refusal(team: str, expected: str) -> None:
     market_team = "Louisiana" if team == "both" else "Nowhere State"
     with pytest.raises(pe.ExecutionGateError, match=f"matches {expected} of the row's teams"):
         pe._resolve_spread_side(row, {"team": market_team, "line": -2.5})
+
+
+# ------------------------------------------------------------------ real NCAAB triples
+#
+# tests/fixtures/ncaab_spread_side_triples.json: 320 (away, home, polymarket team, line, selection,
+# row line, event title) triples cut from the real data, with the side each must resolve to.
+#
+# Where the inputs came from (both read-only, 2026-11-25):
+#   - ESPN names (away_team/home_team): the decision payloads of the NCAAB spread rows in
+#     ledgers.db, joined to the Polymarket event by event_id (695 of 961 spread events join; the
+#     same id keys both). The few schools whose only snapshot games have no ledger row (EIU, UML,
+#     "Tenn. State", "Ore. State" and their opponents) take their name from the same school's other
+#     ledger rows.
+#   - Polymarket team, line and event title: odds/ncaab/*/polymarket_snapshots.jsonl spread rows
+#     (valid timestamps only). A spread snapshot's own team/line describe its LONG side; SHORT is the
+#     opponent at the negated line.
+#
+# How the expected side was derived, WITHOUT the code under test: the event title lists the two
+# teams "away vs. home", an orientation that holds on all 616 events whose ledger names decide it
+# (0 reversed; the other 44 differ only by abbreviation, e.g. "FDU vs. Butler" against "Fairleigh
+# Dickinson Knights"). The market's team is either exactly one title participant, or an abbreviation
+# whose school was identified by hand (UCA, NAU, EIU, UML, Tenn. State, Ore. State, plus two
+# long-form spellings). That fixes whether the market team is the away or the home side, and then
+# the rule is the market's own: a row on the market team at the market line is LONG, a row on the
+# opponent at the negated line is SHORT, every other (selection, line) pair is no match. The
+# "truth_side" field holds that; "expected_side" differs only where the resolver refuses on
+# purpose (UML in UMass Lowell vs UMass matches both row teams), and "expected_mapper_side"
+# differs only for the one real ledger row whose home team is mislabelled (Central Connecticut for
+# UConn), which only the mapper's title check can see.
+
+_FIXTURE = Path(__file__).parent / "fixtures" / "ncaab_spread_side_triples.json"
+_TRIPLES = json.loads(_FIXTURE.read_text(encoding="utf-8"))["triples"]
+# The 13 Polymarket names added to the alias table on 2026-11-25.
+_NEW_ALIASES = [
+    "UCA", "NAU", "EIU", "UML", "Tenn. State", "Ore. State", "UNCW", "FDU", "Penn",
+    "St. Thomas (MN)", "USC Upstate", "ARK-Pine Bluff", "Mich. State",
+]  # fmt: skip
+
+
+def _triple_id(t: dict) -> str:
+    return f"{t['event_id']}-{t['polymarket_team']}-{t['selection']}-{t['row_line']}"
+
+
+def _triple_inputs(t: dict) -> tuple[dict, dict]:
+    row = {
+        "league": "NCAAB",
+        "market_type": "spread",
+        "away_team": t["away"],
+        "home_team": t["home"],
+        "selection": t["selection"],
+        "line": str(t["row_line"]),
+    }
+    snapshot = {
+        "event_title": t["event_title"],
+        "market_type": "spread",
+        "team": t["polymarket_team"],
+        "line": t["market_line"],
+    }
+    return row, snapshot
+
+
+@pytest.mark.parametrize("triple", _TRIPLES, ids=_triple_id)
+def test_real_triples_resolve_the_same_side_in_the_core_the_gate_and_the_mapper(triple: dict) -> None:
+    row, snapshot = _triple_inputs(triple)
+
+    core = polymarket_matching.match_spread_side(
+        row, triple["row_line"], triple["polymarket_team"], triple["market_line"]
+    ).side
+    gate = _gate_side(row, {k: v for k, v in snapshot.items() if k != "event_title"})
+    mapper = backtests._spread_side_for_row(row, snapshot)
+
+    assert core == triple["expected_side"]
+    assert gate == triple["expected_side"]
+    assert mapper == triple["expected_mapper_side"]
+    # Fail closed is allowed where documented; a flipped side never is.
+    for got in (core, gate, mapper):
+        assert got in (None, triple["truth_side"])
+
+
+def test_fixture_covers_every_new_alias_the_refusals_and_a_broad_sample() -> None:
+    def names_in(t: dict) -> set[str]:
+        return {t["polymarket_team"], *t["event_title"].split(" vs. ")}
+
+    for alias in _NEW_ALIASES:
+        sided = [t for t in _TRIPLES if alias in names_in(t) and t["expected_side"]]
+        assert {t["expected_side"] for t in sided} == {"long", "short"}, alias
+
+    uml = [
+        t for t in _TRIPLES if t["polymarket_team"] == "UML" and t["event_title"] == "UMass Lowell vs. UMass"
+    ]
+    assert uml
+    assert any(t["truth_side"] and t["expected_side"] is None and t["refusal_reason"] for t in uml)
+
+    broad = [t for t in _TRIPLES if t["group"] == "broad"]
+    assert len(broad) >= 150
+    assert {t["expected_side"] for t in broad} == {"long", "short", None}
+    assert any(t["expected_mapper_side"] != t["expected_side"] for t in _TRIPLES)  # the mislabelled row
