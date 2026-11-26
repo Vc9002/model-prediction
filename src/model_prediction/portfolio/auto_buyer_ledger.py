@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
 from collections.abc import Callable
@@ -103,6 +104,98 @@ _EXECUTION_PASSTHROUGH_FIELDS = (
     "cohort_min_edge",
     "cohort_max_edge",
 )
+
+# Polymarket US taker fee per share: coefficient x p x (1 - p) on the price paid. The research code
+# documents 0.06 (docs.polymarket.us/fees, effective 2026-07-01), but the live NCAAB fills of
+# 2026-11-25 cost 0.07 x p x (1 - p) to the cent: exchange position cost minus shares x limit was
+# $0.29 on 16.69 sh at 49c (Rice), $0.35 on 20.02 sh at 49c, $0.20 on 11.62 sh at 56c. That is
+# about 1.75c a share at 50c. The order read-back this code parses (cumQuantity) carries no fee, so
+# every fill is recorded with this modeled fee and the live rows are trued up to the exchange
+# position cost in settle_auto_buyer_ledger. A post-only resting remainder is a maker fill and is
+# not charged here.
+TAKER_FEE_COEFFICIENT = 0.07
+# A position-cost difference above this per share is not one order's fee (the position aggregates
+# something else); the modeled fee stays.
+_MAX_PLAUSIBLE_FEE_PER_SHARE = 0.05
+
+
+def taker_fee_per_share(price: float) -> float:
+    p = min(max(float(price), 0.0), 1.0)
+    return TAKER_FEE_COEFFICIENT * p * (1.0 - p)
+
+
+def modeled_taker_fee_usd(shares: float, price: float) -> float:
+    return round(max(0.0, float(shares)) * taker_fee_per_share(price), 4)
+
+
+def row_fee_usd(row: dict[str, Any]) -> float:
+    """The row's recorded fee; 0.0 for a row written before fees were recorded."""
+    try:
+        fee = float(row.get("fee_usd") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    return fee if math.isfinite(fee) else 0.0
+
+
+def _refresh_fee_fields(row: dict[str, Any]) -> None:
+    """Re-derive the fee-inclusive fields from ``cost_usd``, ``shares`` and ``fee_usd``.
+
+    ``cost_usd`` stays shares x limit (reconcile, top-up merges and CLV assume it); the cost the caps
+    and P&L use is ``cost_incl_fee_usd``. ``net_edge`` is reporting only: buy gating stays on gross
+    edge (operator decision 2026-11-25).
+    """
+    if row.get("fee_usd") is None:
+        return
+    fee = row_fee_usd(row)
+    try:
+        cost = float(row.get("cost_usd") or 0.0)
+        shares = float(row.get("shares") or 0.0)
+        model_p = float(row.get("model_probability") or 0.0)
+    except (TypeError, ValueError):
+        return
+    row["fee_usd"] = round(fee, 4)
+    row["cost_incl_fee_usd"] = round(cost + fee, 4)
+    if shares > 0:
+        row["avg_fill_price"] = round(cost / shares, 4)
+        if model_p > 0:
+            row["net_edge"] = round(model_p - (cost + fee) / shares, 4)
+
+
+def _fee_inclusive_cost(row: dict[str, Any], cost: float) -> float:
+    """P&L cost basis: cost plus the recorded fee. A legacy row without ``fee_usd`` is unchanged."""
+    return cost + row_fee_usd(row) if row.get("fee_usd") is not None else cost
+
+
+def _win_pnl(row: dict[str, Any], shares: float, price: float, cost: float) -> float:
+    """A binary win's P&L: shares less the fee-inclusive cost (legacy rows: shares x (1 - price))."""
+    if row.get("fee_usd") is None:
+        return shares * (1.0 - price)
+    return shares - _fee_inclusive_cost(row, cost)
+
+
+def _true_up_fee_from_position_cost(row: dict[str, Any], position_cost: float) -> bool:
+    """Replace the modeled fee with the exchange's: position cost minus shares x limit.
+
+    Only for a row that records fees and whose position the caller matched share for share. The
+    difference also carries any price improvement below the limit; the position cost cannot split
+    the two. Returns whether the row changed.
+    """
+    if row.get("fee_usd") is None:
+        return False
+    try:
+        cost = float(row.get("cost_usd") or 0.0)
+        shares = float(row.get("shares") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    fee = round(float(position_cost) - cost, 4)
+    if shares <= 0 or not math.isfinite(fee) or abs(fee) > _MAX_PLAUSIBLE_FEE_PER_SHARE * shares:
+        return False
+    if row.get("fee_source") == "exchange_position_cost" and abs(row_fee_usd(row) - fee) < 1e-9:
+        return False
+    row["fee_usd"] = fee
+    row["fee_source"] = "exchange_position_cost"
+    _refresh_fee_fields(row)
+    return True
 
 
 class AutoBuyerLedgerWriteError(RuntimeError):
@@ -390,6 +483,10 @@ def record_auto_buy_execution(
     model_units = float(pick.get("units") or pick.get("display_units") or 1.0)
     unit_value_usd = float(order_payload.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
     units = _usd_to_auto_buyer_units(cost, unit_value_usd)
+    # The fee of this leg's filled shares, as the buyer modeled it (live and paper alike). A caller
+    # that passes none (a legacy or manual path) records no fee and keeps fee-exclusive P&L.
+    _fee_raw = order_payload.get("fee_usd")
+    fee_usd: float | None = round(float(_fee_raw), 4) if _fee_raw is not None else None
     model_id = str(order_payload.get("model_id") or pick.get("model_id") or pick.get("model_version") or "")
     model_p = float(pick.get("model_probability") or 0.0)
     market_p = float(pick.get("market_probability") or pick.get("market_implied_probability") or price)
@@ -464,6 +561,11 @@ def record_auto_buy_execution(
             rec["entry_price"] = avg_price
             rec["primary_filled_shares"] = total_shares
             rec["primary_filled_cost_usd"] = total_cost
+            if fee_usd is not None:
+                rec["fee_usd"] = round(row_fee_usd(rec) + fee_usd, 4)
+                rec["primary_fee_usd"] = rec["fee_usd"]
+                rec["fee_source"] = "modeled_taker_fee"
+            _refresh_fee_fields(rec)
             # The earlier leg's fallback fills are now in the primary baseline above; the new leg has
             # none yet. A stale count would be subtracted from the new remainder (C6) and under-count
             # the daily and per-game caps.
@@ -589,6 +691,10 @@ def record_auto_buy_execution(
     for field_name in _EXECUTION_PASSTHROUGH_FIELDS:
         if order_payload.get(field_name) is not None:
             jsonl_record[field_name] = order_payload[field_name]
+    if fee_usd is not None:
+        jsonl_record.update(
+            {"fee_usd": fee_usd, "primary_fee_usd": fee_usd, "fee_source": "modeled_taker_fee"}
+        )
     if fallback_unknown:
         jsonl_record["fallback_submit_unknown"] = True
     if submit_unknown:
@@ -604,6 +710,8 @@ def record_auto_buy_execution(
                 "units": 0.0,
                 "primary_filled_shares": 0.0,
                 "primary_filled_cost_usd": 0.0,
+                "fee_usd": 0.0,
+                "primary_fee_usd": 0.0,
                 "fill_known": False,
                 "order_state": ORDER_STATE_SUBMIT_UNKNOWN,
                 "fallback_order_id": None,
@@ -611,6 +719,8 @@ def record_auto_buy_execution(
                 "status": "open",
             }
         )
+
+    _refresh_fee_fields(jsonl_record)
 
     # 1. Append to JSONL log
     try:
@@ -911,6 +1021,20 @@ def reconcile_pending_auto_buyer_fallbacks(
             else:
                 row["fallback_filled_shares"] = round(fallback_filled, 4)
                 row["fallback_filled_cost_usd"] = round(fallback_filled * entry_price, 4)
+            if row.get("fee_usd") is not None and row.get("fee_source") != "exchange_position_cost":
+                # IOC fills (an unknown-fill primary or top-up) are taker fills and pay the modeled
+                # fee; a post-only resting remainder is a maker fill and adds none.
+                if update_primary:
+                    row["primary_fee_usd"] = modeled_taker_fee_usd(new_shares, entry_price)
+                    row["fee_usd"] = row["primary_fee_usd"]
+                else:
+                    leg_fee = (
+                        modeled_taker_fee_usd(fallback_filled, entry_price)
+                        if row.get("fallback_is_topup_ioc") is True
+                        else 0.0
+                    )
+                    row["fee_usd"] = round(float(row.get("primary_fee_usd") or 0.0) + leg_fee, 4)
+            _refresh_fee_fields(row)
             try:
                 unit_value = float(row.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
             except (TypeError, ValueError):
@@ -1616,19 +1740,49 @@ def _exchange_settlement_cost(
     resolution: dict[str, Any] | None,
     shares: float,
     recorded_cost: float,
+    row: dict[str, Any] | None = None,
 ) -> float:
-    """Use fee-inclusive exchange cost when it exactly matches this order."""
+    """Use fee-inclusive exchange cost when it exactly matches this order.
+
+    Otherwise the recorded cost plus the row's recorded fee: until 2026-11-25 P&L was fee-inclusive
+    only when the exchange position matched the row share for share. A row written before fees were
+    recorded keeps its recorded cost, so settled history is never restated.
+    """
+    fallback = _fee_inclusive_cost(row, recorded_cost) if row is not None else recorded_cost
     if resolution is None:
-        return recorded_cost
+        return fallback
     position_cost = resolution.get("position_cost_usd")
     position_quantity = resolution.get("position_quantity")
     if position_cost is None or position_quantity is None:
-        return recorded_cost
+        return fallback
     if abs(abs(float(position_quantity)) - shares) > 1e-9:
         # The resolution aggregates more than this one order; do not assign
         # the full position cost to every ledger row.
-        return recorded_cost
+        return fallback
+    if row is not None:
+        _true_up_fee_from_position_cost(row, float(position_cost))
     return float(position_cost)
+
+
+def _exchange_open_position_costs(snapshot: dict[str, Any]) -> dict[str, tuple[float, float]]:
+    """{slug: (abs net quantity, cost)} for the account's open positions, from portfolio_snapshot."""
+    positions = snapshot.get("positions") or {}
+    items = positions.items() if isinstance(positions, dict) else []
+    out: dict[str, tuple[float, float]] = {}
+    for slug, item in items:
+        if not isinstance(item, dict):
+            continue
+        cost_raw = item.get("cost")
+        if isinstance(cost_raw, dict):
+            cost_raw = cost_raw.get("value")
+        try:
+            qty = abs(float(item.get("netPositionDecimal") or item.get("netPosition") or 0.0))
+            cost = float(cost_raw)
+        except (TypeError, ValueError):
+            continue
+        if qty > 0 and math.isfinite(cost):
+            out[str(slug)] = (qty, cost)
+    return out
 
 
 def manually_settle_auto_buyer_order(
@@ -1686,13 +1840,15 @@ def manually_settle_auto_buyer_order(
         )
 
     shares = float(target.get("shares") or 0.0)
-    cost = float(target.get("cost_usd") or 0.0)
+    cost = _fee_inclusive_cost(target, float(target.get("cost_usd") or 0.0))
     unit_value_usd = float(target.get("unit_value_usd") or AUTO_BUYER_UNIT_VALUE_USD)
     if settlement_type == "fair_value":
         if result != "push":
             raise ValueError("fair_value settlement must use result='push'")
         pnl_usd = round(
-            (float(settlement_price or 0.0) - float(target.get("entry_price") or 0.0)) * shares, 4
+            (float(settlement_price or 0.0) - float(target.get("entry_price") or 0.0)) * shares
+            - (row_fee_usd(target) if target.get("fee_usd") is not None else 0.0),
+            4,
         )
     elif result == "win":
         pnl_usd = round(shares - cost, 4)
@@ -1914,6 +2070,7 @@ def settle_auto_buyer_ledger(
             offset_fills.update(_exchange_offset_fills(snapshot))
         except (OSError, ValueError, KeyError, TypeError, RuntimeError):
             pass
+    open_position_costs = _exchange_open_position_costs(exchange_snapshot) if exchange_snapshot else {}
 
     for r in records:
         sport = str(r.get("sport") or "").upper()
@@ -1949,6 +2106,18 @@ def settle_auto_buyer_ledger(
         units = float(r["units"])
         if str(r.get("status") or "").lower() == "settled":
             r["pnl_units"] = _usd_to_auto_buyer_units(float(r.get("pnl_usd") or 0.0), unit_value_usd)
+
+        # Replace the modeled fee with the exchange's once the open position is this row's alone,
+        # share for share (a pending fill would make the comparison premature).
+        open_position = open_position_costs.get(slug) if slug else None
+        if (
+            open_position is not None
+            and str(r.get("status") or "").lower() == "open"
+            and r.get("fill_known") is not False
+            and not (r.get("fallback_order_id") and not r.get("fallback_reconciled"))
+            and abs(open_position[0] - shares) <= 1e-6
+        ):
+            _true_up_fee_from_position_cost(r, open_position[1])
 
         # An unknown submission is never settled or voided here: whether the order exists is
         # unknown, so it stays open (and counted pending) until the operator resolves it. The same
@@ -2008,7 +2177,7 @@ def settle_auto_buyer_ledger(
             )
             if corrected_res is not None:
                 assert exchange_resolution is not None
-                settlement_cost = _exchange_settlement_cost(exchange_resolution, shares, cost)
+                settlement_cost = _exchange_settlement_cost(exchange_resolution, shares, cost, r)
                 expected_pnl_usd = round(
                     shares - settlement_cost if corrected_res == "win" else -settlement_cost,
                     4,
@@ -2101,10 +2270,10 @@ def settle_auto_buyer_ledger(
 
                                         if corrected_res != r.get("result"):
                                             if corrected_res == "win":
-                                                pnl_usd = round(shares * (1.0 - price), 4)
+                                                pnl_usd = round(_win_pnl(r, shares, price, cost), 4)
                                                 pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                                             elif corrected_res == "loss":
-                                                pnl_usd = round(-cost, 4)
+                                                pnl_usd = round(-_fee_inclusive_cost(r, cost), 4)
                                                 pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                                             else:
                                                 pnl_usd = 0.0
@@ -2165,10 +2334,10 @@ def settle_auto_buyer_ledger(
 
                     if corrected_res and corrected_res != r.get("result"):
                         if corrected_res == "win":
-                            pnl_usd = round(shares * (1.0 - price), 4)
+                            pnl_usd = round(_win_pnl(r, shares, price, cost), 4)
                             pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                         elif corrected_res == "loss":
-                            pnl_usd = round(-cost, 4)
+                            pnl_usd = round(-_fee_inclusive_cost(r, cost), 4)
                             pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                         else:
                             pnl_usd = 0.0
@@ -2601,7 +2770,7 @@ def settle_auto_buyer_ledger(
                     r["settlement_pnl_derived_shares"] = sell_trade["derived_pnl_shares"]
             else:
                 exchange_resolution = pm_resolutions.get(slug)
-                settlement_cost = _exchange_settlement_cost(exchange_resolution, shares, cost)
+                settlement_cost = _exchange_settlement_cost(exchange_resolution, shares, cost, r)
                 if result == "win":
                     pnl_usd = round(shares - settlement_cost, 4)
                     pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
@@ -2610,7 +2779,7 @@ def settle_auto_buyer_ledger(
                     pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                 elif result == "push" and r.get("settlement_type") == "fair_value":
                     settlement_price = float(r.get("settlement_price") or 0.0)
-                    pnl_usd = round((settlement_price - price) * shares, 4)
+                    pnl_usd = round((settlement_price - price) * shares - _fee_inclusive_cost(r, 0.0), 4)
                     pnl_units = _usd_to_auto_buyer_units(pnl_usd, unit_value_usd)
                 else:
                     pnl_usd = 0.0

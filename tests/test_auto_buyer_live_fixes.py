@@ -822,7 +822,7 @@ def test_loss_stop_counts_gross_losses_so_morning_wins_never_offset_them(tmp_pat
     )
     assert auto_executor._today_auto_buyer_totals(tmp_path)[1] == -250.0
     # The paper book keeps the net figure.
-    assert auto_executor._today_auto_buyer_totals(tmp_path, gross_loss=False)[1] == -50.0
+    assert auto_executor._today_auto_buyer_totals(tmp_path, live_book=False)[1] == -50.0
 
 
 def test_loss_stop_ignores_manual_rows(tmp_path, frozen_now):
@@ -915,3 +915,177 @@ def test_settle_route_refuses_while_another_run_holds_the_writer_lock(tmp_path, 
     assert settled == []
     code, body = _post(f"/api/auto-buyer/settle?mode={mode}", {})
     assert code == 200 and len(settled) == 1
+
+
+# ---------------------------------------------------------------- 5. fees
+
+
+FEE_AT_50C = 0.07 * 0.5 * 0.5  # TAKER_FEE_COEFFICIENT x p x (1 - p): 1.75c a share at 50c
+
+
+def test_modeled_fee_matches_the_live_fills_of_2026_11_25():
+    # Exchange position cost minus shares x limit on real rows: Rice 16.69 sh at 49c cost $0.29,
+    # Long Beach St 20.02 sh at 49c $0.35, Liberty 11.62 sh at 56c $0.20.
+    assert round(auto_buyer_ledger.modeled_taker_fee_usd(16.69, 0.49), 2) == 0.29
+    assert round(auto_buyer_ledger.modeled_taker_fee_usd(20.02, 0.49), 2) == 0.35
+    assert round(auto_buyer_ledger.modeled_taker_fee_usd(11.62, 0.56), 2) == 0.20
+
+
+def test_live_fill_records_fee_avg_price_and_net_edge(tmp_path, buyer_env):
+    _BuyExecutor.fill_fraction = 0.5
+    pick = _pick(SPREAD_V7, pick_id="f1", event="gf1", model_probability=0.57, ask=0.50, units=2.0)
+    _live_buyer(tmp_path).evaluate_and_execute([pick])
+    row = _ledger(tmp_path / "auto_buyer_ledger.jsonl")[0]
+    assert row["fee_usd"] == pytest.approx(row["shares"] * FEE_AT_50C, abs=1e-4)
+    assert row["fee_source"] == "modeled_taker_fee"
+    assert row["avg_fill_price"] == 0.5
+    assert row["cost_incl_fee_usd"] == pytest.approx(row["cost_usd"] + row["fee_usd"], abs=1e-4)
+    assert row["net_edge"] == pytest.approx(0.57 - (0.5 + FEE_AT_50C), abs=1e-4)
+    # Gating stays on gross edge: the recorded edge is the live-ask edge.
+    assert row["edge"] == pytest.approx(0.07, abs=1e-4)
+
+
+def test_live_game_cap_is_fee_inclusive_and_the_ticket_stays_shares_times_limit(tmp_path, buyer_env):
+    pick = _pick(SPREAD_V7, pick_id="cap", event="gcap", model_probability=0.57, ask=0.50, units=5.0)
+    _live_buyer(tmp_path).evaluate_and_execute([pick])
+    (ticket, _row) = _BuyExecutor.executed[0]
+    assert ticket.estimated_cost_usd == pytest.approx(round(ticket.size_shares * ticket.price, 2))
+    all_in = ticket.estimated_cost_usd + auto_buyer_ledger.modeled_taker_fee_usd(ticket.size_shares, 0.5)
+    assert 24.5 < all_in <= 25.0
+    # The next cycle reads the game as full: a total on the same game is refused.
+    _BuyExecutor.executed = []
+    total = _pick(TOTAL_V6, pick_id="cap-t", event="gcap", market="total", model_probability=0.57)
+    later = _live_buyer(tmp_path).evaluate_and_execute([total])
+    assert _BuyExecutor.executed == [] and later.rejected_budget == 1
+
+
+def test_live_daily_spend_includes_recorded_fees_but_paper_spend_does_not(tmp_path, frozen_now):
+    row = {
+        "pick_id": "d1",
+        "order_id": "o-d1",
+        "executed_at_utc": "2026-11-26T14:00:00Z",
+        "event_start_utc": "2026-11-26T20:00:00Z",
+        "status": "open",
+        "cost_usd": 10.0,
+        "fee_usd": 0.35,
+        "shares": 20.0,
+        "entry_price": 0.5,
+    }
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [row])
+    assert auto_executor._today_auto_buyer_totals(tmp_path)[0] == 10.35
+    assert auto_executor._today_auto_buyer_totals(tmp_path, live_book=False)[0] == 10.0
+
+
+def test_paper_fill_records_the_same_modeled_fee_and_settles_net_of_it(tmp_path, buyer_env, monkeypatch):
+    paper_root = tmp_path / "paper_auto_buyer"
+    monkeypatch.setattr(auto_executor, "PAPER_AUTO_BUYER_DATA_ROOT", paper_root)
+    pick = _pick(SPREAD_V7, pick_id="pp1", event="gp1", model_probability=0.57, ask=0.50, units=2.0)
+    paper = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            mode="paper",
+            unit_value_usd=5.0,
+            max_game_stake_usd=25.0,
+            max_daily_spend_usd=500.0,
+            whitelisted_models=(),
+            cohorts=(BuyCohort(SPREAD_V7, "ncaab", "spread", 0.05, 0.12, "paper"),),
+            edge_scaled_sizing_enabled=False,
+            require_model_timestamp=True,
+            capture_missing_slates=False,
+            dedup_own_ledger_only=True,
+        ),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        data_root=tmp_path,
+    )
+    result = paper.evaluate_and_execute([pick])
+    # Paper sizing is unchanged: 2U at $5 is $10 of shares, the fee comes on top.
+    assert result.dry_run_orders[0]["cost_usd"] == 10.0
+    auto_executor._record_paper_fills(result.dry_run_orders)
+    row = _ledger(paper_root / "auto_buyer_ledger.jsonl")[0]
+    assert row["fee_usd"] == pytest.approx(20.0 * FEE_AT_50C, abs=1e-4)
+    row.update({"event_start_utc": "2026-11-25T00:30:00Z", "home_team": "Boston Celtics"})
+    row.update({"away_team": "New York Knicks", "sport": "NBA", "selection": "home", "line": -3.5})
+    _write_ledger(paper_root / "auto_buyer_ledger.jsonl", [row])
+    _no_gateway(monkeypatch)
+    espn = _espn_by_date(
+        {
+            "20261125": [
+                _espn_game("t1", "2026-11-25T00:30Z", "New York Knicks", "100", "Boston Celtics", "110")
+            ]
+        }
+    )
+    settle_auto_buyer_ledger(data_root=paper_root, espn=espn)
+    settled = _ledger(paper_root / "auto_buyer_ledger.jsonl")[0]
+    assert settled["result"] == "win"
+    assert settled["pnl_usd"] == pytest.approx(20.0 - 10.0 - 20.0 * FEE_AT_50C, abs=1e-4)
+
+
+def _settle_row(**extra: Any) -> dict[str, Any]:
+    return _series_row(**{"market_slug": "test-fee-total", **extra})
+
+
+def test_settlement_is_fee_inclusive_for_rows_that_record_a_fee(tmp_path, monkeypatch):
+    _no_gateway(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(
+        path,
+        [
+            _settle_row(order_id="with-fee", fee_usd=0.18, primary_fee_usd=0.18),
+            _settle_row(order_id="legacy", market_slug="test-fee-total-legacy"),
+        ],
+    )
+    espn = _espn_by_date(
+        {
+            "20261125": [
+                _espn_game("t1", "2026-11-25T00:30Z", "Boston Celtics", "120", "New York Knicks", "118")
+            ]
+        }
+    )
+    settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)
+    by_order = {r["order_id"]: r for r in _ledger(path)}
+    assert by_order["with-fee"]["pnl_usd"] == pytest.approx(10.0 - 5.0 - 0.18)
+    # A row written before fees were recorded is graded exactly as before.
+    assert by_order["legacy"]["pnl_usd"] == pytest.approx(5.0)
+    assert "fee_usd" not in by_order["legacy"]
+
+
+class _PortfolioStub:
+    def __init__(self, positions: dict[str, Any]) -> None:
+        self.positions = positions
+
+    def portfolio_snapshot(self) -> dict[str, Any]:
+        return {"status": "live", "positions": self.positions, "activities": []}
+
+
+def test_open_row_fee_is_trued_up_to_the_exchange_position_cost(tmp_path, monkeypatch):
+    _no_gateway(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    future = iso_utc(utc_now() + timedelta(hours=3))
+    row = _settle_row(
+        event_start_utc=future,
+        shares=16.69,
+        entry_price=0.49,
+        cost_usd=8.1781,
+        model_probability=0.56,
+        fee_usd=0.2919,
+        primary_fee_usd=0.2919,
+        fee_source="modeled_taker_fee",
+    )
+    _write_ledger(path, [row])
+    stub = _PortfolioStub({"test-fee-total": {"netPosition": "-16.69", "cost": {"value": "8.4681"}}})
+    settle_auto_buyer_ledger(data_root=tmp_path, espn=_espn_by_date({}), polymarket_executor=stub)
+    trued = _ledger(path)[0]
+    assert trued["status"] == "open"
+    assert trued["fee_usd"] == pytest.approx(0.29)
+    assert trued["fee_source"] == "exchange_position_cost"
+    assert trued["cost_incl_fee_usd"] == pytest.approx(8.4681)
+    assert trued["net_edge"] == pytest.approx(0.56 - 8.4681 / 16.69, abs=1e-4)
+
+
+def test_a_position_that_aggregates_more_than_the_row_keeps_the_modeled_fee(tmp_path, monkeypatch):
+    _no_gateway(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    future = iso_utc(utc_now() + timedelta(hours=3))
+    _write_ledger(path, [_settle_row(event_start_utc=future, fee_usd=0.18, fee_source="modeled_taker_fee")])
+    stub = _PortfolioStub({"test-fee-total": {"netPosition": "25", "cost": {"value": "12.9"}}})
+    settle_auto_buyer_ledger(data_root=tmp_path, espn=_espn_by_date({}), polymarket_executor=stub)
+    assert _ledger(path)[0]["fee_source"] == "modeled_taker_fee"

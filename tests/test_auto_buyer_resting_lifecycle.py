@@ -446,8 +446,10 @@ def test_daily_spend_counts_only_the_unfilled_remainder(tmp_path):
     ]
     _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", rows)
     spend, _ = auto_executor._today_auto_buyer_totals(tmp_path)
-    # fb: 3.00 filled + 6 * 0.5 pending; uk: 2.00 + 6 * 0.5; su: 7.50.
-    assert spend == pytest.approx(3.0 + 3.0 + 2.0 + 3.0 + 7.5)
+    # fb: 3.00 filled + 6 * 0.5 pending; uk: 2.00 + 6 * 0.5; su: 7.50. The live book's caps are
+    # fee-inclusive, so each pending share also carries its modeled fee (su has no price to model).
+    fee = auto_buyer_ledger.taker_fee_per_share(0.5)
+    assert spend == pytest.approx(3.0 + 3.0 + 2.0 + 3.0 + 7.5 + 12 * fee, abs=0.01)
 
 
 def test_a_dead_looking_row_with_a_resting_fallback_still_blocks_its_pick(tmp_path):
@@ -496,7 +498,8 @@ def test_game_exposure_keeps_a_picks_pending_exposure_apart_from_its_filled_cost
     exposure = _buyer(tmp_path)._build_bought_index()["game_exposure"]["event:g1"]
     # The game-room check skips only key "p1" (the pick's own filled cost, which the top-up math
     # subtracts); its resting $5 stays on the game.
-    assert exposure == {"p1": pytest.approx(3.0), "p1#pending": pytest.approx(5.0)}
+    pending = 5.0 + 10 * auto_buyer_ledger.taker_fee_per_share(0.5)  # fee-inclusive live caps
+    assert exposure == {"p1": pytest.approx(3.0), "p1#pending": pytest.approx(pending)}
 
 
 # ---------------------------------------------------------------- B6 / C5 / D-02 reconcile

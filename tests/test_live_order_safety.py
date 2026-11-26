@@ -987,10 +987,14 @@ def test_unknown_ioc_records_an_unknown_row_alarms_halts_and_blocks(tmp_path, ex
     assert requested == pytest.approx(10.0, abs=0.06)
     assert unknown["idempotency_key"] == exchange.order_posts()[0]["headers"]["Idempotency-Key"]
 
-    # Caps: the requested cost counts toward the daily and per-game caps.
-    assert auto_executor._today_auto_buyer_totals(tmp_path)[0] == pytest.approx(requested)
+    # Caps: the requested cost, plus its modeled taker fee (the live caps are fee-inclusive), counts
+    # toward the daily and per-game caps.
+    requested_all_in = requested + unknown["requested_shares"] * auto_buyer_ledger.taker_fee_per_share(
+        unknown["entry_price"]
+    )
+    assert auto_executor._today_auto_buyer_totals(tmp_path)[0] == pytest.approx(requested_all_in, abs=0.01)
     index = _buyer(tmp_path, rows)._build_bought_index()
-    assert sum(index["game_exposure"]["event:g1"].values()) == pytest.approx(requested)
+    assert sum(index["game_exposure"]["event:g1"].values()) == pytest.approx(requested_all_in, abs=0.01)
 
     # Next cycle: the unknown pick is blocked, nothing is resent.
     again = _buyer(tmp_path, rows[:1]).evaluate_and_execute([dict(rows[0])])
@@ -1612,7 +1616,11 @@ def test_unknown_fallback_leg_row_is_unreconciled_pending_and_counts_toward_the_
 
     remainder_cost = recorded["fallback_resting_shares"] * recorded["entry_price"]
     assert remainder_cost > 0
-    expected = recorded["cost_usd"] + remainder_cost
+    # Fee-inclusive live caps: the IOC fill's recorded fee and the remainder's modeled fee count too.
+    remainder_fee = recorded["fallback_resting_shares"] * auto_buyer_ledger.taker_fee_per_share(
+        recorded["entry_price"]
+    )
+    expected = recorded["cost_usd"] + recorded["fee_usd"] + remainder_cost + remainder_fee
     assert auto_executor._today_auto_buyer_totals(tmp_path)[0] == pytest.approx(expected, abs=0.01)
     index = _buyer(tmp_path, [row])._build_bought_index()
     assert "fu2" not in index["partially_filled"]

@@ -40,7 +40,13 @@ from model_prediction.data_sources.polymarket_execute import (
     classify_gate_refusal,
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
-from model_prediction.portfolio.auto_buyer_ledger import event_key_from_slug, is_fallback_submit_unknown
+from model_prediction.portfolio.auto_buyer_ledger import (
+    event_key_from_slug,
+    is_fallback_submit_unknown,
+    modeled_taker_fee_usd,
+    row_fee_usd,
+    taker_fee_per_share,
+)
 from model_prediction.portfolio.auto_buyer_tracking import (
     LIVE_FILL_LOG_NAME,
     SKIP_LOG_NAME,
@@ -1161,14 +1167,16 @@ def _append_auto_buyer_cycle_history(
         logger.warning("Failed to append auto_buyer_cycle_history.jsonl: %s", exc)
 
 
-def _pending_exposure_cost(row: dict[str, Any]) -> float:
+def _pending_exposure_cost(row: dict[str, Any], *, with_fee: bool = False) -> float:
     """Dollars an open order of this row may still add on the exchange, beyond its recorded fill.
 
     One helper for the daily cap, the per-game cap and the pending-orders check (C6), so none of
     them double-counts: reconcile folds a resting fallback's partial fill into ``cost_usd`` (and
     ``fallback_filled_shares``), and an unknown-fill primary's into ``shares``, so only the unfilled
     remainder is still pending. An open unknown submission counts its full requested cost and an
-    unknown fallback leg its remainder: either may exist on the exchange.
+    unknown fallback leg its remainder: either may exist on the exchange. ``with_fee`` (the live
+    book's fee-inclusive caps) adds the modeled taker fee of the pending shares, the same fee the
+    order was sized with, so a game sized to its $25 cap reads as full while its order rests.
     """
     try:
         price = float(row.get("entry_price") or 0.0)
@@ -1186,6 +1194,8 @@ def _pending_exposure_cost(row: dict[str, Any]) -> float:
             cost = max(0.0, resting - float(row.get("shares") or 0.0)) * price
         else:
             cost = max(0.0, resting - float(row.get("fallback_filled_shares") or 0.0)) * price
+        if with_fee and price > 0:
+            cost += cost / price * taker_fee_per_share(price)
     except (TypeError, ValueError):
         return 0.0
     return cost if math.isfinite(cost) and cost > 0 else 0.0
@@ -1325,16 +1335,16 @@ def _live_book_has_pending_orders(ledger_path: Path) -> bool:
     )
 
 
-def _today_auto_buyer_totals(data_root: Path | str = DATA, *, gross_loss: bool = True) -> tuple[float, float]:
+def _today_auto_buyer_totals(data_root: Path | str = DATA, *, live_book: bool = True) -> tuple[float, float]:
     """Today's (ET calendar day) executed spend and the P&L the daily loss stop compares.
 
     Computed fresh from the ledger rather than reset per call, so the daily-spend cap and the loss
     stop both apply across a full calendar day's worth of cycles. Hand-placed (manual) rows count
     in neither half. A settled row belongs to the ET date of its game's start (its settlement time
     only when the start is missing), so a late tip settled after midnight still counts against the
-    day it was bought for. With ``gross_loss`` (the live book) the second value is minus the sum of
-    today's losses alone: morning wins must not let afternoon losses run past the stop. The paper
-    book passes False and keeps the net figure.
+    day it was bought for. For the live book (``live_book``) spend includes each row's recorded fee
+    and the second value is minus the sum of today's losses alone: morning wins must not let
+    afternoon losses run past the stop. The paper book keeps fee-exclusive spend and net P&L.
     """
     from model_prediction.portfolio.auto_buyer_ledger import (
         is_manual_auto_buyer_record,
@@ -1358,7 +1368,8 @@ def _today_auto_buyer_totals(data_root: Path | str = DATA, *, gross_loss: bool =
         if is_manual_auto_buyer_record(row):
             continue
         if _et_date(row.get("executed_at_utc")) == today:
-            spend += float(row.get("cost_usd") or 0.0) + _pending_exposure_cost(row)
+            fee = row_fee_usd(row) if live_book else 0.0
+            spend += float(row.get("cost_usd") or 0.0) + fee + _pending_exposure_cost(row, with_fee=live_book)
 
         result = str(row.get("result") or "").lower()
         if not row.get("settled_at_utc") or result not in ("win", "loss", "push"):
@@ -1371,7 +1382,7 @@ def _today_auto_buyer_totals(data_root: Path | str = DATA, *, gross_loss: bool =
             continue
         # Any negative row counts, not only result "loss": a fair-value push or a manual-sell exit
         # can realize a loss too.
-        realized_pnl += min(pnl, 0.0) if gross_loss else pnl
+        realized_pnl += min(pnl, 0.0) if live_book else pnl
 
     return round(spend, 2), round(realized_pnl, 2)
 
@@ -2747,6 +2758,8 @@ class AutoPolymarketBuyer:
             # book's fills would block the other book's cohort on the same game and side.
             auto_ledger_files = [auto_ledger_files[0] if self.config.mode == "live" else auto_ledger_files[1]]
         game_exposure: dict[str, dict[str, float]] = {}
+        # The live book's caps are fee-inclusive (2026-11-25); paper sizing is unchanged.
+        fee_in_caps = self.config.mode == "live"
         for auto_ledger_file, source_label in auto_ledger_files:
             if not auto_ledger_file.exists():
                 continue
@@ -2782,8 +2795,8 @@ class AutoPolymarketBuyer:
                     # Per-game exposure before the dead-row filter below: a zero-fill primary whose
                     # IOC was cancelled can still have its fallback resting on the book.
                     game = _game_key(r)
-                    pending_cost = _pending_exposure_cost(r)
-                    filled_cost_r = float(r.get("cost_usd") or 0.0)
+                    pending_cost = _pending_exposure_cost(r, with_fee=fee_in_caps)
+                    filled_cost_r = float(r.get("cost_usd") or 0.0) + (row_fee_usd(r) if fee_in_caps else 0.0)
                     if game and filled_cost_r + pending_cost > 0:
                         by_pick = game_exposure.setdefault(game, {})
                         pick_key = str(r.get("pick_id") or r.get("order_id") or "")
@@ -2837,7 +2850,9 @@ class AutoPolymarketBuyer:
                         and not fallback_unknown
                         and shares_cnt > 0
                     ):
-                        filled_cost = float(r.get("cost_usd") or 0.0)
+                        filled_cost = float(r.get("cost_usd") or 0.0) + (
+                            row_fee_usd(r) if fee_in_caps else 0.0
+                        )
                         p_info = {
                             "pick_id": pid,
                             "market_slug": slug,
@@ -3145,7 +3160,7 @@ class AutoPolymarketBuyer:
             else self.data_root
         )
         today_spend_usd, today_realized_pnl_usd = _today_auto_buyer_totals(
-            totals_root, gross_loss=totals_root != self.paper_data_root
+            totals_root, live_book=totals_root != self.paper_data_root
         )
 
         # Drawdown circuit breaker: once today's realized loss (gross on the live book) crosses
@@ -3721,11 +3736,30 @@ class AutoPolymarketBuyer:
                     result.rejected_min_topup += 1
                     continue
 
+            # The live book's caps are fee-inclusive (2026-11-25): $25 a game is $25 paid, taker fee
+            # included. When the fee alone would carry an order past the game or daily cap, the order
+            # shrinks to fit. Paper records the same fee for P&L but keeps fee-exclusive caps. The
+            # ticket itself stays shares x limit (the executor recomputes and checks exactly that).
+            fee_usd = modeled_taker_fee_usd(shares, limit_price)
+            fee_in_caps = self.config.mode == "live"
+            room = self.config.max_daily_spend_usd - committed_spend
+            if game:
+                room = min(room, self.config.max_game_stake_usd - game_other_spend)
+            # (The 10-cent slack is the game check's own rounding tolerance below.)
+            if fee_in_caps and actual_cost + fee_usd > room and actual_cost <= room + 0.10:
+                shares = math.floor(room / (limit_price + taker_fee_per_share(limit_price)) * 100) / 100
+                if shares < self.config.min_shares:
+                    result.rejected_budget += 1
+                    continue
+                actual_cost = round(shares * limit_price, 2)
+                fee_usd = modeled_taker_fee_usd(shares, limit_price)
+            all_in_cost = round(actual_cost + fee_usd, 4) if fee_in_caps else actual_cost
+
             # Daily budget check
-            if committed_spend + actual_cost > self.config.max_daily_spend_usd:
+            if committed_spend + all_in_cost > self.config.max_daily_spend_usd:
                 result.rejected_budget += 1
                 continue
-            if game and game_other_spend + actual_cost > self.config.max_game_stake_usd + 0.10:
+            if game and game_other_spend + all_in_cost > self.config.max_game_stake_usd + 0.10:
                 result.rejected_budget += 1
                 continue
 
@@ -3767,6 +3801,8 @@ class AutoPolymarketBuyer:
                 "limit_price": limit_price,
                 "shares": shares,
                 "cost_usd": actual_cost,
+                # Modeled taker fee of a full fill; the live path restates it for the filled shares.
+                "fee_usd": fee_usd,
                 "unit_value_usd": self.config.unit_value_usd,
                 "edge": round(edge, 4),
                 "event_start_utc": event_start_str,
@@ -3820,7 +3856,7 @@ class AutoPolymarketBuyer:
             if game:
                 # Requested cost, not filled: an IOC remainder can still rest and fill.
                 game_picks = bought_index.setdefault("game_exposure", {}).setdefault(game, {})
-                game_picks[pick_id] = game_picks.get(pick_id, 0.0) + actual_cost
+                game_picks[pick_id] = game_picks.get(pick_id, 0.0) + all_in_cost
             if "partially_filled" in bought_index and pick_id in bought_index["partially_filled"]:
                 del bought_index["partially_filled"][pick_id]
 
@@ -3836,7 +3872,7 @@ class AutoPolymarketBuyer:
                     }
                 )
                 current_spend += actual_cost
-                committed_spend += actual_cost
+                committed_spend += all_in_cost
                 result.total_spend_usd = round(current_spend, 2)
                 continue
 
@@ -3924,6 +3960,7 @@ class AutoPolymarketBuyer:
                     "requested_cost_usd": actual_cost,
                     "shares": 0.0,
                     "cost_usd": 0.0,
+                    "fee_usd": 0.0,
                     "order_ids": [],
                     "fill_known": False,
                     "intent_id": exc.intent_id,
@@ -3933,7 +3970,7 @@ class AutoPolymarketBuyer:
                     {"status": "submit_unknown", "error": str(exc), **unknown_payload}
                 )
                 # The order may exist: its requested cost counts against this pass's caps.
-                committed_spend += actual_cost
+                committed_spend += all_in_cost
                 logger.error(
                     "Live order outcome UNKNOWN for pick %s on %s (key %s): %s -- check the exchange, "
                     "never resubmit",
@@ -4004,6 +4041,8 @@ class AutoPolymarketBuyer:
             order_ids = sub.get("order_ids") or [oid]
             filled_shares = float(sub.get("filled_size_shares") or 0.0)
             filled_cost = float(sub.get("estimated_filled_cost_usd") or 0.0)
+            # The IOC fill is a taker fill; the order read-back carries no fee (see TAKER_FEE_COEFFICIENT).
+            filled_fee = modeled_taker_fee_usd(filled_shares, limit_price)
             fill_known = bool(sub.get("fill_known", True))
             fallback_status = sub.get("fallback_status")
             executed_payload = {
@@ -4012,6 +4051,7 @@ class AutoPolymarketBuyer:
                 "requested_cost_usd": actual_cost,
                 "shares": filled_shares,
                 "cost_usd": filled_cost,
+                "fee_usd": filled_fee,
                 "order_ids": order_ids,
                 "fallback_order_id": sub.get("fallback_order_id"),
                 "fallback_status": fallback_status,
@@ -4034,10 +4074,12 @@ class AutoPolymarketBuyer:
             )
             # The daily cap counts committed money: a fallback resting on the book can still
             # fill after this cycle, so 30 zero-fill IOCs resting $25 each must not read as $0.
-            resting_cost = float(sub.get("fallback_resting_shares") or 0.0) * limit_price
-            committed = round(filled_cost + resting_cost, 2)
+            resting_cost = float(sub.get("fallback_resting_shares") or 0.0) * (
+                limit_price + taker_fee_per_share(limit_price)
+            )
+            committed = round(filled_cost + filled_fee + resting_cost, 2)
             if not fill_known:
-                committed = max(committed, actual_cost)
+                committed = max(committed, all_in_cost)
             committed_spend += committed
             current_spend += filled_cost
             result.total_spend_usd = round(current_spend, 2)

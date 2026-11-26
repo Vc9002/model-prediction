@@ -1121,7 +1121,8 @@ def test_daily_totals_count_unreconciled_resting_exposure(tmp_path):
         ],
     )
     spend, _pnl = _REAL_TODAY_TOTALS(tmp_path)
-    assert spend == pytest.approx(35.0)
+    # The live book's caps are fee-inclusive: the 50 resting shares count at limit plus modeled fee.
+    assert spend == pytest.approx(35.0 + 50 * auto_buyer_ledger.taker_fee_per_share(0.5), abs=0.01)
 
 
 @pytest.mark.parametrize(
