@@ -33,10 +33,19 @@ def _probability_to_american(prob: float) -> int:
     return round(100.0 * (1.0 - p) / p)
 
 
-_ESPN_TEAM_NAME_FIELDS = ("displayName", "name", "abbreviation", "location", "shortDisplayName")
+# Fields for the exact-membership test only. location / shortDisplayName are school-only names
+# ("Kansas" for Kansas Jayhawks): they make a school-only row an exact match, but must never feed the
+# substring test, where "kansas" would sit inside "kansas state" and pick the wrong orientation.
+_ESPN_TEAM_EXACT_FIELDS = ("displayName", "name", "abbreviation", "location", "shortDisplayName")
+_ESPN_TEAM_SUBSTRING_FIELDS = ("displayName", "name", "abbreviation")
 
 # Polymarket US contract slugs; manual-sync rows carry one in event_id.
 _CONTRACT_SLUG_RE = re.compile(r"^(aec|asc|tsc|atc|mkt)-")
+
+
+def _espn_team_names(team: dict[str, Any], fields: tuple[str, ...]) -> set[str]:
+    names = {str(team.get(field) or "").casefold().strip() for field in fields}
+    return names - {"", "none", "tbd", "unknown"}
 
 
 def _get_ledger_path(data_root: Path | str | None = None) -> Path:
@@ -358,6 +367,7 @@ def settle_ledger_rows_against_espn(
             # match, across all leagues. Taking the first substring hit graded "Michigan" against
             # "Michigan State @ Ohio State" whenever that game was listed first.
             candidates: list[tuple[str, int, int, bool]] = []
+            ambiguous_ids: list[str] = []
             for espn_lg in espn_leagues:
                 try:
                     sb = espn.scoreboard(espn_lg, game_day)
@@ -370,79 +380,83 @@ def settle_ledger_rows_against_espn(
                             continue
                         c_away = next((c for c in comps if c.get("homeAway") == "away"), comps[1])
                         c_home = next((c for c in comps if c.get("homeAway") == "home"), comps[0])
+                        event_id = str(event.get("id") or "")
 
-                        # location / shortDisplayName: a school-only row ("Michigan") is never an exact
-                        # member of displayName ("Michigan Wolverines") or name ("Wolverines").
                         h_team = c_home.get("team") or {}
                         a_team = c_away.get("team") or {}
-                        h_names = {
-                            str(h_team.get(field) or "").casefold().strip()
-                            for field in _ESPN_TEAM_NAME_FIELDS
-                        }
-                        a_names = {
-                            str(a_team.get(field) or "").casefold().strip()
-                            for field in _ESPN_TEAM_NAME_FIELDS
-                        }
-                        for bad in ("", "none", "tbd", "unknown"):
-                            h_names.discard(bad)
-                            a_names.discard(bad)
-                        if not h_names or not a_names or not home_name or not away_name:
+                        h_exact = _espn_team_names(h_team, _ESPN_TEAM_EXACT_FIELDS)
+                        a_exact = _espn_team_names(a_team, _ESPN_TEAM_EXACT_FIELDS)
+                        if not h_exact or not a_exact or not home_name or not away_name:
                             continue
 
-                        h_match_normal = home_name in h_names or any(
-                            (hn in home_name or home_name in hn) for hn in h_names if len(hn) > 3
-                        )
-                        a_match_normal = away_name in a_names or any(
-                            (an in away_name or away_name in an) for an in a_names if len(an) > 3
-                        )
-
-                        h_match_inverted = home_name in a_names or any(
-                            (an in home_name or home_name in an) for an in a_names if len(an) > 3
-                        )
-                        a_match_inverted = away_name in h_names or any(
-                            (hn in away_name or away_name in hn) for hn in h_names if len(hn) > 3
-                        )
-
-                        if h_match_normal and a_match_normal:
-                            try:
-                                h_score = int(c_home.get("score", 0))
-                                a_score = int(c_away.get("score", 0))
-                            except (ValueError, TypeError):
+                        # Both orientations are judged on every event. The normal one used to be tried
+                        # first and win on any substring hit even when the inverted one was the exact
+                        # match (Kansas away at Kansas State against a Kansas State @ Kansas row).
+                        exact_normal = home_name in h_exact and away_name in a_exact
+                        exact_inverted = home_name in a_exact and away_name in h_exact
+                        if exact_normal and exact_inverted:
+                            ambiguous_ids.append(event_id or "?")
+                            continue
+                        if exact_normal or exact_inverted:
+                            inverted = exact_inverted
+                            exact = True
+                        else:
+                            h_names = _espn_team_names(h_team, _ESPN_TEAM_SUBSTRING_FIELDS)
+                            a_names = _espn_team_names(a_team, _ESPN_TEAM_SUBSTRING_FIELDS)
+                            h_match_normal = any(
+                                (hn in home_name or home_name in hn) for hn in h_names if len(hn) > 3
+                            )
+                            a_match_normal = any(
+                                (an in away_name or away_name in an) for an in a_names if len(an) > 3
+                            )
+                            h_match_inverted = any(
+                                (an in home_name or home_name in an) for an in a_names if len(an) > 3
+                            )
+                            a_match_inverted = any(
+                                (hn in away_name or away_name in hn) for hn in h_names if len(hn) > 3
+                            )
+                            normal = h_match_normal and a_match_normal
+                            flipped = h_match_inverted and a_match_inverted
+                            if normal and flipped:
+                                ambiguous_ids.append(event_id or "?")
                                 continue
-                            exact = home_name in h_names and away_name in a_names
-                        elif h_match_inverted and a_match_inverted:
-                            try:
-                                # When inverted: c_away is the row's home team, c_home is the row's away team
+                            if not normal and not flipped:
+                                continue
+                            inverted = flipped
+                            exact = False
+                        try:
+                            if inverted:
+                                # c_away is the row's home team, c_home is the row's away team
                                 h_score = int(c_away.get("score", 0))
                                 a_score = int(c_home.get("score", 0))
-                            except (ValueError, TypeError):
-                                continue
-                            exact = home_name in a_names and away_name in h_names
-                        else:
+                            else:
+                                h_score = int(c_home.get("score", 0))
+                                a_score = int(c_away.get("score", 0))
+                        except (ValueError, TypeError):
                             continue
-                        candidate = (str(event.get("id") or ""), a_score, h_score, exact)
+                        candidate = (event_id, a_score, h_score, exact)
                         if candidate not in candidates:
                             candidates.append(candidate)
                 except (KeyError, TypeError, ValueError, OSError):
                     logger.debug("Scoreboard lookup failed for %s on %s", espn_lg, game_day, exc_info=True)
                     continue
 
-            if len(candidates) > 1:
-                exact_hits = [c for c in candidates if c[3]]
-                if len(exact_hits) == 1:
-                    candidates = exact_hits
-            if len(candidates) == 1:
+            exact_hits = [c for c in candidates if c[3]]
+            if len(exact_hits) == 1:
+                match_found = (exact_hits[0][1], exact_hits[0][2])
+            elif not exact_hits and len(candidates) == 1 and not ambiguous_ids:
                 match_found = (candidates[0][1], candidates[0][2])
-            elif candidates:
-                # Several different games match the row's names and none is the only exact one:
-                # grading any of them is a guess, so the row stays open.
+            elif candidates or ambiguous_ids:
+                # Several different games match the row's names, or one event matches in both
+                # orientations, and none is the only exact one: grading any of them is a guess,
+                # so the row stays open.
                 match_ambiguous = True
                 logger.warning(
                     "ambiguous scoreboard match for %s @ %s on %s: events %s; leaving row %s open",
                     away_name,
                     home_name,
                     game_day,
-                    [c[0] or "?" for c in candidates],
+                    [c[0] or "?" for c in candidates] + ambiguous_ids,
                     row.get("pick_id"),
                 )
 
@@ -459,22 +473,18 @@ def settle_ledger_rows_against_espn(
                     prices = json.loads(raw_pxs) if isinstance(raw_pxs, str) else (raw_pxs or [])
                     for out_name, out_px in zip(outcomes, prices):
                         if str(out_px).strip() in ("1", "1.0", "1.00", "1.0000"):
-                            h_win = (
-                                1
-                                if (
-                                    home_name
-                                    and (home_name in out_name.casefold() or out_name.casefold() in home_name)
+                            out_key = str(out_name).casefold().strip()
+                            if out_key and out_key == home_name and out_key != away_name:
+                                h_win, a_win = 1, 0
+                            elif out_key and out_key == away_name and out_key != home_name:
+                                h_win, a_win = 0, 1
+                            else:
+                                h_win = int(
+                                    bool(home_name and (home_name in out_key or out_key in home_name))
                                 )
-                                else 0
-                            )
-                            a_win = (
-                                1
-                                if (
-                                    away_name
-                                    and (away_name in out_name.casefold() or out_name.casefold() in away_name)
+                                a_win = int(
+                                    bool(away_name and (away_name in out_key or out_key in away_name))
                                 )
-                                else 0
-                            )
                             if h_win and a_win:
                                 # Substring hit on both row names (Kansas / Kansas State): the winning
                                 # outcome cannot be attributed to one side.
@@ -501,9 +511,13 @@ def settle_ledger_rows_against_espn(
             sel_raw = str(row.get("selection") or "").casefold().strip()
             if sel_raw in ("home", "long", "over", "yes", "nrfi", "away", "short", "under", "no", "yrfi"):
                 sel = sel_raw
-            elif sel_raw == home_name or (home_name and (sel_raw in home_name or home_name in sel_raw)):
+            elif sel_raw == home_name:
                 sel = "home"
-            elif sel_raw == away_name or (away_name and (sel_raw in away_name or away_name in sel_raw)):
+            elif sel_raw == away_name:
+                sel = "away"
+            elif home_name and (sel_raw in home_name or home_name in sel_raw):
+                sel = "home"
+            elif away_name and (sel_raw in away_name or away_name in sel_raw):
                 sel = "away"
             else:
                 sel = sel_raw
@@ -558,6 +572,9 @@ def settle_ledger_rows_against_espn(
         elif match_ambiguous:
             # A decided game must not be voided because our own name matching cannot pick its
             # event; the warning above names the candidates and the row is retried every run.
+            if status != "open":
+                # resettle_all: a settled row stays settled, so it is not an open row.
+                open_count -= 1
             continue
         elif (now - start_dt).total_seconds() > 48 * 3600:
             row["status"] = "voided"

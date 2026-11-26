@@ -378,10 +378,16 @@ class _ResolvedMarketClient:
 
 
 def test_resolution_fallback_refuses_an_outcome_that_matches_both_row_teams(tmp_path, monkeypatch):
-    bet = {**_COLLEGE_BET, "league": "NCAAB", "away_team": "Kansas State", "home_team": "Kansas"}
+    # "Wildcats" is a substring of both row teams and equal to neither.
+    bet = {
+        **_COLLEGE_BET,
+        "league": "NCAAB",
+        "away_team": "Arizona Wildcats",
+        "home_team": "Kansas State Wildcats",
+    }
     record_manual_bet(bet, data_root=tmp_path)
-    _set_row_fields(tmp_path, event_id="aec-cbb-ksu-ku-2026-11-21")
-    client = _ResolvedMarketClient(["Kansas", "Kansas State"], ["0", "1"])
+    _set_row_fields(tmp_path, event_id="aec-cbb-ariz-ksu-2026-11-21")
+    client = _ResolvedMarketClient(["Wildcats", "Jayhawks"], ["1", "0"])
     monkeypatch.setattr("model_prediction.data_sources.polymarket_us.PolymarketUSClient", lambda: client)
     res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({}))
     assert res["settled_count"] == 0
@@ -397,3 +403,146 @@ def test_resolution_fallback_uses_the_event_id_slug_of_a_manual_row(tmp_path, mo
     res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({}))
     assert res["settled_count"] == 1
     assert read_manual_bets(data_root=tmp_path)[0]["result"] == "win"
+
+
+def test_resolution_fallback_takes_the_exactly_named_outcome_over_a_substring_hit(tmp_path, monkeypatch):
+    # "Kansas State" contains the home row team "Kansas" but equals only the away row team.
+    bet = {**_COLLEGE_BET, "league": "NCAAB", "away_team": "Kansas State", "home_team": "Kansas"}
+    record_manual_bet(bet, data_root=tmp_path)
+    _set_row_fields(tmp_path, event_id="aec-cbb-ksu-ku-2026-11-21")
+    client = _ResolvedMarketClient(["Kansas", "Kansas State"], ["0", "1"])
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.PolymarketUSClient", lambda: client)
+    res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({}))
+    assert res["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"], row["result"]) == ("1", "0", "loss")
+
+
+@pytest.mark.parametrize(
+    ("short", "short_mascot", "short_abbr", "long_mascot", "long_abbr"),
+    [
+        ("Kansas", "Jayhawks", "KU", "Wildcats", "KSU"),
+        ("Iowa", "Hawkeyes", "IOWA", "Cyclones", "ISU"),
+    ],
+)
+def test_settle_flipped_orientation_with_a_school_and_its_state_namesake(
+    tmp_path, short, short_mascot, short_abbr, long_mascot, long_abbr
+):
+    # Row: "<X> State" away at "<X>" home. ESPN lists <X> away at <X> State home, and <X> State wins.
+    # The normal orientation used to win on a substring hit ("kansas" inside "kansas state"), so the
+    # scores were swapped for good.
+    bet = {**_COLLEGE_BET, "away_team": f"{short} State", "home_team": short}
+    record_manual_bet(bet, data_root=tmp_path)
+    espn = _FakeScoreboard(
+        {
+            "NCAAF": [
+                _espn_event(
+                    "5",
+                    _espn_team(short, short_mascot, short_abbr, 14, "away"),
+                    _espn_team(f"{short} State", long_mascot, long_abbr, 28, "home"),
+                )
+            ]
+        }
+    )
+    assert settle_manual_bets(data_root=tmp_path, espn_client=espn)["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    # The row's home pick is <X>, which lost 14-28.
+    assert (row["away_score"], row["home_score"], row["result"]) == ("28", "14", "loss")
+
+
+def test_nba_row_does_not_settle_on_a_college_game_between_the_same_locations(tmp_path):
+    from datetime import timedelta
+
+    from model_prediction.domain import utc_now
+
+    start = (utc_now() - timedelta(hours=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    bet = {
+        **_COLLEGE_BET,
+        "league": "NBA",
+        "away_team": "Minnesota Timberwolves",
+        "home_team": "Indiana Pacers",
+        "event_start_utc": start,
+    }
+    record_manual_bet(bet, data_root=tmp_path)
+    espn = _FakeScoreboard(
+        {
+            "NCAAB": [
+                _espn_event(
+                    "9",
+                    _espn_team("Minnesota", "Golden Gophers", "MINN", 60, "away"),
+                    _espn_team("Indiana", "Hoosiers", "IND", 70, "home"),
+                )
+            ]
+        }
+    )
+    res = settle_manual_bets(data_root=tmp_path, espn_client=espn)
+    assert res["settled_count"] == 0
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert row["status"] == "open" and row["result"] == ""
+
+
+def test_event_that_is_exact_in_both_orientations_stays_open_and_names_the_event(tmp_path, caplog):
+    bet = {**_COLLEGE_BET, "league": "NFL", "away_team": "New York", "home_team": "New York"}
+    record_manual_bet(bet, data_root=tmp_path)
+    espn = _FakeScoreboard(
+        {
+            "NFL": [
+                _espn_event(
+                    "77",
+                    _espn_team("New York", "Jets", "NYJ", 10, "away"),
+                    _espn_team("New York", "Giants", "NYG", 20, "home"),
+                )
+            ]
+        }
+    )
+    with caplog.at_level("WARNING"):
+        res = settle_manual_bets(data_root=tmp_path, espn_client=espn)
+    assert res["settled_count"] == 0
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert row["status"] == "open"
+    assert any("ambiguous scoreboard match" in r.message and "77" in r.message for r in caplog.records)
+
+
+def test_selection_naming_a_team_is_matched_exactly_before_by_substring(tmp_path):
+    bet = {**_COLLEGE_BET, "away_team": "Kansas State", "home_team": "Kansas"}
+    record_manual_bet(bet, data_root=tmp_path)
+    _set_row_fields(tmp_path, selection="kansas state")
+    espn = _FakeScoreboard(
+        {
+            "NCAAF": [
+                _espn_event(
+                    "3",
+                    _espn_team("Kansas State", "Wildcats", "KSU", 28, "away"),
+                    _espn_team("Kansas", "Jayhawks", "KU", 14, "home"),
+                )
+            ]
+        }
+    )
+    assert settle_manual_bets(data_root=tmp_path, espn_client=espn)["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    # "kansas state" is the away team and it won; a substring-first mapping graded it as the home pick.
+    assert row["result"] == "win"
+
+
+def test_resettle_all_does_not_count_an_ambiguous_settled_row_as_open(tmp_path):
+    record_manual_bet({**_COLLEGE_BET, "event_start_utc": "2026-11-01T17:00:00Z"}, data_root=tmp_path)
+    _set_row_fields(tmp_path, status="settled", result="win")
+    espn = _FakeScoreboard(
+        {
+            "NCAAF": [
+                _espn_event(
+                    "1",
+                    _espn_team("Michigan State", "Spartans", "MSU", 10, "away"),
+                    _espn_team("Ohio State", "Buckeyes", "OSU", 20, "home"),
+                ),
+                _espn_event(
+                    "2",
+                    _espn_team("Michigan Tech", "Huskies", "MTU", 30, "away"),
+                    _espn_team("Ohio State", "Buckeyes", "OSU", 20, "home"),
+                ),
+            ]
+        }
+    )
+    res = settle_manual_bets(data_root=tmp_path, espn_client=espn, resettle_all=True)
+    assert res["settled_count"] == 0 and res["open_count"] == 0
+    assert read_manual_bets(data_root=tmp_path)[0]["status"] == "settled"
