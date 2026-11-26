@@ -782,3 +782,92 @@ def test_a_newly_abandoned_cancel_raises_a_live_alarm(cycle, monkeypatch):
     assert raised.value.alarms[0]["order_ids"] == ["gtd-9"]
     cycle["reconcile_result"] = {}
     auto_executor.run_auto_buyer_cycle()
+
+
+# ---------------------------------------------------------------- 3. daily loss stop
+
+
+def _settled_row(pnl: float, *, start: str, settled: str, **extra: Any) -> dict[str, Any]:
+    row = {
+        "pick_id": f"s-{len(start)}-{pnl}",
+        "order_id": f"o-{start}-{pnl}",
+        "model_id": SPREAD_V7,
+        "executed_at_utc": start,
+        "event_start_utc": start,
+        "settled_at_utc": settled,
+        "status": "settled",
+        "result": "win" if pnl > 0 else "loss",
+        "cost_usd": 10.0,
+        "pnl_usd": pnl,
+    }
+    row.update(extra)
+    return row
+
+
+@pytest.fixture
+def frozen_now(monkeypatch):
+    # 10:00 ET on 2026-11-26.
+    now = auto_executor.parse_utc("2026-11-26T15:00:00Z")
+    monkeypatch.setattr(auto_executor, "utc_now", lambda: now)
+    return now
+
+
+def test_loss_stop_counts_gross_losses_so_morning_wins_never_offset_them(tmp_path, frozen_now):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            _settled_row(200.0, start="2026-11-26T14:00:00Z", settled="2026-11-26T14:30:00Z"),
+            _settled_row(-250.0, start="2026-11-26T14:10:00Z", settled="2026-11-26T14:40:00Z"),
+        ],
+    )
+    assert auto_executor._today_auto_buyer_totals(tmp_path)[1] == -250.0
+    # The paper book keeps the net figure.
+    assert auto_executor._today_auto_buyer_totals(tmp_path, gross_loss=False)[1] == -50.0
+
+
+def test_loss_stop_ignores_manual_rows(tmp_path, frozen_now):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            _settled_row(
+                -300.0,
+                start="2026-11-26T14:00:00Z",
+                settled="2026-11-26T14:30:00Z",
+                pick_id="MANUAL-asc-cbb-x",
+                order_id="MANUAL-asc-cbb-x",
+            ),
+            _settled_row(-40.0, start="2026-11-26T14:00:00Z", settled="2026-11-26T14:30:00Z", manual=True),
+        ],
+    )
+    assert auto_executor._today_auto_buyer_totals(tmp_path) == (0.0, 0.0)
+
+
+def test_a_late_game_settled_after_midnight_counts_against_its_own_day(tmp_path, frozen_now):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            # Tip 22:00 ET on 11-25, settled 00:30 ET on 11-26: yesterday's loss, not today's.
+            _settled_row(-250.0, start="2026-11-26T03:00:00Z", settled="2026-11-26T05:30:00Z"),
+            # No start recorded: the settlement date still counts it, so no loss is ever dropped.
+            _settled_row(-20.0, start="", settled="2026-11-26T14:30:00Z", executed_at_utc=""),
+        ],
+    )
+    assert auto_executor._today_auto_buyer_totals(tmp_path)[1] == -20.0
+
+
+def test_live_book_stops_on_gross_loss_while_the_paper_book_nets(tmp_path, frozen_now, buyer_env):
+    rows = [
+        _settled_row(200.0, start="2026-11-26T14:00:00Z", settled="2026-11-26T14:30:00Z"),
+        _settled_row(-250.0, start="2026-11-26T14:10:00Z", settled="2026-11-26T14:40:00Z"),
+    ]
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", rows)
+    _write_ledger(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl", rows)
+    pick = _pick(SPREAD_V7, pick_id="after-stop", event="gs1")
+    live = _live_buyer(tmp_path, max_daily_loss_usd=250.0).evaluate_and_execute([dict(pick)])
+    assert live.rejected_daily_loss_breaker == 1
+    paper = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(mode="paper", max_daily_loss_usd=250.0, whitelisted_models=()),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        data_root=tmp_path,
+    ).evaluate_and_execute([dict(pick)])
+    assert paper.rejected_daily_loss_breaker == 0

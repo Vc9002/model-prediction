@@ -1325,37 +1325,53 @@ def _live_book_has_pending_orders(ledger_path: Path) -> bool:
     )
 
 
-def _today_auto_buyer_totals(data_root: Path | str = DATA) -> tuple[float, float]:
-    """Sum today's (ET calendar day) already-executed spend and realized P&L.
+def _today_auto_buyer_totals(data_root: Path | str = DATA, *, gross_loss: bool = True) -> tuple[float, float]:
+    """Today's (ET calendar day) executed spend and the P&L the daily loss stop compares.
 
-    Computed fresh from the ledger rather than reset per call, so the daily-spend
-    cap and the drawdown circuit breaker both apply across a full calendar day's
-    worth of cycles -- not just whichever cycle happens to be running right now.
+    Computed fresh from the ledger rather than reset per call, so the daily-spend cap and the loss
+    stop both apply across a full calendar day's worth of cycles. Hand-placed (manual) rows count
+    in neither half. A settled row belongs to the ET date of its game's start (its settlement time
+    only when the start is missing), so a late tip settled after midnight still counts against the
+    day it was bought for. With ``gross_loss`` (the live book) the second value is minus the sum of
+    today's losses alone: morning wins must not let afternoon losses run past the stop. The paper
+    book passes False and keeps the net figure.
     """
-    from model_prediction.portfolio.auto_buyer_ledger import read_auto_buyer_ledger
+    from model_prediction.portfolio.auto_buyer_ledger import (
+        is_manual_auto_buyer_record,
+        read_auto_buyer_ledger,
+    )
+
+    def _et_date(raw: Any) -> date | None:
+        if not raw:
+            return None
+        try:
+            return parse_utc(str(raw)).astimezone(EASTERN).date()
+        except (TypeError, ValueError):
+            return None
 
     today = utc_now().astimezone(EASTERN).date()
     spend = 0.0
     realized_pnl = 0.0
     j_path = Path(data_root) / "auto_buyer_ledger.jsonl"
     for row in read_auto_buyer_ledger(jsonl_path=j_path):
-        executed_raw = row.get("executed_at_utc")
-        # Hand-placed positions are imported for visibility, not buyer spend.
-        if executed_raw and not row.get("manual"):
-            try:
-                if parse_utc(str(executed_raw)).astimezone(EASTERN).date() == today:
-                    spend += float(row.get("cost_usd") or 0.0) + _pending_exposure_cost(row)
-            except (TypeError, ValueError):
-                pass
+        # Hand-placed positions are imported for visibility: neither buyer spend nor buyer P&L.
+        if is_manual_auto_buyer_record(row):
+            continue
+        if _et_date(row.get("executed_at_utc")) == today:
+            spend += float(row.get("cost_usd") or 0.0) + _pending_exposure_cost(row)
 
-        settled_raw = row.get("settled_at_utc")
         result = str(row.get("result") or "").lower()
-        if settled_raw and result in ("win", "loss", "push"):
-            try:
-                if parse_utc(str(settled_raw)).astimezone(EASTERN).date() == today:
-                    realized_pnl += float(row.get("pnl_usd") or 0.0)
-            except (TypeError, ValueError):
-                pass
+        if not row.get("settled_at_utc") or result not in ("win", "loss", "push"):
+            continue
+        if (_et_date(row.get("event_start_utc")) or _et_date(row.get("settled_at_utc"))) != today:
+            continue
+        try:
+            pnl = float(row.get("pnl_usd") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        # Any negative row counts, not only result "loss": a fair-value push or a manual-sell exit
+        # can realize a loss too.
+        realized_pnl += min(pnl, 0.0) if gross_loss else pnl
 
     return round(spend, 2), round(realized_pnl, 2)
 
@@ -3128,10 +3144,12 @@ class AutoPolymarketBuyer:
             if self.config.mode == "paper" and not self.config.execute_live
             else self.data_root
         )
-        today_spend_usd, today_realized_pnl_usd = _today_auto_buyer_totals(totals_root)
+        today_spend_usd, today_realized_pnl_usd = _today_auto_buyer_totals(
+            totals_root, gross_loss=totals_root != self.paper_data_root
+        )
 
-        # Drawdown circuit breaker: once today's realized loss crosses the configured
-        # threshold, stop considering new buys for the rest of the calendar day.
+        # Drawdown circuit breaker: once today's realized loss (gross on the live book) crosses
+        # the configured threshold, stop considering new buys for the rest of the calendar day.
         # Reconciliation/settlement of already-open positions happens separately in
         # run_auto_buyer_cycle, before this method is called, so it is unaffected.
         if self.config.max_daily_loss_usd is not None and today_realized_pnl_usd <= -abs(
