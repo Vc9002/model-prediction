@@ -223,6 +223,40 @@ def test_first_seen_write_falls_back_to_rename_without_hard_links(tmp_path, monk
     assert json.loads(path.read_text()) == {"a": 1} and [p.name for p in path.parent.iterdir()] == ["1.json"]
 
 
+def test_a_rename_that_loses_a_race_reports_not_written(tmp_path, monkeypatch):
+    import os
+
+    from model_prediction.data_sources.ncaab_boxscores import _write_first_seen
+
+    def no_links(*_args):
+        raise OSError("hard links unsupported")
+
+    def lost_race(*_args):
+        raise FileExistsError("another writer got there first")
+
+    monkeypatch.setattr(os, "link", no_links)
+    monkeypatch.setattr(os, "rename", lost_race)
+    assert _write_first_seen(tmp_path / "d" / "1.json", {"a": 1}) is False
+
+
+def test_a_locked_temp_file_does_not_fail_a_successful_first_seen_write(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from model_prediction.data_sources.ncaab_boxscores import _write_first_seen
+
+    real_unlink = Path.unlink
+
+    def locked(self, *args, **kwargs):
+        if self.name.endswith(".tmp"):
+            raise PermissionError("antivirus holds the temp file")
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", locked)
+    path = tmp_path / "d" / "1.json"
+    assert _write_first_seen(path, {"a": 1}) is True
+    assert json.loads(path.read_text()) == {"a": 1}
+
+
 def test_a_corrupt_existing_record_is_quarantined_and_recaptured(tmp_path):
     for path in (_team_path(tmp_path, "10"), _player_path(tmp_path, "10")):
         path.parent.mkdir(parents=True)
@@ -279,6 +313,26 @@ def test_a_permanent_player_parse_failure_stops_refetching_after_two_attempts(tm
     assert reasons[2] == reasons[3] == "player_parse_failed_2_attempts"
     assert not _player_path(tmp_path, "10").exists()
     assert all(r["missing"] == [] for r in runs)  # the team record is complete: daily status stays "ok"
+
+
+def test_a_parse_failure_marker_from_an_older_parser_does_not_block_a_retry(tmp_path):
+    from model_prediction.data_sources import ncaab_boxscores as module
+
+    team = _team_path(tmp_path, "10")
+    team.parent.mkdir(parents=True)
+    team.write_text(json.dumps({"event_id": "10"}), encoding="utf-8")
+    marker = module._parse_failure_marker(_player_path(tmp_path, "10"))
+    marker.parent.mkdir(parents=True)
+    marker.write_text(json.dumps({"attempts": 2, "reason": "old bug", "parser": "retired-parser"}))
+    client = _Games(["10"])
+    result = capture_completed_boxscores(tmp_path, "2025-11-01", client)
+    assert client.calls == ["10"] and result["player_boxes"]["captured"] == 1
+    assert not marker.exists()
+    # a marker the current parser wrote still stops the refetching
+    marker.write_text(json.dumps({"attempts": 2, "parser": module.PLAYER_PARSER_VERSION}))
+    _player_path(tmp_path, "10").unlink()
+    capture_completed_boxscores(tmp_path, "2025-11-01", client)
+    assert client.calls == ["10"]
 
 
 def test_conference_ids_and_neutral_site_come_from_the_scoreboard(tmp_path):

@@ -2563,6 +2563,21 @@ def test_refresh_restores_a_pick_when_no_replacement_was_logged(tmp_path) -> Non
     assert ledger.restore_unreplaced_picks(prior) == []
 
 
+def test_refresh_restores_every_model_row_of_an_unevaluated_slot(tmp_path) -> None:
+    """Two models' rows share one (league, event, market) slot (NBA v9 beside v10): a run that never
+    re-evaluated the slot must reopen both, not only the first one."""
+    ledger = _ledger(tmp_path)
+    start = "2099-01-01T00:00:00Z"
+    created = datetime(2026, 7, 25, 10, tzinfo=UTC)
+    first = _log_pick(ledger, event_start_utc=start, created_at=created)
+    second = _log_pick(ledger, event_start_utc=start, created_at=created, model_version="v2")
+    prior = ledger.rows()
+    assert set(_clear_today_open(ledger, "2026-07-25")) == {first["pick_id"], second["pick_id"]}
+    assert set(ledger.restore_unreplaced_picks(prior)) == {first["pick_id"], second["pick_id"]}
+    assert {row["status"] for row in ledger.rows()} == {"open"} and len(ledger.rows()) == 2
+    assert ledger.restore_unreplaced_picks(prior) == []
+
+
 def test_refresh_keeps_prior_superseded_when_replacement_was_logged(tmp_path) -> None:
     ledger = _ledger(tmp_path)
     start = "2099-01-01T00:00:00Z"
@@ -2598,12 +2613,14 @@ def test_clear_today_open_by_event_date_matches_on_event_start_not_creation(tmp_
 
 def test_clear_today_open_never_removes_an_already_started_game(tmp_path) -> None:
     """Uses safely past-dated timestamps (both well before any real
-    wall-clock run of this test) so the event is unambiguously "started"."""
+    wall-clock run of this test) so the event is unambiguously "started".
+    created_at is noon UTC so its ET date is 2020-01-01 (00:00Z would be 2019-12-31 ET and the
+    row would never reach the started-game guard)."""
     ledger = _ledger(tmp_path)
     _log_pick(
         ledger,
         event_start_utc="2020-01-02T00:00:00Z",  # after created_at, still long past
-        created_at=datetime(2020, 1, 1, tzinfo=UTC),
+        created_at=datetime(2020, 1, 1, 12, tzinfo=UTC),
     )
     removed = _clear_today_open(ledger, "2020-01-01")
     assert removed == []

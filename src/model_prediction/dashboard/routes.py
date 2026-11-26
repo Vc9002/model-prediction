@@ -791,7 +791,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
             else:
                 try:
-                    self._send(run_auto_buyer_cycle(force=True))
+                    self._send(run_auto_buyer_cycle())
                 except LiveAutoBuyerAlarm as alarm:
                     # The cycle saved its state and history before raising; show the operator why.
                     self._send({"status": "alarm", "alarms": alarm.alarms, "run": alarm.run_summary})

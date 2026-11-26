@@ -1117,3 +1117,49 @@ def test_p1_shadow_hands_the_live_games_to_the_box_index(tmp_path, monkeypatch):
     _p1_shadow_run(tmp_path / "live", monkeypatch, shadow=spy)
     assert len(calls) == 1 and calls[0][1]  # the slate's scoreboard and date reach the helper, once
     assert seen and all(index_live is live for index_live in seen)
+
+
+def test_p1_shadow_never_serves_an_index_without_its_live_games_after_a_failed_lookup(tmp_path, monkeypatch):
+    """A malformed scoreboard date makes the live-games lookup raise for the first game. The season's
+    index used to be stored before that call, so every later game of the season was scored against an
+    empty ``in_progress`` and a previous game still being played looked fine."""
+    from model_prediction import college_basketball_forward as forward
+    from model_prediction.features import ncaab_player_availability as avail
+
+    live = {"Some Team": ["a live tip"]}
+    lookups = []
+
+    def flaky(board, day):
+        lookups.append(day)
+        if len(lookups) == 1:
+            raise ValueError("bad scoreboard date")
+        return live
+
+    seen = []
+    side = avail.TeamAvailability("Home", None, 0.2, 0.8, 5, 5, "prev")
+
+    def spy(home, away, tip, history, index):
+        seen.append(index.in_progress)
+        return avail.P1Adjustment(1.0, None, side, side)
+
+    monkeypatch.setattr(forward, "_p1_in_progress", flaky)
+    monkeypatch.setattr(forward, "p1_margin_adjustment", spy)
+    monkeypatch.setattr(
+        forward.PlayerBoxIndex, "load", classmethod(lambda cls, *a, **k: cls.__new__(cls)), raising=True
+    )
+    monkeypatch.setattr(forward.PlayerBoxIndex, "in_progress", {}, raising=False)
+    decisions = [
+        {
+            "kind": "spread",
+            "home": home,
+            "away": away,
+            "start": "2026-11-25T23:00:00Z",
+            "prediction": SimpleNamespace(feature_basis={"margin_engine": "v7"}),
+        }
+        for home, away in (("H1", "A1"), ("H2", "A2"))
+    ]
+    out = forward._p1_shadow_fields(
+        decisions, [], tmp_path, datetime(2026, 11, 25, 12, tzinfo=UTC), board={}, args_date="2026-11-25"
+    )
+    assert out[id(decisions[0])]["shadow_p1_status"] == "error"
+    assert seen == [live], "a game is only scored against an index that carries the live games"

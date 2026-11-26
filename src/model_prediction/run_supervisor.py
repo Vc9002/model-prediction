@@ -415,7 +415,7 @@ class RunSupervisor:
 
     def _worker_env(self, run_id: str, log_path: Path) -> dict[str, str]:
         env = os.environ.copy()
-        env["PYTHONPATH"] = "src" + (f":{env['PYTHONPATH']}" if env.get("PYTHONPATH") else "")
+        env["PYTHONPATH"] = "src" + (f"{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else "")
         # Workers publish structured counters to a sidecar; the supervisor
         # stores them on the run row (observability item 18: source
         # latency, events seen, predictions, NO_BET, duration...).

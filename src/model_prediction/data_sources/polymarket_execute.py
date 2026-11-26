@@ -1263,7 +1263,9 @@ class PolymarketExecutor:
 
         order_ids = [order_id]
         fallback_order_id: str | None = None
-        fallback_status = "not_authorized"
+        # No fallback was asked for, so none was needed. Rows recorded before 2026-11-26 carry the old
+        # spelling "not_authorized"; nothing branches on either value.
+        fallback_status = "not_needed"
         fallback_resting_shares = 0.0
         fallback_error: str | None = None
         # Which read confirmed the resting fallback (order_readback, open_orders) or none; kept so the

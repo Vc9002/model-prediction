@@ -226,6 +226,28 @@ def test_recorded_market_with_an_unreadable_line_is_refused(snapshots) -> None:
     assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
 
 
+@pytest.mark.parametrize("pinned", [True, False])
+def test_an_unreadable_line_on_a_known_team_is_refused_not_raised(snapshots, pinned) -> None:
+    """A known team reaches the name matcher's float parse (the abbreviation case above never does);
+    the name loop runs before the pin is consulted, so 'n/a' used to raise out of _pick_quote."""
+    snapshots([{**_spread(_NEG, "Jacksonville", -3.5, 0.50, 0.51), "line": "n/a"}])
+    row = _pinned("away", -3.5, _NEG, "long") if pinned else _row("away", -3.5)
+
+    assert backtests._pick_quote(row) is None
+
+
+@pytest.mark.parametrize("pinned", [True, False])
+def test_an_unreadable_total_line_is_refused_not_raised(snapshots, pinned) -> None:
+    snapshots([_total_snapshot(line="n/a")])
+    row = (
+        _total_row("under", 140.5, "short")
+        if pinned
+        else {**_total_row("under", 140.5, "short"), "rationale": "x"}
+    )
+
+    assert backtests._pick_quote(row) is None
+
+
 def test_recorded_side_that_a_decisive_name_match_contradicts_is_refused(snapshots) -> None:
     # The pin says this Central Arkansas -3.5 row is the market's own team at -3.5 (long). By name the
     # market's team is Jacksonville, so long would be Jacksonville -3.5: the opposite bet.

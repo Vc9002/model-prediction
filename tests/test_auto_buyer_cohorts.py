@@ -1077,8 +1077,10 @@ def test_toggle_stores_a_real_bool_and_refuses_ambiguous_payloads(monkeypatch, t
     for bad in ("false", "true", 1, 0, "yes"):
         with pytest.raises(ValueError):
             auto_executor.toggle_auto_buyer(bad)
-    # A bare toggle of a non-boolean value fails safe to off, never on.
-    assert auto_executor.toggle_auto_buyer()["enabled"] is False
+    # A bare toggle is refused: only an explicit boolean may change the master switch.
+    with pytest.raises(ValueError):
+        auto_executor.toggle_auto_buyer()
+    assert json.loads(state_file.read_text(encoding="utf-8"))["enabled"] == "false"
     assert auto_executor.toggle_auto_buyer(True)["enabled"] is True
     assert json.loads(state_file.read_text(encoding="utf-8"))["enabled"] is True
     assert auto_executor.toggle_auto_buyer(False)["enabled"] is False
@@ -1370,7 +1372,7 @@ def test_dashboard_manual_run_refuses_while_the_writer_lock_is_held(monkeypatch,
     code, body = post()
     assert code == 200
     assert body == {"status": "ran"}
-    assert ran == [{"force": True}]
+    assert ran == [{}]
 
 
 # ---------------------------------------------------------------- tracking: paper twins, skip log, fill log
@@ -1753,6 +1755,69 @@ def test_ledger_scope_owns_labelled_rows_and_unlabelled_rows_of_its_model_and_ma
     # Written before the label existed: owned on model and market, or the twin would re-buy it.
     assert scope.owns({"model_id": SPREAD_V7, "market_type": "Spread"})
     assert not scope.owns({"model_id": NBA_SPREAD, "market_type": "spread"})
+
+
+# A plain paper cohort and a twin share a model and market on disjoint windows.
+_TWIN_WINDOW = (SPREAD_V7, "spread", 0.05, 0.12)
+_OLD_PLAIN_LABEL = f"{SPREAD_V7}:spread:[0.12,inf):paper"  # the plain cohort's window was edited since
+
+
+def _shared_model_scope() -> auto_executor.LedgerScope:
+    return auto_executor.LedgerScope(
+        labels=frozenset({TWIN_LABEL}),
+        model_markets=frozenset({(SPREAD_V7, "spread")}),
+        plain_labels=frozenset({f"{SPREAD_V7}:spread:[0.15,inf):paper"}),
+        twin_windows=(_TWIN_WINDOW,),
+    )
+
+
+def test_an_edited_plain_cohorts_old_rows_stay_the_plain_cohorts_beside_a_twin_on_its_model():
+    """The old label is no current cohort's, so ownership falls back to model and market, which the
+    twin also names. The row's recorded window (disjoint from the twin's) says it was the plain one's;
+    otherwise the plain buyer stops seeing its own rows and can buy them again."""
+    scope = _shared_model_scope()
+    old_plain = {
+        "cohort": _OLD_PLAIN_LABEL,
+        "cohort_min_edge": 0.12,
+        "cohort_max_edge": None,
+        "model_id": SPREAD_V7,
+        "market_type": "spread",
+    }
+    assert not scope.owns(old_plain)
+    assert scope.others().owns(old_plain)
+
+
+def test_an_edited_twins_old_rows_stay_the_twins_and_unwindowed_rows_keep_model_and_market():
+    scope = _shared_model_scope()
+    base = {"model_id": SPREAD_V7, "market_type": "spread"}
+    narrowed_twin = {
+        **base,
+        "cohort": f"{SPREAD_V7}:spread:[0.05,0.12):paper-old",
+        "cohort_min_edge": 0.05,
+        "cohort_max_edge": 0.10,
+    }
+    assert scope.owns(narrowed_twin)  # still overlaps the twin's window, so the twin does not re-buy
+    assert scope.owns({**base, "cohort": "gone:spread:[0,1):paper"})  # no recorded window
+    assert scope.owns({**base, "cohort_min_edge": "n/a", "cohort": "gone"})  # unreadable window
+
+
+def test_the_twin_pass_hands_its_windows_to_the_ledger_scope(monkeypatch):
+    seen: list[Any] = []
+
+    class _Spy:
+        def __init__(self, config):
+            seen.append(config.ledger_scope)
+
+        def evaluate_and_execute(self, rows):
+            return auto_executor.AutoExecutionResult()
+
+    monkeypatch.setattr(auto_executor, "AutoPolymarketBuyer", _Spy)
+    plain = BuyCohort(SPREAD_V7, "ncaab", "spread", 0.15, None, "paper")
+    state = _state([], enabled=True)
+    auto_executor._evaluate_paper_cohorts(
+        state, (SPREAD_V7_TWIN, plain), frozenset({SPREAD_V7_TWIN.label}), [], {}
+    )
+    assert {scope.twin_windows for scope in seen} == {((SPREAD_V7, "spread", 0.05, 0.12),)}
 
 
 def test_a_scope_is_refused_on_a_live_config():

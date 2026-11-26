@@ -1,9 +1,9 @@
 """Short, independently scheduled Auto-Buyer cycle.
 
-The daily forecast is intentionally long-running.  This worker only settles
-paper positions, refreshes active market quotes, and evaluates the already
-generated candidate rows, so purchase timing is no longer gated by forecast
-runtime.
+The daily forecast is intentionally long-running.  This worker reconciles and
+settles open positions (live and paper), refreshes active market quotes, and
+evaluates the already generated candidate rows, so purchase timing is no longer
+gated by forecast runtime.
 """
 
 from __future__ import annotations

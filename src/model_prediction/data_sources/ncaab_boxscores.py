@@ -40,6 +40,8 @@ PLAYER_BOX_SUMMARY_URL = f"{SITE_API}/{LEAGUE_PATHS['NCAAB']}/summary"
 # A summary whose player block never parses is refetched this many times, then left alone (daily runs
 # many times a day; without a limit every run would hit ESPN again for the same unparseable game).
 MAX_PLAYER_PARSE_ATTEMPTS = 2
+# Bump when parse_player_boxes changes: a failure marker written by an older parser says nothing about this one.
+PLAYER_PARSER_VERSION = "ncaab-player-boxes-parser-1"
 _logger = logging.getLogger(__name__)
 # ESPN stat key -> output name(s); "made-attempted" keys split into two integers. Same map as the
 # research backfill, whose records the feature definitions were fitted on.
@@ -312,10 +314,18 @@ def _write_first_seen(path: Path, record: dict[str, Any]) -> bool:
             # check covers POSIX, where only a concurrent writer inside this window could be overwritten.
             if path.exists():
                 return False
-            os.rename(temp, path)
+            try:
+                os.rename(temp, path)
+            except FileExistsError:
+                return False
         return True
     finally:
-        temp.unlink(missing_ok=True)
+        # The record is already durable by now; a lock on the leftover temp (antivirus) must not turn a
+        # successful first-seen write into an error.
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            _logger.warning("could not remove NCAAB box temp file %s", temp, exc_info=True)
 
 
 def _usable_record(path: Path) -> bool:
@@ -352,7 +362,10 @@ def _parse_failure_marker(player_path: Path) -> Path:
 
 def _parse_failures(marker: Path) -> int:
     try:
-        return int(json.loads(marker.read_text(encoding="utf-8"))["attempts"])
+        data = json.loads(marker.read_text(encoding="utf-8"))
+        if data.get("parser") != PLAYER_PARSER_VERSION:
+            return 0
+        return int(data["attempts"])
     except (OSError, ValueError, KeyError, TypeError):
         return 0
 
@@ -361,7 +374,14 @@ def _mark_parse_failure(marker: Path, attempts: int, reason: str) -> None:
     try:
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(
-            json.dumps({"attempts": attempts, "reason": reason, "last_attempt_utc": utc_now().isoformat()}),
+            json.dumps(
+                {
+                    "attempts": attempts,
+                    "reason": reason,
+                    "parser": PLAYER_PARSER_VERSION,
+                    "last_attempt_utc": utc_now().isoformat(),
+                }
+            ),
             encoding="utf-8",
         )
     except OSError:

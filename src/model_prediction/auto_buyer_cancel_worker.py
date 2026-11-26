@@ -138,6 +138,12 @@ def _run(paths: RuntimePaths) -> int:
     # An id that now cancels or reads terminal was only briefly invisible: forget the sighting.
     for order_id in done:
         not_found_seen.pop(str(order_id), None)
+    # A run that failed or deferred an id observed nothing new about it, so an older sighting is not
+    # "consecutive": two transient 404s hours apart must not memoise a still-resting live order.
+    for failure in summary.get("failed", []):
+        not_found_seen.pop(str(failure.get("order_id") if isinstance(failure, dict) else failure), None)
+    for order_id in summary.get("deadline_skipped", []):
+        not_found_seen.pop(str(order_id), None)
     for order_id in not_found:
         first = not_found_seen.get(order_id)
         try:

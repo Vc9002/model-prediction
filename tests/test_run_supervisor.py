@@ -75,6 +75,17 @@ def test_worker_env_caps_openblas_threads(tmp_path, monkeypatch) -> None:
     sup.close()
 
 
+def test_worker_env_joins_pythonpath_with_the_platform_separator(tmp_path, monkeypatch) -> None:
+    """A ":" join breaks on Windows, where it also splits a drive letter (src:C:\tools)."""
+    sup = _supervisor(tmp_path)
+    monkeypatch.delenv("PYTHONPATH", raising=False)
+    assert sup._worker_env("run-1", tmp_path / "w.log")["PYTHONPATH"] == "src"
+    monkeypatch.setenv("PYTHONPATH", os.path.join(os.path.abspath(os.sep), "tools"))
+    joined = sup._worker_env("run-1", tmp_path / "w.log")["PYTHONPATH"]
+    assert joined == os.pathsep.join(["src", os.path.join(os.path.abspath(os.sep), "tools")])
+    sup.close()
+
+
 def test_worker_env_keeps_operator_openblas_value(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("OPENBLAS_NUM_THREADS", "4")
     sup = _supervisor(tmp_path)
@@ -372,7 +383,7 @@ def _child_env(repo_root: Path) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if not k.startswith("MODEL_PREDICTION_")}
     # Guard against a future import that loads .env (runtime root, Polymarket credentials).
     env["MODEL_PREDICTION_SKIP_DOTENV"] = "1"
-    # A single entry, so _worker_env's ":"-joined form (not the Windows separator) is not needed.
+    # A single entry: the child gets exactly this PYTHONPATH, whatever the supervisor test env holds.
     env["PYTHONPATH"] = str(repo_root / "src")
     return env
 

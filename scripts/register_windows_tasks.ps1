@@ -73,7 +73,7 @@ Write-Output "registered: ModelPrediction-BackupOffsite ($LogonType)"
 # A daily trigger cannot take a repetition directly, so borrow one from a -Once trigger.
 $autoBuyerTriggers = New-ScheduledTaskTrigger -Daily -At '08:00'
 $autoBuyerTriggers.Repetition = (New-ScheduledTaskTrigger -Once -At '08:00' -RepetitionInterval (New-TimeSpan -Minutes 15) -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
-Register-WorkerTask 'ModelPrediction-AutoBuyer' 'auto-buyer' $autoBuyerTriggers 'model-prediction auto-buyer (paper unless saved state is live)'
+Register-WorkerTask 'ModelPrediction-AutoBuyer' 'auto-buyer' $autoBuyerTriggers 'model-prediction auto-buyer (paper cohorts, plus operator-set live cohorts)'
 
 # Auto-buyer cancel backstop: every 2 minutes over the auto-buyer's own 08:00-02:00 window (quick-261125-hih
 # D-01/D-02). Cancel-only: by order id, it cancels live resting fallbacks whose game starts within 30 s, and

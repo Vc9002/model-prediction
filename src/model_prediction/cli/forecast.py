@@ -82,9 +82,10 @@ from ..tennis_forward import build_tennis_slate
 from .commands import (
     _clear_today_open,
     _declined_slots,
-    _open_ncaab_rows,
+    _evaluated_slots,
+    _open_rows,
     _research_models_dir,
-    _restore_unreplaced_ncaab,
+    _restore_unreplaced,
     _rolling_models_write_dir,
 )
 from .forecast_market_select import (
@@ -6582,10 +6583,13 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
     # too, with nothing in this run to regenerate them. See
     # _clear_today_open's docstring for the 2026-08-03 incident.
     main_ledger_sport_scope = {s.casefold() for s in sports} & set(MAIN_LEDGER_SPORTS)
-    ncaab_prior = {}
-    if log and replace_today and "ncaab" in main_ledger_sport_scope:
+    # Every league this run clears (Main-ledger scope on one tier, dual-ledger sports on the other),
+    # captured before the clear so an unevaluated slot reopens afterwards, as the daily job does.
+    restore_scope = {s.casefold() for s in sports} & (set(MAIN_LEDGER_SPORTS) | DUAL_LEDGER_SPORTS)
+    restore_prior: dict[str, list[dict[str, str]]] = {}
+    if log and replace_today:
         for tier_name, source in (("main", ledger), ("flat", flat_ledger)):
-            ncaab_prior[tier_name] = _open_ncaab_rows(source)
+            restore_prior[tier_name] = _open_rows(source, restore_scope)
     if is_flat:
         if replace_today and log:
             _clear_today_open(flat_ledger, args.date, by_event_date=True, leagues=main_ledger_sport_scope)
@@ -6877,11 +6881,17 @@ def run_forecast(args, config, registry, bans, ledger, audit, data_root) -> dict
             results[sport] = _forecast_research_sport(sport, args.date, config)
     for sport in sports:
         if sport in results:
-            if sport == "ncaab" and ncaab_prior:
-                restored_counts = _restore_unreplaced_ncaab(
+            if restore_prior:
+                sport_prior = {
+                    tier_name: [
+                        row for row in rows if str(row.get("league", "")).casefold() == sport.casefold()
+                    ]
+                    for tier_name, rows in restore_prior.items()
+                }
+                restored_counts = _restore_unreplaced(
                     {"main": ledger, "flat": flat_ledger},
-                    ncaab_prior,
-                    _declined_slots(results[sport]),
+                    sport_prior,
+                    [*_declined_slots(results[sport]), *_evaluated_slots(results, sport_prior)],
                 )
                 for tier_name, count in restored_counts.items():
                     results[sport][f"{tier_name}_unreplaced_restored"] = count

@@ -852,6 +852,8 @@ def test_ioc_partial_fill_without_resting_flag_leaves_remainder_unfilled(tmp_pat
     assert len(post_payloads) == 1
     assert result["order_ids"] == ["primary-partial"]
     assert result["fallback_order_id"] is None
+    # No fallback was asked for, so none was needed (this default used to read "not_authorized").
+    assert result["fallback_status"] == "not_needed"
     assert result["filled_size_shares"] == 0.88
 
 

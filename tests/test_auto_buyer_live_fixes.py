@@ -1524,6 +1524,27 @@ def test_toggle_live_trading_requires_an_explicit_boolean(cycle, bare_state):
     assert path.read_bytes() == before
 
 
+@pytest.mark.parametrize("bare_state", [{}, {"enabled": False}, {"enabled": True}, {"enabled": "x"}])
+def test_toggle_auto_buyer_requires_an_explicit_boolean(cycle, bare_state):
+    """A bare master toggle used to flip the saved state, so it could turn the buyer ON unconfirmed."""
+    path = _write_state(cycle, {**LIVE_STATE, **bare_state})
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="enabled"):
+        auto_executor.toggle_auto_buyer()
+    with pytest.raises(ValueError, match="enabled"):
+        auto_executor.toggle_auto_buyer(None)
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("payload", [{}, {"confirm": True}, {"enabled": None}])
+def test_master_toggle_route_refuses_a_bare_call_and_never_turns_the_buyer_on(cycle, payload):
+    path = _write_state(cycle, {**LIVE_STATE, "enabled": False})
+    before = path.read_bytes()
+    code, body = _post("/api/auto-buyer/toggle", payload)
+    assert code == 400 and body["status"] == "refused"
+    assert path.read_bytes() == before
+
+
 @pytest.mark.parametrize("payload", [{"enabled": "false"}, {"enabled": 0}])
 def test_live_toggle_route_refuses_a_non_boolean(cycle, payload):
     path = _write_state(cycle, LIVE_STATE)

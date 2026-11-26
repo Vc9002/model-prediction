@@ -344,7 +344,9 @@ class LedgerScope:
     (``others``), so neither side's spend, losses or game exposure can block the other. A row
     carries the cohort label it was bought under. The label embeds the edge window, so a label
     that is no current cohort's (the operator edited a window) is owned by model and market, like
-    a row written before the label existed, or the twin would re-buy its own pick.
+    a row written before the label existed, or the twin would re-buy its own pick. When a plain
+    cohort shares that model and market, the row's recorded window decides instead: a window that
+    overlaps no current twin window was a plain cohort's, so the plain buyer still sees its own row.
     """
 
     labels: frozenset[str]
@@ -352,6 +354,8 @@ class LedgerScope:
     # Labels of the current non-twin paper cohorts: a row labelled with one of these is theirs even
     # when its model and market also name a twin.
     plain_labels: frozenset[str] = frozenset()
+    # Current twin windows as (model, market, min_saved_edge, max_saved_edge_exclusive or None).
+    twin_windows: tuple[tuple[str, str, float, float | None], ...] = ()
     # The complement view: every paper row the twin group does not own.
     complement: bool = False
 
@@ -363,7 +367,20 @@ class LedgerScope:
             if label in self.plain_labels:
                 return False
         model = str(row.get("model_id") or row.get("model_version") or "")
-        return (model, str(row.get("market_type") or "").lower()) in self.model_markets
+        market = str(row.get("market_type") or "").lower()
+        if (model, market) not in self.model_markets:
+            return False
+        lower = _cohort_edge(row.get("cohort_min_edge"))
+        if lower is None or not self.twin_windows:
+            return True  # written before windows were recorded: model and market decide
+        upper = _cohort_edge(row.get("cohort_max_edge"))
+        upper = math.inf if upper is None else upper
+        return any(
+            (twin_model, twin_market) == (model, market)
+            and lower < (math.inf if twin_max is None else twin_max)
+            and twin_min < upper
+            for twin_model, twin_market, twin_min, twin_max in self.twin_windows
+        )
 
     def owns(self, row: dict[str, Any]) -> bool:
         return self._twin_owns(row) != self.complement
@@ -507,7 +524,7 @@ class AutoExecutionConfig:
     max_tennis_price: float | None = 0.68  # Sport-specific ceiling on market price for Tennis (68¢)
     min_ncaaf_edge: float | None = 0.02  # Sport-specific calibrated edge for NCAAF (2.0%)
     max_ncaaf_edge: float | None = 0.12  # Sport-specific blowout edge cap for NCAAF (12.0%)
-    max_moneyline_price: float | None = 0.65  # Ceiling on moneyline buy price (odds <= -185 / implied > 65%)
+    max_moneyline_price: float | None = 0.65  # Ceiling on moneyline buy price (implied probability above 65%)
     auto_quarantine_underperforming: bool = True  # Dynamic circuit breaker against underperforming models
     auto_quarantine_min_picks: int = 15  # Minimum sample before evaluating rolling drawdown
     auto_quarantine_max_loss_roi: float = (
@@ -997,11 +1014,7 @@ def _capture_missing_active_snapshot_slates(
                 snapshot_path = runtime_snap
         is_missing = not snapshot_path.exists()
         is_stale = False
-        max_quote_age = (
-            config.max_quote_age_seconds
-            if hasattr(config, "max_quote_age_seconds")
-            else MAX_AUTO_BUYER_QUOTE_AGE_SECONDS
-        )
+        max_quote_age = config.max_quote_age_seconds
         if not is_missing:
             try:
                 age_seconds = now.timestamp() - snapshot_path.stat().st_mtime
@@ -1784,14 +1797,15 @@ def _live_cap_problem(state: dict[str, Any]) -> str | None:
 
 
 def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
-    """Toggle Auto-Buyer ON or OFF from the dashboard or API."""
-    # Only the booleans true/false are accepted: bool("false") is True, and this switch gates
-    # scheduled real-money orders. A bare toggle of a non-boolean saved value fails safe to off.
-    if enabled is not None and not isinstance(enabled, bool):
-        raise ValueError(f"Auto-Buyer enabled must be true or false, got {enabled!r}")
-    current = load_auto_buyer_state()
-    new_enabled = (current.get("enabled") is False) if enabled is None else enabled
-    _update_auto_buyer_state({"enabled": new_enabled, "updated_at_utc": iso_utc(utc_now())})
+    """Turn the master Auto-Buyer switch ON or OFF from the dashboard or API.
+
+    The value must be an explicit boolean, like ``toggle_live_trading``: bool("false") is True, and a
+    bare call used to flip the saved state, which could turn the buyer (and real money) ON unconfirmed.
+    """
+    if not isinstance(enabled, bool):
+        # ValueError, not TypeError: the dashboard route and its tests treat this as a refused value.
+        raise ValueError(f"Auto-Buyer enabled must be true or false, got {enabled!r}")  # noqa: TRY004
+    _update_auto_buyer_state({"enabled": enabled, "updated_at_utc": iso_utc(utc_now())})
     state = load_auto_buyer_state()
     if not live_switch_on(state):
         _cancel_resting_after_switch_off(state, reason="kill_switch")
@@ -2130,6 +2144,9 @@ def _evaluate_paper_cohorts(
         labels=frozenset(c.label for c in twins),
         model_markets=frozenset((c.model_id, c.market) for c in twins),
         plain_labels=frozenset(c.label for c in plain),
+        twin_windows=tuple(
+            (c.model_id, c.market, c.min_saved_edge, c.max_saved_edge_exclusive) for c in twins
+        ),
     )
     plain_rows = [dict(r) for r in picks if any(_row_in_cohort(r, c) for c in plain)]
     twin_rows = [dict(r) for r in picks if not any(_row_in_cohort(r, c) for c in plain)]
@@ -2272,7 +2289,6 @@ def _preview_pass_overrides(preview: bool, preview_lookahead_hours: float | None
 def run_auto_buyer_cycle(
     execute_override: bool | None = None,
     forecast_date: str | None = None,
-    force: bool = False,
     *,
     preview: bool = False,
     preview_lookahead_hours: float | None = None,
@@ -2850,7 +2866,6 @@ class AutoPolymarketBuyer:
                             settled_intents.add(str(payload["intent_id"]))
                         if ev_type in {
                             "order_executed",
-                            "order_submitted",
                             "order_submit_unknown",
                             "order_intent",
                         }:
@@ -3066,11 +3081,7 @@ class AutoPolymarketBuyer:
                             "event_id": ev_id,
                             "selection": sel,
                             "filled_cost_usd": filled_cost,
-                            "filled_shares": shares_cnt,
-                            "model_units": float(r.get("model_units") or r.get("units") or 1.0),
-                            "unit_value_usd": float(r.get("unit_value_usd") or self.config.unit_value_usd),
                             "existing_order_ids": list(r.get("order_ids") or [r.get("order_id")]),
-                            "entry_price": float(r.get("entry_price") or 0.0),
                             "ledger_row": r,
                         }
                         if pid:
@@ -3190,9 +3201,6 @@ class AutoPolymarketBuyer:
             "held_slugs": held_slugs,
             "held_events": held_events,
             "partially_filled": partially_filled,
-            "partially_filled_market_sides": partially_filled_market_sides,
-            "partially_filled_event_selections": partially_filled_event_selections,
-            "partially_filled_slugs": partially_filled_slugs,
             "partial_contracts": partial_contracts,
             "game_exposure": game_exposure,
             "ledger_pick_ids": ledger_pick_ids,
@@ -3550,11 +3558,6 @@ class AutoPolymarketBuyer:
                 result.rejected_started += 1
                 continue
 
-            # Block games that already started
-            if now >= event_start:
-                result.rejected_started += 1
-                continue
-
             # Block games scheduled beyond the active slate window. Bounded to the
             # scheduler's own run cadence (daily cycle runs every 6h) by default, so
             # an event isn't bought hours before it can be re-evaluated against a
@@ -3769,7 +3772,8 @@ class AutoPolymarketBuyer:
                 result.rejected_unrealistic_edge += 1
                 continue
 
-            # Heavy favorite moneyline gate: cap moneyline buying price to prevent negative vig traps (odds <= -260)
+            # Heavy favorite moneyline gate: cap the moneyline buy price (max_moneyline_price, 65% by
+            # default) to prevent negative vig traps.
             if (
                 cohort is None
                 and market_type == "moneyline"
@@ -4105,10 +4109,6 @@ class AutoPolymarketBuyer:
                 continue
 
             # Live Execution
-            assert self.config.mode == "live" and self.config.execute_live is True, (
-                f"FATAL: Live order execution reached under invalid configuration! "
-                f"mode={self.config.mode!r}, execute_live={self.config.execute_live!r}"
-            )
             # Explicit guard that survives `python -O`, outside the submission try/except so it
             # can never be downgraded to a "refused" row. In a cohort-carrying config only a row
             # matched to a live cohort may reach the exchange.

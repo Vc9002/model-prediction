@@ -1795,7 +1795,7 @@ def test_topup_merge_clears_a_resolved_unknown_flag(tmp_path):
     # Review cycle 2: the operator resolved a held row by setting its fallback_order_id; reconcile
     # then made it a reconciled partial. A later top-up that fills completely has no fallback leg
     # (fallback_order_id None), so a stale fallback_submit_unknown=True would re-hold the row:
-    # never settled, pick blocked, and no alarm because "not_authorized" is not an alarm status.
+    # never settled, pick blocked, and no alarm because "not_needed" is not an alarm status.
     j_path = tmp_path / "auto_buyer_ledger.jsonl"
     row = _brow("tp3", "g1")
     resolved = _partial_row(row)
@@ -1819,7 +1819,7 @@ def test_topup_merge_clears_a_resolved_unknown_flag(tmp_path):
             limit_price=0.51,
             order_ids=["ioc-full"],
             fallback_order_id=None,
-            fallback_status="not_authorized",
+            fallback_status="not_needed",
             fallback_resting_shares=0.0,
             intent_id="i-3",
             idempotency_key="mp-i-3-p",

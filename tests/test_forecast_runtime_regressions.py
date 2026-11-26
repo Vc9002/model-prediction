@@ -221,6 +221,88 @@ def test_ordinary_logging_writes_learned_flat_companion(tmp_path, monkeypatch):
     assert calls[0][1]["observed_at"] == datetime(2026, 10, 25, tzinfo=UTC)
 
 
+class _RestoreSpyLedger:
+    """Holds open rows, retires them on supersede and records what restore is asked to reopen."""
+
+    def __init__(self, rows):
+        self._rows = list(rows)
+        self.restored: list[tuple[list[str], list[tuple[str, str, str]]]] = []
+
+    def rows(self):
+        return list(self._rows)
+
+    def supersede_open_rows(self, pick_ids, **_kw):
+        retired = [r["pick_id"] for r in self._rows if r["pick_id"] in pick_ids]
+        self._rows = [r for r in self._rows if r["pick_id"] not in pick_ids]
+        return retired
+
+    def restore_unreplaced_picks(self, prior, exclude_slots=()):
+        self.restored.append(([r["pick_id"] for r in prior], list(exclude_slots)))
+        return [r["pick_id"] for r in prior]
+
+
+def test_manual_forecast_restores_unevaluated_picks_of_every_cleared_sport_not_only_ncaab(
+    tmp_path, monkeypatch
+):
+    """The manual run clears every in-scope open row; before this, only NCAAB rows were captured and
+    restored, so an NBA pick the run never re-evaluated vanished."""
+    from model_prediction.cli import forecast
+
+    row = {
+        "pick_id": "nba-1",
+        "status": "open",
+        "league": "NBA",
+        "event_id": "g1",
+        "market_type": "spread",
+        "created_at_utc": "2026-10-25T12:00:00Z",
+        "event_start_utc": "2099-01-01T00:00:00Z",
+    }
+    main = _RestoreSpyLedger([row])
+    flat = _RestoreSpyLedger([])
+    monkeypatch.setattr(forecast, "MultiSportPickLedger", lambda *a, **kw: flat)
+    monkeypatch.setattr(forecast, "ledger_path", lambda config: tmp_path / "picks.xlsx")
+    monkeypatch.setattr(forecast, "_forecast_nba_spread_sport", lambda **kw: {})
+    monkeypatch.setattr(forecast, "_forecast_nba_total_sport", lambda **kw: {})
+    monkeypatch.setattr(forecast, "_forecast_learned_sport", lambda *a, **kw: {"candidates": []})
+    args = SimpleNamespace(
+        command="forecast", sport="nba", date="2026-10-25", log=True, replace_today=True, force=True
+    )
+    forecast.run_forecast(args, {"project": {}}, None, None, main, None, tmp_path)
+    assert main.restored == [(["nba-1"], [])]
+    assert main.rows() == []  # the spy retired it, so the restore call is what would reopen it
+
+
+def test_manual_forecast_does_not_restore_a_slot_the_run_evaluated(tmp_path, monkeypatch):
+    from model_prediction.cli import forecast
+
+    row = {
+        "pick_id": "nba-1",
+        "status": "open",
+        "league": "NBA",
+        "event_id": "g1",
+        "market_type": "spread",
+        "created_at_utc": "2026-10-25T12:00:00Z",
+        "event_start_utc": "2099-01-01T00:00:00Z",
+    }
+    main = _RestoreSpyLedger([row])
+    flat = _RestoreSpyLedger([])
+    monkeypatch.setattr(forecast, "MultiSportPickLedger", lambda *a, **kw: flat)
+    monkeypatch.setattr(forecast, "ledger_path", lambda config: tmp_path / "picks.xlsx")
+    monkeypatch.setattr(forecast, "_forecast_nba_spread_sport", lambda **kw: {})
+    monkeypatch.setattr(forecast, "_forecast_nba_total_sport", lambda **kw: {})
+    monkeypatch.setattr(
+        forecast,
+        "_forecast_learned_sport",
+        lambda *a, **kw: {"candidates": [{"event_id": "g1", "market_type": "spread"}]},
+    )
+    args = SimpleNamespace(
+        command="forecast", sport="nba", date="2026-10-25", log=True, replace_today=True, force=True
+    )
+    forecast.run_forecast(args, {"project": {}}, None, None, main, None, tmp_path)
+    # Evaluated and not re-emitted means a gate dropped it: the slot is excluded from the restore.
+    assert main.restored == [(["nba-1"], [("NBA", "g1", "spread")])]
+
+
 def test_model_coverage_does_not_hide_missing_flat_behind_main(tmp_path):
     import yaml
 

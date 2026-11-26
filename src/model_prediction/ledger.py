@@ -1594,7 +1594,9 @@ class PickLedger:
             }
             for row in prior_rows:
                 slot = (row["league"].casefold(), row["event_id"], row["market_type"])
-                if slot in active_slots or slot in declined:
+                # The slot test uses the rows that were active BEFORE this restore, so every
+                # superseded row of an unevaluated slot (two models share one slot) reopens.
+                if slot in active_slots or slot in declined or row["pick_id"] in restored:
                     continue
                 # Only the rows this refresh actually retired are eligible.
                 if retired_ids is not None and row["pick_id"] not in retired_ids:
@@ -1607,7 +1609,6 @@ class PickLedger:
                 )
                 self.audit.append("pick_restored_unreplaced", row["pick_id"], {"slot": slot})
                 restored.append(row["pick_id"])
-                active_slots.add(slot)
                 if self.authority != "sqlite":
                     current.append({**row, "status": "open"})
             if restored:

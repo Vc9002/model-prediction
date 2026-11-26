@@ -463,12 +463,15 @@ def _p1_shadow_fields(
                 tip = parse_utc(key[2])
                 season = ncaab_season_year(tip)
                 if season not in indexes:
-                    indexes[season] = PlayerBoxIndex.load(player_box_root(data_root), observed, season)
+                    index = PlayerBoxIndex.load(player_box_root(data_root), observed, season)
                     if live is None:
                         live = _p1_in_progress(board, args_date)
-                    indexes[season].in_progress = live
+                    index.in_progress = live
+                    # Stored only once complete: a lookup that raised must not leave an index without its
+                    # live games (or without its history) for the rest of the slate; the next game retries.
                     # every team scan would otherwise walk all seasons of history
                     season_history[season] = [g for g in history if ncaab_season_year(g.start) == season]
+                    indexes[season] = index
                 p1 = p1_margin_adjustment(key[0], key[1], tip, season_history[season], indexes[season])
                 fields: dict[str, Any] = {
                     "shadow_p1_status": p1.reason or "ok",

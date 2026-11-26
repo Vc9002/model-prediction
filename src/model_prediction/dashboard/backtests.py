@@ -236,6 +236,17 @@ def _row_matches_snapshot_event(row: dict, snapshot: dict) -> bool:
     return any(away_index != home_index for away_index in away_indexes for home_index in home_indexes)
 
 
+def _snapshot_line(snapshot: dict) -> float | None:
+    """The snapshot's line as a float, or None when it is missing or unreadable ("n/a").
+
+    The name loop calls the side matchers on every snapshot of the day before any pin is consulted,
+    so one unparseable line must refuse that market, never raise out of the quote."""
+    try:
+        return float(snapshot.get("line"))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
 def _spread_side_for_row(row: dict, snapshot: dict) -> str | None:
     """Which side ("long"/"short") of a spread snapshot this row's team+line
     picks, or None if it doesn't match at all (including belonging to a
@@ -253,7 +264,7 @@ def _spread_side_for_row(row: dict, snapshot: dict) -> str | None:
     selected_team = _row_selected_team(row)
     row_line = _row_line(row)
     market_team = snapshot.get("team")
-    market_line = snapshot.get("line")
+    market_line = _snapshot_line(snapshot)
     if not selected_team or row_line is None or market_team is None or market_line is None:
         return None
     return match_spread_side(row, row_line, market_team, market_line).side
@@ -273,8 +284,8 @@ def _total_side_for_row(row: dict, snapshot: dict) -> str | None:
     if selection not in ("over", "under"):
         return None
     row_line = _row_line(row)
-    market_line = snapshot.get("line")
-    if row_line is None or market_line is None or not _lines_match(row_line, float(market_line)):
+    market_line = _snapshot_line(snapshot)
+    if row_line is None or market_line is None or not _lines_match(row_line, market_line):
         return None
     long_desc = str((snapshot.get("long") or {}).get("description") or "").casefold().strip()
     short_desc = str((snapshot.get("short") or {}).get("description") or "").casefold().strip()
@@ -526,7 +537,9 @@ def _pick_quote(row: dict) -> dict | None:
     A row that recorded the market and side it was priced against (the NCAAB forecast writes
     ``market_slug=... token_side=...``, 2026-11-25) is quoted on exactly that market and side, or
     refused when the captured market does not line up with the row (_pinned_side). Name matching
-    below is the fallback only when that market was never captured.
+    below is the fallback when no pregame snapshot of that market qualifies: it was never captured,
+    or every snapshot of it is post-tip, timestamp-invalid or of another market type. In that case
+    the name path may quote a different contract of the same game, as it did before the pin existed.
     """
     market_type = row.get("market_type")
     if market_type not in ("moneyline", "spread", "total", "nrfi"):

@@ -822,3 +822,41 @@ def test_a_second_not_found_ten_minutes_later_memoises_the_id(runtime, monkeypat
     monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", _never_built)
     code, out = _run(capsys)
     assert code == 0 and out["candidates"] == 0
+
+
+def _seed_old_not_found_stamp(runtime, order_id: str = "gtd-1") -> None:
+    """A transient 404 seen hours ago: old enough that a second sighting now would confirm it."""
+    stamp = iso_utc(utc_now() - timedelta(hours=6))
+    (runtime / worker.MEMO_FILE_NAME).write_text(
+        json.dumps({"order_ids": {}, worker.NOT_FOUND_KEY: {order_id: stamp}}), encoding="utf-8"
+    )
+
+
+def test_a_failed_run_drops_the_not_found_stamp_so_only_consecutive_sightings_memoise(
+    runtime, monkeypatch, capsys
+):
+    """Two transient 404s hours apart, with a failed cancel between them, must not memoise a still
+    resting live order for three days: the failed run forgets the first sighting."""
+    _write(runtime, [_row("gtd-1", start_seconds=20.0)])
+    _seed_old_not_found_stamp(runtime)
+    _exchange(monkeypatch, fail_cancel=("gtd-1",))  # live on the exchange, cancel keeps failing
+    code, out = _run(capsys)
+    assert code == 1 and [f["order_id"] for f in out["failed"]] == ["gtd-1"]
+    assert _memo(runtime)[worker.NOT_FOUND_KEY] == {}
+    # The next not-found is a first sighting again: stamped, not memoised.
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: _Gone(("gtd-1",)))
+    code, out = _run(capsys)
+    assert code == 0 and out["not_found"] == ["gtd-1"]
+    memo = _memo(runtime)
+    assert "gtd-1" not in memo["order_ids"] and "gtd-1" in memo[worker.NOT_FOUND_KEY]
+
+
+def test_a_deadline_skipped_run_drops_the_not_found_stamp(runtime, monkeypatch, capsys):
+    _write(runtime, [_row("gtd-1", start_seconds=20.0)])
+    _seed_old_not_found_stamp(runtime)
+    exchange = _exchange(monkeypatch)
+    ticks = iter([0.0, 100.0, 110.0, 120.0])
+    monkeypatch.setattr(worker, "_monotonic", lambda: next(ticks))
+    code, out = _run(capsys)
+    assert code == 0 and exchange.calls == [] and out["deadline_skipped"] == ["gtd-1"]
+    assert _memo(runtime)[worker.NOT_FOUND_KEY] == {}

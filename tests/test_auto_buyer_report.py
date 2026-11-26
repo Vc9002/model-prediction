@@ -778,7 +778,18 @@ def test_report_can_trim_rows_to_the_report_date(runtime):
 
 def test_skip_reasons_read_only_the_report_dates_file(runtime, monkeypatch):
     legacy = runtime / "logs" / "auto_buyer_skip_reasons.jsonl"
-    _jsonl(legacy, [{"book": "live", "pick_id": "legacy", "tip_date_et": "2026-11-26", "reason": "x"}])
+    # Both records carry a cycle and a tip time, and the date string, so the legacy reader keeps them
+    # and only the tip-date filter can drop the later one (the same record dated today is kept).
+    timed = {"book": "live", "cohort": LIVE_SPREAD_LABEL, "cycle_at_utc": "2026-11-25T22:00:00Z"}
+    _jsonl(
+        legacy,
+        [
+            {**timed, "pick_id": "later", "tip_date_et": "2026-11-26", "tip_utc": "2026-11-26T23:00:00Z"}
+            | {"reason": "legacy_later"},
+            {**timed, "pick_id": "today", "tip_date_et": DATE, "tip_utc": "2026-11-25T23:00:00Z"}
+            | {"reason": "legacy_today"},
+        ],
+    )
     other_day = report_mod.skip_log_path(runtime, "2026-11-24")
     assert other_day.exists()
     opened: list[Path] = []
@@ -790,7 +801,9 @@ def test_skip_reasons_read_only_the_report_dates_file(runtime, monkeypatch):
     assert report_mod.skip_log_path(runtime, DATE) in opened
     assert other_day not in opened
     # A pick of a later tip date is not this date's, wherever its record sits.
-    assert "legacy" not in json.dumps(report["skip_reasons"])
+    skipped = json.dumps(report["skip_reasons"])
+    assert "legacy_today" in skipped, "the legacy log is read for this date, so the assertion can fail"
+    assert "legacy_later" not in skipped
     # From the first per-date file on, the single legacy log is never opened.
     opened.clear()
     report_mod.build_auto_buyer_report(runtime, "2026-11-26")
