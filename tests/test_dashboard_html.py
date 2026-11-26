@@ -1012,9 +1012,17 @@ def _run_auto_buyer_ui(scenario: str) -> dict:
         html,
     )
     assert match, "auto-buyer controls block is missing"
+    extra = ""
+    if "runAutoBuyerNow" in scenario:
+        start = html.index("async function runAutoBuyerNow(")
+        extra = html[start : html.index("\n}\n", start) + 3] + (
+            "\nconst getAutoBuyerMode = m => (m === 'live' || m === 'paper') ? m : 'paper';"
+            "\nfunction refreshAll() {}\nasync function renderAutoBuyerSection() {}\n"
+        )
     script = (
         _AUTO_BUYER_HARNESS
         + match.group(1)
+        + extra
         + "\n(async () => {\n"
         + scenario
         + "\n})().catch(e => { process.stderr.write(String(e && e.stack || e)); process.exit(1); });\n"
@@ -1066,7 +1074,9 @@ def test_refused_toggle_shows_the_error_and_renders_server_state(toggle_reply: s
     toggle_body = next(f["body"] for f in out["fetchLog"] if f["url"] == "/api/auto-buyer/toggle")
     assert json.loads(toggle_body)["enabled"] is False
     urls = [f["url"] for f in out["fetchLog"]]
-    assert urls.index("/api/auto-buyer/status") > urls.index("/api/auto-buyer/toggle")
+    # Re-rendered from a status read taken after the POST, never from the failed body.
+    last_status = len(urls) - 1 - urls[::-1].index("/api/auto-buyer/status")
+    assert last_status > urls.index("/api/auto-buyer/toggle")
     assert len(out["alerts"]) == 1 and "refused" in out["alerts"][0].lower()
     assert out["btn"] == "ON (LIVE)"
     assert out["pillState"] == "live"
@@ -1203,3 +1213,79 @@ def test_live_drawdown_block_lists_each_cohort_and_flags_warnings() -> None:
     assert "3-5-1" in block and "2-0-0" in block
     assert "-$104.50" in block and "-20.9U" in block and "-11.6%" in block
     assert 'class="red"' in block and "current drawdown $104.50" in block
+
+
+# Review of Task 3 (MAJOR): both real-money buttons decide from a FRESH status read, and do nothing
+# when it cannot be read. A stale or empty cache once offered "Enable ... PAPER ... no real orders"
+# and POSTed enabled:true while live cohorts traded.
+_PAPER_STALE = {
+    "enabled": False,
+    "mode": "paper",
+    "cohorts": [],
+    "live_cohorts": [],
+    "live_trading_active": False,
+}
+
+
+def test_toggle_with_unreadable_status_sends_nothing() -> None:
+    out = _run_auto_buyer_ui(
+        """
+        routes['/api/auto-buyer/status'] = () => reply(500, 'boom');
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {enabled: false});
+        routes['/api/auto-buyer/toggle'] = () => reply(200, {enabled: true});
+        await toggleAutoBuyer();
+        """
+        + _REPORT
+    )
+    assert [f for f in out["fetchLog"] if f["url"] == "/api/auto-buyer/toggle"] == []
+    assert out["confirms"] == []
+    assert any("unavailable" in a.lower() for a in out["alerts"])
+
+
+def test_toggle_confirms_from_a_fresh_status_not_the_stale_cache() -> None:
+    stale = json.dumps(_PAPER_STALE)
+    fresh = json.dumps({**_LIVE_STATUS, "enabled": False, "live_trading_active": False})
+    out = _run_auto_buyer_ui(
+        f"""
+        updateAutoBuyerUI({stale});
+        routes['/api/auto-buyer/status'] = () => reply(200, {fresh});
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        routes['/api/auto-buyer/toggle'] = () => reply(200, {{enabled: true}});
+        await toggleAutoBuyer();
+        """
+        + _REPORT
+    )
+    confirm = out["confirms"][0]
+    assert "REAL MONEY" in confirm["message"] and confirm["opts"].get("danger") is True
+    for label in _LIVE_STATUS["live_cohorts"]:
+        assert label in confirm["message"]
+
+
+def test_run_now_with_unreadable_status_sends_nothing() -> None:
+    out = _run_auto_buyer_ui(
+        """
+        routes['/api/auto-buyer/status'] = () => reply(500, 'boom');
+        routes['/api/auto-buyer/run'] = () => reply(200, {status: 'ok'});
+        await runAutoBuyerNow('live');
+        """
+        + _REPORT
+    )
+    assert [f for f in out["fetchLog"] if f["url"] == "/api/auto-buyer/run"] == []
+    assert out["confirms"] == []
+    assert any("unavailable" in a.lower() for a in out["alerts"])
+
+
+def test_run_now_confirms_live_from_a_fresh_status() -> None:
+    stale = json.dumps({**_PAPER_STALE, "enabled": True})
+    fresh = json.dumps(_LIVE_STATUS)
+    out = _run_auto_buyer_ui(
+        f"""
+        updateAutoBuyerUI({stale});
+        routes['/api/auto-buyer/status'] = () => reply(200, {fresh});
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        await runAutoBuyerNow('live');
+        """
+        + _REPORT
+    )
+    confirm = out["confirms"][0]
+    assert "REAL" in confirm["message"] and confirm["opts"].get("danger") is True

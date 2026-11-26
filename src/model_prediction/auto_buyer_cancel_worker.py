@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -36,19 +37,34 @@ START_LEAD_SECONDS = 30.0
 # Ids this worker already cancelled or found terminal are never re-sent (the gateway's rate limit is
 # shared with the buyer). Three days outlives any fallback, which expires at its game's start.
 MEMO_RETENTION = timedelta(days=3)
+# One failed read of the state file (a sharing violation, or a hand edit caught mid-save) must not
+# read as the kill switch and cancel every resting fallback; only a persistent failure does.
+STATE_READ_ATTEMPTS = 3
+STATE_READ_RETRY_SECONDS = 0.3
+# Stop starting new cancels after this long. One exchange GET or cancel can take ~46 s and a cancel's
+# audit append can wait on the audit lock, so the run must end well inside the supervisor's 115 s kill
+# (run_supervisor.DEFAULT_WORKER_TIMEOUTS); ids not reached are retried on the next 2-minute run.
+RUN_DEADLINE_SECONDS = 90.0
+_sleep = time.sleep
+_monotonic = time.monotonic
 
 
 def _buyer_enabled(state_path: Path) -> bool:
     """Only the boolean true in the canonical runtime state file counts as enabled.
 
     Read directly rather than through ``load_auto_buyer_state``: that loader falls back to the repo
-    seed file when the runtime file is missing, and this worker must fail toward cancelling.
+    seed file when the runtime file is missing, and this worker must fail toward cancelling. A read
+    that fails is retried; a file that stays missing or unreadable counts as disabled.
     """
-    try:
-        data = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    return isinstance(data, dict) and data.get("enabled") is True
+    for attempt in range(STATE_READ_ATTEMPTS):
+        try:
+            data = json.loads(state_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            if attempt + 1 < STATE_READ_ATTEMPTS:
+                _sleep(STATE_READ_RETRY_SECONDS)
+            continue
+        return isinstance(data, dict) and data.get("enabled") is True
+    return False
 
 
 def _load_memo(path: Path, now: datetime) -> dict[str, str]:
@@ -78,6 +94,7 @@ def _save_memo(path: Path, memo: dict[str, str]) -> None:
 def _run(paths: RuntimePaths) -> int:
     from .portfolio import auto_buyer_ledger
 
+    deadline = _monotonic() + RUN_DEADLINE_SECONDS
     now = utc_now()
     root = paths.runtime_root
     enabled = _buyer_enabled(root / "auto_buyer_state.json")
@@ -92,6 +109,7 @@ def _run(paths: RuntimePaths) -> int:
             start_lead_seconds=START_LEAD_SECONDS,
             skip_order_ids=frozenset(memo),
             reason=reason,
+            stop_before=lambda: _monotonic() >= deadline,
         )
     except Exception as exc:  # noqa: BLE001 -- reported as a failed run, never a silent pass
         error = f"{type(exc).__name__}: {exc}"[:300]
@@ -101,6 +119,8 @@ def _run(paths: RuntimePaths) -> int:
         return 1
     done = [*summary.get("cancelled", []), *summary.get("already_terminal", [])]
     result: dict[str, Any] = {"enabled": enabled, **summary}
+    if summary.get("deadline_skipped"):
+        result["note"] = "deadline"
     if done:
         memo.update({str(order_id): iso_utc(now) for order_id in done})
         try:

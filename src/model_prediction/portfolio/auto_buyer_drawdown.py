@@ -109,6 +109,12 @@ def _cohort_report(
             continue
         if str(row.get("market_type") or "").strip().lower() != cohort.market or _excluded(row):
             continue
+        # Rows carry the label of the cohort they were bought under (the buyer's order payload);
+        # one bought under another window of the same model is not this cohort's. Untagged rows
+        # (written before the label reached the ledger) fall back to model, sport and market.
+        tag = str(row.get("cohort") or "").strip()
+        if tag and tag != cohort.label:
+            continue
         if approved is not None:
             try:
                 if parse_utc(str(row.get("executed_at_utc") or "")) < approved:

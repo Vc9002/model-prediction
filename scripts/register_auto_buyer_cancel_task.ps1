@@ -10,6 +10,10 @@
 #
 # Usage:  powershell -NoProfile -ExecutionPolicy Bypass -File scripts\register_auto_buyer_cancel_task.ps1
 $ErrorActionPreference = 'Stop'
+# The copied principal is S4U, which needs an elevated shell. Refuse before unregistering anything.
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'Registering the S4U backstop task needs an elevated (administrator) shell; no task was changed.'
+}
 
 $NewTaskName = 'ModelPrediction-AutoBuyerCancel'
 $src = Get-ScheduledTask -TaskName 'ModelPrediction-AutoBuyer'
@@ -25,9 +29,14 @@ $action = New-ScheduledTaskAction -Execute $srcAction.Execute -Argument $newArgs
 $trigger = New-ScheduledTaskTrigger -Daily -At '08:00'
 $trigger.Repetition = (New-ScheduledTaskTrigger -Once -At '08:00' -RepetitionInterval (New-TimeSpan -Minutes 2) -RepetitionDuration (New-TimeSpan -Hours 18)).Repetition
 
+# The copied settings carry the auto-buyer task's Enabled flag; the backstop is always enabled
+# (it is what cancels resting orders when the buyer is switched off).
+$settings = $src.Settings
+$settings.Enabled = $true
+
 $existing = Get-ScheduledTask -TaskName $NewTaskName -ErrorAction SilentlyContinue
 if ($existing) { Unregister-ScheduledTask -TaskName $NewTaskName -Confirm:$false }
-Register-ScheduledTask -TaskName $NewTaskName -Action $action -Trigger $trigger -Settings $src.Settings `
+Register-ScheduledTask -TaskName $NewTaskName -Action $action -Trigger $trigger -Settings $settings `
     -Principal $src.Principal `
     -Description 'model-prediction auto-buyer cancel backstop (cancel-only by order id, own lock, never places orders)' | Out-Null
 

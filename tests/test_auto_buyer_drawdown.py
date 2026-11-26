@@ -303,3 +303,16 @@ def test_preview_cycle_computes_no_drawdown(tmp_path, monkeypatch):
     )
     summary = auto_executor.run_auto_buyer_cycle(preview=True)
     assert "live_drawdown" not in summary
+
+
+def test_rows_tagged_with_another_cohort_label_are_not_counted(tmp_path):
+    """Rows carry the cohort label they were bought under; a row of the same model, sport and
+    market bought under a different window (an earlier or replaced cohort) is not this cohort's."""
+    rows = [
+        _row("loss", -10.0, cohort=SPREAD_LABEL),
+        _row("loss", -30.0, cohort="ncaab-spread-v7:spread:[0.05,0.08):live"),
+        _row("win", 4.0),  # untagged rows (written before the label was recorded) still count
+    ]
+    c = _cohort(_report(tmp_path, rows))
+    assert (c["wins"], c["losses"]) == (1, 1)
+    assert c["pnl_usd"] == pytest.approx(-6.0)

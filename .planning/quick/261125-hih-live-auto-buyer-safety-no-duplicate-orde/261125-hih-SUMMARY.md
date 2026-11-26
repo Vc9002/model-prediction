@@ -650,3 +650,56 @@ Each mutation was a break, then a run of the named test, then a restore by bytes
   - With a 2-minute cadence and a 30-second lead, the first due run can come up to about 90 s after tip. GTD expiry is the primary mechanism.
   - The new worker adds about 540 runs.db rows a day. `_read_daily_run_history` and system_health filter by worker, but the dashboard's `/runs` list (last 20, unfiltered) and the `latest_run` fingerprint will be dominated by `auto-buyer-cancel`. This is cosmetic, and nothing was changed.
   - Until the dashboard restarts, the new page talks to the old server, which sends no `live_cohorts`. It still reads PAPER while live cohorts trade, which is no worse than before.
+
+## Task 3 review fixes (critical-reviewer: CHANGES REQUIRED)
+
+### Fixes
+
+1. **[MAJOR] Real-money buttons decided from a stale or empty cache.**
+   - New `_abFreshStatusOrAlert()` in `dashboard.html`. `toggleAutoBuyer` and `runAutoBuyerNow` (live path) first re-read `/api/auto-buyer/status`. If that read fails, they alert "status unavailable" and send nothing. Otherwise the confirm text and `danger` come from the fresh read.
+   - The NCAAB paper-trial run is unchanged; it does not depend on the main status.
+2. **[minor] One failed state read counted as the kill switch.** `_buyer_enabled` in the worker now reads up to 3 times, 0.3 s apart. A file that stays missing or corrupt still means cancel all.
+3. **[minor] A non-admin S4U re-run deleted tasks.**
+   - `register_windows_tasks.ps1` throws before touching any task when `-LogonType S4U` runs in a non-administrator shell.
+   - `register_auto_buyer_cancel_task.ps1` throws when not run as administrator, before it unregisters anything.
+4. **[minor] Timeout.**
+   - The worker stops starting new cancels after `RUN_DEADLINE_SECONDS = 90`. Ids not reached go to `deadline_skipped`, the note is `deadline`, the exit is 0, and they are not memoised.
+   - `cancel_resting_live_fallbacks` takes an optional `stop_before` callable, checked before the order read and before each cancel.
+   - The supervisor timeout is now 115 s, and the comment is corrected.
+5. **Nits.**
+   - (a) The drawdown now drops a row whose `cohort` label names a different cohort; untagged rows still match on model, sport and market. The ledger passthrough of `cohort` (plus `cohort_min_edge` and `cohort_max_edge`) is in the parallel buyerfix branch's `_EXECUTION_PASSTHROUGH_FIELDS`, so it was not duplicated here.
+   - (b) The single-task script sets `$settings.Enabled = $true` on the copied settings.
+
+### Red (new tests on the landed Task 3 code)
+
+```
+test_dashboard_html.py:1240: assert [{'body': '{"...uyer/toggle'}] == []        (toggle POSTed with status unreadable)
+test_dashboard_html.py:1259: AssertionError: assert ('REAL MONEY' in 'Enable Polymarket Auto-Buyer in PAPER mode?...no real orders')
+test_dashboard_html.py:1273: assert [{'body': '{"...o-buyer/run'}] == []        (run POSTed with status unreadable)
+test_dashboard_html.py:1291: AssertionError: assert ('REAL' in 'Run the main Auto-Buyer check now using its saved mode and enabled state?')
+test_auto_buyer_cancel_worker.py:289: assert 120.0 == 115.0
+test_auto_buyer_cancel_worker.py:318/327: ValueError: substring not found         (no admin pre-check in either ps1)
+test_auto_buyer_cancel_worker.py:456/467: AttributeError: ... has no attribute '_sleep'      (no retry)
+test_auto_buyer_cancel_worker.py:481/494: AttributeError: ... has no attribute '_monotonic'  (no deadline)
+test_auto_buyer_drawdown.py:317: assert (1, 2) == (1, 1)                          (other-cohort row counted)
+```
+
+One existing assertion was updated to the new required behaviour: `test_refused_toggle_...` now checks that the LAST status read follows the toggle POST, because the toggle now also reads the status before the POST. Its intent (re-render from a read taken after the failed POST) is unchanged.
+
+### Mutation proofs (break, run, restore by bytes with a sha256 check)
+
+All went red.
+
+| # | Mutation | Red |
+|---|---|---|
+| N1 | toggle without the fresh-status check | 2 failed |
+| N2 | run-now without the check | 2 failed |
+| N3 | `STATE_READ_ATTEMPTS = 1` | transient-read test |
+| N4 | worker passes no deadline | both deadline tests |
+| N5 | helper ignores the deadline between cancels | deadline test |
+| N6 | full-script guard disabled | 1 failed |
+| N6b | snippet guard disabled | 1 failed |
+| N7 | snippet keeps the copied `Enabled` | 1 failed |
+| N8 | drawdown ignores the cohort label | 1 failed |
+
+The first N6 run survived because the test only checked that the guard text was present. The test now requires a live `if (... IsInRole(Administrator)) { throw` guard placed before any task change; with that, N6 goes red.

@@ -53,6 +53,10 @@ $5/unit, $25/game, $500/day spend, $250/day settled-loss stop).
   status (`enabled === true` only), checks `res.ok` and `status !== "refused"`, alerts on failure,
   and always re-renders from a fresh `/api/auto-buyer/status`. When that status is unreadable, the
   pill says "status unavailable, reload". `setAutoBuyerMode` had the same defect and got the same fix.
+  Review fix: the toggle and "Run main buyer check" first re-read `/api/auto-buyer/status` and build
+  their confirm from that fresh read; if it cannot be read they alert and send nothing. Before this, an
+  empty cache (a failed first status read) offered "Enable ... PAPER, no real orders" and posted
+  `enabled: true` while live cohorts traded.
 - **C2, "ON (PAPER)" while live cohorts trade.** `/api/auto-buyer/status` now returns
   `auto_buyer_status()`: the state plus `live_cohorts`, `live_trading_active` (enabled is the
   boolean true and a live cohort, or the legacy ungoverned `mode: live`, exists) and `live_drawdown`.
@@ -122,8 +126,11 @@ an exchange-wide cancel. This happens in four places:
 `ModelPrediction-AutoBuyerCancel`, every 2 min from 08:00 for 18 h)
 
 - **What it cancels.** Cancel-only: by order id, live fallbacks whose event starts within 30 s, and
-  every live fallback while the buyer is disabled. A missing or unreadable state file counts as
-  disabled.
+  every live fallback while the buyer is disabled. A state file that stays missing or unreadable
+  over 3 reads 0.3 s apart counts as disabled; one failed read (a sharing violation, a hand edit
+  caught mid-save) does not.
+- **Deadline.** It stops starting new cancels 90 s into a run (`deadline_skipped`, note `deadline`,
+  exit 0); those ids are retried on the next run. The supervisor timeout is 115 s.
 - **Lock and runtime root.** It takes its own lock, `locks/auto_buyer_cancel.lock`, never
   `daily.lock`, which the daily job holds for up to ~50 min. It fails closed without
   `MODEL_PREDICTION_RUNTIME_ROOT`.
@@ -135,7 +142,10 @@ an exchange-wide cancel. This happens in four places:
 - **Registration.** `scripts/register_auto_buyer_cancel_task.ps1` registers only this task, copying
   the live auto-buyer task's principal, settings and action. `register_windows_tasks.ps1` now
   defaults to `-LogonType S4U`: the old Interactive default would have switched every live S4U
-  worker task to run only while logged on.
+  worker task to run only while logged on. Both scripts refuse up front in a non-administrator
+  shell (S4U registration needs elevation, and `Register-WorkerTask` unregisters before it
+  registers, so a failed run used to delete the task). The single-task script forces the new task
+  enabled instead of copying the auto-buyer task's `Enabled` flag.
 
 **Drawdown warning (DD, D-06).** `portfolio/auto_buyer_drawdown.py::live_cohort_drawdown_report` is
 the single entry point (the later Telegram task calls it).
@@ -176,9 +186,9 @@ the single entry point (the later Telegram task calls it).
 - **Not proven without a real order (D-07).** The exchange may not echo `tif`/`goodTillTime` on
   `GET /v1/order/{id}`. In that case every fallback is cancelled as `cancelled_unverified_gtd` and
   buying continues IOC-only. Task 4 observes the first one.
-- **Backstop timing.** A cancel's audit append can wait on the audit lock for about 120 s, which
-  equals the backstop's supervisor timeout. The cancel itself is already sent by then, and the next
-  run reads the id back as terminal. A memoised "cancelled" id is never re-verified by the backstop;
+- **Backstop timing.** A cancel's audit append can wait on the audit lock for about 120 s, longer
+  than the backstop's 115 s supervisor timeout. The cancel itself is already sent by then, and the
+  next run reads the id back as terminal. A memoised "cancelled" id is never re-verified by the backstop;
   reconcile under `daily.lock` re-reads it.
 - **Backstop cadence.** With a 2-minute cadence and a 30-second lead, the first run that sees a
   fallback as due can come up to about 90 s after tip. The GTD expiry at start minus 90 s stays

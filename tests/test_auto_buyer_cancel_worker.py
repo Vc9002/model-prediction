@@ -285,7 +285,9 @@ def test_missing_runtime_root_fails_closed_without_reading_the_ledger(tmp_path, 
 
 def test_supervisor_registers_the_backstop_worker():
     assert WORKERS["auto-buyer-cancel"] == [_VENV_PYTHON, "-m", "model_prediction.auto_buyer_cancel_worker"]
-    assert DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"] == 120.0
+    # The worker stops starting cancels at its own deadline, well inside the supervisor's kill.
+    assert DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"] == 115.0
+    assert worker.RUN_DEADLINE_SECONDS <= DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"] - 20
 
 
 def test_windows_task_script_registers_the_backstop_every_two_minutes():
@@ -312,6 +314,28 @@ def test_standalone_registration_snippet_registers_only_the_backstop():
     assert "run auto-buyer-cancel" in snippet
     assert "Start-ScheduledTask" not in snippet
     assert "Unregister-ScheduledTask -TaskName 'ModelPrediction-AutoBuyer'" not in snippet
+    # A non-admin S4U run must stop before it unregisters anything.
+    guard = re.search(_ADMIN_GUARD.format(cond=r"-not "), snippet, re.MULTILINE)
+    assert guard and guard.start() < snippet.index("Unregister-ScheduledTask")
+    # The copied settings would carry the source task's Enabled flag; the backstop is always enabled.
+    assert "$settings.Enabled = $true" in snippet
+    assert "-Settings $settings" in snippet
+
+
+# The guard must be a live `if (<cond>(... IsInRole(Administrator))) { throw ... }`, not a mention.
+_ADMIN_GUARD = (
+    r"^if \({cond}\(\[Security\.Principal\.WindowsPrincipal\]\[Security\.Principal\.WindowsIdentity\]"
+    r"::GetCurrent\(\)\)\.IsInRole\(\[Security\.Principal\.WindowsBuiltInRole\]::Administrator\)\) \{{\n"
+    r"    throw "
+)
+
+
+def test_full_registration_script_checks_admin_before_touching_any_task():
+    script = (ROOT / "scripts" / "register_windows_tasks.ps1").read_text(encoding="utf-8")
+    guard = re.search(_ADMIN_GUARD.format(cond=r"\$LogonType -eq 'S4U' -and -not "), script, re.MULTILINE)
+    assert guard
+    assert guard.start() < script.index("Register-WorkerTask '")
+    assert guard.start() < script.index("Unregister-ScheduledTask -TaskName 'ModelPrediction-BackupOffsite'")
 
 
 def test_health_has_a_skip_escalation_for_the_backstop():
@@ -422,3 +446,61 @@ def test_dry_run_is_unchanged_under_cohorts(script, monkeypatch):
     assert script.main(["--json"]) == 0
     assert script.BUILT[0]["execute_live"] is False
     assert script.LOCK_PROBES == [False]
+
+
+# ---------------------------------------------------------------- review fixes (Task 3 review)
+
+
+def test_transient_state_read_failure_is_retried_before_cancelling_all(runtime, monkeypatch, capsys):
+    """A half-written hand edit or a sharing violation must not read as the kill switch."""
+    _write(runtime, [_row("gtd-1", start_seconds=36000.0)], enabled=None)
+    state = runtime / "auto_buyer_state.json"
+    state.write_text('{"enabled": tr', encoding="utf-8")
+    sleeps: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        state.write_text(json.dumps({"enabled": True}), encoding="utf-8")
+
+    monkeypatch.setattr(worker, "_sleep", fake_sleep)
+    code, out = _run(capsys)
+    assert code == 0
+    assert out["enabled"] is True and out["candidates"] == 0
+    assert len(sleeps) == 1
+
+
+def test_persistently_unreadable_state_is_retried_then_cancels_all(runtime, monkeypatch, capsys):
+    _write(runtime, [_row("gtd-1", start_seconds=36000.0)], enabled=None)
+    (runtime / "auto_buyer_state.json").write_text("{broken", encoding="utf-8")
+    sleeps: list[float] = []
+    monkeypatch.setattr(worker, "_sleep", sleeps.append)
+    exchange = _exchange(monkeypatch)
+    code, out = _run(capsys)
+    assert code == 0
+    assert out["enabled"] is False and exchange.cancelled == ["gtd-1"]
+    assert len(sleeps) == worker.STATE_READ_ATTEMPTS - 1
+    assert all(0.1 <= s <= 0.5 for s in sleeps)
+
+
+def test_run_deadline_stops_new_cancels_and_exits_cleanly(runtime, monkeypatch, capsys):
+    _write(runtime, [_row("gtd-1", start_seconds=20.0), _row("gtd-2", start_seconds=25.0)])
+    exchange = _exchange(monkeypatch)
+    # Clock reads: run start, before the order read, before cancel 1, before cancel 2.
+    ticks = iter([0.0, 30.0, 60.0, 120.0, 130.0, 140.0])
+    monkeypatch.setattr(worker, "_monotonic", lambda: next(ticks))
+    code, out = _run(capsys)
+    assert code == 0
+    assert exchange.cancelled == ["gtd-1"]
+    assert out["deadline_skipped"] == ["gtd-2"] and out["note"] == "deadline"
+    memo = json.loads((runtime / worker.MEMO_FILE_NAME).read_text(encoding="utf-8"))
+    assert set(memo["order_ids"]) == {"gtd-1"}
+
+
+def test_deadline_before_the_order_read_sends_nothing(runtime, monkeypatch, capsys):
+    _write(runtime, [_row("gtd-1", start_seconds=20.0)])
+    exchange = _exchange(monkeypatch)
+    ticks = iter([0.0, 100.0, 110.0, 120.0])
+    monkeypatch.setattr(worker, "_monotonic", lambda: next(ticks))
+    code, out = _run(capsys)
+    assert code == 0 and exchange.calls == []
+    assert out["deadline_skipped"] == ["gtd-1"]

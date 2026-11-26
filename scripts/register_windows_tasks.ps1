@@ -14,6 +14,11 @@ param(
     [string]$User = $env:USERNAME
 )
 $ErrorActionPreference = 'Stop'
+# Register-WorkerTask unregisters each task before registering it, so a non-elevated S4U run
+# would delete the live Daily task and then fail to recreate it. Refuse before touching any task.
+if ($LogonType -eq 'S4U' -and -not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'S4U registration needs an elevated (administrator) shell; no task was changed.'
+}
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $RuntimeRoot = if ($env:MODEL_PREDICTION_RUNTIME_ROOT) { $env:MODEL_PREDICTION_RUNTIME_ROOT.Trim() } else { Join-Path $RepoRoot 'data' }

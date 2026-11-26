@@ -132,8 +132,9 @@ DEFAULT_WORKER_TIMEOUTS: dict[str, float] = {
     "nba-pretip-capture": 300.0,
     # Capture is budgeted at 240 s and writes only at the end; under the 10-minute cadence.
     "ncaaf-prekickoff-capture": 360.0,
-    # One order read plus a cancel per due id; inside the 2-minute cadence so runs never overlap.
-    "auto-buyer-cancel": 120.0,
+    # Under the 2-minute cadence. The worker stops starting cancels at 90 s
+    # (auto_buyer_cancel_worker.RUN_DEADLINE_SECONDS); one exchange call can take ~46 s.
+    "auto-buyer-cancel": 115.0,
     "daily": 3600.0,  # 60 minutes max
     "rebuild-shadow": 3600.0,  # 60 minutes max
 }

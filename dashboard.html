@@ -3923,8 +3923,17 @@ function updateAutoBuyerUI(data){
   }
   updateNcaabPaperUI(_ncaabPaperStatusCache);
 }
+// Both real-money buttons decide from a fresh server read, never from the cache or the button text:
+// a stale or empty cache once offered "Enable ... PAPER, no real orders" and posted enabled:true while
+// live cohorts traded. If the status cannot be read, they do nothing.
+async function _abFreshStatusOrAlert(){
+  await loadAutoBuyerStatus();
+  if(_autoBuyerStatusOk)return true;
+  customAlert("Auto-Buyer status unavailable; reload before toggling or running the buyer.");
+  return false;
+}
 async function toggleAutoBuyer(){
-  // From the last server status, never from the button text (C1).
+  if(!(await _abFreshStatusOrAlert()))return;
   const ls=autoBuyerLiveState(_autoBuyerStatusCache);
   const nextState=!ls.on;
   const unitValue=Number(_autoBuyerStatusCache.unit_value_usd||0.50);
@@ -4828,6 +4837,7 @@ async function settleAutoBuyerTrades(mode = "paper", fromButton = false) {
 async function runAutoBuyerNow(mode = "paper") {
   const m = getAutoBuyerMode(mode);
   const paper=m==="paper";
+  if(!paper&&!(await _abFreshStatusOrAlert()))return;
   const liveActive=!paper&&autoBuyerLiveState(_autoBuyerStatusCache).live;
   const msg=paper
     ?"Run the NCAAB v6 spread paper trial now? This records simulated fills only."
