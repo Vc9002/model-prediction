@@ -70,6 +70,28 @@ TEAM_NAME_ALIASES: dict[str, str] = {
     "nc state wolfpack": "north carolina state",
     "uconn": "connecticut",
     "uconn huskies": "connecticut",
+    # Polymarket US abbreviations in NCAAB spread markets ("team") and event titles that share no
+    # word with the school, so they matched neither row team and every such market was refused
+    # ("UCA" put a real-money order on the wrong team before that refusal, 2026-11-25). Each was
+    # checked in odds/ncaab/*/polymarket_snapshots.jsonl against the same event's title, event-slug
+    # code and moneyline mascot (UCA: "Central Arkansas vs. ...", cbb-cark-*, Bears; UNCW: cbb-ncw-*,
+    # Seahawks; FDU: cbb-fairdk-*, Knights; Penn: Quakers; Mich. State: cbb-det-mst title only).
+    "uca": "central arkansas",
+    "nau": "northern arizona",
+    "eiu": "eastern illinois",
+    "uml": "umass lowell",
+    "tenn state": "tennessee state",
+    "ore state": "oregon state",
+    "uncw": "unc wilmington",
+    "fdu": "fairleigh dickinson",
+    "usc upstate": "south carolina upstate",
+    "st thomas mn": "st thomas",
+    "ark pine bluff": "arkansas pine bluff",
+    "mich state": "michigan state",
+    # History names Penn "Pennsylvania Quakers"; Polymarket says "Penn". "penn quakers" keeps the
+    # ESPN-style name matching the bare "Penn" it matched before.
+    "penn": "pennsylvania",
+    "penn quakers": "pennsylvania quakers",
 }
 
 _DISQUALIFYING_TEAM_PREFIXES = frozenset(

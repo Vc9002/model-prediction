@@ -48,6 +48,9 @@ def _spread_snapshot(event_title: str, team: str, line: float, slug: str) -> dic
 _UCA_SNAPSHOT = _spread_snapshot(
     "Central Arkansas vs. Jacksonville", "UCA", 3.5, "asc-cbb-cark-jax-2026-11-21-pos-3pt5"
 )
+# UCA itself now has an alias and resolves to Central Arkansas (tests/test_recorded_market_pin.py);
+# an abbreviation no alias knows must still be refused, never taken for the opponent.
+_UNMAPPED_SNAPSHOT = {**_UCA_SNAPSHOT, "team": "C. Ark."}
 
 
 def test_market_team_matching_neither_row_team_is_refused() -> None:
@@ -56,7 +59,7 @@ def test_market_team_matching_neither_row_team_is_refused() -> None:
     is Jacksonville -3.5: the opposite bet."""
     row = _ncaab_row("Central Arkansas", "Jacksonville", "away", -3.5)
 
-    assert _spread_side_for_row(row, _UCA_SNAPSHOT) is None
+    assert _spread_side_for_row(row, _UNMAPPED_SNAPSHOT) is None
 
 
 def test_market_team_matching_neither_row_team_is_refused_for_either_pick() -> None:
@@ -64,7 +67,7 @@ def test_market_team_matching_neither_row_team_is_refused_for_either_pick() -> N
     # snapshot proves it, so it fails closed too.
     row = _ncaab_row("Central Arkansas", "Jacksonville", "home", -3.5)
 
-    assert _spread_side_for_row(row, _UCA_SNAPSHOT) is None
+    assert _spread_side_for_row(row, _UNMAPPED_SNAPSHOT) is None
 
 
 @pytest.mark.parametrize(

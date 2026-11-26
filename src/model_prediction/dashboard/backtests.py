@@ -369,6 +369,124 @@ def _load_snapshot_file(path: Path) -> list[dict]:
     return records
 
 
+_RE_RECORDED_SLUG = re.compile(r"\bmarket_slug=([a-z0-9_\-]+)")
+_RE_RECORDED_SIDE = re.compile(r"\btoken_side=(long|short)\b")
+
+
+def _recorded_market(row: dict) -> tuple[str, str] | None:
+    """The Polymarket market slug and side the forecast priced this row against, or None.
+
+    Both must be recorded: other sports already write ``market_slug=`` alone, and those rows keep
+    the name-matching path unchanged."""
+    rationale = str(row.get("rationale") or "")
+    slug = _RE_RECORDED_SLUG.search(rationale)
+    side = _RE_RECORDED_SIDE.search(rationale)
+    if slug is None or side is None:
+        return None
+    return slug.group(1), side.group(1)
+
+
+def _pinned_snapshot(
+    snapshots: list[dict], slug: str, event_start: datetime, market_type: str
+) -> dict | None:
+    """Newest valid pregame snapshot of the recorded market (a max-scan: the file is ingest-ordered)."""
+    newest: dict | None = None
+    for snapshot in snapshots:
+        if snapshot.get("market_slug") != slug or snapshot.get("timestamp_valid") is False:
+            continue
+        observed = snapshot.get("_observed_dt")
+        if observed is not None and observed >= event_start:
+            continue
+        if snapshot.get("market_type") != market_type:
+            continue
+        if newest is None or str(snapshot.get("observed_at_utc") or "") >= str(
+            newest.get("observed_at_utc") or ""
+        ):
+            newest = snapshot
+    return newest
+
+
+def _moneyline_side_by_name(row: dict, snapshot: dict) -> str | None:
+    selected_team = _row_selected_team(row) or ""
+    matches_long = _participant_matches(
+        row, selected_team, str((snapshot.get("long") or {}).get("description") or "")
+    )
+    matches_short = _participant_matches(
+        row, selected_team, str((snapshot.get("short") or {}).get("description") or "")
+    )
+    if matches_long == matches_short:
+        return None
+    return "long" if matches_long else "short"
+
+
+def _pinned_side(row: dict, snapshot: dict, side: str, market_type: str) -> str | None:
+    """``side`` when the recorded market still agrees with the row, "refuse" when it contradicts
+    it, or None when its line no longer matches (the caller then falls back to name matching).
+
+    Name matching is only a cross-check here: a decisive name answer that disagrees with the
+    recorded side refuses the row; an indecisive one (an abbreviation no alias knows) does not."""
+    row_event = str(row.get("event_id") or "")
+    snapshot_event = str(snapshot.get("event_id") or "")
+    if row_event and snapshot_event and row_event != snapshot_event:
+        return "refuse"
+    if market_type == "spread":
+        row_line = _row_line(row)
+        try:
+            market_line = float(snapshot.get("line"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        if row_line is None or not _lines_match(row_line, market_line if side == "long" else -market_line):
+            return None
+        role = match_spread_side(row, row_line, snapshot.get("team"), market_line).market_team
+        selection = str(row.get("selection") or "").casefold()
+        if role in ("away", "home") and (role == selection) != (side == "long"):
+            return "refuse"
+        return side
+    if market_type == "total":
+        row_line = _row_line(row)
+        try:
+            market_line = float(snapshot.get("line"))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+        if not _lines_match(row_line, market_line):
+            return None
+        description = str((snapshot.get(side) or {}).get("description") or "").casefold().strip()
+        if description != str(row.get("selection") or "").casefold().strip():
+            return "refuse"
+        return side
+    name_side = _moneyline_side_by_name(row, snapshot)
+    return "refuse" if name_side is not None and name_side != side else side
+
+
+def _quote_from_snapshot(snapshot: dict, side_name: str, event_start: datetime) -> dict | None:
+    side = snapshot.get(side_name) or {}
+    ask = _number(side.get("ask"), -1)
+    if not 0 < ask < 1:
+        return None
+    observed = str(snapshot.get("observed_at_utc") or "")
+    try:
+        observed_at = datetime.fromisoformat(observed)
+        age_seconds = max(0, int((datetime.now(UTC) - observed_at).total_seconds()))
+    except ValueError:
+        age_seconds = 10**9
+    return {
+        "market_slug": snapshot.get("market_slug"),
+        "side": side_name,
+        "description": side.get("description"),
+        "bid": side.get("bid"),
+        "ask": ask,
+        "ask_size": side.get("ask_size"),
+        "observed_at_utc": observed,
+        "age_seconds": age_seconds,
+        "fresh": age_seconds <= 300,
+        "market_state": snapshot.get("market_state"),
+        # The exchange's own start, which the live buyer cross-checks against the row's tip time.
+        "event_start_utc": snapshot.get("event_start_utc"),
+        "price_role": "pregame_close",
+        "seconds_before_start": max(0, int((event_start - observed_at).total_seconds())),
+    }
+
+
 def _pick_quote(row: dict) -> dict | None:
     """Last valid pregame executable side quote for a moneyline, spread, or
     total pick.
@@ -385,6 +503,10 @@ def _pick_quote(row: dict) -> dict | None:
     2026-08-03) already supported spread/total/btts -- it was simply
     unreachable from the dashboard order flow because this earlier,
     ticket-building stage always refused first.
+
+    A row that recorded the market and side it was priced against (the NCAAB forecast writes
+    ``market_slug=... token_side=...``, 2026-11-25) is quoted on exactly that market and side; name
+    matching below is the fallback when that market was not captured or its line no longer agrees.
     """
     market_type = row.get("market_type")
     if market_type not in ("moneyline", "spread", "total", "nrfi"):
@@ -410,6 +532,14 @@ def _pick_quote(row: dict) -> dict | None:
     snapshots = _load_snapshot_file(path)
     if not snapshots:
         return None
+    recorded = _recorded_market(row) if market_type in ("moneyline", "spread", "total") else None
+    if recorded is not None:
+        pinned = _pinned_snapshot(snapshots, recorded[0], event_start, market_type)
+        pinned_side = _pinned_side(row, pinned, recorded[1], market_type) if pinned is not None else None
+        if pinned_side == "refuse":
+            return None
+        if pinned is not None and pinned_side is not None:
+            return _quote_from_snapshot(pinned, pinned_side, event_start)
     latest: dict[str, dict] = {}
     for snapshot in snapshots:
         if snapshot.get("timestamp_valid") is False:
@@ -523,29 +653,4 @@ def _pick_quote(row: dict) -> dict | None:
         side_name = "long" if long_desc == expected_description else "short"
     if side_name is None:
         return None
-    side = snapshot.get(side_name) or {}
-    ask = _number(side.get("ask"), -1)
-    if not 0 < ask < 1:
-        return None
-    observed = str(snapshot.get("observed_at_utc") or "")
-    try:
-        observed_at = datetime.fromisoformat(observed)
-        age_seconds = max(0, int((datetime.now(UTC) - observed_at).total_seconds()))
-    except ValueError:
-        age_seconds = 10**9
-    return {
-        "market_slug": snapshot.get("market_slug"),
-        "side": side_name,
-        "description": side.get("description"),
-        "bid": side.get("bid"),
-        "ask": ask,
-        "ask_size": side.get("ask_size"),
-        "observed_at_utc": observed,
-        "age_seconds": age_seconds,
-        "fresh": age_seconds <= 300,
-        "market_state": snapshot.get("market_state"),
-        # The exchange's own start, which the live buyer cross-checks against the row's tip time.
-        "event_start_utc": snapshot.get("event_start_utc"),
-        "price_role": "pregame_close",
-        "seconds_before_start": max(0, int((event_start - observed_at).total_seconds())),
-    }
+    return _quote_from_snapshot(snapshot, side_name, event_start)

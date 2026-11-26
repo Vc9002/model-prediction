@@ -950,6 +950,9 @@ def forecast_ncaab_sport(
                 "prediction": prediction,
                 "candidate_row": candidate_row,
                 "selection": selection,
+                # The exchange's own side: slate sides carry Polymarket's away/home ordering, so this
+                # is not a name match.
+                "token_side": "long" if best_side["is_long"] else "short",
                 "has_executable_quote": has_executable_quote,
                 "ask": ask,
                 "indicative_ask": indicative_ask,
@@ -1081,6 +1084,12 @@ def forecast_ncaab_sport(
                     f"{rationale} [UNQUOTED_SHADOW: no executable quote and the indicative price is "
                     "the 50% placeholder; zero stake]"
                 )
+            market_slug = str(market_def.get("market_slug") or "")
+            if market_slug:
+                # The buyer quotes this exact market and side (dashboard/backtests.py::_pick_quote)
+                # instead of re-matching team names at buy time, which put a real-money order on the
+                # wrong team when Polymarket abbreviated a school ("UCA", 2026-11-25). Fixed at pick time.
+                rationale = f"{rationale} market_slug={market_slug} token_side={decision['token_side']}"
             request = PickRequest(
                 event_start_utc=str(start),
                 event_id=str(identity),

@@ -1024,3 +1024,35 @@ def test_p1_shadow_never_changes_the_served_pick(tmp_path, monkeypatch):
 def test_p1_shadow_is_recorded_only_on_v7_margins(tmp_path, monkeypatch):
     _row, features = _p1_shadow_run(tmp_path / "v6", monkeypatch, margin_engine="v6")
     assert not any(key.startswith("shadow_p1") for key in features)
+
+
+def test_ncaab_rows_record_the_market_and_side_the_buyer_then_uses(tmp_path, monkeypatch):
+    """The forecast writes the exact Polymarket market and side it priced into the rationale (the
+    slate's sides carry the exchange's own away/home ordering, no name matching), and the buyer's
+    quote lookup uses them from the dashboard rows it actually reads. The archived quote here has no
+    side descriptions, so matching by name finds nothing."""
+    import importlib
+
+    from model_prediction.dashboard_cache import DashboardCache
+
+    backtests = importlib.import_module("model_prediction.dashboard.backtests")
+    day = _routing_fixture(tmp_path, monkeypatch)
+    factory, _built = _fake_spread_model("ncaab-spread-v6", "h6", "v6", home=0.80)
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_model", factory)
+    flat = MultiSportPickLedger(tmp_path, flat=True)
+    config = {"models": {"NCAAB": {"decline_non_d1": False}}}
+    report = forecast_ncaab_sport(data_root=tmp_path, args_date=day, config=config, flat_ledger=flat)
+    assert report["flat_logged"] == 1
+    assert flat.rows()[0]["rationale"].endswith(" market_slug=fixture-ml token_side=long")
+
+    cache = DashboardCache(tmp_path, db_path=tmp_path / "dashboard_cache.db", authority="xlsx")
+    cache.refresh(force=True)
+    (row,) = cache.read_picks("flat")
+    archive = tmp_path / "odds" / "ncaab" / day / "polymarket_snapshots.jsonl"
+    monkeypatch.setattr(backtests, "_resolve_snapshot_path", lambda _sport, _day: archive)
+
+    quote = backtests._pick_quote(row)
+
+    assert quote is not None
+    assert (quote["market_slug"], quote["side"], quote["ask"]) == ("fixture-ml", "long", 0.56)
+    assert backtests._pick_quote({**row, "rationale": "fixture"}) is None

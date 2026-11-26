@@ -53,6 +53,9 @@ def _spread_snapshot(event_title: str, team: str, line: float, slug: str) -> dic
 
 _UCA_SLUG = "asc-cbb-cark-jax-2026-11-21-pos-3pt5"
 _UCA_SNAPSHOT = _spread_snapshot("Central Arkansas vs. Jacksonville", "UCA", 3.5, _UCA_SLUG)
+# UCA itself now has an alias and resolves to Central Arkansas (tests/test_recorded_market_pin.py);
+# an abbreviation no alias knows must still be refused, never taken for the opponent.
+_UNMAPPED_SNAPSHOT = {**_UCA_SNAPSHOT, "team": "C. Ark."}
 
 
 def test_market_team_matching_neither_row_team_is_refused() -> None:
@@ -61,7 +64,7 @@ def test_market_team_matching_neither_row_team_is_refused() -> None:
     row = _ncaab_row("Central Arkansas", "Jacksonville", "away", -3.5)
 
     with pytest.raises(pe.ExecutionGateError, match="REFUSED"):
-        pe._resolve_spread_side(row, _UCA_SNAPSHOT)
+        pe._resolve_spread_side(row, _UNMAPPED_SNAPSHOT)
 
 
 def test_market_team_matching_neither_row_team_is_refused_for_either_pick() -> None:
@@ -69,7 +72,7 @@ def test_market_team_matching_neither_row_team_is_refused_for_either_pick() -> N
     row = _ncaab_row("Central Arkansas", "Jacksonville", "home", -3.5)
 
     with pytest.raises(pe.ExecutionGateError, match="REFUSED"):
-        pe._resolve_spread_side(row, _UCA_SNAPSHOT)
+        pe._resolve_spread_side(row, _UNMAPPED_SNAPSHOT)
 
 
 @pytest.mark.parametrize(
