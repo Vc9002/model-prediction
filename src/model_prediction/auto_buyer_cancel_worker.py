@@ -39,6 +39,12 @@ START_LEAD_SECONDS = 30.0
 # Ids this worker already cancelled or found terminal are never re-sent (the gateway's rate limit is
 # shared with the buyer). Three days outlives any fallback, which expires at its game's start.
 MEMO_RETENTION = timedelta(days=3)
+# A freshly placed order can answer 404 for a moment (eventual consistency, see polymarket_execute.py
+# _GTD_READBACK_RETRY_DELAYS), so one failed cancel plus one not-found read must not drop a live
+# fallback from the backstop for three days: an id is memoised as gone only when a not-found was seen
+# twice, at least this far apart. Until then it is retried every run.
+NOT_FOUND_CONFIRM = timedelta(minutes=10)
+NOT_FOUND_KEY = "not_found_first_seen"
 # One failed read of the state file (a sharing violation, or a hand edit caught mid-save) must not
 # read as the kill switch and cancel every resting fallback; only a persistent failure does.
 STATE_READ_ATTEMPTS = 3
@@ -74,10 +80,10 @@ def _buyer_enabled(state_path: Path) -> bool:
     return False
 
 
-def _load_memo(path: Path, now: datetime) -> dict[str, str]:
+def _load_memo(path: Path, now: datetime, section: str = "order_ids") -> dict[str, str]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-        entries = raw.get("order_ids") if isinstance(raw, dict) else None
+        entries = raw.get(section) if isinstance(raw, dict) else None
     except (OSError, ValueError):
         return {}
     if not isinstance(entries, dict):
@@ -92,9 +98,10 @@ def _load_memo(path: Path, now: datetime) -> dict[str, str]:
     return kept
 
 
-def _save_memo(path: Path, memo: dict[str, str]) -> None:
+def _save_memo(path: Path, memo: dict[str, str], not_found_seen: dict[str, str] | None = None) -> None:
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps({"order_ids": memo}, sort_keys=True), encoding="utf-8")
+    payload = {"order_ids": memo, NOT_FOUND_KEY: not_found_seen or {}}
+    tmp.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
     os.replace(tmp, path)
 
 
@@ -108,6 +115,7 @@ def _run(paths: RuntimePaths) -> int:
     reason = "backstop_tipoff" if enabled else "backstop_kill_switch"
     memo_path = root / MEMO_FILE_NAME
     memo = _load_memo(memo_path, now)
+    not_found_seen = _load_memo(memo_path, now, NOT_FOUND_KEY)
     try:
         summary: dict[str, Any] = auto_buyer_ledger.cancel_resting_live_fallbacks(
             data_root=root,
@@ -124,18 +132,30 @@ def _run(paths: RuntimePaths) -> int:
             json.dumps({"status": "error", "enabled": enabled, "reason": reason, "error": error}), flush=True
         )
         return 1
-    done = [
-        *summary.get("cancelled", []),
-        *summary.get("already_terminal", []),
-        *summary.get("not_found", []),
-    ]
+    done = [*summary.get("cancelled", []), *summary.get("already_terminal", [])]
+    seen_before = dict(not_found_seen)
+    not_found = [str(order_id) for order_id in summary.get("not_found", [])]
+    # An id that now cancels or reads terminal was only briefly invisible: forget the sighting.
+    for order_id in done:
+        not_found_seen.pop(str(order_id), None)
+    for order_id in not_found:
+        first = not_found_seen.get(order_id)
+        try:
+            confirmed = first is not None and now - parse_utc(first) >= NOT_FOUND_CONFIRM
+        except (TypeError, ValueError):
+            confirmed = False
+        if confirmed:
+            done.append(order_id)
+            del not_found_seen[order_id]
+        else:
+            not_found_seen.setdefault(order_id, iso_utc(now))
     result: dict[str, Any] = {"enabled": enabled, **summary}
     if summary.get("deadline_skipped"):
         result["note"] = "deadline"
-    if done:
+    if done or not_found_seen != seen_before:
         memo.update({str(order_id): iso_utc(now) for order_id in done})
         try:
-            _save_memo(memo_path, memo)
+            _save_memo(memo_path, memo, not_found_seen)
         except OSError as exc:
             # Benign: the next run reads these ids back as terminal before it would cancel again.
             result["memo_error"] = f"{type(exc).__name__}: {exc}"[:300]

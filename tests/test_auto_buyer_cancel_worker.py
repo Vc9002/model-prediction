@@ -20,6 +20,7 @@ import pytest
 
 from model_prediction import auto_buyer_cancel_worker as worker
 from model_prediction.daily_lock import acquire_lock, release_lock
+from model_prediction.data_sources.polymarket_execute import CancelDeferredError
 from model_prediction.domain import iso_utc, utc_now
 from model_prediction.portfolio import auto_buyer_ledger
 from model_prediction.run_supervisor import _VENV_PYTHON, DEFAULT_WORKER_TIMEOUTS, WORKERS
@@ -716,3 +717,108 @@ def test_deadline_skip_of_a_game_not_yet_started_stays_ok_while_enabled(runtime,
     _deadline_after_first(monkeypatch, pre_read=True)
     code, out = _run(capsys)
     assert code == 0 and out["status"] == "ok" and out["deadline_skipped"] == ["gtd-2"]
+
+
+class _LookupExchange(_SlowExchange):
+    """A cancel with no market slug is TWO calls (a slug lookup GET, then the POST), like the real
+    executor: the deadline is rechecked between them and the POST is skipped once it has passed."""
+
+    def cancel(
+        self, order_id: str, *, user_command: bool, market_slug: str | None = None, stop_before=None
+    ) -> dict[str, Any]:
+        if not market_slug:
+            self.started_at.append(self.clock[0])
+            self.clock[0] += self.CALL_SECONDS
+            if stop_before is not None and stop_before():
+                raise CancelDeferredError("deadline passed before the cancel POST")
+        return super().cancel(order_id, user_command=user_command, market_slug=market_slug)
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_a_cancel_that_needs_a_slug_lookup_stays_inside_the_supervisor_kill(
+    runtime, monkeypatch, capsys, enabled
+):
+    """Rows without a market_slug make the executor GET the slug first: two calls behind one deadline
+    check was up to 60 + 46.5 + 46.5 = 153 s against the 115 s kill. The POST is now skipped once the
+    lookup has run past the deadline."""
+    _write(
+        runtime,
+        [_row(f"gtd-{i}", start_seconds=20.0 if enabled else 36000.0, market_slug=None) for i in (1, 2, 3)],
+        enabled=enabled,
+    )
+    clock = [0.0]
+    exchange = _LookupExchange(clock)
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: exchange)
+    monkeypatch.setattr(worker, "_monotonic", lambda: clock[0])
+    code, out = _run(capsys)
+    assert max(exchange.started_at) < worker.RUN_DEADLINE_SECONDS
+    assert clock[0] < DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"]
+    # Tip-off: the read ends at 46.5 s, the lookup at 93 s, so the POST is skipped. Kill switch: no
+    # pre-read, so the first lookup ends at 46.5 s (under the deadline) and its POST goes out.
+    assert bool(out["cancelled"]) is (not enabled)
+    assert out["deadline_skipped"], "a cancel whose lookup ran past the deadline is deferred, not failed"
+    assert not out["failed"]
+    assert code == (0 if enabled else 1)  # buyer off: a deferred cancel leaves a live order resting
+
+
+class _Gone(_Strict):
+    """The exchange answers a genuine not-found for these ids: the cancel fails and the read says gone."""
+
+    def __init__(self, gone: tuple[str, ...]) -> None:
+        super().__init__(fail_cancel=gone)
+        self.gone = set(gone)
+
+    def order_snapshots(self, order_ids: list[str]) -> dict[str, Any]:
+        out = super().order_snapshots(order_ids)
+        out["orders"] = [o for o in out["orders"] if o["order_id"] not in self.gone]
+        out["not_found_order_ids"] = [oid for oid in order_ids if oid in self.gone]
+        return out
+
+
+def _memo(runtime) -> dict[str, Any]:
+    return json.loads((runtime / worker.MEMO_FILE_NAME).read_text(encoding="utf-8"))
+
+
+def test_one_not_found_is_not_memoised_so_a_just_placed_fallback_is_retried(runtime, monkeypatch, capsys):
+    """A fresh order can 404 for a moment: one failed cancel plus one not-found read used to memoise
+    the id for three days and drop a live fallback from the backstop."""
+    _write(runtime, [_row("gtd-1", start_seconds=20.0)])
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: _Gone(("gtd-1",)))
+    code, out = _run(capsys)
+    assert code == 0 and out["not_found"] == ["gtd-1"]
+    memo = _memo(runtime)
+    assert "gtd-1" not in memo["order_ids"] and "gtd-1" in memo[worker.NOT_FOUND_KEY]
+    # The very next run still tries it; the exchange now knows the order, so it is cancelled.
+    retry = _exchange(monkeypatch)
+    code, out = _run(capsys)
+    assert code == 0 and retry.cancelled == ["gtd-1"] and out["cancelled"] == ["gtd-1"]
+    memo = _memo(runtime)
+    assert "gtd-1" in memo["order_ids"] and memo[worker.NOT_FOUND_KEY] == {}
+
+
+def test_a_second_not_found_ten_minutes_later_memoises_the_id(runtime, monkeypatch, capsys):
+    _write(runtime, [_row("gtd-1", start_seconds=20.0)])
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: _Gone(("gtd-1",)))
+    # Seen 5 minutes ago: too soon to count as a second, independent observation.
+    soon = iso_utc(utc_now() - timedelta(minutes=5))
+    (runtime / worker.MEMO_FILE_NAME).write_text(
+        json.dumps({"order_ids": {}, worker.NOT_FOUND_KEY: {"gtd-1": soon}}), encoding="utf-8"
+    )
+    code, out = _run(capsys)
+    assert code == 0 and out["not_found"] == ["gtd-1"]
+    memo = _memo(runtime)
+    assert "gtd-1" not in memo["order_ids"] and memo[worker.NOT_FOUND_KEY] == {"gtd-1": soon}
+    # Seen 11 minutes ago: the second observation confirms it is gone, so it is memoised.
+    (runtime / worker.MEMO_FILE_NAME).write_text(
+        json.dumps(
+            {"order_ids": {}, worker.NOT_FOUND_KEY: {"gtd-1": iso_utc(utc_now() - timedelta(minutes=11))}}
+        ),
+        encoding="utf-8",
+    )
+    code, out = _run(capsys)
+    assert code == 0 and out["not_found"] == ["gtd-1"]
+    memo = _memo(runtime)
+    assert "gtd-1" in memo["order_ids"] and memo[worker.NOT_FOUND_KEY] == {}
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", _never_built)
+    code, out = _run(capsys)
+    assert code == 0 and out["candidates"] == 0

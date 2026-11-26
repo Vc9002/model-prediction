@@ -323,6 +323,11 @@ class ExecutionGateError(RuntimeError):
         self.status_code = status_code
 
 
+class CancelDeferredError(ExecutionGateError):
+    """A cancel was NOT sent because the caller's run deadline passed during its market-slug lookup.
+    Nothing was submitted and the order is untouched; the caller retries on its next run."""
+
+
 # Order states after which an order's fill no longer changes (same set as
 # auto_buyer_ledger._TERMINAL_ORDER_STATES, which imports this module and so cannot be imported here).
 _TERMINAL_ORDER_STATES = frozenset(
@@ -333,11 +338,16 @@ _TERMINAL_ORDER_STATES = frozenset(
 _GRPC_NOT_FOUND_BODY = re.compile(r'"code"\s*:\s*5\b')
 
 
-def _is_order_not_found(error: ExecutionGateError) -> bool:
+def _is_exchange_order_missing(error: BaseException) -> bool:
     """Whether a refused order GET means the exchange has no such order: 404, or another 4xx that
-    is not a rate limit and carries gRPC NOT_FOUND (code 5). Never a 429, a 5xx or a timeout."""
-    status = error.status_code
-    if status is None or status == 429 or status >= 500:
+    is not a rate limit and carries gRPC NOT_FOUND (code 5). Never a 429, a 5xx or a timeout.
+
+    Deliberately a different name from ``_is_order_not_found``, which is the looser read-back retry
+    test: a second module-level def of that name silently replaced the first for the whole module
+    (ruff's F811 does not flag underscore-prefixed names), narrowing the GTD read-back retry.
+    """
+    status = getattr(error, "status_code", None)
+    if not isinstance(status, int) or status == 429 or status >= 500:
         return False
     return status == 404 or bool(_GRPC_NOT_FOUND_BODY.search(str(error)))
 
@@ -1495,7 +1505,7 @@ class PolymarketExecutor:
                 response = self._request("GET", f"/v1/order/{order_id}")
             except ExecutionGateError as error:
                 unavailable.append(order_id)
-                if _is_order_not_found(error):
+                if _is_exchange_order_missing(error):
                     not_found.append(order_id)
                 continue
             order = response.get("order") or response
@@ -1589,7 +1599,11 @@ class PolymarketExecutor:
         order_id: str,
         user_command: bool,
         market_slug: str | None = None,
+        stop_before: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
+        """Cancel one order by id. Without ``market_slug`` an extra GET looks the slug up first, so one
+        cancel can be two exchange calls behind a caller's single deadline check: ``stop_before`` is
+        checked again between them and, once it fires, the POST is not sent (CancelDeferredError)."""
         if not user_command:
             raise ExecutionGateError("REFUSED: cancellation also requires an explicit user command.")
         missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
@@ -1603,6 +1617,8 @@ class PolymarketExecutor:
                 order_info = self._request("GET", f"/v1/order/{order_id}").get("order", {})
                 if order_info.get("marketSlug"):
                     payload["marketSlug"] = order_info["marketSlug"]
+            if stop_before is not None and stop_before():
+                raise CancelDeferredError(f"REFUSED: run deadline passed before cancelling {order_id}.")
         response = self._request("POST", f"/v1/order/{order_id}/cancel", payload)
         try:
             self.audit.append("order_cancelled", order_id, {"raw_response": str(response)[:500]})

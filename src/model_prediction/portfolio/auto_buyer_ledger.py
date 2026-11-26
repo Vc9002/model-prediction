@@ -22,7 +22,7 @@ from typing import Any
 import httpx
 
 from ..data_sources.espn import ESPNClient
-from ..data_sources.polymarket_execute import ExecutionGateError
+from ..data_sources.polymarket_execute import CancelDeferredError, ExecutionGateError
 from ..domain import PickTag, iso_utc, parse_utc, pick_tag_for, utc_now
 from ..esports import TITLE_SPECS as _ESPORTS_TITLE_SPECS
 from ..esports import Bo3EsportsClient, _fuzzy_match_team, _load_manual_aliases, _team_alias_index
@@ -873,10 +873,20 @@ def _is_resting_fallback_leg(row: dict[str, Any]) -> bool:
     return row.get("fallback_is_topup_ioc") is not True
 
 
-def _cancel_by_id(executor: Any, order_id: str, market_slug: str | None) -> None:
-    """Cancel one order by id. Never a cancel-all: the account may hold manual orders."""
+def _cancel_by_id(
+    executor: Any,
+    order_id: str,
+    market_slug: str | None,
+    stop_before: Callable[[], bool] | None = None,
+) -> None:
+    """Cancel one order by id. Never a cancel-all: the account may hold manual orders.
+
+    ``stop_before`` is handed on only when the slug is unknown, the one case where the executor makes
+    a second (lookup) call behind the caller's single deadline check.
+    """
+    extra = {"stop_before": stop_before} if stop_before is not None and not market_slug else {}
     try:
-        executor.cancel(order_id, user_command=True, market_slug=market_slug)
+        executor.cancel(order_id, user_command=True, market_slug=market_slug, **extra)
     except TypeError:
         executor.cancel(order_id, user_command=True)
 
@@ -1373,7 +1383,10 @@ def cancel_resting_live_fallbacks(
                 _skip(fid)
                 continue
         try:
-            _cancel_by_id(live_executor, fid, slug)
+            _cancel_by_id(live_executor, fid, slug, stop_before)
+        except CancelDeferredError:
+            _skip(fid)  # the slug lookup ate the run's time; the POST was never sent
+            continue
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             # A failed cancel is read once: a terminal order needs no cancel and an order the exchange
             # does not know holds nothing, so neither is a failed run. Anything else is.

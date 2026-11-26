@@ -4,6 +4,7 @@ read-only balance call. Every exchange call is a FakeExchange (no network, no sl
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -31,6 +32,8 @@ class SequencedExchange(FakeExchange):
     def __init__(self) -> None:
         super().__init__()
         self.not_found: dict[str, int] = {}
+        # The (status, body) a counted not-found answers with; the default is the exchange's own 404.
+        self.not_found_reply: tuple[int, str] = (404, '{"code":5, "message":"Order not found", "details":[]}')
         self.sync_ioc: dict[str, Any] | None = None
 
     def default_post(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
@@ -46,11 +49,8 @@ class SequencedExchange(FakeExchange):
             if self.not_found.get(order_id, 0) > 0:
                 self.not_found[order_id] -= 1
                 self.calls.append({"method": method, "path": path, "headers": {}, "json": None})
-                return httpx.Response(
-                    404,
-                    text='{"code":5, "message":"Order not found", "details":[]}',
-                    request=httpx.Request(method, url),
-                )
+                status, text = self.not_found_reply
+                return httpx.Response(status, text=text, request=httpx.Request(method, url))
         return super().__call__(method, url, headers=headers, json=json, timeout=timeout, **kw)
 
 
@@ -139,6 +139,51 @@ def test_readback_404_then_found_keeps_the_fallback_resting(tmp_path, exchange):
     assert result["fallback_verified_via"] == "order_readback"
     events = [e for e in AuditLog(tmp_path / "audit.jsonl").events() if e["event_type"] == "order_executed"]
     assert events[-1]["payload"]["fallback_verified_via"] == "order_readback"
+
+
+def test_readback_retries_a_not_found_that_carries_only_the_text_not_a_404(tmp_path, exchange):
+    """The read-back retry test is the loose one (a 404 status OR the "Order not found" text): the
+    strict gRPC/404 test that order_snapshots uses once replaced it by sharing its name, so a
+    not-found answered with only the text stopped retrying and the live fallback was cancelled."""
+    exchange.not_found_reply = (400, '{"message":"Order not found"}')
+
+    def fallback(body):
+        status, order = exchange.default_post(body)
+        exchange.not_found[order["id"]] = 1
+        return status, order
+
+    exchange.post_script = [exchange.default_post, fallback]
+    result = _execute(tmp_path, exchange)
+    assert exchange.cancels() == []
+    assert result["fallback_status"] == "resting"
+    assert result["fallback_verified_via"] == "order_readback"
+
+
+def test_the_two_not_found_tests_stay_distinct_and_tolerate_any_exception():
+    assert pe._is_order_not_found(RuntimeError("Order not found"))  # text only, no status_code at all
+    assert pe._is_order_not_found(pe.ExecutionGateError("gone", status_code=404))
+    assert not pe._is_order_not_found(pe.ExecutionGateError("busy", status_code=503))
+    # order_snapshots' strict test must not raise on an exception that has no status_code.
+    assert not pe._is_exchange_order_missing(RuntimeError("Order not found"))
+    assert pe._is_exchange_order_missing(pe.ExecutionGateError("gone", status_code=404))
+    assert pe._is_exchange_order_missing(pe.ExecutionGateError('{"code":5}', status_code=400))
+    assert not pe._is_exchange_order_missing(pe.ExecutionGateError('{"code":5}', status_code=429))
+    assert not pe._is_exchange_order_missing(pe.ExecutionGateError("busy", status_code=503))
+
+
+def test_executor_module_defines_no_top_level_name_twice():
+    """ruff's F811 skips underscore-prefixed names, so a duplicate private helper (one silently
+    replacing the other for the whole module) passes lint; this is the guard for it."""
+    import ast
+    from collections import Counter
+
+    tree = ast.parse(Path(pe.__file__).read_text(encoding="utf-8"))
+    counts = Counter(
+        node.name
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
+    )
+    assert [name for name, n in counts.items() if n > 1] == []
 
 
 def test_readback_never_found_but_open_orders_show_it_gtd_keeps_it_resting(tmp_path, exchange):
@@ -332,3 +377,41 @@ def test_ioc_partial_from_the_synchronous_answer_alone_is_not_trusted(tmp_path, 
     assert len(exchange.order_posts()) == 1
     assert result["fill_known"] is False
     assert result["fallback_status"] == "unknown_fill"
+
+
+# ------------------------------------------------------------------ cancel: slug lookup vs deadline
+
+
+def _cancel_calls(tmp_path, monkeypatch, *, slug, stop_before):
+    client = _executor(tmp_path, _snapshot(_start()))
+    calls: list[tuple[str, str, Any]] = []
+
+    def fake_request(method, path, payload=None):
+        calls.append((method, path, payload))
+        return {"order": {"id": "o-1", "marketSlug": "looked-up"}} if method == "GET" else {}
+
+    monkeypatch.setattr(client, "_request", fake_request)
+    try:
+        client.cancel("o-1", user_command=True, market_slug=slug, stop_before=stop_before)
+    except pe.CancelDeferredError:
+        return calls, True
+    return calls, False
+
+
+def test_cancel_without_a_slug_rechecks_the_deadline_between_the_lookup_and_the_post(tmp_path, monkeypatch):
+    calls, deferred = _cancel_calls(tmp_path, monkeypatch, slug=None, stop_before=lambda: True)
+    assert deferred and [c[0] for c in calls] == ["GET"]  # the POST was never sent
+
+
+def test_cancel_without_a_slug_still_posts_while_the_deadline_has_not_passed(tmp_path, monkeypatch):
+    calls, deferred = _cancel_calls(tmp_path, monkeypatch, slug=None, stop_before=lambda: False)
+    assert not deferred and [c[0] for c in calls] == ["GET", "POST"]
+    assert calls[-1][2] == {"marketSlug": "looked-up"}
+
+
+def test_cancel_with_a_slug_makes_one_call_and_never_consults_the_deadline(tmp_path, monkeypatch):
+    def boom() -> bool:
+        raise AssertionError("no lookup ran, so there is nothing to recheck")
+
+    calls, deferred = _cancel_calls(tmp_path, monkeypatch, slug="given", stop_before=boom)
+    assert not deferred and [c[0] for c in calls] == ["POST"]
