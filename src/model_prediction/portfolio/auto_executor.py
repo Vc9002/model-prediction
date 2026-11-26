@@ -20,6 +20,7 @@ import sqlite3
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from dataclasses import fields as dataclass_fields
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -51,9 +52,8 @@ from model_prediction.portfolio.auto_buyer_ledger import (
 )
 from model_prediction.portfolio.auto_buyer_tracking import (
     LIVE_FILL_LOG_NAME,
-    SKIP_LOG_NAME,
     CohortSkipRecorder,
-    append_jsonl_records,
+    append_skip_records,
     execute_with_fill_log,
     tracking_log_path,
 )
@@ -330,6 +330,30 @@ class BuyCohort:
 class CohortParse:
     active: tuple[BuyCohort, ...]
     errors: tuple[str, ...]
+    # Labels of the active paper cohorts the operator marked ``paper_twin`` (kept off BuyCohort,
+    # which the live book shares).
+    twin_labels: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True)
+class LedgerScope:
+    """The paper-book rows one pass counts as its own for daily totals, per-game exposure and dedup.
+
+    A twin copies a live cohort, whose books never see paper fills; the twin group therefore reads
+    only its own rows, not the other paper cohorts'. A row carries the cohort label it was bought
+    under; one written before the label existed is owned on model and market, or the twin would
+    re-buy it.
+    """
+
+    labels: frozenset[str]
+    model_markets: frozenset[tuple[str, str]]
+
+    def owns(self, row: dict[str, Any]) -> bool:
+        label = row.get("cohort")
+        if isinstance(label, str) and label.strip():
+            return label in self.labels
+        model = str(row.get("model_id") or row.get("model_version") or "")
+        return (model, str(row.get("market_type") or "").lower()) in self.model_markets
 
 
 def _cohort_edge(value: Any) -> float | None:
@@ -432,7 +456,13 @@ def _parse_cohorts(state: dict[str, Any]) -> CohortParse:
                 errors.append(f"cohorts[{index_a}] and cohorts[{index_b}]: overlapping windows, both dropped")
     for error in errors:
         logger.warning("auto-buyer cohort ignored: %s", error)
-    return CohortParse(tuple(c for index, c in candidates if index not in dropped), tuple(errors))
+    kept = [(index, c) for index, c in candidates if index not in dropped]
+    twins = frozenset(
+        c.label
+        for index, c in kept
+        if c.mode == "paper" and isinstance(raw, list) and raw[index].get("paper_twin") is True
+    )
+    return CohortParse(tuple(c for _index, c in kept), tuple(errors), twins)
 
 
 @dataclass(frozen=True)
@@ -482,10 +512,16 @@ class AutoExecutionConfig:
     # with an `insufficient_cash` alarm before any order that would take this pass's committed spend
     # above it. None: no cash check (paper, preview and direct test construction).
     available_cash_usd: float | None = None
+    # Paper twins only: count just these rows of the paper ledger (see LedgerScope). None everywhere else.
+    ledger_scope: LedgerScope | None = None
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
             object.__setattr__(self, "mode", "live")
+        if self.ledger_scope is not None and (
+            self.mode != "paper" or self.execute_live or not self.dedup_own_ledger_only
+        ):
+            raise ValueError("a ledger scope belongs to a paper cohort pass over its own ledger only")
         object.__setattr__(self, "cohorts", tuple(self.cohorts))
         # One book per config: an executing config can never carry a paper cohort, and a paper
         # config never a live one, so a paper row has no route to the order path.
@@ -1349,7 +1385,12 @@ def _live_book_has_pending_orders(ledger_path: Path) -> bool:
     )
 
 
-def _today_auto_buyer_totals(data_root: Path | str = DATA, *, live_book: bool = True) -> tuple[float, float]:
+def _today_auto_buyer_totals(
+    data_root: Path | str = DATA,
+    *,
+    live_book: bool = True,
+    row_scope: Callable[[dict[str, Any]], bool] | None = None,
+) -> tuple[float, float]:
     """Today's (ET calendar day) executed spend and the P&L the daily loss stop compares.
 
     Computed fresh from the ledger rather than reset per call, so the daily-spend cap and the loss
@@ -1380,6 +1421,8 @@ def _today_auto_buyer_totals(data_root: Path | str = DATA, *, live_book: bool = 
     for row in read_auto_buyer_ledger(jsonl_path=j_path):
         # Hand-placed positions are imported for visibility: neither buyer spend nor buyer P&L.
         if is_manual_auto_buyer_record(row):
+            continue
+        if row_scope is not None and not row_scope(row):
             continue
         if _et_date(row.get("executed_at_utc")) == today:
             fee = row_fee_usd(row) if live_book else 0.0
@@ -2023,10 +2066,89 @@ def _cohort_pass_config(
     )
 
 
+def _merge_results(parts: list[AutoExecutionResult]) -> AutoExecutionResult:
+    """One result from several passes over disjoint rows: counters add, lists join."""
+    merged = AutoExecutionResult()
+    for part in parts:
+        for spec in dataclass_fields(AutoExecutionResult):
+            value = getattr(part, spec.name)
+            if isinstance(value, list):
+                getattr(merged, spec.name).extend(value)
+            elif isinstance(value, (int, float)):
+                setattr(merged, spec.name, getattr(merged, spec.name) + value)
+            elif getattr(merged, spec.name) is None:
+                setattr(merged, spec.name, value)
+    return merged
+
+
+def _evaluate_paper_cohorts(
+    state: dict[str, Any],
+    paper_cohorts: tuple[BuyCohort, ...],
+    twin_labels: frozenset[str],
+    picks: list[dict[str, Any]],
+    pass_overrides: dict[str, Any],
+) -> AutoExecutionResult:
+    """The paper cohort pass. Without twins it is one buyer over every paper cohort, as before.
+
+    With twins, the twin cohorts run as their own buyer whose totals, per-game exposure and dedup
+    read only the twin group's rows, so the paper copy of a live cohort meets the caps the live book
+    meets and not those the other paper cohorts have used. The other paper cohorts keep the shared
+    paper book. The rows split by cohort, so the counters of the two results add up.
+    """
+
+    def run(cohorts: tuple[BuyCohort, ...], rows: list[dict[str, Any]], **extra: Any) -> AutoExecutionResult:
+        config = _cohort_pass_config(
+            state,
+            cohorts=cohorts,
+            mode="paper",
+            execute_live=False,
+            **{**pass_overrides, "auto_quarantine_underperforming": False, **extra},
+        )
+        return AutoPolymarketBuyer(config=config).evaluate_and_execute(rows)
+
+    twins = tuple(c for c in paper_cohorts if c.label in twin_labels)
+    if not twins:
+        return run(paper_cohorts, [dict(r) for r in picks])
+    plain = tuple(c for c in paper_cohorts if c.label not in twin_labels)
+    scope = LedgerScope(
+        labels=frozenset(c.label for c in twins),
+        model_markets=frozenset((c.model_id, c.market) for c in twins),
+    )
+    plain_rows = [dict(r) for r in picks if any(_row_in_cohort(r, c) for c in plain)]
+    twin_rows = [dict(r) for r in picks if not any(_row_in_cohort(r, c) for c in plain)]
+    parts = [run(plain, plain_rows)] if plain else []
+    parts.append(run(twins, twin_rows, ledger_scope=scope))
+    return _merge_results(parts)
+
+
 def _skipped_cohort_pass(
     label: str, cohorts: tuple[BuyCohort, ...], reason: str = "enabled is not true"
 ) -> dict[str, Any]:
     return {"mode": label, "cohorts": [c.label for c in cohorts], "skipped": reason}
+
+
+def _skipped_pass_records(
+    book: str,
+    cohorts: tuple[BuyCohort, ...],
+    picks: list[dict[str, Any]],
+    kind: str,
+    detail: str,
+    *,
+    preview: bool,
+) -> list[dict[str, Any]]:
+    """Skip records for the cohort rows of a pass that never ran, so the report names the cause
+    instead of showing each row's last reason from an earlier cycle. A preview records nothing."""
+    if preview:
+        return []
+    recorder = CohortSkipRecorder(book=book, enabled=True, now=utc_now())
+    recorder.reject_all(
+        picks,
+        lambda row: next((c for c in cohorts if _row_in_cohort(row, c)), None),
+        f"pass_skipped:{kind}",
+        detail=detail,
+        upcoming_only=True,
+    )
+    return recorder.records
 
 
 def _cycle_manages_live_book(*, governed: bool, buying_live: bool, preview: bool) -> bool:
@@ -2261,11 +2383,15 @@ def run_auto_buyer_cycle(
             should_execute = False
     available_cash = cash_check.get("available_cash_usd") if cash_check else None
     if live_cohorts and not live_pass_runs:
-        cohort_passes["live"] = _skipped_cohort_pass(
-            "LIVE_DISABLED",
-            live_cohorts,
-            "enabled is not true" if not run_cohort_passes else f"{LIVE_ENABLED_STATE_KEY} is not true",
+        live_skip_detail = (
+            "enabled is not true" if not run_cohort_passes else f"{LIVE_ENABLED_STATE_KEY} is not true"
         )
+        cohort_passes["live"] = {
+            **_skipped_cohort_pass("LIVE_DISABLED", live_cohorts, live_skip_detail),
+            "skip_records": _skipped_pass_records(
+                "live", live_cohorts, cohort_picks, "live_disabled", live_skip_detail, preview=preview
+            ),
+        }
     elif live_cohorts and live_cap_problem is not None:
         cohort_passes["live"] = {
             "mode": "LIVE_REFUSED",
@@ -2276,11 +2402,17 @@ def run_auto_buyer_cycle(
                 if preview
                 else [_alarm("live_caps_invalid", pick_id="", market_slug="", detail=live_cap_problem)]
             ),
+            "skip_records": _skipped_pass_records(
+                "live", live_cohorts, cohort_picks, "live_refused", live_cap_problem, preview=preview
+            ),
         }
     elif live_cohorts and live_blocked is not None:
         cohort_passes["live"] = {
             **_skipped_cohort_pass("LIVE_BLOCKED", live_cohorts),
             "skipped": live_blocked,
+            "skip_records": _skipped_pass_records(
+                "live", live_cohorts, cohort_picks, "live_blocked", live_blocked, preview=preview
+            ),
         }
     elif live_cohorts:
         # First, so the live book is evaluated before any paper fill of this cycle exists.
@@ -2343,15 +2475,8 @@ def run_auto_buyer_cycle(
         # After the global pass recorded its paper fills, so this book's dedup sees them. The paper
         # book never quarantines: it exists to measure the cohort, and the rolling-ROI breaker would
         # silently stop that measurement after the first losing stretch.
-        paper_config = _cohort_pass_config(
-            state,
-            cohorts=paper_cohorts,
-            mode="paper",
-            execute_live=False,
-            **{**pass_overrides, "auto_quarantine_underperforming": False},
-        )
-        paper_res = AutoPolymarketBuyer(config=paper_config).evaluate_and_execute(
-            [dict(r) for r in cohort_picks]
+        paper_res = _evaluate_paper_cohorts(
+            state, paper_cohorts, parsed_cohorts.twin_labels, cohort_picks, pass_overrides
         )
         if record_paper:
             _record_paper_fills(paper_res.dry_run_orders)
@@ -2435,9 +2560,7 @@ def run_auto_buyer_cycle(
         history_path=paper_history_path if global_mode == "paper" else AUTO_BUYER_CYCLE_HISTORY_PATH,
     )
     for book, pass_summary in cohort_passes.items():
-        append_jsonl_records(
-            tracking_log_path(DATA, SKIP_LOG_NAME), pass_summary.pop("skip_records", None) or []
-        )
+        append_skip_records(DATA, pass_summary.pop("skip_records", None) or [])
         _append_auto_buyer_cycle_history(
             {
                 "executed_at_utc": run_summary["executed_at_utc"],
@@ -2642,6 +2765,10 @@ class AutoPolymarketBuyer:
         bought_matchup_selections: set[tuple[str, str, str, str, str]] = set()
         held_slugs: set[str] = set()
         held_events: set[str] = set()
+        # The picks in this book's own ledger (live-or-paper per `auto_ledger_files`), kept apart from
+        # `bought_pick_ids`, which the audit logs feed and the pass itself extends: the skip log
+        # leaves out a dedup rejection of a pick the book already holds.
+        ledger_pick_ids: set[str] = set()
 
         partially_filled: dict[str, dict[str, Any]] = {}
         partially_filled_pick_ids: set[str] = set()
@@ -2825,6 +2952,8 @@ class AutoPolymarketBuyer:
                 from .auto_buyer_ledger import read_auto_buyer_ledger
 
                 for r in read_auto_buyer_ledger(auto_ledger_file):
+                    if self.config.ledger_scope is not None and not self.config.ledger_scope.owns(r):
+                        continue
                     # An unknown primary submission, or an unknown fallback leg (the remainder may
                     # rest or fill with no id to track): never a top-up candidate, always blocked.
                     fallback_unknown = is_fallback_submit_unknown(r)
@@ -2955,6 +3084,7 @@ class AutoPolymarketBuyer:
                         held_events.add(event_key_from_slug(slug))
                     if pid:
                         bought_pick_ids.add(pid)
+                        ledger_pick_ids.add(pid)
                     if r.get("order_id"):
                         bought_pick_ids.add(str(r["order_id"]))
                     if slug and side:
@@ -3046,6 +3176,7 @@ class AutoPolymarketBuyer:
             "partially_filled_slugs": partially_filled_slugs,
             "partial_contracts": partial_contracts,
             "game_exposure": game_exposure,
+            "ledger_pick_ids": ledger_pick_ids,
         }
 
     def _get_partial_fill_info(
@@ -3217,8 +3348,11 @@ class AutoPolymarketBuyer:
             if self.config.mode == "paper" and not self.config.execute_live
             else self.data_root
         )
+        scope = self.config.ledger_scope
         today_spend_usd, today_realized_pnl_usd = _today_auto_buyer_totals(
-            totals_root, live_book=totals_root != self.paper_data_root
+            totals_root,
+            live_book=totals_root != self.paper_data_root,
+            **({"row_scope": scope.owns} if scope is not None else {}),
         )
 
         # Drawdown circuit breaker: once today's realized loss (gross on the live book) crosses
@@ -3276,6 +3410,9 @@ class AutoPolymarketBuyer:
         # not buying power in use, so it must not trip the insufficient_cash halt.
         cancelled_fallback_cost = 0.0
         bought_index = self._build_bought_index()
+        skip_log.settled_pick_ids = bought_index.get("ledger_pick_ids", frozenset())
+        ordered_picks = sorted(picks, key=_auto_buyer_start_order)
+        skip_log.expect(ordered_picks, lambda candidate: _match_cohort(candidate, self.config))
         live_calibration_alarmed: set[str] = set()
         overnight_age = _OvernightAgeExtension(picks)
         open_pick_ids = [str(row.get("pick_id") or "") for row in picks if row.get("status") == "open"]
@@ -3285,7 +3422,7 @@ class AutoPolymarketBuyer:
             _load_pick_calibration_fields(open_pick_ids) if self.config.mode == "live" else {}
         )
 
-        for row in sorted(picks, key=_auto_buyer_start_order):
+        for row in ordered_picks:
             result.total_evaluated += 1
             pick_id = str(row.get("pick_id") or "")
             model_id = str(row.get("model_id") or row.get("model_version") or "")
@@ -4088,6 +4225,7 @@ class AutoPolymarketBuyer:
                     )
                 break
             except ExecutionGateError as exc:
+                refusal_kind = classify_gate_refusal(exc)
                 result.submitted_orders.append(
                     {
                         "status": "refused",
@@ -4095,10 +4233,13 @@ class AutoPolymarketBuyer:
                         # Lets the cycle tell "every order refused for auth or balance" (an alarm and a
                         # failed run) from ordinary gate refusals.
                         "http_status": exc.status_code,
-                        "refusal_kind": classify_gate_refusal(exc),
+                        "refusal_kind": refusal_kind,
                         **order_payload,
                     }
                 )
+                # No rejected_* counter moves here, so name it: without this the pick keeps an earlier
+                # cycle's reason as its terminal one.
+                skip_log.mark("gate_refused", detail=f"{refusal_kind or 'gate'}: {exc}"[:300])
                 continue
             except (RuntimeError, OSError) as exc:
                 # Not a gate refusal: the intent may already be audited and the POST may have gone

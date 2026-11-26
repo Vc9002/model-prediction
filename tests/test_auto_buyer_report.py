@@ -17,6 +17,7 @@ from model_prediction.portfolio import auto_buyer_report as report_mod
 DATE = "2026-11-25"
 SPREAD_V7 = "ncaab-spread-v7"
 TOTAL_V6 = "ncaab-total-v6"
+LIVE_SPREAD_LABEL = "ncaab-spread-v7:spread:[0.05,0.12):live"
 SLUG_A = "asc-cbb-aaa-bbb-2026-11-25-neg-3pt5"  # tips 16:00 ET (21:00Z)
 SLUG_B = "tsc-cbb-ccc-ddd-2026-11-25-140pt5"  # tips 19:00 ET (00:00Z next day)
 SLUG_C = "tsc-cbb-eee-fff-2026-11-25-150pt5"  # tips 18:00 ET (23:00Z); no quote after the buy
@@ -58,6 +59,12 @@ def _jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("a", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
+
+
+def _skips(root: Path, records: list[dict[str, Any]]) -> None:
+    """Skip records into the per-tip-date files the buyer writes."""
+    for record in records:
+        _jsonl(report_mod.skip_log_path(root, record["tip_date_et"]), [record])
 
 
 def _buy(pick_id: str, slug: str, *, model: str, market: str, **extra: Any) -> dict[str, Any]:
@@ -251,8 +258,8 @@ def runtime(tmp_path: Path) -> Path:
             },
         ],
     )
-    _jsonl(
-        root / "logs" / "auto_buyer_skip_reasons.jsonl",
+    _skips(
+        root,
         [
             # Two cycles skip pk; the terminal (last) reason counts once.
             {
@@ -295,6 +302,28 @@ def runtime(tmp_path: Path) -> Path:
                 "tip_date_et": DATE,
                 "tip_window": "before_5pm_et",
             },
+            # The twin copy of pc was skipped too; pc is not in the paper ledger.
+            {
+                "book": "paper",
+                "pick_id": "pc",
+                "cohort": "twin",
+                "reason": "rejected_low_edge",
+                "cycle_at_utc": "2026-11-25T20:12:00Z",
+                "tip_utc": "2026-11-25T21:00:00Z",
+                "tip_date_et": DATE,
+                "tip_window": "before_5pm_et",
+            },
+            # px also has an order attempt in the fill log: the attempt, not this skip, is its reason.
+            {
+                "book": "live",
+                "pick_id": "px",
+                "cohort": "c",
+                "reason": "rejected_low_edge",
+                "cycle_at_utc": "2026-11-25T20:05:00Z",
+                "tip_utc": "2026-11-25T21:00:00Z",
+                "tip_date_et": DATE,
+                "tip_window": "before_5pm_et",
+            },
             {
                 "book": "live",
                 "pick_id": "other-day",
@@ -320,6 +349,7 @@ def runtime(tmp_path: Path) -> Path:
             },
             {
                 "pick_id": "px",
+                "sent_utc": "2026-11-25T20:30:00Z",
                 "outcome": "refused",
                 "fill_path": None,
                 "requested_shares": 10.0,
@@ -439,7 +469,10 @@ def test_daily_cohort_summary(runtime):
 
 def test_skip_reasons_count_the_terminal_reason_of_unbought_picks(runtime):
     report = report_mod.build_auto_buyer_report(runtime, DATE)
-    assert report["skip_reasons"] == {"live": {"c": {"rejected_low_edge": 1}}}
+    assert report["skip_reasons"] == {
+        "live": {"c": {"rejected_low_edge": 1}, LIVE_SPREAD_LABEL: {"fill_log:refused": 1}},
+        "paper": {"twin": {"rejected_low_edge": 1}},
+    }
 
 
 def test_twin_comparison_joins_on_pick_id(runtime):
@@ -543,7 +576,6 @@ def test_quotes_at_or_before_the_buy_are_never_a_close(runtime):
 # ---------------------------------------------------------------- the buy anchor and the close
 
 A_START = "2026-11-25T21:00:00Z"
-LIVE_SPREAD_LABEL = "ncaab-spread-v7:spread:[0.05,0.12):live"
 
 
 def _mini(tmp_path: Path, buy: dict[str, Any], snaps: list[tuple[str, float, str, str]], **logs: Any) -> Path:
@@ -723,3 +755,63 @@ def test_report_can_trim_rows_to_the_report_date(runtime):
     day = report_mod.build_auto_buyer_report(runtime, DATE, day_rows_only=True)
     assert day["rows"] and {r["tip_date_et"] for r in day["rows"]} == {DATE}
     assert day["cohorts"] == full["cohorts"]
+
+
+# ---------------------------------------------------------------- skip reasons: per-date files, fill-log outcomes
+
+
+def test_skip_reasons_read_only_the_report_dates_file(runtime, monkeypatch):
+    legacy = runtime / "logs" / "auto_buyer_skip_reasons.jsonl"
+    _jsonl(
+        legacy, [{"book": "live", "pick_id": "legacy", "tip_date_et": DATE, "reason": "rejected_low_edge"}]
+    )
+    other_day = report_mod.skip_log_path(runtime, "2026-11-24")
+    assert other_day.exists()
+    opened: list[Path] = []
+    real = report_mod._read_jsonl
+    monkeypatch.setattr(
+        report_mod, "_read_jsonl", lambda path, **kw: (opened.append(Path(path)), real(path, **kw))[1]
+    )
+    report = report_mod.build_auto_buyer_report(runtime, DATE)
+    assert report_mod.skip_log_path(runtime, DATE) in opened
+    assert other_day not in opened and legacy not in opened
+    assert "legacy" not in json.dumps(report["skip_reasons"])
+
+
+def test_a_fill_log_outcome_is_the_reason_a_pick_with_an_order_attempt_went_unbought(runtime):
+    # px has a skip record AND a refused order attempt: the attempt is why it was not bought.
+    report = report_mod.build_auto_buyer_report(runtime, DATE)
+    live = report["skip_reasons"]["live"]
+    assert live[LIVE_SPREAD_LABEL] == {"fill_log:refused": 1}
+    assert "px" not in json.dumps(live.get("c"))
+
+
+def test_a_zero_fill_void_row_is_unbought_and_explained_by_its_fill_log_outcome(tmp_path):
+    buy = {
+        "executed_at_utc": "2026-11-25T20:30:00Z",
+        "submitted_at_utc": "2026-11-25T20:41:00Z",
+        "shares": 0.0,
+        "cost_usd": 0.0,
+        "result": "void",
+        "status": "settled",
+    }
+    fills = [
+        {
+            "pick_id": "pq",
+            "order_ids": ["O-pq"],
+            "outcome": "submitted",
+            "fill_path": "ioc_none",
+            "sent_utc": "2026-11-25T20:41:00Z",
+            "tip_date_et": DATE,
+            "cohort": LIVE_SPREAD_LABEL,
+        }
+    ]
+    report = report_mod.build_auto_buyer_report(_mini(tmp_path, buy, [], fills=fills), DATE)
+    assert report["skip_reasons"] == {"live": {LIVE_SPREAD_LABEL: {"fill_log:submitted:ioc_none": 1}}}
+
+
+def test_twin_comparison_names_the_twins_skip_reason_for_live_only_picks(runtime):
+    report = report_mod.build_auto_buyer_report(runtime, DATE)
+    (twin,) = report["twin_comparison"]
+    assert twin["live_only"] == ["pc"]
+    assert twin["live_only_reasons"] == {"pc": "rejected_low_edge"}

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 import time
 from collections.abc import Callable, Iterable
 from datetime import datetime
@@ -41,9 +42,18 @@ EDGE_BUCKETS: tuple[tuple[float, float, str], ...] = (
 PREREGISTERED_BAND = (0.05, 0.12)
 
 LIVE_FILL_LOG_NAME = "auto_buyer_live_fills.jsonl"
-SKIP_LOG_NAME = "auto_buyer_skip_reasons.jsonl"
+# One file per tip date, ``logs/auto_buyer_skip_reasons/<date>.jsonl``. Every cycle logs every unbought
+# cohort row, so a single file grows without bound and a report would parse all of it. A record lands
+# in its pick's own tip date (not the cycle's), so the report for a date reads exactly one file and
+# loses no skip logged the evening before.
+SKIP_LOG_DIR = "auto_buyer_skip_reasons"
+UNDATED_SKIP_FILE = "undated"
+_ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # The started gate counts a stale open row twice; the second name says why it was skipped.
 _SECONDARY_REASONS = frozenset({"rejected_stale_open"})
+# Halts that fire before the current row's order is sent: that row was not bought either. Any other
+# halt comes after a send (or an attempt the fill log records), so its row is not named here.
+_HALTS_BEFORE_SEND = frozenset({"kill_switch", "insufficient_cash"})
 # Exchange order fields that may carry an average fill price, a fee or a fill time. The US API
 # documents none of them for the order response, so each is read only when present.
 _AVG_PRICE_KEYS = ("avgPx", "avgPrice", "averagePrice", "avg_price")
@@ -54,6 +64,29 @@ _TRANSACT_KEYS = ("transactTime", "updateTime", "lastUpdateTime")
 def tracking_log_path(data_root: Path | str, name: str) -> Path:
     """``<data_root>/logs/<name>``; the caller passes the runtime root it already resolved."""
     return Path(data_root) / "logs" / name
+
+
+def skip_log_path(data_root: Path | str, report_date: str) -> Path:
+    """The skip-reason file of one US-Eastern tip date; refuses anything but an ISO date."""
+    if not _ISO_DATE.fullmatch(str(report_date)):
+        raise ValueError(f"skip log date must be YYYY-MM-DD, got {report_date!r}")
+    return tracking_log_path(data_root, f"{SKIP_LOG_DIR}/{report_date}.jsonl")
+
+
+def append_skip_records(data_root: Path | str, records: Iterable[dict[str, Any]]) -> bool:
+    """Append skip records, each to the file of its own tip date. Never raises; False if any write failed."""
+    by_file: dict[Path, list[dict[str, Any]]] = {}
+    for record in records:
+        tip_date = record.get("tip_date_et")
+        if isinstance(tip_date, str) and _ISO_DATE.fullmatch(tip_date):
+            path = skip_log_path(data_root, tip_date)
+        else:
+            path = tracking_log_path(data_root, f"{SKIP_LOG_DIR}/{UNDATED_SKIP_FILE}.jsonl")
+        by_file.setdefault(path, []).append(record)
+    written = [
+        append_jsonl_records(path, batch) for path, batch in by_file.items()
+    ]  # every file, even after a failure
+    return all(written)
 
 
 def _finite(value: Any) -> float | None:
@@ -312,19 +345,24 @@ class CohortSkipRecorder:
         self.enabled = enabled
         self.now = now
         self.records: list[dict[str, Any]] = []
+        # Pick ids already in the book's own ledger: a row there that only trips the dedup gate is
+        # the bought pick showing up again, not news (it would be logged every cycle until tip).
+        self.settled_pick_ids: frozenset[str] | set[str] = frozenset()
         self._pending: tuple[dict[str, Any], Any] | None = None
         self._before: dict[str, int] = {}
         self._notes: dict[str, Any] = {}
+        self._marks: list[str] = []
+        self._ordered: list[dict[str, Any]] = []
+        self._match: Callable[[dict[str, Any]], Any] | None = None
+
+    def expect(self, ordered: list[dict[str, Any]], match: Callable[[dict[str, Any]], Any]) -> None:
+        """The rows the loop will visit, in order, so a halted pass can name those it never reached."""
+        self._ordered = ordered
+        self._match = match
 
     def observe(self, row: dict[str, Any] | None, cohort: Any, result: Any) -> None:
+        self._flush(result, None)
         try:
-            if self._pending is not None:
-                after = _rejection_counters(result)
-                reasons = sorted(name for name, value in after.items() if value > self._before.get(name, 0))
-                if reasons:
-                    self.records.append(self._record(*self._pending, reasons))
-            self._pending = None
-            self._notes = {}
             if self.enabled and row is not None and cohort is not None:
                 self._pending = (row, cohort)
                 self._before = _rejection_counters(result)
@@ -332,28 +370,88 @@ class CohortSkipRecorder:
             _logger.warning("auto-buyer skip record failed", exc_info=True)
             self._pending = None
 
+    def _flush(self, result: Any, halt: str | None) -> None:
+        """Write the pending row's record, if it has a reason, and clear it."""
+        try:
+            if self._pending is not None:
+                after = _rejection_counters(result)
+                reasons = sorted(name for name, value in after.items() if value > self._before.get(name, 0))
+                if not reasons and not self._marks and halt in _HALTS_BEFORE_SEND:
+                    reasons = [f"halted:{halt}"]
+                reasons = [*reasons, *self._marks]
+                if reasons and not self._suppressed(self._pending[0], reasons):
+                    self.records.append(self._record(*self._pending, reasons))
+        except Exception:  # tracking must never reach the buy path
+            _logger.warning("auto-buyer skip record failed", exc_info=True)
+        self._pending = None
+        self._notes = {}
+        self._marks = []
+
+    def _suppressed(self, row: dict[str, Any], reasons: list[str]) -> bool:
+        return reasons == ["rejected_dedup"] and str(row.get("pick_id") or "") in self.settled_pick_ids
+
     def note(self, **values: Any) -> None:
         if self._pending is not None:
             self._notes.update(values)
 
+    def mark(self, reason: str, **values: Any) -> None:
+        """Name a reason no ``rejected_*`` counter carries (a gate refusal) for the pending row."""
+        if self._pending is not None:
+            self._marks.append(reason)
+            self._notes.update(values)
+
     def reject_all(
-        self, rows: Iterable[dict[str, Any]], match: Callable[[dict[str, Any]], Any], reason: str
+        self,
+        rows: Iterable[dict[str, Any]],
+        match: Callable[[dict[str, Any]], Any],
+        reason: str,
+        *,
+        detail: str | None = None,
+        upcoming_only: bool = False,
     ) -> None:
-        """A whole pass rejected before its loop (the daily loss breaker)."""
+        """A whole pass rejected before its loop (the daily loss breaker, or a skipped live pass).
+
+        ``upcoming_only`` leaves out rows already started or with no parseable start: a skipped pass
+        logs once a cycle, and an open row keeps matching its cohort after tip.
+        """
         if not self.enabled:
             return
         try:
+            self._notes = {"detail": detail} if detail else {}
             for row in rows:
                 if str(row.get("status") or "open").lower() != "open":
+                    continue
+                if upcoming_only and not self._upcoming(row):
                     continue
                 cohort = match(row)
                 if cohort is not None:
                     self.records.append(self._record(row, cohort, [reason]))
         except Exception:  # tracking must never reach the buy path
             _logger.warning("auto-buyer skip record failed", exc_info=True)
+        self._notes = {}
+
+    def _upcoming(self, row: dict[str, Any]) -> bool:
+        try:
+            return parse_utc(str(row.get("event_start_utc") or "")) > self.now
+        except (TypeError, ValueError):
+            return False
 
     def finish(self, result: Any) -> None:
-        self.observe(None, None, result)
+        """Close the last row, then name every cohort row a halted pass never reached.
+
+        ``result.total_evaluated`` counts the rows the loop started (the one it stopped on
+        included), so the rest of the ordered list was never visited.
+        """
+        halt = getattr(result, "live_halt_reason", None)
+        self._flush(result, halt if isinstance(halt, str) else None)
+        if halt and self.enabled and self._match is not None:
+            self.reject_all(
+                self._ordered[getattr(result, "total_evaluated", 0) :],
+                self._match,
+                f"halted:{halt}",
+                detail=f"the pass stopped early ({halt}) before this row was evaluated",
+                upcoming_only=True,
+            )
         result.cohort_skips = self.records
 
     def _record(self, row: dict[str, Any], cohort: Any, reasons: list[str]) -> dict[str, Any]:
@@ -380,6 +478,7 @@ class CohortSkipRecorder:
             "saved_edge": saved_edge,
             "live_edge": _finite(self._notes.get("live_edge")),
             "ask": _finite(self._notes.get("ask")),
+            "detail": self._notes.get("detail"),
             "market_slug": self._notes.get("market_slug") or row.get("market_slug"),
             "model_age_minutes": model_age,
             "event_start_utc": row.get("event_start_utc"),

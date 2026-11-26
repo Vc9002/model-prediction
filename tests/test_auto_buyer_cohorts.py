@@ -1561,14 +1561,7 @@ def test_cycle_writes_cohort_skip_reasons_outside_state(monkeypatch, tmp_path):
     ]
     calls = _cycle_harness(monkeypatch, tmp_path, _twin_state(), rows)
     auto_executor.run_auto_buyer_cycle()
-    import json
-
-    skips = [
-        json.loads(line)
-        for line in (tmp_path / "logs" / "auto_buyer_skip_reasons.jsonl")
-        .read_text(encoding="utf-8")
-        .splitlines()
-    ]
+    skips = _skip_records(tmp_path)
     by_book = {(s["book"], s["pick_id"]): s for s in skips}
     assert set(by_book) == {("live", "live-low"), ("live", "far"), ("paper", "live-low"), ("paper", "far")}
     low = by_book[("live", "live-low")]
@@ -1650,3 +1643,199 @@ def test_live_and_paper_rows_carry_the_send_time_after_the_pass_start(tmp_path, 
     assert rows[0]["submitted_at_utc"] == live_order["submitted_at_utc"]
     assert rows[0]["quote_observed_at_utc"] == "2026-11-25T12:00:00Z"
     assert rows[0]["executed_at_utc"] == live_order["timestamp_utc"]
+
+
+def _skip_records(tmp_path) -> list[dict[str, Any]]:
+    import json
+
+    folder = tmp_path / "logs" / "auto_buyer_skip_reasons"
+    return [
+        json.loads(line)
+        for path in sorted(folder.glob("*.jsonl"))
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+
+
+def _three_rows() -> list[dict[str, Any]]:
+    return [
+        _row(
+            SPREAD_V7, pick_id=name, event=f"g{n}", edge="0.07", model_probability=0.58, start_minutes=minutes
+        )
+        for n, (name, minutes) in enumerate([("first", 10), ("second", 15), ("third", 20)], start=1)
+    ]
+
+
+def test_kill_switch_mid_pass_records_the_row_it_stopped_on_and_the_rows_not_reached(
+    tmp_path, decorate, monkeypatch
+):
+    answers = iter([True, False])
+    monkeypatch.setattr(auto_executor, "_live_buying_still_enabled", lambda: next(answers))
+    buyer = _live_buyer(tmp_path, recheck_enabled_before_submit=True)
+    result = buyer.evaluate_and_execute(_three_rows())
+    assert result.live_halt_reason == "kill_switch"
+    assert [ticket.pick_id for ticket, _ in FakeExecutor.executed] == ["first"]
+    assert [(r["pick_id"], r["reason"]) for r in result.cohort_skips] == [
+        ("second", "halted:kill_switch"),
+        ("third", "halted:kill_switch"),
+    ]
+
+
+def test_a_gate_refusal_is_a_recorded_reason_not_silence(tmp_path, decorate, monkeypatch):
+    from model_prediction.data_sources.polymarket_execute import ExecutionGateError
+
+    original = FakeExecutor.execute
+
+    def refusing(self, ticket, pick_row, **kwargs):
+        if ticket.pick_id == "first":
+            raise ExecutionGateError("REFUSED: market is not open")
+        return original(self, ticket, pick_row, **kwargs)
+
+    monkeypatch.setattr(FakeExecutor, "execute", refusing)
+    result = _live_buyer(tmp_path).evaluate_and_execute(_three_rows())
+    assert [ticket.pick_id for ticket, _ in FakeExecutor.executed] == ["second", "third"]
+    (record,) = result.cohort_skips
+    assert (record["pick_id"], record["reason"]) == ("first", "gate_refused")
+    assert "market is not open" in record["detail"]
+    assert record["ask"] == pytest.approx(0.51)
+
+
+def test_a_live_pass_the_live_switch_skipped_records_why_its_rows_were_not_bought(monkeypatch, tmp_path):
+    state = {**_twin_state(), "live_enabled": False}
+    _cycle_harness(monkeypatch, tmp_path, state, _twin_rows())
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert summary["cohort_passes"]["live"]["mode"] == "LIVE_DISABLED"
+    live = [s for s in _skip_records(tmp_path) if s["book"] == "live"]
+    assert sorted((s["pick_id"], s["reason"]) for s in live) == [
+        ("spread9", "pass_skipped:live_disabled"),
+        ("total6", "pass_skipped:live_disabled"),
+    ]
+    assert all(s["detail"] for s in live)
+    assert FakeExecutor.executed == []
+
+
+# ---------------------------------------------------------------- paper twins keep their own books
+
+
+PLAIN_ML = _entry(
+    model_id=ML_V7M, market="moneyline", min_saved_edge=0.12, max_saved_edge_exclusive=None, mode="paper"
+)
+TWIN_LABEL = SPREAD_V7_TWIN.label
+
+
+def _paper_row(row: dict[str, Any], **extra: Any) -> dict[str, Any]:
+    return {
+        **_today_row(pick_id=row["pick_id"], event_id=row["event_id"], market_type=row["market_type"]),
+        "status": "open",
+        "shares": 1000,
+        "market_slug": row["market_slug"],
+        "token_side": "long",
+        "selection": row["selection"],
+        **extra,
+    }
+
+
+def test_parse_names_the_paper_twins():
+    parsed = _parse_cohorts({"cohorts": [_entry(), TWIN_SPREAD, PLAIN_ML]})
+    assert parsed.errors == ()
+    assert parsed.twin_labels == frozenset({TWIN_LABEL})
+    assert _parse_cohorts({"cohorts": [_entry()]}).twin_labels == frozenset()
+
+
+def test_ledger_scope_owns_labelled_rows_and_unlabelled_rows_of_its_model_and_market():
+    scope = auto_executor.LedgerScope(
+        labels=frozenset({TWIN_LABEL}), model_markets=frozenset({(SPREAD_V7, "spread")})
+    )
+    assert scope.owns({"cohort": TWIN_LABEL, "model_id": "anything"})
+    assert not scope.owns({"cohort": ML_V7M_PAPER.label, "model_id": SPREAD_V7, "market_type": "spread"})
+    # Written before the label existed: owned on model and market, or the twin would re-buy it.
+    assert scope.owns({"model_id": SPREAD_V7, "market_type": "Spread"})
+    assert not scope.owns({"model_id": NBA_SPREAD, "market_type": "spread"})
+
+
+def test_a_scope_is_refused_on_a_live_config():
+    scope = auto_executor.LedgerScope(labels=frozenset(), model_markets=frozenset())
+    with pytest.raises(ValueError, match="paper"):
+        AutoExecutionConfig(mode="live", execute_live=True, ledger_scope=scope)
+
+
+def test_totals_count_only_the_scoped_rows(tmp_path, monkeypatch):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    row = _twin_rows()[0]
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            _paper_row(row, pick_id="mine", cohort=TWIN_LABEL, cost_usd=40.0),
+            _paper_row(row, pick_id="other", cohort=ML_V7M_PAPER.label, cost_usd=300.0),
+        ],
+    )
+    scope = auto_executor.LedgerScope(labels=frozenset({TWIN_LABEL}), model_markets=frozenset())
+    assert _REAL_TODAY_TOTALS(tmp_path, live_book=False)[0] == pytest.approx(340.0)
+    assert _REAL_TODAY_TOTALS(tmp_path, live_book=False, row_scope=scope.owns)[0] == pytest.approx(40.0)
+
+
+def _twin_cycle_state() -> dict[str, Any]:
+    return {**_state([_entry(), TWIN_SPREAD, PLAIN_ML], enabled=True), "whitelist_models": []}
+
+
+def test_other_paper_cohorts_rows_never_cap_or_block_the_twin(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    monkeypatch.setattr(auto_executor, "PolymarketExecutor", AuditingFakeExecutor)
+    spread = _twin_rows()[0]
+    # The plain paper cohort holds $600 on the very game and contract (above every cap).
+    _write_ledger(
+        tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl",
+        [_paper_row(spread, pick_id="ml-on-g1", cohort=ML_V7M_PAPER.label, cost_usd=600.0)],
+    )
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), [spread])
+    summary = auto_executor.run_auto_buyer_cycle()
+    paper = _ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")
+    assert sorted(r["pick_id"] for r in paper) == ["ml-on-g1", "spread9"]
+    assert [r["cohort"] for r in paper if r["pick_id"] == "spread9"] == [TWIN_LABEL]
+    assert summary["cohort_passes"]["paper"]["rejected_budget"] == 0
+    assert summary["cohort_passes"]["paper"]["rejected_dedup"] == 0
+
+
+def test_the_twins_own_spend_caps_it_like_the_live_book(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    spread = _twin_rows()[0]
+    other_game = _row(SPREAD_V7, pick_id="held", event="g9", edge="0.07", model_probability=0.58)
+    # The twin already spent above the daily cap on another game.
+    _write_ledger(
+        tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl",
+        [_paper_row(other_game, cohort=TWIN_LABEL, cost_usd=600.0)],
+    )
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), [spread])
+    summary = auto_executor.run_auto_buyer_cycle()
+    twin_pass = summary["cohort_passes"]["paper"]
+    assert twin_pass["rejected_budget"] == 1 and twin_pass["orders_count"] == 0
+    assert len(_ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")) == 1
+
+
+def test_a_paper_row_from_before_the_label_existed_still_blocks_its_twin(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    spread = _twin_rows()[0]
+    # No `cohort` on the row: owned by the twin on model and market, or the twin would re-buy it.
+    _write_ledger(
+        tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl",
+        [_paper_row(spread, model_id=SPREAD_V7, cost_usd=5.0)],
+    )
+    _cycle_harness(monkeypatch, tmp_path, _twin_cycle_state(), [spread])
+    summary = auto_executor.run_auto_buyer_cycle()
+    twin_pass = summary["cohort_passes"]["paper"]
+    assert twin_pass["rejected_dedup"] == 1 and twin_pass["orders_count"] == 0
+    assert len(_ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")) == 1
+
+
+def test_dedup_of_a_pick_the_book_already_holds_is_not_logged_but_a_rival_pick_is(tmp_path, decorate):
+    held = _row(SPREAD_V7, pick_id="held", event="g1", edge="0.07", model_probability=0.58, start_minutes=10)
+    rival = _row(
+        SPREAD_V7, pick_id="rival", event="g1", edge="0.07", model_probability=0.58, start_minutes=15
+    )
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [_paper_row(held, status="open", shares=20.0, cost_usd=10.0, order_state="ORDER_STATE_FILLED")],
+    )
+    result = _live_buyer(tmp_path).evaluate_and_execute([held, rival])
+    assert FakeExecutor.executed == []
+    assert result.rejected_dedup == 2
+    assert [(r["pick_id"], r["reason"]) for r in result.cohort_skips] == [("rival", "rejected_dedup")]

@@ -317,3 +317,106 @@ def test_skip_recorder_reject_all_names_only_cohort_rows():
     assert [(r["pick_id"], r["reason"]) for r in result.cohort_skips] == [
         ("a", "rejected_daily_loss_breaker")
     ]
+
+
+# ---------------------------------------------------------------- halted passes, refusals, dedup noise, per-date files
+
+
+def _loop(recorder, rows, result, *, stop_at: str | None = None, cohort=COHORT) -> None:
+    """The buyer's loop shape: count the row, observe it, and stop after ``stop_at`` is observed."""
+    for row in rows:
+        result.total_evaluated += 1
+        recorder.observe(row, cohort, result)
+        if row["pick_id"] == stop_at:
+            return
+
+
+def test_a_halt_names_the_row_it_stopped_on_and_every_row_not_reached():
+    result = AutoExecutionResult()
+    recorder = tracking.CohortSkipRecorder(book="live", enabled=True, now=parse_utc("2026-11-25T21:20:00Z"))
+    rows = [
+        _cohort_row("a"),
+        _cohort_row("b"),
+        _cohort_row("c"),
+        _cohort_row("settled", status="settled"),
+        _cohort_row("started", event_start_utc="2026-11-25T21:10:00Z"),
+        _cohort_row("e"),
+    ]
+    recorder.expect(rows, lambda row: COHORT)
+    _loop(recorder, rows, result, stop_at="b")
+    result.live_halt_reason = "kill_switch"  # b was never sent
+    recorder.finish(result)
+    assert [(r["pick_id"], r["reason"]) for r in result.cohort_skips] == [
+        ("b", "halted:kill_switch"),
+        ("c", "halted:kill_switch"),
+        ("e", "halted:kill_switch"),
+    ]
+    assert all(r["book"] == "live" and r["tip_date_et"] == "2026-11-25" for r in result.cohort_skips)
+
+
+def test_a_halt_after_a_buy_does_not_blame_the_row_that_was_bought():
+    result = AutoExecutionResult()
+    recorder = tracking.CohortSkipRecorder(book="live", enabled=True, now=parse_utc("2026-11-25T21:20:00Z"))
+    rows = [_cohort_row("a"), _cohort_row("b")]
+    recorder.expect(rows, lambda row: COHORT)
+    _loop(recorder, rows, result, stop_at="a")
+    result.live_halt_reason = "ledger_write_failed"  # a was sent and bought
+    recorder.finish(result)
+    assert [(r["pick_id"], r["reason"]) for r in result.cohort_skips] == [("b", "halted:ledger_write_failed")]
+
+
+def test_a_gate_refusal_is_recorded_with_its_detail():
+    result = AutoExecutionResult()
+    recorder = tracking.CohortSkipRecorder(book="live", enabled=True, now=parse_utc("2026-11-25T21:20:00Z"))
+    recorder.observe(_cohort_row("a"), COHORT, result)
+    recorder.note(ask=0.53, market_slug="asc-x")
+    recorder.mark("gate_refused", detail="REFUSED: stale quote")
+    recorder.observe(_cohort_row("bought"), COHORT, result)
+    recorder.finish(result)
+    (record,) = result.cohort_skips
+    assert (record["pick_id"], record["reason"], record["reasons"]) == ("a", "gate_refused", ["gate_refused"])
+    assert record["detail"] == "REFUSED: stale quote"
+    assert record["ask"] == 0.53
+
+
+def test_dedup_noise_for_a_row_already_in_the_ledger_is_not_recorded():
+    result = AutoExecutionResult()
+    recorder = tracking.CohortSkipRecorder(book="live", enabled=True, now=parse_utc("2026-11-25T21:20:00Z"))
+    recorder.settled_pick_ids = frozenset({"held"})
+    recorder.observe(_cohort_row("held"), COHORT, result)
+    result.rejected_dedup += 1  # the pick is in the book's own ledger
+    recorder.observe(_cohort_row("other-game"), COHORT, result)
+    result.rejected_dedup += 1  # a different pick covers this game: a real reason
+    recorder.observe(_cohort_row("held-low"), COHORT, result)
+    recorder.settled_pick_ids = frozenset({"held", "held-low"})
+    result.rejected_dedup += 1
+    result.rejected_low_edge += 1  # more than dedup: still recorded
+    recorder.finish(result)
+    assert [(r["pick_id"], r["reason"]) for r in result.cohort_skips] == [
+        ("other-game", "rejected_dedup"),
+        ("held-low", "rejected_dedup"),
+    ]
+
+
+def test_skip_records_go_to_one_file_per_tip_date(tmp_path):
+    records = [
+        {"pick_id": "a", "tip_date_et": "2026-11-25"},
+        {"pick_id": "b", "tip_date_et": "2026-11-26"},
+        {"pick_id": "c", "tip_date_et": "2026-11-25"},
+        {"pick_id": "d", "tip_date_et": None},
+    ]
+    assert tracking.append_skip_records(tmp_path, records) is True
+    folder = tmp_path / "logs" / "auto_buyer_skip_reasons"
+    assert sorted(p.name for p in folder.iterdir()) == [
+        "2026-11-25.jsonl",
+        "2026-11-26.jsonl",
+        "undated.jsonl",
+    ]
+    assert [r["pick_id"] for r in _read(tracking.skip_log_path(tmp_path, "2026-11-25"))] == ["a", "c"]
+    assert tracking.append_skip_records(tmp_path, []) is True
+
+
+@pytest.mark.parametrize("bad", ["../2026-11-25", "2026-11-25.jsonl", "tomorrow", ""])
+def test_skip_log_path_rejects_anything_but_an_iso_date(tmp_path, bad):
+    with pytest.raises(ValueError, match="YYYY-MM-DD"):
+        tracking.skip_log_path(tmp_path, bad)

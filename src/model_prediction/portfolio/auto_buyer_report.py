@@ -40,9 +40,9 @@ from .auto_buyer_tracking import (
     BEFORE_CUTOFF,
     EASTERN,
     LIVE_FILL_LOG_NAME,
-    SKIP_LOG_NAME,
     edge_bucket,
     in_preregistered_band,
+    skip_log_path,
     tip_fields,
     tracking_log_path,
 )
@@ -547,14 +547,14 @@ def _max_drawdown(rows: list[dict[str, Any]]) -> float:
     return round(drawdown, 2)
 
 
-def _skip_reasons(runtime_root: Path, report_date: str, bought: set[tuple[str, str]]) -> dict[str, Any]:
-    """Count each unbought cohort pick once, by the reason of its last skip before tip.
+def _terminal_skips(runtime_root: Path, report_date: str) -> dict[tuple[str, str], dict[str, Any]]:
+    """The last skip record before tip of each (book, pick) of the report date, from that date's file.
 
     An open row keeps matching its cohort after tip, so every later cycle logs it as started; the
     last pre-tip record says why it was never bought. A pick with no pre-tip record keeps its latest.
     """
     terminal: dict[tuple[str, str], tuple[bool, datetime, dict[str, Any]]] = {}
-    for record in _read_jsonl(tracking_log_path(runtime_root, SKIP_LOG_NAME), contains=(report_date,)):
+    for record in _read_jsonl(skip_log_path(runtime_root, report_date)):
         if record.get("tip_date_et") != report_date:
             continue
         cycle = _time(record.get("cycle_at_utc"))
@@ -566,11 +566,45 @@ def _skip_reasons(runtime_root: Path, report_date: str, bought: set[tuple[str, s
         previous = terminal.get(key)
         if previous is None or rank >= previous[:2]:
             terminal[key] = (*rank, record)
-    counts: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
-    for key, (_pre_tip, _cycle, record) in terminal.items():
-        if key in bought:
+    return {key: record for key, (_pre_tip, _cycle, record) in terminal.items()}
+
+
+def _fill_log_reasons(fill_records: list[dict[str, Any]]) -> dict[str, tuple[str, str]]:
+    """Per pick, its newest order attempt as (reason, cohort): ``fill_log:<outcome>``, with the fill
+    path appended for a submitted order (an IOC that filled nothing and left no fallback)."""
+    newest: dict[str, tuple[datetime, dict[str, Any]]] = {}
+    for record in fill_records:
+        pick_id = str(record.get("pick_id") or "")
+        sent = _time(record.get("sent_utc"))
+        if not pick_id or sent is None:
             continue
-        counts[key[0]][str(record.get("cohort"))][str(record.get("reason"))] += 1
+        if pick_id not in newest or sent >= newest[pick_id][0]:
+            newest[pick_id] = (sent, record)
+    out = {}
+    for pick_id, (_sent, record) in newest.items():
+        outcome = str(record.get("outcome"))
+        reason = f"fill_log:{outcome}" + (
+            f":{record.get('fill_path') or 'unknown'}" if outcome == "submitted" else ""
+        )
+        out[pick_id] = (reason, str(record.get("cohort")))
+    return out
+
+
+def _skip_reasons(
+    terminal: dict[tuple[str, str], dict[str, Any]],
+    fill_reasons: dict[str, tuple[str, str]],
+    bought: set[tuple[str, str]],
+) -> dict[str, Any]:
+    """Count each unbought cohort pick once. A live pick the buyer tried to order is explained by its
+    order attempt (the fill log); any other by its terminal skip record."""
+    counts: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
+    reasons: dict[tuple[str, str], tuple[str, str]] = {
+        key: (str(record.get("reason")), str(record.get("cohort"))) for key, record in terminal.items()
+    }
+    reasons.update({("live", pick_id): reason for pick_id, reason in fill_reasons.items()})
+    for key, (reason, cohort) in reasons.items():
+        if key not in bought:
+            counts[key[0]][cohort][reason] += 1
     return {book: {cohort: dict(c) for cohort, c in by_cohort.items()} for book, by_cohort in counts.items()}
 
 
@@ -612,7 +646,9 @@ def _loss_stop_cycles(runtime_root: Path, report_date: str) -> dict[str, int]:
     return hits
 
 
-def _twin_comparison(rows: list[dict[str, Any]], report_date: str) -> list[dict[str, Any]]:
+def _twin_comparison(
+    rows: list[dict[str, Any]], report_date: str, terminal: dict[tuple[str, str], dict[str, Any]]
+) -> list[dict[str, Any]]:
     out = []
     twins = {(r["model_id"], r["market_type"]) for r in rows if r["paper_twin"]}
     for model_id, market in sorted(twins):
@@ -630,6 +666,11 @@ def _twin_comparison(rows: list[dict[str, Any]], report_date: str) -> list[dict[
                 "market_type": market,
                 "both": both,
                 "live_only": sorted(set(live) - set(paper)),
+                # Why the twin did not buy what live bought (its last skip before tip), None if unlogged.
+                "live_only_reasons": {
+                    pick_id: (terminal.get(("paper", pick_id)) or {}).get("reason")
+                    for pick_id in sorted(set(live) - set(paper))
+                },
                 "paper_only": sorted(set(paper) - set(live)),
                 "entry_diff_cents_mean": _mean(
                     _cents(live[p]["buy_price"], paper[p]["buy_price"]) for p in both
@@ -661,7 +702,10 @@ def build_auto_buyer_report(
     fill_records = _fill_records(root, report_date)
     rows = _base_rows(root, cohorts, context, _sent_by_order(fill_records))
     _attach_closes(root, rows, report_date)
-    bought = {(r["book"], r["pick_id"]) for r in rows}
+    # A zero-fill IOC whose fallback expired (void, no shares) owns nothing: its order attempt, not
+    # a purchase, is what the skip reasons should say.
+    bought = {(r["book"], r["pick_id"]) for r in rows if r["shares"] > 0 or r["result"] != "void"}
+    terminal = _terminal_skips(root, report_date)
     fills = _fill_stats(fill_records)
     summaries = []
     for book, cohort in sorted({(r["book"], r["cohort"]) for r in rows}):
@@ -712,9 +756,9 @@ def build_auto_buyer_report(
             "pnl_net_usd": "ledger pnl_usd minus fee_usd where the row records a fee",
         },
         "cohorts": summaries,
-        "skip_reasons": _skip_reasons(root, report_date, bought),
+        "skip_reasons": _skip_reasons(terminal, _fill_log_reasons(fill_records), bought),
         "loss_stop_cycles": _loss_stop_cycles(root, report_date),
-        "twin_comparison": _twin_comparison(rows, report_date),
+        "twin_comparison": _twin_comparison(rows, report_date, terminal),
         "rows": [r for r in rows if r["tip_date_et"] == report_date] if day_rows_only else rows,
     }
 
@@ -795,7 +839,11 @@ def render_markdown(report: dict[str, Any]) -> str:
             lines.append(
                 f"| {c['cohort']} | {f['attempts']} | {f['outcomes']} | {f['fill_paths']} | {_fmt(f['ioc_fill_rate'], kind='pct')} |"
             )
-    lines += ["", "## Skip reasons (terminal reason of each unbought cohort pick)", ""]
+    lines += [
+        "",
+        "## Skip reasons (the order attempt, else the terminal skip, of each unbought cohort pick)",
+        "",
+    ]
     for book, by_cohort in sorted(report["skip_reasons"].items()):
         for cohort, counts in sorted(by_cohort.items()):
             detail = ", ".join(f"{reason} {n}" for reason, n in sorted(counts.items(), key=lambda kv: -kv[1]))
