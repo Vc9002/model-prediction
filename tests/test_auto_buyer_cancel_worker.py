@@ -387,8 +387,8 @@ def script(tmp_path, monkeypatch):
             self.config = config
 
         def evaluate_and_execute(self) -> _FakeResult:
-            # While a live run is under way it must hold daily.lock.
-            probe = acquire_lock(root / "locks" / "daily.lock")
+            # While a live run is under way it must hold auto_buyer.lock (the scheduled worker's lock).
+            probe = acquire_lock(root / "locks" / "auto_buyer.lock")
             module.LOCK_PROBES.append(probe is None)
             release_lock(probe)
             return _FakeResult()
@@ -419,24 +419,24 @@ def test_execute_refuses_under_cohorts_or_unless_enabled_is_true(script, monkeyp
     assert "REFUSED" in capsys.readouterr().err
 
 
-def test_execute_refuses_while_daily_lock_is_held(script, monkeypatch, capsys):
+def test_execute_refuses_while_the_buyer_lock_is_held(script, monkeypatch, capsys):
     monkeypatch.setattr(script, "load_auto_buyer_state", lambda: {"enabled": True})
-    held = acquire_lock(script.ROOT / "locks" / "daily.lock")
+    held = acquire_lock(script.ROOT / "locks" / "auto_buyer.lock")
     try:
         code = script.main(["--execute"])
     finally:
         release_lock(held)
     assert code != 0 and script.BUILT == []
-    assert "daily.lock" in capsys.readouterr().err
+    assert "auto_buyer.lock" in capsys.readouterr().err
 
 
-def test_allowed_execute_runs_under_daily_lock(script, monkeypatch):
+def test_allowed_execute_runs_under_the_buyer_lock(script, monkeypatch):
     monkeypatch.setattr(script, "load_auto_buyer_state", lambda: {"enabled": True})
     assert script.main(["--execute", "--json"]) == 0
     assert script.BUILT[0]["execute_live"] is True
     assert script.LOCK_PROBES == [True]
     # Released afterwards.
-    probe = acquire_lock(script.ROOT / "locks" / "daily.lock")
+    probe = acquire_lock(script.ROOT / "locks" / "auto_buyer.lock")
     assert probe is not None
     release_lock(probe)
 

@@ -4,8 +4,8 @@
 ``--execute`` places REAL orders, so it is governed like the scheduled buyer (quick-261125-hih C3):
 it refuses while the saved state has a ``cohorts`` key (only operator-set live cohorts may trade
 real money, through the scheduled cycle) or while ``enabled`` is not the boolean true (the kill
-switch), and it runs under the same ``daily.lock`` as the worker and the daily job, refusing when
-that lock is held. The dry run is unchanged.
+switch), and it runs under ``auto_buyer.lock``, the lock the scheduled worker and the daily job's
+buyer steps hold (auto_buyer_lock.py), refusing when that lock is held. The dry run is unchanged.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import argparse
 import json
 import sys
 
+from model_prediction.auto_buyer_lock import auto_buyer_lock_path
 from model_prediction.daily_lock import acquire_lock, release_lock
 from model_prediction.portfolio.auto_executor import (
     COHORTS_STATE_KEY,
@@ -83,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"REFUSED --execute: {refusal}.", file=sys.stderr)
         return 2
     # Operational real-money path: fail closed without MODEL_PREDICTION_RUNTIME_ROOT.
-    lock_path = RuntimePaths.resolve(require_external_runtime=True).lock_root / "daily.lock"
+    lock_path = auto_buyer_lock_path(RuntimePaths.resolve(require_external_runtime=True))
     lock = acquire_lock(lock_path)
     if lock is None:
         print(
