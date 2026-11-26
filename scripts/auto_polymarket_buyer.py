@@ -3,9 +3,10 @@
 
 ``--execute`` places REAL orders, so it is governed like the scheduled buyer (quick-261125-hih C3):
 it refuses while the saved state has a ``cohorts`` key (only operator-set live cohorts may trade
-real money, through the scheduled cycle) or while ``enabled`` is not the boolean true (the kill
-switch), and it runs under ``auto_buyer.lock``, the lock the scheduled worker and the daily job's
-buyer steps hold (auto_buyer_lock.py), refusing when that lock is held. The dry run is unchanged.
+real money, through the scheduled cycle) or while ``enabled`` (the kill switch) or ``live_enabled``
+(when present) is not the boolean true, and it runs under ``auto_buyer.lock``, the lock the scheduled
+worker and the daily job's buyer steps hold (auto_buyer_lock.py), refusing when that lock is held. The
+dry run is unchanged.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import sys
 
 from model_prediction.auto_buyer_lock import auto_buyer_lock_path
 from model_prediction.daily_lock import acquire_lock, release_lock
+from model_prediction.portfolio.auto_buyer_ledger import live_switch_on
 from model_prediction.portfolio.auto_executor import (
     COHORTS_STATE_KEY,
     AutoExecutionConfig,
@@ -34,6 +36,8 @@ def _execute_refusal() -> str | None:
         )
     if state.get("enabled") is not True:
         return f"the auto-buyer kill switch is off (enabled is {state.get('enabled')!r}, not true)"
+    if not live_switch_on(state):
+        return f"the live switch is off (live_enabled is {state.get('live_enabled')!r}, not true)"
     return None
 
 

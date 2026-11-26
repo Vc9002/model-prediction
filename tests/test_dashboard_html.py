@@ -1289,3 +1289,136 @@ def test_run_now_confirms_live_from_a_fresh_status() -> None:
     )
     confirm = out["confirms"][0]
     assert "REAL" in confirm["message"] and confirm["opts"].get("danger") is True
+
+
+# ---------------------------------------------------------------- the separate Live (real money) switch
+# `live_enabled` stops only the real-money book; the master toggle still stops everything.
+
+
+def test_live_switch_off_with_the_master_on_renders_paper_not_live() -> None:
+    status = json.dumps({**_LIVE_STATUS, "live_enabled": False, "live_trading_active": False})
+    out = _run_auto_buyer_ui(
+        f"updateAutoBuyerUI({status});"
+        + _REPORT.replace(
+            "alerts, confirms", "live: $('#autoBuyerLiveSwitchBtn').textContent, alerts, confirms"
+        )
+    )
+    assert out["btn"] == "ON (PAPER)" and out["pillState"] == "paper"
+    assert "live OFF" in out["pill"] and "LIVE: real orders" not in out["pill"]
+    assert out["live"] == "OFF"
+
+
+def test_live_switch_on_renders_real_money_and_a_status_without_the_field_follows_the_master() -> None:
+    for extra in ({"live_enabled": True}, {}):
+        status = json.dumps({**_LIVE_STATUS, **extra})
+        out = _run_auto_buyer_ui(
+            f"updateAutoBuyerUI({status});"
+            + _REPORT.replace(
+                "alerts, confirms", "live: $('#autoBuyerLiveSwitchBtn').textContent, alerts, confirms"
+            )
+        )
+        assert out["btn"] == "ON (LIVE)" and out["pillState"] == "live"
+        assert out["live"] == "ON (REAL MONEY)"
+
+
+def test_live_toggle_with_unreadable_status_sends_nothing() -> None:
+    out = _run_auto_buyer_ui(
+        """
+        routes['/api/auto-buyer/status'] = () => reply(500, 'boom');
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {enabled: false});
+        routes['/api/auto-buyer/live-toggle'] = () => reply(200, {live_enabled: true});
+        await toggleLiveTrading();
+        """
+        + _REPORT
+    )
+    assert [f for f in out["fetchLog"] if f["url"] == "/api/auto-buyer/live-toggle"] == []
+    assert out["confirms"] == []
+    assert any("unavailable" in a.lower() for a in out["alerts"])
+
+
+def test_turning_live_on_confirms_real_money_from_a_fresh_status_and_posts_true() -> None:
+    stale = json.dumps({**_LIVE_STATUS, "live_enabled": True})
+    fresh = json.dumps(
+        {**_LIVE_STATUS, "live_enabled": False, "live_trading_active": False, "max_game_stake_usd": 25.0}
+    )
+    out = _run_auto_buyer_ui(
+        f"""
+        updateAutoBuyerUI({stale});
+        routes['/api/auto-buyer/status'] = () => reply(200, {fresh});
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        routes['/api/auto-buyer/live-toggle'] = () => reply(200, {{live_enabled: true}});
+        await toggleLiveTrading();
+        """
+        + _REPORT
+    )
+    confirm = out["confirms"][0]
+    assert "REAL MONEY" in confirm["message"] and confirm["opts"].get("danger") is True
+    assert "$25.00" in confirm["message"]
+    for label in _LIVE_STATUS["live_cohorts"]:
+        assert label in confirm["message"]
+    body = next(f["body"] for f in out["fetchLog"] if f["url"] == "/api/auto-buyer/live-toggle")
+    assert json.loads(body) == {"confirm": True, "enabled": True}
+
+
+def test_turning_live_off_needs_no_confirm_posts_false_and_reports_the_cancels() -> None:
+    status = json.dumps({**_LIVE_STATUS, "live_enabled": True})
+    off = json.dumps({**_LIVE_STATUS, "live_enabled": False, "live_trading_active": False})
+    out = _run_auto_buyer_ui(
+        f"""
+        let served = {status};
+        routes['/api/auto-buyer/status'] = () => reply(200, served);
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        routes['/api/auto-buyer/live-toggle'] = () => {{
+          served = {off};
+          return reply(200, {{live_enabled: false, kill_switch_cancel:
+            {{candidates: 1, cancelled: ['gtd-1'], already_terminal: [], failed: []}}}});
+        }};
+        await loadAutoBuyerStatus();
+        await toggleLiveTrading();
+        """
+        + _REPORT
+    )
+    assert out["confirms"] == []
+    body = next(f["body"] for f in out["fetchLog"] if f["url"] == "/api/auto-buyer/live-toggle")
+    assert json.loads(body) == {"confirm": True, "enabled": False}
+    assert out["pillState"] == "paper" and out["btn"] == "ON (PAPER)"
+    assert any("1 cancelled" in a for a in out["alerts"])
+
+
+def test_refused_live_toggle_shows_the_error_and_rereads_the_server_state() -> None:
+    status = json.dumps(_LIVE_STATUS)
+    out = _run_auto_buyer_ui(
+        f"""
+        routes['/api/auto-buyer/status'] = () => reply(200, {status});
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        routes['/api/auto-buyer/live-toggle'] = () => reply(200, {{status: 'refused', error: 'state conflict'}});
+        await loadAutoBuyerStatus();
+        fetchLog.length = 0;
+        await toggleLiveTrading();
+        """
+        + _REPORT
+    )
+    urls = [f["url"] for f in out["fetchLog"]]
+    assert urls.index("/api/auto-buyer/live-toggle") < len(urls) - 1 - urls[::-1].index(
+        "/api/auto-buyer/status"
+    )
+    assert len(out["alerts"]) == 1 and "refused" in out["alerts"][0].lower()
+    assert out["pillState"] == "live"
+
+
+def test_enabling_the_master_with_live_off_is_a_paper_confirm_not_real_money() -> None:
+    status = json.dumps(
+        {**_LIVE_STATUS, "enabled": False, "live_enabled": False, "live_trading_active": False}
+    )
+    out = _run_auto_buyer_ui(
+        f"""
+        routes['/api/auto-buyer/status'] = () => reply(200, {status});
+        routes['/api/auto-buyer/ncaab-paper/status'] = () => reply(200, {{enabled: false}});
+        routes['/api/auto-buyer/toggle'] = () => reply(200, {{enabled: true}});
+        await toggleAutoBuyer();
+        """
+        + _REPORT
+    )
+    confirm = out["confirms"][0]
+    assert "REAL MONEY" not in confirm["message"] and "PAPER" in confirm["message"]
+    assert not confirm["opts"].get("danger")

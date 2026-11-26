@@ -6,9 +6,11 @@ exchange expires at the event start minus 90 s (quick-261125-hih D-01). That exp
 mechanism; this worker is the backstop for an exchange that did not honour it and for the kill switch
 (D-02):
 
-- buyer enabled: cancel, by order id, every unreconciled live fallback whose event starts within
-  ``START_LEAD_SECONDS`` (the operator's 30 s spec);
-- buyer disabled, or the state file missing or unreadable: cancel every unreconciled live fallback.
+- live trading on (``enabled`` true and ``live_enabled`` true or absent): cancel, by order id, every
+  unreconciled live fallback whose event starts within ``START_LEAD_SECONDS`` (the operator's 30 s
+  spec);
+- buyer disabled, ``live_enabled`` false, or the state file missing or unreadable: cancel every
+  unreconciled live fallback.
 
 It only cancels. It never places an order, never calls a cancel-all or batch endpoint, and never
 writes the ledger: there is no ledger lock, so restating fills stays with the reconcile that runs under
@@ -52,12 +54,15 @@ _monotonic = time.monotonic
 
 
 def _buyer_enabled(state_path: Path) -> bool:
-    """Only the boolean true in the canonical runtime state file counts as enabled.
+    """Whether live fallbacks may stand: ``enabled`` and, if present, ``live_enabled`` are the
+    boolean true in the canonical runtime state file (``live_switch_on``).
 
     Read directly rather than through ``load_auto_buyer_state``: that loader falls back to the repo
     seed file when the runtime file is missing, and this worker must fail toward cancelling. A read
     that fails is retried; a file that stays missing or unreadable counts as disabled.
     """
+    from .portfolio.auto_buyer_ledger import live_switch_on
+
     for attempt in range(STATE_READ_ATTEMPTS):
         try:
             data = json.loads(state_path.read_text(encoding="utf-8"))
@@ -65,7 +70,7 @@ def _buyer_enabled(state_path: Path) -> bool:
             if attempt + 1 < STATE_READ_ATTEMPTS:
                 _sleep(STATE_READ_RETRY_SECONDS)
             continue
-        return isinstance(data, dict) and data.get("enabled") is True
+        return isinstance(data, dict) and live_switch_on(data)
     return False
 
 

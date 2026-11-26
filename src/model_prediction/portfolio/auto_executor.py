@@ -41,8 +41,10 @@ from model_prediction.data_sources.polymarket_execute import (
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
 from model_prediction.portfolio.auto_buyer_ledger import (
+    LIVE_ENABLED_STATE_KEY,
     event_key_from_slug,
     is_fallback_submit_unknown,
+    live_switch_on,
     modeled_taker_fee_usd,
     row_fee_usd,
     taker_fee_per_share,
@@ -1202,9 +1204,10 @@ def _pending_exposure_cost(row: dict[str, Any], *, with_fee: bool = False) -> fl
 
 
 def _live_buying_still_enabled() -> bool:
-    """C9: the kill switch as saved right now; an unreadable state fails toward stopping."""
+    """C9: the kill switch and the live switch as saved right now; an unreadable state fails toward
+    stopping."""
     try:
-        return load_auto_buyer_state().get("enabled") is True
+        return live_switch_on(load_auto_buyer_state())
     except Exception:
         logger.exception("Auto-buyer state unreadable before a live submission; stopping live buying")
         return False
@@ -1720,20 +1723,51 @@ def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
     new_enabled = (current.get("enabled") is False) if enabled is None else enabled
     _update_auto_buyer_state({"enabled": new_enabled, "updated_at_utc": iso_utc(utc_now())})
     state = load_auto_buyer_state()
-    if state["enabled"] is False:
-        # D-02: turning the buyer off also cancels the live book's resting fallbacks by order id,
-        # right now and best effort, after the save so a failed cancel never blocks or undoes the
-        # kill switch. Cancel-only (no ledger write): this runs in the dashboard process without
-        # auto_buyer.lock; every disabled cycle, daily reconcile and the backstop cancel again.
-        try:
-            from .auto_buyer_ledger import cancel_resting_live_fallbacks
+    if not live_switch_on(state):
+        _cancel_resting_after_switch_off(state, reason="kill_switch")
+    return state
 
-            state["kill_switch_cancel"] = cancel_resting_live_fallbacks(
-                data_root=DATA, cancel_all=True, reason="kill_switch"
-            )
-        except Exception as exc:  # reported to the operator, never raised
-            logger.exception("Kill switch saved, but cancelling resting live fallbacks failed")
-            state["kill_switch_cancel"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"[:300]}
+
+def _cancel_resting_after_switch_off(state: dict[str, Any], *, reason: str) -> None:
+    """D-02: switching the buyer (or only its live book) off also cancels the live book's resting
+    fallbacks by order id, right now and best effort, after the save so a failed cancel never blocks
+    or undoes the switch. Cancel-only (no ledger write): this runs in the dashboard process without
+    auto_buyer.lock; every cycle with live off, daily reconcile and the backstop cancel again."""
+    try:
+        from .auto_buyer_ledger import cancel_resting_live_fallbacks
+
+        state["kill_switch_cancel"] = cancel_resting_live_fallbacks(
+            data_root=DATA, cancel_all=True, reason=reason
+        )
+    except Exception as exc:  # reported to the operator, never raised
+        logger.exception("Switch saved, but cancelling resting live fallbacks failed")
+        state["kill_switch_cancel"] = {"status": "error", "error": f"{type(exc).__name__}: {exc}"[:300]}
+
+
+def toggle_live_trading(enabled: bool | None = None) -> dict[str, Any]:
+    """Turn only the real-money book ON or OFF (``live_enabled``); the paper books are untouched.
+
+    The master ``enabled`` still stops everything. Turning live off saves first and then cancels the
+    live book's resting orders by id, like the master kill switch. A bare toggle flips the effective
+    state (a saved non-boolean reads as off).
+    """
+    if enabled is not None and not isinstance(enabled, bool):
+        raise ValueError(f"Auto-Buyer live_enabled must be true or false, got {enabled!r}")
+    current = load_auto_buyer_state()
+    if enabled is None:
+        enabled = current.get(LIVE_ENABLED_STATE_KEY, True) is not True
+    _update_auto_buyer_state({LIVE_ENABLED_STATE_KEY: enabled, "updated_at_utc": iso_utc(utc_now())})
+    state = load_auto_buyer_state()
+    try:
+        AuditLog(DATA / "audit.jsonl").append(
+            "auto_buyer_live_switch_updated",
+            "auto_buyer.live_enabled",
+            {"live_enabled": enabled, "source": "dashboard"},
+        )
+    except (OSError, RuntimeError, TypeError, ValueError):
+        pass
+    if not live_switch_on(state):
+        _cancel_resting_after_switch_off(state, reason="live_off")
     return state
 
 
@@ -1757,8 +1791,9 @@ def _live_drawdown(state: dict[str, Any]) -> dict[str, Any]:
 def auto_buyer_status() -> dict[str, Any]:
     """Saved state plus what the dashboard needs to show real-money trading truthfully (C1, C2, DD).
 
-    ``live_trading_active`` holds only when ``enabled`` is the boolean true and a live book trades:
-    an active live cohort, or the legacy ungoverned ``mode: live`` (no ``cohorts`` key at all).
+    ``live_trading_active`` holds only when ``enabled`` and ``live_enabled`` (absent: follows
+    ``enabled``) are the boolean true and a live book trades: an active live cohort, or the legacy
+    ungoverned ``mode: live`` (no ``cohorts`` key at all).
     """
     state = load_auto_buyer_state()
     try:
@@ -1769,8 +1804,12 @@ def auto_buyer_status() -> dict[str, Any]:
     legacy_live = COHORTS_STATE_KEY not in state and str(state.get("mode") or "").lower() == "live"
     return {
         **state,
+        # The live switch as the buyer reads it: a file without the key follows `enabled`, so it
+        # reports true there. `live_enabled_set` says whether the key is actually in the file.
+        LIVE_ENABLED_STATE_KEY: state.get(LIVE_ENABLED_STATE_KEY, True) is True,
+        "live_enabled_set": LIVE_ENABLED_STATE_KEY in state,
         "live_cohorts": live_cohorts,
-        "live_trading_active": state.get("enabled") is True and (bool(live_cohorts) or legacy_live),
+        "live_trading_active": live_switch_on(state) and (bool(live_cohorts) or legacy_live),
         "live_drawdown": _live_drawdown(state),
     }
 
@@ -1974,8 +2013,10 @@ def _cohort_pass_config(
     )
 
 
-def _skipped_cohort_pass(label: str, cohorts: tuple[BuyCohort, ...]) -> dict[str, Any]:
-    return {"mode": label, "cohorts": [c.label for c in cohorts], "skipped": "enabled is not true"}
+def _skipped_cohort_pass(
+    label: str, cohorts: tuple[BuyCohort, ...], reason: str = "enabled is not true"
+) -> dict[str, Any]:
+    return {"mode": label, "cohorts": [c.label for c in cohorts], "skipped": reason}
 
 
 def _cycle_manages_live_book(*, governed: bool, buying_live: bool, preview: bool) -> bool:
@@ -1991,10 +2032,10 @@ def auto_buyer_cycle_manages_live_book(state: dict[str, Any]) -> bool:
     """Whether ``run_auto_buyer_cycle()`` (no override, no preview) on ``state`` reconciles the live
     book itself. The daily job defers its own reconcile only when this is true."""
     mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
-    cycle_enabled = state.get("enabled") is True
+    live_on = live_switch_on(state)
     governed = COHORTS_STATE_KEY in state
     live_cohorts = [c for c in _parse_cohorts(state).active if c.mode == "live"]
-    buying_live = cycle_enabled and ((not governed and mode == "live") or bool(live_cohorts))
+    buying_live = live_on and ((not governed and mode == "live") or bool(live_cohorts))
     return _cycle_manages_live_book(governed=governed, buying_live=buying_live, preview=False)
 
 
@@ -2111,6 +2152,10 @@ def run_auto_buyer_cycle(
     state["mode"] = mode
     # Strict: only the boolean true enables (bool("false") is True).
     cycle_enabled = state.get("enabled") is True and state_unreadable is None
+    # The real-money switch: `enabled` stays the master (false stops live AND paper); `live_enabled`
+    # false stops only the live book and cancels its resting orders like the kill switch does, while
+    # the paper books keep buying. A file without the key follows `enabled` (the old behaviour).
+    live_on = cycle_enabled and live_switch_on(state)
     # Cohort governance (quick-261125-31d): any `cohorts` key, even an empty or malformed one, puts
     # the legacy whitelist pass on paper, so only an operator-set live cohort can trade real money
     # from the scheduler. A separate local keeps the saved `mode` untouched in the state written back.
@@ -2119,15 +2164,13 @@ def run_auto_buyer_cycle(
     live_cohorts = tuple(c for c in parsed_cohorts.active if c.mode == "live")
     paper_cohorts = tuple(c for c in parsed_cohorts.active if c.mode == "paper")
     global_mode = "paper" if governed else mode
-    wants_execution = cycle_enabled if execute_override is None else bool(execute_override)
+    wants_execution = live_on if execute_override is None else bool(execute_override)
     # Explicit execution can request a one-off live cycle, but can never
     # override PAPER mode. Changing the saved mode is a separate action.
     should_execute = global_mode == "live" and wants_execution and not preview
     # `enabled: false` in the state file is the cohorts' kill switch: execute_override=True never
     # bypasses it (the legacy ungoverned pass keeps its override semantics above).
-    cohort_live_execute = (
-        bool(live_cohorts) and cycle_enabled and execute_override is not False and not preview
-    )
+    cohort_live_execute = bool(live_cohorts) and live_on and execute_override is not False and not preview
     record_paper = cycle_enabled and not preview
     # A disabled cycle runs no cohort buy pass at all (no candidate read, no quote refresh, no slate
     # capture); the live book below is still managed.
@@ -2135,7 +2178,8 @@ def run_auto_buyer_cycle(
     pass_overrides = _preview_pass_overrides(preview, preview_lookahead_hours)
     # Live caps are hard dollars (fix 2026-11-25): a live pass with a missing or unit-derived cap
     # does not run at all, and the cycle alarms.
-    live_cap_problem = _live_cap_problem(state) if live_cohorts and run_cohort_passes else None
+    live_pass_runs = run_cohort_passes and (live_on or preview)
+    live_cap_problem = _live_cap_problem(state) if live_cohorts and live_pass_runs else None
     if live_cap_problem is not None:
         cohort_live_execute = False
     buying_live = should_execute or cohort_live_execute
@@ -2155,9 +2199,7 @@ def run_auto_buyer_cycle(
             )
 
             # D-02: while disabled, every cycle cancels the live book's resting fallbacks by id.
-            reconciliation_summary = reconcile_pending_auto_buyer_fallbacks(
-                cancel_all_resting=not cycle_enabled
-            )
+            reconciliation_summary = reconcile_pending_auto_buyer_fallbacks(cancel_all_resting=not live_on)
             settle_auto_buyer_ledger()
         except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
@@ -2206,8 +2248,12 @@ def run_auto_buyer_cycle(
             live_blocked = live_blocked or f"account balance {cash_check['status']}"
             should_execute = False
     available_cash = cash_check.get("available_cash_usd") if cash_check else None
-    if live_cohorts and not run_cohort_passes:
-        cohort_passes["live"] = _skipped_cohort_pass("LIVE_DISABLED", live_cohorts)
+    if live_cohorts and not live_pass_runs:
+        cohort_passes["live"] = _skipped_cohort_pass(
+            "LIVE_DISABLED",
+            live_cohorts,
+            "enabled is not true" if not run_cohort_passes else f"{LIVE_ENABLED_STATE_KEY} is not true",
+        )
     elif live_cohorts and live_cap_problem is not None:
         cohort_passes["live"] = {
             "mode": "LIVE_REFUSED",
@@ -2563,7 +2609,7 @@ class AutoPolymarketBuyer:
                 # The fallback never runs cohort passes, and the legacy whitelist never trades
                 # live while cohorts exist.
                 state_mode = "paper"
-            state_should_execute = state.get("enabled") is True and state_mode == "live"
+            state_should_execute = live_switch_on(state) and state_mode == "live"
             self.config = AutoExecutionConfig(
                 **_base_auto_execution_kwargs_from_state(state),
                 execute_live=state_should_execute,

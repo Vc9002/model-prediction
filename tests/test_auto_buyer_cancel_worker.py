@@ -162,6 +162,44 @@ def test_disabled_buyer_cancels_every_pending_fallback(runtime, monkeypatch, cap
     assert out["reason"] == "backstop_kill_switch" and out["enabled"] is False
 
 
+@pytest.mark.parametrize("live_enabled", [False, "false", 0, None])
+def test_live_switch_off_cancels_every_pending_fallback_like_the_kill_switch(
+    runtime, monkeypatch, capsys, live_enabled
+):
+    # The master buyer is ON (paper keeps running) but live trading is off: the backstop treats the
+    # live fallbacks exactly as it does under the kill switch.
+    _write(runtime, [_row("gtd-1", start_seconds=36000.0), _row("gtd-2", start_seconds=600.0)])
+    (runtime / "auto_buyer_state.json").write_text(
+        json.dumps({"enabled": True, "live_enabled": live_enabled}), encoding="utf-8"
+    )
+    exchange = _exchange(monkeypatch)
+    code, out = _run(capsys)
+    assert code == 0
+    assert sorted(exchange.cancelled) == ["gtd-1", "gtd-2"]
+    assert out["reason"] == "backstop_kill_switch" and out["enabled"] is False
+
+
+@pytest.mark.parametrize("state", [{"enabled": True}, {"enabled": True, "live_enabled": True}])
+def test_live_switch_on_or_absent_keeps_the_tipoff_only_behaviour(runtime, monkeypatch, capsys, state):
+    _write(runtime, [_row("gtd-1", start_seconds=20.0), _row("gtd-2", start_seconds=36000.0)])
+    (runtime / "auto_buyer_state.json").write_text(json.dumps(state), encoding="utf-8")
+    exchange = _exchange(monkeypatch)
+    code, out = _run(capsys)
+    assert code == 0
+    assert exchange.cancelled == ["gtd-1"]
+    assert out["reason"] == "backstop_tipoff" and out["enabled"] is True
+
+
+def test_master_off_still_cancels_even_when_the_live_switch_says_on(runtime, monkeypatch, capsys):
+    _write(runtime, [_row("gtd-1", start_seconds=36000.0)], enabled=False)
+    (runtime / "auto_buyer_state.json").write_text(
+        json.dumps({"enabled": False, "live_enabled": True}), encoding="utf-8"
+    )
+    exchange = _exchange(monkeypatch)
+    code, out = _run(capsys)
+    assert code == 0 and exchange.cancelled == ["gtd-1"] and out["enabled"] is False
+
+
 @pytest.mark.parametrize("state_text", [None, "{not json", json.dumps({"enabled": "true"}), json.dumps([1])])
 def test_missing_or_unreadable_state_counts_as_disabled(runtime, monkeypatch, capsys, state_text):
     _write(runtime, [_row("gtd-1", start_seconds=36000.0)], enabled=None)

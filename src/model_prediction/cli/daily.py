@@ -286,11 +286,13 @@ def _auto_buyer_enabled(state: dict[str, Any]) -> bool:
 
 
 def _daily_cancels_all_resting() -> bool:
-    """D-02: while the buyer is not enabled, daily's own reconcile cancels every resting live
-    fallback by id. An unreadable state loads as defaults (disabled), so it fails toward cancelling."""
+    """D-02: while the buyer is not enabled, or its live switch (``live_enabled``) is off, daily's own
+    reconcile cancels every resting live fallback by id. An unreadable state loads as defaults
+    (disabled), so it fails toward cancelling."""
+    from ..portfolio.auto_buyer_ledger import live_switch_on
     from ..portfolio.auto_executor import load_auto_buyer_state
 
-    return not _auto_buyer_enabled(load_auto_buyer_state())
+    return not live_switch_on(load_auto_buyer_state())
 
 
 def _run_auto_buyer_step12(forecast_date: str | None) -> dict[str, Any]:

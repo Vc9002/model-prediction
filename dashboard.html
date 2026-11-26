@@ -414,6 +414,7 @@ body.hide-col-order .c-order,body.hide-col-matchup .c-matchup{display:none}
       <summary class="ab-pill" id="autoBuyerPill" aria-label="Auto-Buyer status and controls"><span class="dot gray" id="autoBuyerDot"></span><span id="autoBuyerPillTxt">Auto-Buyer OFF</span></summary>
       <div class="menu">
         <div class="menu-row"><span>Auto-Buyer (<span id="autoBuyerUnitBadge">50¢/U</span>)</span><button id="autoBuyerToggleBtn" class="ab-toggle off" onclick="toggleAutoBuyer()">OFF</button></div>
+        <div class="menu-row"><span>Live (real money)</span><button id="autoBuyerLiveSwitchBtn" class="ab-toggle off" onclick="toggleLiveTrading()">OFF</button></div>
         <div class="menu-row"><span>Main buyer mode</span>
           <div id="autoBuyerModeSeg" class="segmented ab-seg">
             <button id="autoBuyerPaperBtn" onclick="setAutoBuyerMode('paper')">PAPER</button>
@@ -3813,7 +3814,18 @@ function autoBuyerLiveState(d){
   const cohorts=Array.isArray(d.live_cohorts)?d.live_cohorts.map(String):[];
   const legacyLive=!Object.prototype.hasOwnProperty.call(d,"cohorts")&&String(d.mode||"paper").toLowerCase()==="live";
   const liveConfigured=cohorts.length>0||legacyLive;
-  return {on,live:on&&(d.live_trading_active===true||legacyLive),liveConfigured,cohorts};
+  // The live switch is separate from the master: a status without the field (an older server) follows
+  // the master, as the buyer does. Only the boolean false turns live off here.
+  const liveSwitch=d.live_enabled!==false;
+  return {on,live:on&&liveSwitch&&(d.live_trading_active===true||legacyLive),liveConfigured,liveSwitch,cohorts};
+}
+// Dollar caps from the server (hard dollars since 2026-11-25); units x 1U only for an older status.
+function _abCapsText(s){
+  const unit=Number(s.unit_value_usd||0.50);
+  const game=Number(s.max_game_stake_usd)>0?Number(s.max_game_stake_usd):Number(s.max_game_stake_units||5)*unit;
+  const daily=Number(s.max_daily_spend_usd)>0?Number(s.max_daily_spend_usd):Number(s.max_daily_spend_units||50)*unit;
+  const loss=Number(s.max_daily_loss_usd)>0?`\n- Daily loss stop: $${Number(s.max_daily_loss_usd).toFixed(2)}`:"";
+  return `- Sizing: 1U = $${unit.toFixed(2)}\n- Per-game cap: $${game.toFixed(2)}\n- Daily cap: $${daily.toFixed(2)}${loss}`;
 }
 function _abToken(){return {"X-Dashboard-Token":window._DASHBOARD_TOKEN||""};}
 async function _abJson(res){try{return await res.json();}catch(_e){return null;}}
@@ -3893,19 +3905,33 @@ function updateAutoBuyerUI(data){
     if(inp && document.activeElement !== inp) inp.value = unitValue.toFixed(2);
   });
   const ls=autoBuyerLiveState(_autoBuyerStatusCache);
-  const on=ls.on,isLive=ls.liveConfigured;
-  const state=on?(isLive?"live":"paper"):(isLive?"armed":"off");
+  // isLive: real orders may be placed (master ON, live switch ON); the live switch alone can be off
+  // while the master is ON, which leaves the paper books running.
+  const on=ls.on,isLive=ls.live;
+  const liveOffPaperOn=on&&ls.liveConfigured&&!ls.liveSwitch;
+  const state=on?(isLive?"live":"paper"):(ls.liveConfigured&&ls.liveSwitch?"armed":"off");
   const liveList=ls.cohorts.length?ls.cohorts.join(", "):"legacy mode=live";
   btn.className="ab-toggle "+(on?(isLive?"live":"paper"):"off");
   btn.textContent=on?(isLive?"ON (LIVE)":"ON (PAPER)"):"OFF";
   btn.title=on
-    ?(isLive?`Auto-Buyer is placing REAL-MONEY orders for: ${liveList} (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`
+    ?(isLive?`Auto-Buyer is placing REAL-MONEY orders for: ${liveList} (1U=$${unitValue.toFixed(2)}). Click to turn OFF (stops paper too).`
+      :liveOffPaperOn?`Auto-Buyer is running PAPER only: the Live (real money) switch is OFF. Click to turn everything OFF.`
       :`Auto-Buyer is ACTIVE in PAPER mode (1U=$${unitValue.toFixed(2)}). Click to turn OFF.`)
-    :(isLive?`Auto-Buyer is DISABLED. Live cohorts are set (${liveList}); turning it ON places REAL-MONEY orders.`:"Auto-Buyer is DISABLED. Click to turn ON.");
+    :(ls.liveConfigured&&ls.liveSwitch?`Auto-Buyer is DISABLED. Live cohorts are set (${liveList}); turning it ON places REAL-MONEY orders.`:"Auto-Buyer is DISABLED. Click to turn ON.");
+  const liveBtn=$("#autoBuyerLiveSwitchBtn");
+  if(liveBtn){
+    liveBtn.className="ab-toggle "+(ls.liveSwitch?(isLive?"live":"paper"):"off");
+    liveBtn.textContent=ls.liveSwitch?(isLive?"ON (REAL MONEY)":ls.liveConfigured?"ARMED":"ON"):"OFF";
+    liveBtn.setAttribute("aria-pressed",String(ls.liveSwitch));
+    liveBtn.title=ls.liveSwitch
+      ?(isLive?"Live trading is ON: REAL-MONEY orders are placed. Click to turn live OFF; paper keeps running."
+        :"The live switch is ON but the main Auto-Buyer is OFF, so nothing is bought. Turning the main buyer ON places REAL-MONEY orders.")
+      :"Live trading is OFF: no real orders; resting live orders were cancelled. Paper keeps running while the main buyer is ON.";
+  }
   const pill=$("#autoBuyerTopControl");
   if(pill)pill.dataset.state=state;
   const pillTxt=$("#autoBuyerPillTxt");
-  if(pillTxt)pillTxt.textContent={live:"LIVE: real orders ON",paper:"Auto-Buyer ON · paper",armed:"Auto-Buyer OFF · LIVE set",off:"Auto-Buyer OFF"}[state];
+  if(pillTxt)pillTxt.textContent={live:"LIVE: real orders ON",paper:liveOffPaperOn?"Auto-Buyer ON · paper · live OFF":"Auto-Buyer ON · paper",armed:"Auto-Buyer OFF · LIVE set",off:"Auto-Buyer OFF"}[state];
   const pillDot=$("#autoBuyerDot");
   if(pillDot)pillDot.className="dot "+({live:"r",paper:"g",armed:"y",off:"gray"}[state]);
   $("#statusbar").classList.toggle("live-on",state==="live");
@@ -3936,20 +3962,19 @@ async function toggleAutoBuyer(){
   if(!(await _abFreshStatusOrAlert()))return;
   const ls=autoBuyerLiveState(_autoBuyerStatusCache);
   const nextState=!ls.on;
-  const unitValue=Number(_autoBuyerStatusCache.unit_value_usd||0.50);
-  const gameCapUnits=Number(_autoBuyerStatusCache.max_game_stake_units||5);
-  const dailyCapUnits=Number(_autoBuyerStatusCache.max_daily_spend_units||50);
-  const caps=`- Sizing: 1U = $${unitValue.toFixed(2)}\n- Per-game cap: ${gameCapUnits.toFixed(1)}U = $${(gameCapUnits*unitValue).toFixed(2)}\n- Daily cap: ${dailyCapUnits.toFixed(1)}U = $${(dailyCapUnits*unitValue).toFixed(2)}`;
+  const caps=_abCapsText(_autoBuyerStatusCache);
+  // Real money only when the live switch is on as well; with it off the main buyer runs paper only.
+  const realMoney=ls.liveConfigured&&ls.liveSwitch;
   let msg;
   if(!nextState){
-    msg="Disable Polymarket Auto-Buyer?\n\nResting live orders are cancelled by order id.";
-  }else if(ls.liveConfigured){
+    msg="Disable Polymarket Auto-Buyer?\n\nThis stops paper AND live buying. Resting live orders are cancelled by order id.";
+  }else if(realMoney){
     const list=ls.cohorts.length?ls.cohorts.map(c=>`- ${c}`).join("\n"):"- legacy whitelist (mode=live, no cohorts)";
     msg=`Enable the Auto-Buyer with REAL MONEY orders?\n\nThese live cohorts place REAL MONEY orders on Polymarket US:\n${list}\n\n${caps}\n- Limit IOC orders; any unfilled remainder rests until the game starts, then expires\n- Paper cohorts record simulated fills only`;
   }else{
-    msg=`Enable Polymarket Auto-Buyer in PAPER mode?\n\n${caps}\n- Simulated fills recorded to the paper ledger only, no real orders`;
+    msg=`Enable Polymarket Auto-Buyer in PAPER mode?\n\n${caps}\n- Simulated fills recorded to the paper ledger only, no real orders${ls.liveConfigured?"\n- The Live (real money) switch is OFF":""}`;
   }
-  if(!(await customConfirm(msg,{danger:nextState&&ls.liveConfigured})))return;
+  if(!(await customConfirm(msg,{danger:nextState&&realMoney})))return;
   let res,data;
   try{
     res=await fetch("/api/auto-buyer/toggle",{
@@ -3976,6 +4001,48 @@ async function toggleAutoBuyer(){
     }else{
       const n=k=>Array.isArray(kc[k])?kc[k].length:0;
       if(n("cancelled")||n("failed")||n("already_terminal"))customAlert(`Auto-Buyer is OFF. Resting live orders: ${n("cancelled")} cancelled, ${n("already_terminal")} already closed, ${n("failed")} failed.`);
+    }
+  }
+}
+// The real-money switch alone (live_enabled). Same pattern as the main toggle: decide from a FRESH
+// status, do nothing when it cannot be read. Turning live OFF is the safe direction and needs no
+// confirm; turning it ON names REAL MONEY, the cohorts and the dollar caps.
+async function toggleLiveTrading(){
+  if(!(await _abFreshStatusOrAlert()))return;
+  const ls=autoBuyerLiveState(_autoBuyerStatusCache);
+  const next=!ls.liveSwitch;
+  if(next){
+    const list=ls.cohorts.length?ls.cohorts.map(c=>`- ${c}`).join("\n"):"- legacy whitelist (mode=live, no cohorts)";
+    const masterNote=ls.on?"":"\n\nThe main Auto-Buyer is OFF: nothing buys until it is turned ON.";
+    const msg=`Turn LIVE trading ON with REAL MONEY?\n\nThese live cohorts place REAL MONEY orders on Polymarket US:\n${list}\n\n${_abCapsText(_autoBuyerStatusCache)}${masterNote}`;
+    if(!(await customConfirm(msg,{danger:true})))return;
+  }
+  let res,data;
+  try{
+    res=await fetch("/api/auto-buyer/live-toggle",{
+      method:"POST",
+      headers:{"Content-Type":"application/json",..._abToken()},
+      body:JSON.stringify({confirm:true,enabled:next})
+    });
+    data=await _abJson(res);
+  }catch(e){
+    customAlert("Live switch update failed: "+e+". Showing the server's current state.");
+    await loadAutoBuyerStatus();
+    return;
+  }
+  if(!res.ok||!data||typeof data!=="object"||data.status==="refused"||data.status==="error"){
+    customAlert(`Live switch refused (HTTP ${res.status}): ${(data&&data.error)||"no details"}. Showing the server's current state.`);
+    await loadAutoBuyerStatus();
+    return;
+  }
+  await loadAutoBuyerStatus();
+  const kc=data.kill_switch_cancel;
+  if(kc&&typeof kc==="object"){
+    if(kc.status==="error"){
+      customAlert(`Live trading is OFF, but cancelling resting live orders failed: ${kc.error||"unknown error"}. The next cycle and the backstop retry.`);
+    }else{
+      const n=k=>Array.isArray(kc[k])?kc[k].length:0;
+      if(n("cancelled")||n("failed")||n("already_terminal"))customAlert(`Live trading is OFF. Resting live orders: ${n("cancelled")} cancelled, ${n("already_terminal")} already closed, ${n("failed")} failed.`);
     }
   }
 }

@@ -1118,3 +1118,254 @@ def test_a_position_that_aggregates_more_than_the_row_keeps_the_modeled_fee(tmp_
     stub = _PortfolioStub({"test-fee-total": {"netPosition": "25", "cost": {"value": "12.9"}}})
     settle_auto_buyer_ledger(data_root=tmp_path, espn=_espn_by_date({}), polymarket_executor=stub)
     assert _ledger(path)[0]["fee_source"] == "modeled_taker_fee"
+
+
+# ---------------------------------------------------------------- 10. independent live and paper switches
+# `enabled` stays the master (false stops live AND paper); `live_enabled` false stops only the live
+# book and cancels its resting orders like the kill switch. Absent: live follows `enabled`.
+
+PAPER_TOTAL_COHORT = {
+    "model_id": TOTAL_V6,
+    "sport": "ncaab",
+    "market": "total",
+    "min_saved_edge": 0.05,
+    "max_saved_edge_exclusive": 0.12,
+    "mode": "paper",
+    "enabled": True,
+}
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [
+        ({"enabled": True}, True),  # no key: live follows the master
+        ({"enabled": True, "live_enabled": True}, True),
+        ({"enabled": True, "live_enabled": False}, False),
+        ({"enabled": False, "live_enabled": True}, False),  # the master wins
+        ({"enabled": False}, False),
+        ({"enabled": True, "live_enabled": "true"}, False),  # strict is True: a string is off
+        ({"enabled": True, "live_enabled": 1}, False),
+        ({"enabled": True, "live_enabled": None}, False),
+        ({"enabled": "true"}, False),
+        ({}, False),
+    ],
+)
+def test_live_switch_is_strict_and_follows_enabled_when_the_key_is_absent(state, expected):
+    assert auto_buyer_ledger.live_switch_on(state) is expected
+
+
+def _paper_configs(cycle) -> list[AutoExecutionConfig]:
+    return [c for c in cycle["configs"] if c.mode == "paper" and c.cohorts]
+
+
+def test_live_off_with_paper_on_runs_no_live_pass_and_keeps_the_paper_pass(cycle, monkeypatch):
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    _write_state(
+        cycle,
+        {**LIVE_STATE, "live_enabled": False, "cohorts": [*LIVE_STATE["cohorts"], PAPER_TOTAL_COHORT]},
+    )
+    summary = auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert [c for c in cycle["configs"] if c.mode == "live"] == []
+    assert all(c.execute_live is False for c in cycle["configs"])
+    assert len(_paper_configs(cycle)) == 1
+    assert summary["cohort_passes"]["live"]["mode"] == "LIVE_DISABLED"
+    assert "live_enabled" in summary["cohort_passes"]["live"]["skipped"]
+    assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_TRADING"
+    # The resting live book is cancelled by id exactly like the kill switch.
+    assert cycle["reconcile"] == [{"cancel_all_resting": True}]
+
+
+@pytest.mark.parametrize("extra", [{}, {"live_enabled": True}])
+def test_live_on_or_key_absent_keeps_todays_live_behaviour(cycle, extra):
+    _write_state(cycle, {**LIVE_STATE, **extra})
+    auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    config = _live_config(cycle)
+    assert config.execute_live is True
+
+
+def test_master_off_still_stops_everything_even_with_live_on(cycle):
+    _write_state(
+        cycle,
+        {
+            **LIVE_STATE,
+            "enabled": False,
+            "live_enabled": True,
+            "cohorts": [*LIVE_STATE["cohorts"], PAPER_TOTAL_COHORT],
+        },
+    )
+    summary = auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert cycle["configs"] and all(c.execute_live is False for c in cycle["configs"])
+    assert [c for c in cycle["configs"] if c.mode == "live"] == []
+    assert summary["cohort_passes"]["live"]["skipped"] == "enabled is not true"
+    assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_DISABLED"
+
+
+def test_a_live_off_cycle_never_writes_the_live_switch_back(cycle):
+    path = _write_state(cycle, {**LIVE_STATE, "live_enabled": False})
+    auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert json.loads(path.read_text(encoding="utf-8"))["live_enabled"] is False
+
+
+def test_live_off_buys_paper_rows_and_sends_no_live_order(tmp_path, monkeypatch, buyer_env):
+    # The real buyer end to end (no stubbed evaluate): a live-cohort pick and a paper-cohort pick on
+    # the slate, live switch off. The paper pick is recorded, nothing reaches the executor.
+    state_file = tmp_path / "state" / "auto_buyer_state.json"
+    state_file.parent.mkdir(parents=True)
+    state_file.write_text(
+        json.dumps(
+            {
+                **LIVE_STATE,
+                "live_enabled": False,
+                "cohorts": [*LIVE_STATE["cohorts"], PAPER_TOTAL_COHORT],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(auto_executor, "AUTO_BUYER_STATE_FILE", state_file)
+    monkeypatch.setattr(auto_executor, "DATA", tmp_path)
+    monkeypatch.setattr(auto_executor, "PAPER_AUTO_BUYER_DATA_ROOT", tmp_path / "paper_auto_buyer")
+    monkeypatch.setattr(auto_executor, "_append_auto_buyer_cycle_history", lambda *_a, **_k: None)
+    monkeypatch.setattr(auto_executor, "_capture_missing_active_snapshot_slates", lambda *a, **k: [])
+    monkeypatch.setattr(auto_buyer_ledger, "reconcile_pending_auto_buyer_fallbacks", lambda **_k: {})
+    monkeypatch.setattr(auto_buyer_ledger, "settle_auto_buyer_ledger", lambda *_a, **_k: {})
+    picks = [
+        _pick(SPREAD_V7, pick_id="live-pick", event="gl1", model_probability=0.57, ask=0.50),
+        _pick(TOTAL_V6, pick_id="paper-pick", event="gp1", market="total", model_probability=0.57, ask=0.50),
+    ]
+    monkeypatch.setattr(auto_executor, "_read_cohort_candidate_picks", lambda: [dict(p) for p in picks])
+    auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert _BuyExecutor.executed == []
+    assert not (tmp_path / "auto_buyer_ledger.jsonl").exists()
+    paper_rows = _ledger(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")
+    assert [r["pick_id"] for r in paper_rows] == ["paper-pick"]
+
+    # The same slate with live on is what the harness is for: the live pick reaches the executor.
+    state_file.write_text(
+        json.dumps({**LIVE_STATE, "cohorts": [*LIVE_STATE["cohorts"], PAPER_TOTAL_COHORT]}), encoding="utf-8"
+    )
+    auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert len(_BuyExecutor.executed) == 1 and "gl1" in _BuyExecutor.executed[0][0].market_slug
+
+
+def test_toggle_live_off_saves_then_cancels_resting_orders_by_id(cycle, monkeypatch, tmp_path):
+    path = _write_state(cycle, LIVE_STATE)
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_fallback_row("gtd-1", start_minutes=120.0)])
+    seen: list[Any] = []
+
+    class _SavedFirst(_Exchange):
+        def cancel(self, order_id, user_command, market_slug=None):
+            seen.append(json.loads(path.read_text(encoding="utf-8")).get("live_enabled"))
+            return super().cancel(order_id, user_command, market_slug)
+
+    exchange = _SavedFirst({"gtd-1": ("ORDER_STATE_NEW", 0.0)})
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: exchange)
+    state = auto_executor.toggle_live_trading(False)
+    assert state["live_enabled"] is False and state["enabled"] is True
+    assert state["kill_switch_cancel"]["cancelled"] == ["gtd-1"]
+    assert exchange.cancelled == ["gtd-1"] and seen == [False]
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert on_disk["live_enabled"] is False and on_disk["enabled"] is True
+    assert "kill_switch_cancel" not in on_disk
+
+
+def test_toggle_live_on_cancels_nothing_and_leaves_the_master_alone(cycle, tmp_path):
+    path = _write_state(cycle, {**LIVE_STATE, "live_enabled": False})
+    state = auto_executor.toggle_live_trading(True)
+    assert state["live_enabled"] is True and "kill_switch_cancel" not in state
+    assert json.loads(path.read_text(encoding="utf-8"))["enabled"] is True
+
+
+@pytest.mark.parametrize("bad", ["false", 0, 1, "true"])
+def test_toggle_live_rejects_a_non_boolean(cycle, bad):
+    path = _write_state(cycle, LIVE_STATE)
+    with pytest.raises(ValueError, match="true or false"):
+        auto_executor.toggle_live_trading(bad)
+    assert "live_enabled" not in json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_toggle_live_refuses_to_overwrite_a_malformed_state_file(cycle):
+    path = cycle["state_file"]
+    path.write_text("{not json", encoding="utf-8")
+    with pytest.raises(auto_executor.AutoBuyerStateUnreadableError):
+        auto_executor.toggle_live_trading(True)
+    assert path.read_text(encoding="utf-8") == "{not json"
+
+
+def test_master_toggle_off_still_cancels_and_master_on_with_live_off_cancels_too(
+    cycle, monkeypatch, tmp_path
+):
+    # Live off is the kill switch for live orders: re-enabling the master does not revive them.
+    _write_state(cycle, {**LIVE_STATE, "enabled": False, "live_enabled": False})
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_fallback_row("gtd-1", start_minutes=120.0)])
+    exchange = _Exchange({"gtd-1": ("ORDER_STATE_NEW", 0.0)})
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", lambda _root: exchange)
+    state = auto_executor.toggle_auto_buyer(True)
+    assert state["enabled"] is True and state["live_enabled"] is False
+    assert exchange.cancelled == ["gtd-1"]
+
+
+def test_status_exposes_the_live_switch_and_an_effective_live_trading_active(cycle):
+    _write_state(cycle, LIVE_STATE)
+    status = auto_executor.auto_buyer_status()
+    assert status["live_enabled"] is True and status["live_enabled_set"] is False
+    assert status["live_trading_active"] is True
+    _write_state(cycle, {**LIVE_STATE, "live_enabled": False})
+    status = auto_executor.auto_buyer_status()
+    assert status["live_enabled"] is False and status["live_enabled_set"] is True
+    assert status["enabled"] is True and status["live_trading_active"] is False
+    _write_state(cycle, {**LIVE_STATE, "enabled": False, "live_enabled": True})
+    assert auto_executor.auto_buyer_status()["live_trading_active"] is False
+
+
+def test_mid_pass_recheck_stops_live_submissions_when_the_live_switch_goes_off(cycle):
+    _write_state(cycle, {**LIVE_STATE, "live_enabled": False})
+    assert auto_executor._live_buying_still_enabled() is False
+    _write_state(cycle, LIVE_STATE)
+    assert auto_executor._live_buying_still_enabled() is True
+
+
+@pytest.mark.parametrize(
+    ("state", "cancel_all"),
+    [
+        ({"enabled": True}, False),
+        ({"enabled": True, "live_enabled": True}, False),
+        ({"enabled": True, "live_enabled": False}, True),
+        ({"enabled": False, "live_enabled": True}, True),
+    ],
+)
+def test_daily_reconcile_cancels_all_when_the_live_switch_is_off(monkeypatch, state, cancel_all):
+    from model_prediction.cli import daily
+
+    monkeypatch.setattr(auto_executor, "load_auto_buyer_state", lambda: dict(state))
+    assert daily._daily_cancels_all_resting() is cancel_all
+
+
+def test_the_manual_buy_script_refuses_while_the_live_switch_is_off(monkeypatch):
+    import importlib.util
+
+    script = Path(__file__).resolve().parents[1] / "scripts" / "auto_polymarket_buyer.py"
+    spec = importlib.util.spec_from_file_location("auto_polymarket_buyer_script", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(module, "load_auto_buyer_state", lambda: {"enabled": True, "live_enabled": False})
+    assert "live switch is off" in module._execute_refusal()
+    monkeypatch.setattr(module, "load_auto_buyer_state", lambda: {"enabled": True})
+    assert module._execute_refusal() is None
+
+
+def test_live_toggle_route_flips_only_the_live_switch(cycle):
+    path = _write_state(cycle, LIVE_STATE)
+    code, body = _post("/api/auto-buyer/live-toggle", {"enabled": False})
+    assert code == 200 and body["live_enabled"] is False and body["enabled"] is True
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert on_disk["live_enabled"] is False and on_disk["enabled"] is True
+    code, body = _post("/api/auto-buyer/live-toggle", {"enabled": True})
+    assert code == 200 and body["live_enabled"] is True
+
+
+@pytest.mark.parametrize("payload", [{"enabled": "false"}, {"enabled": 0}])
+def test_live_toggle_route_refuses_a_non_boolean(cycle, payload):
+    path = _write_state(cycle, LIVE_STATE)
+    code, _body = _post("/api/auto-buyer/live-toggle", payload)
+    assert code == 400
+    assert "live_enabled" not in json.loads(path.read_text(encoding="utf-8"))

@@ -113,6 +113,7 @@ from model_prediction.portfolio.auto_executor import (
     set_auto_buyer_mode,
     set_auto_buyer_unit_value,
     toggle_auto_buyer,
+    toggle_live_trading,
 )
 from model_prediction.portfolio.manual_bet_ledger import (
     get_manual_bankroll,
@@ -748,6 +749,12 @@ class Handler(BaseHTTPRequestHandler):
             enabled = payload.get("enabled")
             try:
                 self._send(toggle_auto_buyer(enabled))
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
+                self._send({"status": "refused", "error": str(error)}, code=400)
+        elif parsed.path == "/api/auto-buyer/live-toggle":
+            # Only the real-money book; the master toggle above still stops paper and live alike.
+            try:
+                self._send(toggle_live_trading(payload.get("enabled")))
             except (OSError, RuntimeError, TypeError, ValueError) as error:
                 self._send({"status": "refused", "error": str(error)}, code=400)
         elif parsed.path == "/api/auto-buyer/unit-value":

@@ -86,6 +86,23 @@ def resolve_auto_buyer_paths(
 logger = logging.getLogger("model_prediction.auto_buyer")
 
 AUTO_BUYER_UNIT_VALUE_USD = 0.50  # 1U = 50 cents
+# The real-money switch, independent of the master ``enabled`` (which stops live AND paper).
+LIVE_ENABLED_STATE_KEY = "live_enabled"
+
+
+def live_switch_on(state: dict[str, Any]) -> bool:
+    """Whether the saved state lets real-money orders stand: the master ``enabled`` is the boolean
+    true and, when the file carries ``live_enabled``, that is the boolean true too. A file without the
+    key keeps the old behaviour (live follows ``enabled``). Strict ``is True`` throughout, so a
+    string, a number or a typo reads as off. Callers that cancel live orders treat False as the
+    kill switch."""
+    if state.get("enabled") is not True:
+        return False
+    if LIVE_ENABLED_STATE_KEY in state:
+        return state[LIVE_ENABLED_STATE_KEY] is True
+    return True
+
+
 AUTO_BUYER_TERMINAL_RESULTS = frozenset({"win", "loss", "push"})
 # An order POST whose outcome is unknown (quick-261125-hih B1): no exchange id, nothing known filled.
 ORDER_STATE_SUBMIT_UNKNOWN = "ORDER_STATE_SUBMIT_UNKNOWN"
