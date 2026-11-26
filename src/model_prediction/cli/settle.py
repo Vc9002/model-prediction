@@ -111,8 +111,8 @@ def _settle_all_unsettled(
         if row["status"] != "open":
             continue
         try:
-            start = parse_utc(row["event_start_utc"])
-        except ValueError:
+            start = parse_utc(str(row.get("event_start_utc") or ""))
+        except (TypeError, ValueError, OverflowError):
             failures.append({"pick_id": row["pick_id"], "reason": "bad event_start_utc"})
             continue
         if start > now:
@@ -290,10 +290,11 @@ def _settle_all_unsettled(
                 voided.append(resolved["pick_id"])
                 continue
             if resolved is not None and str(resolved.get("reason", "")).startswith(
-                _NON_BINARY_TERMINAL_REASON
+                (_NON_BINARY_TERMINAL_REASON, _AMBIGUOUS_SIDE_REASON)
             ):
-                # Decided market with trading-price terminal quotes: report it and keep the
-                # pick open rather than letting the 7-day rule void it as "unrecorded".
+                # Decided market with trading-price terminal quotes, or one whose winning side
+                # our own name matching cannot pin down: report it every run and keep the pick
+                # open. A decided result must not be voided on our own matching weakness.
                 failures.append(resolved)
                 continue
             if (now - start).total_seconds() > 7 * 86400:
@@ -1204,7 +1205,7 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
     else:
         team = str(row["home_team"] if selection == "home" else row["away_team"])
         tkey = _identity_key(team)
-        name_hits: list[dict] = []
+        name_hits: list[tuple[dict, str]] = []
         for side, _ in prices:
             name = _identity_key(str((side.get("team") or {}).get("name") or side.get("description") or ""))
             if name and (name in tkey or tkey in name):
@@ -1217,12 +1218,15 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
                             continue
                     except (TypeError, ValueError):
                         continue
-                name_hits.append(side)
-        if is_ncaaf and len(name_hits) > 1:
-            # Both outcomes named alike ("Wildcats" for Arizona and Kansas State): taking the
-            # first would grade on a guess.
-            return {"pick_id": row["pick_id"], "reason": f"resolution side ambiguous for {slug}"}
-        own = name_hits[0] if name_hits else None
+                name_hits.append((side, name))
+        if len(name_hits) > 1:
+            # Substring hits on both outcomes ("Kansas" and "Kansas State" for a Kansas State row,
+            # or "Wildcats" for both Arizona and Kansas State): the first listed side used to win,
+            # which grades on a guess. Only an exact or strictly most-specific name is taken.
+            name_hits = _disambiguate_side_hits(name_hits, tkey)
+            if len(name_hits) > 1:
+                return {"pick_id": row["pick_id"], "reason": f"{_AMBIGUOUS_SIDE_REASON} for {slug}"}
+        own = name_hits[0][0] if name_hits else None
         if own is None:
             own = _resolve_side_by_name_tokens(team, prices, market_type, row.get("line"))
     if own is None:
@@ -1268,6 +1272,29 @@ def _settle_by_resolution(row: dict, ledger, client=None, data_root=None) -> dic
 
 _RESOLVED_MARKET_STATUSES = frozenset({"MARKET_STATUS_RESOLVED"})
 _NON_BINARY_TERMINAL_REASON = "market terminal with non-binary prices"
+_AMBIGUOUS_SIDE_REASON = "resolution side ambiguous"
+
+
+def _disambiguate_side_hits(hits: list[tuple[dict, str]], tkey: str) -> list[tuple[dict, str]]:
+    """Narrow several substring-matched outcome sides to one when the names allow it.
+
+    1. Exactly one side whose name equals the row team's key wins.
+    2. Else, only when every side's name is contained in the row team's key (side is a
+       truncation of the row, "Kansas" / "Kansas State" for "Kansas State Wildcats"): the
+       strictly longest name that contains all the others wins. A side that matched only the
+       other way (row team inside the side name) never takes this rule, so "Kansas State"
+       against "Kansas" / "Kansas State Wildcats" stays ambiguous.
+    Anything else is returned unchanged for the caller to refuse.
+    """
+    exact = [hit for hit in hits if hit[1] == tkey]
+    if len(exact) == 1:
+        return exact
+    if all(name in tkey for _, name in hits):
+        longest = max(len(name) for _, name in hits)
+        top = [hit for hit in hits if len(hit[1]) == longest]
+        if len(top) == 1 and all(other in top[0][1] for _, other in hits):
+            return top
+    return hits
 
 
 def _market_is_terminal(market: dict, book: dict) -> bool:

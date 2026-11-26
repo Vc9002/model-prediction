@@ -447,7 +447,7 @@ def mark_manual_bet_result(
     return {"status": "ok", "pick_id": pick_id, "result": result, "pnl_usd": round(pnl, 2)}
 
 
-def _run_scheduled_sync() -> None:
+def _run_manual_sync() -> None:
     """Manual entry point: ``python -m model_prediction.portfolio.manual_bet_ledger``.
 
     The scheduled sync worker was removed from run_supervisor.WORKERS on 2026-11-26; nothing runs this on a timer.
@@ -459,4 +459,4 @@ def _run_scheduled_sync() -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    _run_scheduled_sync()
+    _run_manual_sync()

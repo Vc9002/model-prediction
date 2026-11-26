@@ -238,3 +238,162 @@ def test_sync_manual_bets_from_polymarket_imports_unmatched_positions(tmp_path, 
     assert res2["synced_count"] == 0
     assert res2["skipped_existing"] == 1
     assert len(read_manual_bets(data_root=tmp_path)) == 1
+
+
+def _espn_team(location, mascot, abbreviation, score, home_away):
+    # The real ESPN scoreboard shape: displayName is "location mascot", location is the school only.
+    return {
+        "homeAway": home_away,
+        "score": str(score),
+        "team": {
+            "displayName": f"{location} {mascot}",
+            "name": mascot,
+            "abbreviation": abbreviation,
+            "location": location,
+            "shortDisplayName": location,
+        },
+    }
+
+
+def _espn_event(event_id, away, home):
+    return {
+        "id": event_id,
+        "status": {"type": {"completed": True}},
+        "competitions": [{"competitors": [home, away]}],
+    }
+
+
+class _FakeScoreboard:
+    def __init__(self, by_league):
+        self.by_league = by_league
+
+    def scoreboard(self, league, day):
+        return {"events": self.by_league.get(league, [])}
+
+
+_COLLEGE_BET = {
+    "league": "NCAAF",
+    "away_team": "Michigan",
+    "home_team": "Ohio State",
+    "market_type": "moneyline",
+    "selection": "home",
+    "entry_price": 0.55,
+    "stake_usd": 15.0,
+    "event_start_utc": "2026-11-21T17:00:00Z",
+    "sportsbook": "polymarket",
+}
+
+
+def test_settle_picks_the_exact_scoreboard_match_over_an_earlier_substring_match(tmp_path):
+    record_manual_bet(_COLLEGE_BET, data_root=tmp_path)
+    espn = _FakeScoreboard(
+        {
+            "NCAAF": [
+                # Listed first: Michigan State is a substring hit for "michigan"; Ohio State wins it.
+                _espn_event(
+                    "1",
+                    _espn_team("Michigan State", "Spartans", "MSU", 10, "away"),
+                    _espn_team("Ohio State", "Buckeyes", "OSU", 20, "home"),
+                ),
+                _espn_event(
+                    "2",
+                    _espn_team("Michigan", "Wolverines", "MICH", 30, "away"),
+                    _espn_team("Ohio State", "Buckeyes", "OSU", 20, "home"),
+                ),
+            ]
+        }
+    )
+    res = settle_manual_bets(data_root=tmp_path, espn_client=espn)
+    assert res["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"], row["result"]) == ("30", "20", "loss")
+
+
+def test_settle_leaves_the_row_open_when_two_games_match_and_none_is_exact(tmp_path):
+    record_manual_bet({**_COLLEGE_BET, "event_start_utc": "2026-11-01T17:00:00Z"}, data_root=tmp_path)
+    espn = _FakeScoreboard(
+        {
+            "NCAAF": [
+                _espn_event(
+                    "1",
+                    _espn_team("Michigan State", "Spartans", "MSU", 10, "away"),
+                    _espn_team("Ohio State", "Buckeyes", "OSU", 20, "home"),
+                ),
+                _espn_event(
+                    "2",
+                    _espn_team("Michigan Tech", "Huskies", "MTU", 30, "away"),
+                    _espn_team("Ohio State", "Buckeyes", "OSU", 20, "home"),
+                ),
+            ]
+        }
+    )
+    res = settle_manual_bets(data_root=tmp_path, espn_client=espn)
+    assert res["settled_count"] == 0
+    row = read_manual_bets(data_root=tmp_path)[0]
+    # Long past the 48h unresolved-void window, and still not voided: the game is decided, our matching is not.
+    assert row["status"] == "open" and row["result"] == ""
+
+
+def test_settle_inverted_orientation_swaps_scores_and_prefers_the_exact_event(tmp_path):
+    # The scoreboard lists the row's home team as the away side.
+    record_manual_bet(_COLLEGE_BET, data_root=tmp_path)
+    espn = _FakeScoreboard(
+        {
+            "NCAAF": [
+                _espn_event(
+                    "2",
+                    _espn_team("Ohio State", "Buckeyes", "OSU", 7, "away"),
+                    _espn_team("Michigan State", "Spartans", "MSU", 9, "home"),
+                ),
+                _espn_event(
+                    "1",
+                    _espn_team("Ohio State", "Buckeyes", "OSU", 21, "away"),
+                    _espn_team("Michigan", "Wolverines", "MICH", 14, "home"),
+                ),
+            ]
+        }
+    )
+    assert settle_manual_bets(data_root=tmp_path, espn_client=espn)["settled_count"] == 1
+    row = read_manual_bets(data_root=tmp_path)[0]
+    assert (row["away_score"], row["home_score"], row["result"]) == ("14", "21", "win")
+
+
+def _set_row_fields(tmp_path, **fields):
+    from model_prediction.ledger import FIELDNAMES
+    from model_prediction.portfolio.manual_bet_ledger import _get_ledger_path
+    from model_prediction.xlsx_ledger import read_xlsx_rows, write_xlsx_rows_atomic
+
+    path = _get_ledger_path(tmp_path)
+    _, rows = read_xlsx_rows(path)
+    rows[0].update(fields)
+    write_xlsx_rows_atomic(path, FIELDNAMES, rows)
+
+
+class _ResolvedMarketClient:
+    def __init__(self, outcomes, prices):
+        self.outcomes, self.prices = outcomes, prices
+
+    def market(self, slug):
+        return {"status": "MARKET_STATUS_RESOLVED", "outcomes": self.outcomes, "outcomePrices": self.prices}
+
+
+def test_resolution_fallback_refuses_an_outcome_that_matches_both_row_teams(tmp_path, monkeypatch):
+    bet = {**_COLLEGE_BET, "league": "NCAAB", "away_team": "Kansas State", "home_team": "Kansas"}
+    record_manual_bet(bet, data_root=tmp_path)
+    _set_row_fields(tmp_path, event_id="aec-cbb-ksu-ku-2026-11-21")
+    client = _ResolvedMarketClient(["Kansas", "Kansas State"], ["0", "1"])
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.PolymarketUSClient", lambda: client)
+    res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({}))
+    assert res["settled_count"] == 0
+    assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
+
+
+def test_resolution_fallback_uses_the_event_id_slug_of_a_manual_row(tmp_path, monkeypatch):
+    bet = {**_COLLEGE_BET, "league": "NCAAB", "away_team": "Boise State", "home_team": "Kansas"}
+    record_manual_bet(bet, data_root=tmp_path)
+    _set_row_fields(tmp_path, event_id="aec-cbb-bsu-ku-2026-11-21")
+    client = _ResolvedMarketClient(["Kansas", "Boise State"], ["1", "0"])
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.PolymarketUSClient", lambda: client)
+    res = settle_manual_bets(data_root=tmp_path, espn_client=_FakeScoreboard({}))
+    assert res["settled_count"] == 1
+    assert read_manual_bets(data_root=tmp_path)[0]["result"] == "win"

@@ -325,3 +325,140 @@ def test_espn_fallback_reports_non_binary_terminal_and_does_not_age_out_to_void(
     )
     assert out["voided"] == [] and out["settled"] == []
     assert [f["pick_id"] for f in out["failures"]] == ["p"]
+
+
+def _moneyline_grade(row_team, selection, side_names, prices):
+    """Settle a moneyline row against a fake resolved market; return (result dict, graded pick result)."""
+    row = {**ROW, "market_type": "moneyline", "selection": selection, "home_team": "Z", "away_team": "Z"}
+    row["away_team" if selection == "away" else "home_team"] = row_team
+    sides = [(name, name) for name in side_names]
+    ledger = _Ledger()
+    out = _settle_by_resolution(row, ledger, _Client("MARKET_STATE_EXPIRED", prices, sides))
+    if not out.get("settled"):
+        return out, None
+    away, home = ledger.args
+    return out, grade_pick(MarketType.MONEYLINE, selection, None, away, home)
+
+
+@pytest.mark.parametrize("reverse", [False, True], ids=["short-side-first", "short-side-last"])
+@pytest.mark.parametrize(
+    ("row_team", "short", "long"),
+    [
+        ("Kansas State Wildcats", "Kansas", "Kansas State"),
+        ("Iowa State Cyclones", "Iowa", "Iowa State"),
+        ("Michigan State Spartans", "Michigan", "Michigan State"),
+        ("Oregon State Beavers", "Oregon", "Oregon State"),
+    ],
+)
+def test_state_school_row_is_not_graded_off_the_shorter_school_side(row_team, short, long, reverse):
+    # The short school won and the row's own team lost. Taking the first substring hit graded a win.
+    names = [long, short] if reverse else [short, long]
+    prices = [1.0 if name == short else 0.0 for name in names]
+    out, graded = _moneyline_grade(row_team, "away", names, prices)
+    assert out["settled"] and graded is PickResult.LOSS
+    # And the row's own team winning is a win, whichever side is listed first.
+    prices = [1.0 if name == long else 0.0 for name in names]
+    out, graded = _moneyline_grade(row_team, "away", names, prices)
+    assert out["settled"] and graded is PickResult.WIN
+
+
+def test_short_school_row_still_picks_its_own_side():
+    out, graded = _moneyline_grade("Kansas Jayhawks", "away", ["Kansas State", "Kansas"], [0.0, 1.0])
+    assert out["settled"] and graded is PickResult.WIN
+
+
+def test_exact_side_name_wins_over_a_longer_substring_hit():
+    out, graded = _moneyline_grade("Kansas State", "away", ["Kansas", "Kansas State"], [1.0, 0.0])
+    assert out["settled"] and graded is PickResult.LOSS
+
+
+@pytest.mark.parametrize(
+    ("row_team", "names"),
+    [
+        # Both outcomes named alike.
+        ("Arizona Wildcats", ["Wildcats", "Wildcats"]),
+        # The row team sits inside one side's name and the other side sits inside the row team:
+        # the shorter side must never be taken by the most-specific rule.
+        ("Kansas State", ["Kansas", "Kansas State Wildcats"]),
+        ("Kansas State", ["Kansas State Wildcats", "Kansas"]),
+    ],
+)
+def test_ambiguous_resolution_sides_are_refused_for_every_sport(row_team, names):
+    row = {**ROW, "market_type": "moneyline", "selection": "away", "league": "NCAAB", "away_team": row_team}
+    sides = [(name, name) for name in names]
+    out = _settle_by_resolution(row, _RecordingLedger(), _Client("MARKET_STATE_EXPIRED", [1.0, 0.0], sides))
+    assert out["reason"].startswith("resolution side ambiguous")
+    assert "settled" not in out and "voided" not in out
+
+
+def test_espn_fallback_keeps_an_ambiguous_resolution_open_past_seven_days(tmp_path, monkeypatch):
+    """An ambiguous side is reported every run, never voided as 'unrecorded' by the 7-day rule."""
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from model_prediction.domain import utc_now
+
+    start = utc_now() - timedelta(days=9)
+    row = {
+        **ROW,
+        "status": "open",
+        "league": "NBA",
+        "event_start_utc": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+    class _OneRowLedger(_RecordingLedger):
+        def rows(self):
+            return [row]
+
+    monkeypatch.setattr(settle_module, "_find_espn_result", lambda *a, **k: None)
+    monkeypatch.setattr(
+        settle_module,
+        "_settle_by_resolution",
+        lambda r, ledger: {
+            "pick_id": r["pick_id"],
+            "reason": f"{settle_module._AMBIGUOUS_SIDE_REASON} for aec-x",
+        },
+    )
+    config = {
+        "project": {
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+            "market_odds_snapshot_path": str(tmp_path / "no_market_odds.jsonl"),
+        }
+    }
+    out = settle_module._settle_all_unsettled(
+        SimpleNamespace(), config, _OneRowLedger(), espn=SimpleNamespace(), scoreboard_cache={}
+    )
+    assert out["voided"] == [] and out["settled"] == []
+    assert [f["pick_id"] for f in out["failures"]] == ["p"]
+
+
+@pytest.mark.parametrize("start_value", [None, "0001-01-01T00:00:00+05:00", "not-a-date", "MISSING"])
+def test_bad_event_start_lands_in_failures_and_the_next_row_still_settles(tmp_path, monkeypatch, start_value):
+    from types import SimpleNamespace
+
+    bad = {**ROW, "pick_id": "bad", "status": "open", "league": "NBA", "event_start_utc": start_value}
+    if start_value == "MISSING":
+        del bad["event_start_utc"]
+    good = {**ROW, "pick_id": "good", "status": "open", "league": "NBA"}
+
+    class _TwoRowLedger(_RecordingLedger):
+        def rows(self):
+            return [bad, good]
+
+    monkeypatch.setattr(settle_module, "_find_espn_result", lambda *a, **k: None)
+    monkeypatch.setattr(
+        settle_module,
+        "_settle_by_resolution",
+        lambda r, ledger: {"pick_id": r["pick_id"], "settled": True, "result": "win"},
+    )
+    config = {
+        "project": {
+            "ledger_path": str(tmp_path / "picks.xlsx"),
+            "market_odds_snapshot_path": str(tmp_path / "no_market_odds.jsonl"),
+        }
+    }
+    out = settle_module._settle_all_unsettled(
+        SimpleNamespace(), config, _TwoRowLedger(), espn=SimpleNamespace(), scoreboard_cache={}
+    )
+    assert out["failures"] == [{"pick_id": "bad", "reason": "bad event_start_utc"}]
+    assert [r["pick_id"] for r in out["settled"]] == ["good"]
