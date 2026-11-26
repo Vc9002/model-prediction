@@ -871,3 +871,47 @@ def test_live_book_stops_on_gross_loss_while_the_paper_book_nets(tmp_path, froze
         data_root=tmp_path,
     ).evaluate_and_execute([dict(pick)])
     assert paper.rejected_daily_loss_breaker == 0
+
+
+# ---------------------------------------------------------------- 6. settle takes daily.lock
+
+
+def _post(path: str, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    from io import BytesIO
+    from unittest.mock import Mock
+
+    from model_prediction.dashboard.common import _DASHBOARD_TOKEN
+    from model_prediction.dashboard.routes import Handler
+
+    body = json.dumps({"confirm": True, **payload}).encode("utf-8")
+    handler = Handler.__new__(Handler)
+    handler.path = path
+    handler.headers = {"Content-Length": str(len(body)), "X-Dashboard-Token": _DASHBOARD_TOKEN}
+    handler.rfile = BytesIO(body)
+    handler.wfile = BytesIO()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+    handler.do_POST()
+    return handler.send_response.call_args.args[0], json.loads(handler.wfile.getvalue().decode("utf-8"))
+
+
+@pytest.mark.parametrize("mode", ["live", "paper"])
+def test_settle_route_refuses_while_another_run_holds_the_writer_lock(tmp_path, monkeypatch, mode):
+    from model_prediction import daily_lock
+    from model_prediction.dashboard import routes
+
+    lock_path = tmp_path / "locks" / "daily.lock"
+    monkeypatch.setattr(routes, "_auto_buyer_run_lock_path", lambda: lock_path)
+    settled: list[Any] = []
+    monkeypatch.setattr(routes, "settle_auto_buyer_ledger", lambda **kw: settled.append(kw) or {"settled": 0})
+    held = daily_lock.acquire_lock(lock_path)
+    assert held is not None
+    try:
+        code, body = _post(f"/api/auto-buyer/settle?mode={mode}", {})
+    finally:
+        daily_lock.release_lock(held)
+    assert code == 409 and body["status"] == "refused"
+    assert settled == []
+    code, body = _post(f"/api/auto-buyer/settle?mode={mode}", {})
+    assert code == 200 and len(settled) == 1
