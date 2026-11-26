@@ -22,7 +22,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from ..auto_buyer_lock import AUTO_BUYER_LOCK_WAIT_SECONDS, hold_auto_buyer_lock
+from ..auto_buyer_lock import AUTO_BUYER_LOCK_DAILY_STEPS_WAIT_SECONDS, hold_auto_buyer_lock
 from ..college_basketball_forward import forecast_ncaab_sport
 from ..config import PROJECT_ROOT, is_sport_daily_enabled, ledger_path, polymarket_edge_enabled
 from ..daily_lock import acquire_lock, release_lock
@@ -362,12 +362,16 @@ def _run_auto_buyer_steps(
     A skip is safe: the worker's own cycle reconciles and settles the live book.
     """
     # A verification run touches no Auto-Buyer file, so it never waits on the buyer.
-    guard = nullcontext(True) if _skip_auto_buyer_for_verification() else hold_auto_buyer_lock()
+    guard = (
+        nullcontext(True)
+        if _skip_auto_buyer_for_verification()
+        else hold_auto_buyer_lock(AUTO_BUYER_LOCK_DAILY_STEPS_WAIT_SECONDS)
+    )
     with guard as auto_buyer_lock:
         if auto_buyer_lock is None:
             logger.warning(
                 "Auto-Buyer lock still held after %.0fs; steps 11b/12/12b skipped",
-                AUTO_BUYER_LOCK_WAIT_SECONDS,
+                AUTO_BUYER_LOCK_DAILY_STEPS_WAIT_SECONDS,
             )
             busy = {"status": "skipped", "reason": "auto_buyer_lock_busy"}
             return dict(busy), dict(busy), dict(busy)

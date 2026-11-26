@@ -41,7 +41,9 @@ from .daily_lock import LOCK_BUSY_EXIT, acquire_lock, release_lock
 from .runtime_paths import RuntimePaths
 
 __all__ = [
+    "AUTO_BUYER_LOCK_DAILY_STEPS_WAIT_SECONDS",
     "AUTO_BUYER_LOCK_NAME",
+    "AUTO_BUYER_LOCK_SETTLE_WAIT_SECONDS",
     "AUTO_BUYER_LOCK_WAIT_SECONDS",
     "LOCK_BUSY_EXIT",
     "auto_buyer_lock_path",
@@ -53,6 +55,12 @@ AUTO_BUYER_LOCK_NAME = "auto_buyer.lock"
 # reconciles. 600 s covers either holder, and wait + cycle stays inside the worker's 15-minute cadence
 # far more often than the old 1,200 s daily.lock wait did.
 AUTO_BUYER_LOCK_WAIT_SECONDS = 600.0
+# The daily job can wait for this lock twice (cli settle's reconcile + settle, then steps 11b/12/12b),
+# and the supervisor kills it at 3,600 s after a 30-50 minute run. The buyer worker keeps the full
+# wait above (it has nothing else to do); the daily job waits briefly: a skip is safe because the
+# worker settles and buys every 15 minutes anyway. 50 min of work + both waits stays under 3,600 s.
+AUTO_BUYER_LOCK_SETTLE_WAIT_SECONDS = 90.0
+AUTO_BUYER_LOCK_DAILY_STEPS_WAIT_SECONDS = 300.0
 
 
 def auto_buyer_lock_path(paths: RuntimePaths | None = None) -> Path:

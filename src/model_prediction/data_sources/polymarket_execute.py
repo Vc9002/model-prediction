@@ -343,6 +343,22 @@ def _ioc_fill_is_final(order: dict[str, Any], state: str) -> bool:
         return False
 
 
+def _reports_working_quantity(order: dict[str, Any]) -> bool:
+    """True when the order explicitly reports quantity still working (leavesQuantity > 0).
+
+    Absent or empty leavesQuantity, or one at or below zero, reports none. A value that does not
+    parse as a number cannot show nothing is working, so it counts as working (fail closed).
+    """
+    raw = order.get("leavesQuantity")
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return False
+    try:
+        leaves = float(raw)
+    except (TypeError, ValueError):
+        return True
+    return not math.isfinite(leaves) or leaves > 0.0
+
+
 # Our own refusal texts for missing or unusable credentials (raised before any request is signed).
 _CREDENTIAL_REFUSAL_MARKERS = (" is not set", "is not a valid base64 Ed25519 secret key")
 _BALANCE_REFUSAL = re.compile(r"insufficient|balance|buying.?power|funds", re.IGNORECASE)
@@ -1215,10 +1231,12 @@ class PolymarketExecutor:
                 primary_filled is None
                 and polled is not None
                 and str(polled.get("state") or "").upper() == "ORDER_STATE_PARTIALLY_FILLED"
+                and not _reports_working_quantity(polled)
             ):
                 # Seconds after the POST an IOC is no longer working, so a polled partial that still
                 # reports no leavesQuantity is the exchange's final count. Never the synchronous
-                # answer alone: that count can predate the IOC's last fills.
+                # answer alone: that count can predate the IOC's last fills. An order that
+                # explicitly reports leavesQuantity > 0 stays unknown (tracked, nothing rested).
                 primary_filled = fill_quantity(polled, ticket.size_shares, settled=True)
 
         order_ids = [order_id]

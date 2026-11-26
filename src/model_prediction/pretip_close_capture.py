@@ -33,7 +33,7 @@ _logger = logging.getLogger(__name__)
 EASTERN = ZoneInfo("America/New_York")
 DEFAULT_WINDOW_MINUTES = 25.0  # one 15-minute cycle plus slack, so every game is seen once
 MIN_LEAD_SECONDS = 60.0  # a game tipping inside a minute would be captured after tip
-DEFAULT_MAX_CAPTURE_SECONDS = 120.0  # the worker holds daily.lock; keep inside its 300 s budget
+DEFAULT_MAX_CAPTURE_SECONDS = 120.0  # runs inside the buyer worker's auto_buyer.lock hold; keep it short
 MIN_USEFUL_CAPTURE_SECONDS = 5.0
 # Tighter than the Daily's client (30 s x 6 attempts), so one in-flight request can overrun the
 # deadline by at most about timeout x attempts plus a short backoff.

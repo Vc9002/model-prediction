@@ -135,6 +135,55 @@ def test_cash_for_one_order_buys_one_then_stops(monkeypatch, tmp_path):
     assert [a["alarm"] for a in raised.value.alarms] == ["insufficient_cash"]
 
 
+class _ZeroFillFallbackExecutor(FakeExecutor):
+    """The IOC fills nothing and the whole ticket becomes a fallback in ``fallback_status``."""
+
+    fallback_status: ClassVar[str] = "resting"
+
+    def execute(self, ticket: Any, pick_row: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        FakeExecutor.executed.append((ticket, dict(pick_row)))
+        return {
+            "status": "submitted",
+            "order_id": f"sim-{ticket.pick_id}",
+            "order_ids": [f"sim-{ticket.pick_id}", f"fb-{ticket.pick_id}"],
+            "order_state": "ORDER_STATE_PARTIALLY_FILLED",
+            "filled_size_shares": 0.0,
+            "estimated_filled_cost_usd": 0.0,
+            "fallback_order_id": f"fb-{ticket.pick_id}",
+            "fallback_status": _ZeroFillFallbackExecutor.fallback_status,
+            "fallback_resting_shares": ticket.size_shares,
+        }
+
+
+@pytest.mark.parametrize(
+    ("fallback_status", "orders_placed", "halted"),
+    [
+        # Cancelled on the exchange: its cost is not buying power in use, so the next order is placed.
+        pytest.param("cancelled_unverified_gtd", 2, False, id="cancelled-does-not-hold-cash"),
+        # Resting, of unknown outcome or a failed cancel: may still fill, so each keeps holding cash.
+        pytest.param("resting", 1, True, id="resting-holds-cash"),
+        pytest.param("submit_unknown", 1, True, id="unknown-holds-cash"),
+        pytest.param("unverified_gtd_cancel_failed", 1, True, id="cancel-failed-holds-cash"),
+    ],
+)
+def test_only_a_still_possible_fallback_counts_against_buying_power(
+    monkeypatch, tmp_path, fallback_status, orders_placed, halted
+):
+    _cycle_harness(monkeypatch, tmp_path, _state([_entry()], enabled=True), _live_rows())
+    monkeypatch.setattr(auto_executor, "PolymarketExecutor", _ZeroFillFallbackExecutor)
+    _ZeroFillFallbackExecutor.fallback_status = fallback_status
+    monkeypatch.setattr(
+        auto_executor, "_live_cash_check", lambda: {"status": "ok", "available_cash_usd": 15.0}
+    )
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+        auto_executor.run_auto_buyer_cycle()
+    assert len(FakeExecutor.executed) == orders_placed
+    alarms = [a["alarm"] for a in raised.value.alarms]
+    assert ("insufficient_cash" in alarms) is halted
+    live = raised.value.run_summary["cohort_passes"]["live"]
+    assert (live["live_halt_reason"] == "insufficient_cash") is halted
+
+
 @pytest.mark.parametrize("status", ["auth_error", "unavailable"])
 def test_unreadable_or_refused_balance_skips_live_buying(monkeypatch, tmp_path, status):
     _cycle_harness(monkeypatch, tmp_path, _state([_entry()], enabled=True), _live_rows())

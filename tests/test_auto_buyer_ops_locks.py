@@ -156,10 +156,7 @@ def test_daily_buyer_steps_skip_when_the_worker_holds_the_lock(monkeypatch, tmp_
     record: list[str] = []
     lock_path = tmp_path / "locks" / "auto_buyer.lock"
     daily = _daily_stubs(monkeypatch, record, lock_path)
-    monkeypatch.setattr(daily, "AUTO_BUYER_LOCK_WAIT_SECONDS", 0.3)
-    monkeypatch.setattr(
-        "model_prediction.auto_buyer_lock.AUTO_BUYER_LOCK_WAIT_SECONDS", 0.3
-    )  # default argument is bound at definition; the call below passes nothing
+    monkeypatch.setattr(daily, "AUTO_BUYER_LOCK_DAILY_STEPS_WAIT_SECONDS", 0.3)
     args = type("Args", (), {"skip_settlement": False, "date": "2026-11-25"})()
     lock_path.parent.mkdir(parents=True)
     with _held_by_another_process(lock_path):
@@ -198,12 +195,59 @@ def test_cli_settle_rewrites_the_auto_buyer_ledger_only_under_the_lock(monkeypat
     }
 
     seen.clear()
-    monkeypatch.setattr("model_prediction.auto_buyer_lock.AUTO_BUYER_LOCK_WAIT_SECONDS", 0.3)
+    monkeypatch.setattr("model_prediction.auto_buyer_lock.AUTO_BUYER_LOCK_SETTLE_WAIT_SECONDS", 0.3)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with _held_by_another_process(lock_path):
         out = settle_cli._settle_auto_buyer_books(tmp_path)
     assert seen == []
     assert out == {"auto_buyer_settlement": {"status": "skipped", "reason": "auto_buyer_lock_busy"}}
+
+
+# ------------------------------------------------------------------ daily supervisor budget
+
+
+def _recording_lock(waits: list[float | None]):
+    @contextmanager
+    def hold(wait_seconds: float | None = None, **_kwargs: Any):
+        waits.append(wait_seconds)
+        yield object()
+
+    return hold
+
+
+def test_daily_job_waits_are_short_and_fit_the_supervisor_timeout(monkeypatch, tmp_path):
+    """The daily job can wait for auto_buyer.lock twice (cli settle, then steps 11b/12/12b). The old
+    600 s each could push a long daily run past its 3,600 s supervisor timeout."""
+    from model_prediction import auto_buyer_lock
+    from model_prediction.cli import daily
+    from model_prediction.cli import settle as settle_cli
+    from model_prediction.portfolio import auto_buyer_ledger
+    from model_prediction.run_supervisor import DEFAULT_WORKER_TIMEOUTS
+
+    waits: list[float | None] = []
+    monkeypatch.setattr(auto_buyer_lock, "hold_auto_buyer_lock", _recording_lock(waits))
+    monkeypatch.setattr(daily, "hold_auto_buyer_lock", _recording_lock(waits))
+    monkeypatch.setattr(auto_buyer_ledger, "reconcile_pending_auto_buyer_fallbacks", lambda *_a, **_k: {})
+    monkeypatch.setattr(auto_buyer_ledger, "settle_auto_buyer_ledger", lambda *_a, **_k: {})
+    monkeypatch.setattr(daily, "_auto_buyer_cycle_owns_live_reconcile", lambda: False)
+    monkeypatch.setattr(daily, "_daily_cancels_all_resting", lambda: False)
+    monkeypatch.setattr(daily, "_auto_buyer_is_decoupled", lambda: False)
+    monkeypatch.setattr(daily, "_run_auto_buyer_step12", lambda _date: {"status": "ok"})
+
+    settle_cli._settle_auto_buyer_books(tmp_path)
+    args = type("Args", (), {"skip_settlement": False, "date": "2026-11-25"})()
+    daily._run_auto_buyer_steps(args, tmp_path, lambda _name: None)
+
+    assert waits == [
+        auto_buyer_lock.AUTO_BUYER_LOCK_SETTLE_WAIT_SECONDS,
+        daily.AUTO_BUYER_LOCK_DAILY_STEPS_WAIT_SECONDS,
+    ]
+    assert auto_buyer_lock.AUTO_BUYER_LOCK_SETTLE_WAIT_SECONDS <= 120.0  # a skip there is safe
+    assert daily.AUTO_BUYER_LOCK_DAILY_STEPS_WAIT_SECONDS < auto_buyer_lock.AUTO_BUYER_LOCK_WAIT_SECONDS
+    # 50 minutes of daily work (the longest seen) plus both waits stays under the supervisor timeout.
+    assert 50 * 60 + sum(waits) < DEFAULT_WORKER_TIMEOUTS["daily"]
+    # The buyer worker keeps the full wait: it must not skip its cycle for a daily step.
+    assert worker.LOCK_WAIT_SECONDS == auto_buyer_lock.AUTO_BUYER_LOCK_WAIT_SECONDS == 600.0
 
 
 # ------------------------------------------------------------------ dashboard routes

@@ -2060,12 +2060,13 @@ def _settle_auto_buyer_books(data_directory: Path) -> dict[str, Any]:
 
     The 15-minute buyer worker no longer waits on daily.lock, so this daily-step-1 rewrite of the
     Auto-Buyer ledger must exclude a concurrent buyer cycle itself. A busy lock skips: the worker's
-    cycle reconciles and settles the live book on its own.
+    cycle reconciles and settles the live book on its own, so the wait is short: the daily job also
+    waits for this lock at its buyer steps, and both waits must fit its supervisor timeout.
     """
-    from ..auto_buyer_lock import AUTO_BUYER_LOCK_WAIT_SECONDS, hold_auto_buyer_lock
+    from ..auto_buyer_lock import AUTO_BUYER_LOCK_SETTLE_WAIT_SECONDS, hold_auto_buyer_lock
 
     output: dict[str, Any] = {}
-    with hold_auto_buyer_lock(AUTO_BUYER_LOCK_WAIT_SECONDS) as auto_buyer_lock:
+    with hold_auto_buyer_lock(AUTO_BUYER_LOCK_SETTLE_WAIT_SECONDS) as auto_buyer_lock:
         if auto_buyer_lock is None:
             logger.warning("Auto-buyer settlement skipped: auto_buyer.lock still held")
             return {"auto_buyer_settlement": {"status": "skipped", "reason": "auto_buyer_lock_busy"}}

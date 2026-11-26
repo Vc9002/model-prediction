@@ -279,6 +279,45 @@ def test_ioc_still_partially_filled_after_every_poll_takes_the_polled_quantity(t
     assert result["fallback_resting_shares"] == 6.0
 
 
+def _polled_partial(exchange, **extra):
+    """A NEW synchronous IOC whose polled order is PARTIALLY_FILLED with cum 4 plus ``extra`` fields."""
+    exchange.sync_ioc = {"state": "ORDER_STATE_NEW", "cum": 0.0}
+
+    def partial_on_poll(body):
+        status, order = exchange.default_post(body)
+        exchange.readback_overrides[order["id"]] = {
+            "state": "ORDER_STATE_PARTIALLY_FILLED",
+            "cumQuantity": 4.0,
+            **extra,
+        }
+        return status, order
+
+    exchange.post_script = [partial_on_poll]
+
+
+@pytest.mark.parametrize("leaves", [0, 0.0, "0", "", None, -1.0])
+def test_polled_partial_reporting_no_leaves_quantity_is_final(tmp_path, exchange, leaves):
+    _polled_partial(exchange, leavesQuantity=leaves)
+    result = _execute(tmp_path, exchange)
+    assert result["fill_known"] is True
+    assert result["filled_size_shares"] == 4.0
+    assert result["fallback_status"] == "resting"
+    assert result["fallback_resting_shares"] == 6.0
+
+
+@pytest.mark.parametrize("leaves", [6, 6.0, "6", 0.5, "n/a"])
+def test_polled_partial_still_working_is_not_final_and_rests_nothing(tmp_path, exchange, leaves):
+    """An order that says leavesQuantity > 0 may still fill: a fallback for the remainder on top of
+    it could double the position. The row stays an unknown-fill primary for reconcile instead."""
+    _polled_partial(exchange, leavesQuantity=leaves)
+    result = _execute(tmp_path, exchange)
+    assert len(exchange.order_posts()) == 1  # no fallback leg
+    assert result["fill_known"] is False
+    assert result["fallback_status"] == "unknown_fill"
+    assert result["fallback_order_id"] == result["order_id"]
+    assert result["fallback_resting_shares"] == 10.0
+
+
 def test_ioc_partial_from_the_synchronous_answer_alone_is_not_trusted(tmp_path, exchange):
     """Every poll fails: the synchronous PARTIALLY_FILLED count may predate later fills."""
     exchange.sync_ioc = {"state": "ORDER_STATE_PARTIALLY_FILLED", "cum": 4.0}

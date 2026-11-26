@@ -74,7 +74,9 @@ def test_auto_buyer_copy_goes_ahead_when_the_buyer_lock_stays_held(tmp_path):
         )
     finally:
         held.close()
-    assert [r["status"] for r in results] == ["ok"] * 5
+    # A copy that went ahead without the lock is not reported as a plain "ok", but it is a good copy:
+    # main() still exits 0 for it.
+    assert [r["status"] for r in results] == ["ok_unlocked"] * 5
     assert not any(r["locked"] for r in results)
 
 
@@ -130,3 +132,26 @@ def test_nightly_main_backs_up_databases_and_auto_buyer_files(monkeypatch, tmp_p
         "production",
         "runs",
     ]
+
+
+def test_nightly_main_exits_zero_when_the_copy_went_ahead_unlocked(monkeypatch, tmp_path):
+    import sqlite3
+
+    backup = _backup_module()
+    runtime = tmp_path / "runtime"
+    _seed_runtime(runtime)
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(runtime))
+    from model_prediction.runtime_paths import RuntimePaths
+
+    paths = RuntimePaths.resolve(require_external_runtime=True)
+    for db in (paths.ledgers_db, paths.runs_db, paths.production_db):
+        db.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(db) as conn:
+            conn.execute("CREATE TABLE t (x INTEGER)")
+    monkeypatch.setattr(
+        backup,
+        "backup_auto_buyer_files",
+        lambda *_a, **_k: [{"source": "s", "status": "ok_unlocked", "locked": False}],
+    )
+    monkeypatch.setattr("sys.argv", ["backup_runtime_databases.py"])
+    assert backup.main() == 0

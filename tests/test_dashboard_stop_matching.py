@@ -89,6 +89,56 @@ OTHERS = [
         "CommandLine": "python.exe other_server.py --port 8765",
     },
 ]
+# Processes that carry "dashboard_server.py" as an argument without launching the dashboard: an
+# editor with the file open, linters and type checkers run on it, git on its path. The fallback with
+# no 8765 listener used to kill all of them.
+LOOKALIKES = [
+    {
+        "ProcessId": 601,
+        "ParentProcessId": 1,
+        "Name": "Code.exe",
+        "CommandLine": '"C:\\Users\\Vince\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe" '
+        '"E:\\MP\\dashboard_server.py"',
+    },
+    {
+        "ProcessId": 602,
+        "ParentProcessId": 1,
+        "Name": "ruff.exe",
+        "CommandLine": "E:\\MP\\.venv\\Scripts\\ruff.exe check dashboard_server.py",
+    },
+    {
+        "ProcessId": 603,
+        "ParentProcessId": 1,
+        "Name": "python.exe",
+        "CommandLine": '"E:\\MP\\.venv\\Scripts\\python.exe" -m ruff check src dashboard_server.py',
+    },
+    {
+        "ProcessId": 604,
+        "ParentProcessId": 1,
+        "Name": "python.exe",
+        "CommandLine": '"E:\\MP\\.venv\\Scripts\\python.exe" -m mypy dashboard_server.py',
+    },
+    {
+        "ProcessId": 605,
+        "ParentProcessId": 1,
+        "Name": "git.exe",
+        "CommandLine": '"C:\\Program Files\\Git\\cmd\\git.exe" diff HEAD -- dashboard_server.py',
+    },
+    {
+        "ProcessId": 606,
+        "ParentProcessId": 1,
+        "Name": "powershell.exe",
+        "CommandLine": 'powershell.exe -NoProfile -Command "ruff check dashboard_server.py"',
+    },
+    {
+        "ProcessId": 607,
+        "ParentProcessId": 1,
+        "Name": "node.exe",
+        "CommandLine": "node.exe tsserver.js --watch dashboard_server.py",
+    },
+]
+OTHERS_WITHOUT_SCRIPT_ARGUMENT = list(OTHERS)
+OTHERS = OTHERS + LOOKALIKES
 ALL = DASHBOARD_CHAIN + PYTEST_CHAIN + OTHERS
 
 
@@ -118,9 +168,34 @@ def _targets(tmp_path: Path, processes: list[dict[str, Any]], listeners: list[in
 
 
 def test_command_line_matcher_accepts_launches_and_rejects_pytest(tmp_path):
-    lines = [p["CommandLine"] for p in DASHBOARD_CHAIN + PYTEST_CHAIN + OTHERS]
+    lines = [p["CommandLine"] for p in DASHBOARD_CHAIN + PYTEST_CHAIN + OTHERS_WITHOUT_SCRIPT_ARGUMENT]
     verdicts = _ps("$in | ForEach-Object { Test-DashboardServerCommandLine $_ }", lines, tmp_path)
-    assert verdicts == [True] * len(DASHBOARD_CHAIN) + [False] * (len(PYTEST_CHAIN) + len(OTHERS))
+    assert verdicts == [True] * len(DASHBOARD_CHAIN) + [False] * (
+        len(PYTEST_CHAIN) + len(OTHERS_WITHOUT_SCRIPT_ARGUMENT)
+    )
+
+
+def test_launch_matcher_rejects_editors_linters_and_git_that_name_the_script(tmp_path):
+    verdicts = _ps("@($in) | ForEach-Object { Test-DashboardLaunchProcess $_ }", ALL, tmp_path)
+    assert verdicts == [True] * len(DASHBOARD_CHAIN) + [False] * (len(ALL) - len(DASHBOARD_CHAIN))
+
+
+@pytest.mark.parametrize(
+    ("name", "command_line", "launch"),
+    [
+        ("python.exe", "python.exe dashboard_server.py", True),
+        ("python.exe", '"E:\\MP\\.venv\\Scripts\\python.exe" -u "E:\\MP\\dashboard_server.py"', True),
+        ("pythonw.exe", "pythonw.exe -X utf8 dashboard_server.py", True),
+        ("wscript.exe", "wscript.exe run_silent.vbs & 'E:\\x\\python.exe' dashboard_server.py }", True),
+        ("python.exe", 'python.exe -c "import dashboard_server" dashboard_server.py', False),
+        ("python.exe", "python.exe -X utf8 -m mypy dashboard_server.py", False),
+        ("python.exe", "python.exe -m pytest dashboard_server.py", False),
+        ("cmd.exe", "cmd.exe /c python.exe dashboard_server.py", False),
+    ],
+)
+def test_launch_matcher_forms(tmp_path, name, command_line, launch):
+    process = {"ProcessId": 1, "ParentProcessId": 0, "Name": name, "CommandLine": command_line}
+    assert _ps("Test-DashboardLaunchProcess $in", process, tmp_path) == [launch]
 
 
 def test_listener_and_its_launcher_chain_are_stopped_never_pytest(tmp_path):

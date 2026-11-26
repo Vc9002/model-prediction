@@ -15,6 +15,21 @@ function Test-DashboardServerCommandLine([string]$CommandLine) {
     return [bool]($CommandLine -match '(?i)(^|[\s"''\\/])dashboard_server\.py["'']?(\s|$)')
 }
 
+function Test-DashboardLaunchProcess($Process) {
+    # True for a process that IS the dashboard or one link of its launcher chain, not merely one
+    # naming the file: the process must be python, powershell or wscript, and the command line must
+    # run dashboard_server.py as the script of a python interpreter (options other than -m and -c
+    # allowed in between). An editor with the file open, `ruff check dashboard_server.py`,
+    # `python -m mypy dashboard_server.py` and git all carry the file name and none of them match.
+    if (-not $Process) { return $false }
+    if ($Process.Name -inotmatch '^(python|pythonw|powershell|wscript)\.exe$') { return $false }
+    if (-not (Test-DashboardServerCommandLine $Process.CommandLine)) { return $false }
+    $interpreter = '(^|[\s"''\\/])py(thonw?[\d.]*)?(\.exe)?["'']?\s+'
+    $options = '((-[XW]\s+\S+|-(?![mcXW])\S*)\s+)*'
+    $script = '["'']?([^\s"'']*[\\/])?dashboard_server\.py["'']?(\s|$)'
+    return [bool]($Process.CommandLine -match ('(?i)' + $interpreter + $options + $script))
+}
+
 function Select-DashboardStopTargets {
     # PIDs to stop: each listener on the dashboard port that is a dashboard launch, then its parents
     # while they are part of the same launcher chain, up to and including the wscript. With no
@@ -28,7 +43,7 @@ function Select-DashboardStopTargets {
     $targets = New-Object System.Collections.Generic.List[int]
     foreach ($listener in @($ListenerPids)) {
         $current = $byId[[int]$listener]
-        while ($current -and (Test-DashboardServerCommandLine $current.CommandLine)) {
+        while ($current -and (Test-DashboardLaunchProcess $current)) {
             if (-not $targets.Contains([int]$current.ProcessId)) { $targets.Add([int]$current.ProcessId) }
             if ($current.Name -ieq 'wscript.exe') { break }
             $current = $byId[[int]$current.ParentProcessId]
@@ -36,7 +51,7 @@ function Select-DashboardStopTargets {
     }
     if ($targets.Count -eq 0) {
         foreach ($process in @($Processes)) {
-            if (Test-DashboardServerCommandLine $process.CommandLine) { $targets.Add([int]$process.ProcessId) }
+            if (Test-DashboardLaunchProcess $process) { $targets.Add([int]$process.ProcessId) }
         }
     }
     return ,$targets.ToArray()

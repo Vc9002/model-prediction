@@ -3259,6 +3259,10 @@ class AutoPolymarketBuyer:
         # committed_spend (fills plus resting fallbacks); total_spend_usd keeps reporting fills.
         current_spend = today_spend_usd
         committed_spend = today_spend_usd
+        # The part of committed_spend that is a fallback the exchange has since cancelled: still
+        # inside the daily cap (a fill before the cancel is only known at the next reconcile), but
+        # not buying power in use, so it must not trip the insufficient_cash halt.
+        cancelled_fallback_cost = 0.0
         bought_index = self._build_bought_index()
         live_calibration_alarmed: set[str] = set()
         overnight_age = _OvernightAgeExtension(picks)
@@ -3950,7 +3954,7 @@ class AutoPolymarketBuyer:
                 result.live_halt_reason = "kill_switch"
                 break
             available_cash = self.config.available_cash_usd
-            pass_committed = committed_spend - today_spend_usd
+            pass_committed = committed_spend - today_spend_usd - cancelled_fallback_cost
             if available_cash is not None and pass_committed + actual_cost > available_cash + 1e-9:
                 logger.error(
                     "Live buying stopped: pick %s needs $%.2f with $%.2f already committed this pass, "
@@ -4130,6 +4134,9 @@ class AutoPolymarketBuyer:
             if not fill_known:
                 committed = max(committed, all_in_cost)
             committed_spend += committed
+            if fallback_status == "cancelled_unverified_gtd":
+                # Only a cancel that succeeded: "unverified_gtd_cancel_failed" may still be resting.
+                cancelled_fallback_cost += resting_cost
             current_spend += filled_cost
             result.total_spend_usd = round(current_spend, 2)
 

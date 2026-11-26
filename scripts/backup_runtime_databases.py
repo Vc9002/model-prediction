@@ -67,8 +67,8 @@ def backup_auto_buyer_files(
 
     Copy only: each source is opened read-only and never moved, truncated or rewritten. The copy
     runs under auto_buyer.lock when it can be had, so no buyer cycle is mid-write; a busy lock is
-    recorded (``locked: false``) and the copy still runs, since a missed night is worse than a copy
-    whose last JSONL line may be torn.
+    recorded (``locked: false``, status ``ok_unlocked``) and the copy still runs, since a missed
+    night is worse than a copy whose last JSONL line may be torn.
     """
     target_root = dest_dir / AUTO_BUYER_BACKUP_SUBDIR / stamp
     lock = acquire_lock(lock_path, wait_seconds=lock_wait_seconds) if lock_path is not None else None
@@ -88,7 +88,12 @@ def backup_auto_buyer_files(
                     handle.flush()
                     os.fsync(handle.fileno())
                 copied = hashlib.sha256(dest_path.read_bytes()).hexdigest()
-                status = "ok" if copied == hashlib.sha256(data).hexdigest() else "copy_mismatch"
+                if copied != hashlib.sha256(data).hexdigest():
+                    status = "copy_mismatch"
+                elif lock_path is not None and lock is None:
+                    status = "ok_unlocked"  # a good copy, but a buyer cycle may have been mid-write
+                else:
+                    status = "ok"
             except OSError as exc:
                 results.append({"source": str(source), "status": "failed", "error": str(exc)})
                 continue
@@ -218,7 +223,7 @@ def main() -> int:
     if pruned:
         print(f"pruned {len(pruned)} old backup(s): {pruned}")
 
-    failed = [r for r in results if r.get("status") not in ("ok", "skipped_missing")]
+    failed = [r for r in results if r.get("status") not in ("ok", "ok_unlocked", "skipped_missing")]
     if failed:
         print(f"FAILED: {failed}", file=sys.stderr)
         return 1

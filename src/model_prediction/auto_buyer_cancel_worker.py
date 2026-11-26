@@ -15,8 +15,8 @@ mechanism; this worker is the backstop for an exchange that did not honour it an
 It only cancels. It never places an order, never calls a cancel-all or batch endpoint, and never
 writes the ledger: there is no ledger lock, so restating fills stays with the reconcile that runs under
 auto_buyer.lock. It takes its OWN lock (auto_buyer_cancel.lock), neither of the buyer's two, because
-a daily job or a buyer cycle can hold those for up to ~50 minutes and the backstop has to keep running through it. With nothing due it builds no executor
-and makes no network call.
+a daily job or a buyer cycle can hold those for up to ~50 minutes and the backstop has to keep running
+through it. With nothing due it builds no executor and makes no network call.
 """
 
 from __future__ import annotations
