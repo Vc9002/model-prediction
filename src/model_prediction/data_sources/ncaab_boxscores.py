@@ -366,7 +366,7 @@ def _parse_failures(marker: Path) -> int:
         if data.get("parser") != PLAYER_PARSER_VERSION:
             return 0
         return int(data["attempts"])
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):  # AttributeError: not a JSON object
         return 0
 
 

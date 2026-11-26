@@ -19,6 +19,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
+# Every live-buy timing gate reads the row's ESPN tip time; the exchange's own event start is the second
+# opinion. Five minutes absorbs the two feeds' rounding, not a rescheduled game. Lives here (not in
+# auto_executor, which re-exports it) so the dashboard quote mapper shares the live buyer's tolerance
+# without a lazy import of the whole executor.
+TIP_TIME_TOLERANCE_SECONDS = 300.0
+
 _RE_NAME_PUNCT = re.compile(r"[(),.\-_]")
 _RE_WORD = re.compile(r"\w+")
 

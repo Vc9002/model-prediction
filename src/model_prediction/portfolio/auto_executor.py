@@ -41,6 +41,7 @@ from model_prediction.data_sources.polymarket_execute import (
     classify_gate_refusal,
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
+from model_prediction.polymarket_matching import TIP_TIME_TOLERANCE_SECONDS
 from model_prediction.portfolio.auto_buyer_ledger import (
     LIVE_ENABLED_STATE_KEY,
     event_key_from_slug,
@@ -1270,11 +1271,6 @@ def _alarm(
         "detail": str(detail)[:500],
         "at_utc": iso_utc(utc_now()),
     }
-
-
-# Every timing gate reads the row's ESPN tip time; the exchange's own event start is the second
-# opinion. Five minutes absorbs the two feeds' rounding, not a rescheduled game.
-TIP_TIME_TOLERANCE_SECONDS = 300.0
 
 
 def _tip_time_refusal(row_start: datetime, exchange_start_raw: Any, now: datetime) -> str | None:

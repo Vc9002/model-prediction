@@ -1119,6 +1119,37 @@ def test_p1_shadow_hands_the_live_games_to_the_box_index(tmp_path, monkeypatch):
     assert seen and all(index_live is live for index_live in seen)
 
 
+def test_p1_shadow_failed_live_lookup_does_not_reload_the_season_index_per_game(tmp_path, monkeypatch):
+    """The lookup used to run after PlayerBoxIndex.load and before the index was stored, so a lookup that kept
+    raising re-read the whole season's box tree once per game of the slate."""
+    from model_prediction import college_basketball_forward as forward
+
+    loads = []
+
+    def broken(board, day):
+        raise ValueError("bad scoreboard board")
+
+    monkeypatch.setattr(forward, "_p1_in_progress", broken)
+    monkeypatch.setattr(
+        forward.PlayerBoxIndex, "load", classmethod(lambda cls, *a, **k: loads.append(a) or cls.__new__(cls))
+    )
+    decisions = [
+        {
+            "kind": "spread",
+            "home": home,
+            "away": away,
+            "start": "2026-11-25T23:00:00Z",
+            "prediction": SimpleNamespace(feature_basis={"margin_engine": "v7"}),
+        }
+        for home, away in (("H1", "A1"), ("H2", "A2"), ("H3", "A3"))
+    ]
+    out = forward._p1_shadow_fields(
+        decisions, [], tmp_path, datetime(2026, 11, 25, 12, tzinfo=UTC), board={}, args_date="2026-11-25"
+    )
+    assert [out[id(d)]["shadow_p1_status"] for d in decisions] == ["error"] * 3
+    assert loads == [], "no season index is read while the live-games lookup is failing"
+
+
 def test_p1_shadow_never_serves_an_index_without_its_live_games_after_a_failed_lookup(tmp_path, monkeypatch):
     """A malformed scoreboard date makes the live-games lookup raise for the first game. The season's
     index used to be stored before that call, so every later game of the season was scored against an

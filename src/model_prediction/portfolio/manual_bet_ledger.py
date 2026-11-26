@@ -448,7 +448,10 @@ def mark_manual_bet_result(
 
 
 def _run_scheduled_sync() -> None:
-    """Entry point for the periodic sync worker (see run_supervisor.WORKERS)."""
+    """Manual entry point: ``python -m model_prediction.portfolio.manual_bet_ledger``.
+
+    The scheduled sync worker was removed from run_supervisor.WORKERS on 2026-11-26; nothing runs this on a timer.
+    """
     result = sync_manual_bets_from_polymarket()
     logger.info("Manual bet sync: %s", json.dumps(result))
     print(json.dumps(result))

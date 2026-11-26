@@ -27,8 +27,8 @@ from model_prediction.dashboard.common import (
     _read_json,
     _today,
 )
+from model_prediction.polymarket_matching import TIP_TIME_TOLERANCE_SECONDS, match_spread_side
 from model_prediction.polymarket_matching import lines_match as _lines_match
-from model_prediction.polymarket_matching import match_spread_side
 from model_prediction.polymarket_matching import participant_matches as _participant_matches
 from model_prediction.polymarket_matching import team_matches as _team_matches  # noqa: F401 -- re-export
 
@@ -540,19 +540,6 @@ def _pick_quote(row: dict, refusals: list[str] | None = None) -> dict | None:
     return _resolve_pick_quote(row, [] if refusals is None else refusals)
 
 
-def _pick_quote_refusal(row: dict) -> str | None:
-    """Why a row that recorded its market was refused a quote, or None.
-
-    None also covers every row without a recorded market and every row that does get a quote: the
-    ordinary "no mapping" case carries no reason of its own. Only a recorded market can be refused,
-    so unpinned rows skip the second resolver pass."""
-    if _recorded_market(row) is None:
-        return None
-    refusals: list[str] = []
-    _resolve_pick_quote(row, refusals)
-    return refusals[0] if refusals else None
-
-
 def _day_snapshots(odds_sport: str, sport: str, day: str, *, probe: bool = False) -> list[dict]:
     """The stored snapshots for one ET day, under the odds sport's folder then the league's.
 
@@ -677,8 +664,6 @@ def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
     if from_neighbour and pinned is not None:
         # The capture sits under another ET day than the row, so the exchange's start is not where the
         # row says: only a gap within the live buyer's own tolerance is the same game.
-        from model_prediction.portfolio.auto_executor import TIP_TIME_TOLERANCE_SECONDS
-
         exchange_start = _parse_aware(pinned.get("event_start_utc"))
         gap = abs((exchange_start - event_start).total_seconds()) if exchange_start else None
         if gap is None or gap > TIP_TIME_TOLERANCE_SECONDS:

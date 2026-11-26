@@ -161,6 +161,13 @@ def test_umass_lowell_against_umass_still_refuses_rather_than_guess() -> None:
 _UNKNOWN = "C. Ark."  # an abbreviation no alias knows: name matching refuses it
 
 
+def _refusal(row: dict) -> str | None:
+    """Why the quote resolver refused a row's recorded market (the first reason), or None."""
+    refusals: list[str] = []
+    backtests._pick_quote(row, refusals)
+    return refusals[0] if refusals else None
+
+
 def _pinned(selection: str, line: float, slug: str, side: str) -> dict:
     return _row(
         selection, line, f"Projected margin -1.6 (home), sd 10.7. market_slug={slug} token_side={side}"
@@ -187,9 +194,7 @@ def test_recorded_market_missing_from_the_snapshots_is_refused_not_name_matched(
 
     assert backtests._pick_quote(_row("away", -3.5))["market_slug"] == _NEG  # name matching would find it
     assert backtests._pick_quote(row) is None
-    assert backtests._pick_quote_refusal(row) == (
-        f"recorded market {gone}: never captured for this day; not name-matched"
-    )
+    assert _refusal(row) == (f"recorded market {gone}: never captured for this day; not name-matched")
 
 
 def test_recorded_market_whose_line_disagrees_with_the_row_is_refused(snapshots) -> None:
@@ -445,12 +450,12 @@ def test_captured_pin_that_nothing_qualifies_is_refused_not_name_matched(snapsho
 def test_refusal_of_a_captured_pin_names_the_slug_and_why(snapshots, override) -> None:
     snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.97, 0.03, **override), _name_candidate()])
 
-    reason = backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long"))
+    reason = _refusal(_pinned("away", -3.5, _NEG, "long"))
 
     assert reason is not None
     assert _NEG in reason
     assert "no qualifying pregame snapshot" in reason
-    assert backtests._pick_quote_refusal(_row("away", -3.5)) is None  # an unpinned row is not refused
+    assert _refusal(_row("away", -3.5)) is None  # an unpinned row is not refused
 
 
 def test_captured_total_pin_that_nothing_qualifies_is_refused_not_name_matched(snapshots) -> None:
@@ -462,7 +467,7 @@ def test_captured_total_pin_that_nothing_qualifies_is_refused_not_name_matched(s
         == other
     )
     assert backtests._pick_quote(_total_row("under", 140.5, "short")) is None
-    assert _TOTAL in backtests._pick_quote_refusal(_total_row("under", 140.5, "short"))
+    assert _TOTAL in _refusal(_total_row("under", 140.5, "short"))
 
 
 def test_never_captured_pin_is_refused_with_a_reason_and_not_name_matched(snapshots) -> None:
@@ -474,17 +479,15 @@ def test_never_captured_pin_is_refused_with_a_reason_and_not_name_matched(snapsh
 
     assert backtests._pick_quote(_row("away", -3.5))["market_slug"] == _ALT  # name matching would find it
     assert backtests._pick_quote(row) is None
-    assert backtests._pick_quote_refusal(row) == (
-        f"recorded market {slug}: never captured for this day; not name-matched"
-    )
+    assert _refusal(row) == (f"recorded market {slug}: never captured for this day; not name-matched")
 
 
 def test_pinned_row_with_no_day_file_at_all_is_refused_with_a_reason(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(backtests, "_resolve_snapshot_path", lambda _sport, _day: tmp_path / "absent.jsonl")
 
     assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
-    assert "never captured" in backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long"))
-    assert backtests._pick_quote_refusal(_row("away", -3.5)) is None  # an unpinned row has no pin to blame
+    assert "never captured" in _refusal(_pinned("away", -3.5, _NEG, "long"))
+    assert _refusal(_row("away", -3.5)) is None  # an unpinned row has no pin to blame
 
 
 @pytest.fixture
@@ -522,7 +525,7 @@ def test_pin_captured_in_an_adjacent_day_file_is_quoted_not_refused(day_files, c
 
     assert quote is not None
     assert (quote["market_slug"], quote["side"], quote["ask"]) == (_NEG, "long", 0.50)
-    assert backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long")) is None
+    assert _refusal(_pinned("away", -3.5, _NEG, "long")) is None
 
 
 def test_pin_absent_from_the_row_day_and_its_neighbours_is_refused(day_files) -> None:
@@ -538,7 +541,7 @@ def test_pin_absent_from_the_row_day_and_its_neighbours_is_refused(day_files) ->
     far = _pinned("away", -3.5, far_slug, "long")  # captured two days away: not a neighbour
 
     assert backtests._pick_quote(far) is None
-    assert "never captured" in backtests._pick_quote_refusal(far)
+    assert "never captured" in _refusal(far)
 
 
 def test_adjacent_day_pin_that_nothing_qualifies_is_still_refused(day_files) -> None:
@@ -551,7 +554,7 @@ def test_adjacent_day_pin_that_nothing_qualifies_is_still_refused(day_files) -> 
     row = _pinned("away", -3.5, _NEG, "long")
 
     assert backtests._pick_quote(row) is None
-    assert "no qualifying pregame snapshot" in backtests._pick_quote_refusal(row)
+    assert "no qualifying pregame snapshot" in _refusal(row)
 
 
 def test_pin_without_an_executable_ask_on_its_side_is_refused_with_a_reason(snapshots) -> None:
@@ -561,7 +564,7 @@ def test_pin_without_an_executable_ask_on_its_side_is_refused_with_a_reason(snap
     row = _pinned("away", -3.5, _NEG, "long")
 
     assert backtests._pick_quote(row) is None
-    assert backtests._pick_quote_refusal(row) == f"recorded market {_NEG}: no executable ask on long"
+    assert _refusal(row) == f"recorded market {_NEG}: no executable ask on long"
 
 
 @pytest.mark.parametrize("observed", ["not-a-time", "", None])
@@ -572,7 +575,7 @@ def test_unreadable_observed_time_disqualifies_the_pinned_snapshot(snapshots, ob
     row = _pinned("away", -3.5, _NEG, "long")
 
     assert backtests._pick_quote(row) is None
-    assert "no qualifying pregame snapshot" in backtests._pick_quote_refusal(row)
+    assert "no qualifying pregame snapshot" in _refusal(row)
 
 
 @pytest.mark.parametrize("observed", ["not-a-time", "", None])
@@ -591,16 +594,16 @@ def test_stale_but_pregame_pin_is_still_quoted_and_marked_not_fresh(snapshots) -
 
     assert quote is not None
     assert (quote["market_slug"], quote["fresh"]) == (_NEG, False)
-    assert backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long")) is None
+    assert _refusal(_pinned("away", -3.5, _NEG, "long")) is None
 
 
 def test_every_pin_refusal_carries_a_reason(snapshots) -> None:
     snapshots([_spread(_NEG, _UNKNOWN, 3.5, 0.50, 0.51)])  # recorded market's line contradicts the row
-    assert "does not line up" in backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long"))
+    assert "does not line up" in _refusal(_pinned("away", -3.5, _NEG, "long"))
 
     other_game = _spread("asc-cbb-cark-jax-2026-11-21-b-neg-3pt5", "UCA", -3.5, 0.40, 0.61, event_id="999999")
     snapshots([_spread(_NEG, "UCA", -3.5, 0.50, 0.51), other_game])  # a second game matches by name
-    assert "another contract" in backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long"))
+    assert "another contract" in _refusal(_pinned("away", -3.5, _NEG, "long"))
 
 
 def test_decorated_pick_surfaces_the_pin_refusal_as_its_block_reason(monkeypatch) -> None:
@@ -704,7 +707,7 @@ def test_pin_is_pregame_only_before_the_earlier_of_row_and_exchange_start(
 
     assert (backtests._pick_quote(row) is not None) is quoted
     if not quoted:
-        assert "no qualifying pregame snapshot" in backtests._pick_quote_refusal(row)
+        assert "no qualifying pregame snapshot" in _refusal(row)
 
 
 @pytest.mark.parametrize("start", ["not-a-time", "", None, "2026-11-21T21:00:00"], ids=str)
@@ -713,7 +716,7 @@ def test_pin_snapshot_without_a_readable_aware_exchange_start_does_not_qualify(s
     row = _pinned("away", -3.5, _NEG, "long")
 
     assert backtests._pick_quote(row) is None
-    assert "no qualifying pregame snapshot" in backtests._pick_quote_refusal(row)
+    assert "no qualifying pregame snapshot" in _refusal(row)
 
 
 def test_name_matching_also_stops_at_the_exchanges_earlier_start(snapshots) -> None:
@@ -832,7 +835,7 @@ def test_pin_found_under_a_neighbour_day_needs_the_exchange_start_within_toleran
 
     assert (backtests._pick_quote(row) is not None) is quoted
     if not quoted:
-        assert "captured under another ET day" in backtests._pick_quote_refusal(row)
+        assert "captured under another ET day" in _refusal(row)
 
 
 def test_same_day_pin_keeps_no_tolerance_check_beyond_pregame(snapshots) -> None:
@@ -878,11 +881,9 @@ def test_row_without_an_aware_event_start_gets_no_quote_and_a_pinned_row_a_reaso
     unpinned = {**_row("away", -3.5), "event_start_utc": start}
 
     assert backtests._pick_quote(pinned) is None
-    assert backtests._pick_quote_refusal(pinned) == (
-        f"recorded market {_NEG}: row has no timezone-aware event start"
-    )
+    assert _refusal(pinned) == (f"recorded market {_NEG}: row has no timezone-aware event start")
     assert backtests._pick_quote(unpinned) is None
-    assert backtests._pick_quote_refusal(unpinned) is None
+    assert _refusal(unpinned) is None
 
 
 # ----------------------------------------------- scan prices names the day whose file holds the slug

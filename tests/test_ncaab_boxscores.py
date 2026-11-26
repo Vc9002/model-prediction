@@ -335,6 +335,17 @@ def test_a_parse_failure_marker_from_an_older_parser_does_not_block_a_retry(tmp_
     assert client.calls == ["10"]
 
 
+def test_a_parse_failure_marker_that_is_not_a_json_object_counts_as_no_failures(tmp_path):
+    from model_prediction.data_sources import ncaab_boxscores as module
+
+    marker = tmp_path / ".marker.parse_failed"
+    for body in ("[]", "5", "null", '"text"', "true"):
+        marker.write_text(body, encoding="utf-8")
+        assert module._parse_failures(marker) == 0, body
+    marker.write_text(json.dumps({"attempts": 2, "parser": module.PLAYER_PARSER_VERSION}), encoding="utf-8")
+    assert module._parse_failures(marker) == 2
+
+
 def test_conference_ids_and_neutral_site_come_from_the_scoreboard(tmp_path):
     capture_completed_boxscores(tmp_path, "2025-11-01", _Games(["10"], neutral=True))
     record = json.loads(_player_path(tmp_path, "10").read_text())

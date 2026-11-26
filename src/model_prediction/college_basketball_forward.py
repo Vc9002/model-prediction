@@ -463,11 +463,12 @@ def _p1_shadow_fields(
                 tip = parse_utc(key[2])
                 season = ncaab_season_year(tip)
                 if season not in indexes:
-                    index = PlayerBoxIndex.load(player_box_root(data_root), observed, season)
+                    # Before the load: a lookup that raises must not cost a season-index read per game.
                     if live is None:
                         live = _p1_in_progress(board, args_date)
+                    index = PlayerBoxIndex.load(player_box_root(data_root), observed, season)
                     index.in_progress = live
-                    # Stored only once complete: a lookup that raised must not leave an index without its
+                    # Stored only once complete: a failure here must not leave an index without its
                     # live games (or without its history) for the rest of the slate; the next game retries.
                     # every team scan would otherwise walk all seasons of history
                     season_history[season] = [g for g in history if ncaab_season_year(g.start) == season]

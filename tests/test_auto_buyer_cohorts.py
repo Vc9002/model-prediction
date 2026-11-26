@@ -784,7 +784,8 @@ def test_old_state_keys_for_the_removed_v6_bucket_and_whitelist_load_and_buy_not
     monkeypatch, tmp_path
 ):
     """A state file written before 2026-11-26 still carries ``ncaab_spread_v6_live_bucket`` and
-    ``whitelist_models``; both are ignored, so the cycle buys exactly what the cohorts buy."""
+    ``whitelist_models``; the bucket key is ignored and an empty whitelist adds nothing, so the cycle buys exactly
+    what the cohorts buy."""
     state = {
         **_state(OPERATOR_COHORTS_FINAL, enabled=True),
         "whitelist_models": [],
