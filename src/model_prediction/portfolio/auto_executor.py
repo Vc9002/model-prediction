@@ -534,6 +534,8 @@ class AutoExecutionConfig:
     refresh_stale_quotes: bool = True
     capture_missing_slates: bool = True
     paper_ncaab_spread_v6_trial: bool = False
+    # Inert: nba_ml_v6_paper_trial passes this key in its config dict. The 2026-11-10 legacy NCAAB
+    # v6 live bucket is gone (operator 2026-11-26); live cohorts come only from ``cohorts``.
     ncaab_spread_v6_live_bucket: tuple[float, float] | None = None
     cohorts: tuple[BuyCohort, ...] = ()
     # Cohort passes index only their own book's auto-buyer ledger (see _build_bought_index).
@@ -886,44 +888,12 @@ def _row_in_cohort(row: dict[str, Any], cohort: BuyCohort) -> bool:
     return True
 
 
-def _legacy_ncaab_spread_v6_cohort(config: AutoExecutionConfig) -> BuyCohort | None:
-    bucket = config.ncaab_spread_v6_live_bucket
-    if not (bucket and config.execute_live and config.mode == "live"):
-        return None
-    return BuyCohort("ncaab-spread-v6", "ncaab", "spread", bucket[0], bucket[1], "live")
-
-
-def _is_live_ncaab_spread_v6_bucket(row: dict[str, Any], config: AutoExecutionConfig) -> bool:
-    """Exact operator-approved live cohort, with decision-time quote evidence."""
-    cohort = _legacy_ncaab_spread_v6_cohort(config)
-    return cohort is not None and _row_in_cohort(row, cohort)
-
-
 def _match_cohort(row: dict[str, Any], config: AutoExecutionConfig) -> BuyCohort | None:
-    """The config's cohort this row belongs to (state cohorts first, then the legacy v6 bucket)."""
+    """The config's cohort this row belongs to, or None."""
     for cohort in config.cohorts:
         if _row_in_cohort(row, cohort):
             return cohort
-    legacy = _legacy_ncaab_spread_v6_cohort(config)
-    if legacy is not None and _row_in_cohort(row, legacy):
-        return legacy
     return None
-
-
-def _ncaab_spread_v6_live_bucket_from_state(state: dict[str, Any]) -> tuple[float, float] | None:
-    raw = state.get("ncaab_spread_v6_live_bucket")
-    if not isinstance(raw, dict) or raw.get("enabled") is not True:
-        return None
-    try:
-        minimum = float(raw["min_saved_edge"])
-        maximum = float(raw["max_saved_edge_exclusive"])
-    except (KeyError, TypeError, ValueError):
-        return None
-    if not all(math.isfinite(value) for value in (minimum, maximum)):
-        return None
-    if not (minimum == 0.05 and maximum == 0.08):
-        return None
-    return minimum, maximum
 
 
 def _is_disabled_auto_buyer_sport_market(
@@ -2013,7 +1983,6 @@ def _base_auto_execution_kwargs_from_state(state: dict[str, Any]) -> dict[str, A
         "whitelisted_models": tuple(whitelisted) if whitelisted is not None else DEFAULT_WHITELIST_MODELS,
         "blacklisted_models": tuple(blacklisted) if blacklisted is not None else EXPLICIT_BLACKLIST_MODELS,
         "disabled_sport_markets": _parse_disabled_sport_markets(state),
-        "ncaab_spread_v6_live_bucket": _ncaab_spread_v6_live_bucket_from_state(state),
         "max_daily_loss_usd": (
             float(state["max_daily_loss_usd"])
             if state.get("max_daily_loss_usd") is not None
@@ -2077,7 +2046,6 @@ def _cohort_pass_config(
         **{
             **_base_auto_execution_kwargs_from_state(state),
             "whitelisted_models": (),
-            "ncaab_spread_v6_live_bucket": None,
             # D-06 (operator decision 2026-11-25): no cohort book auto-quarantines. The paper book
             # exists to measure its cohort; the live book gets an advisory drawdown warning instead
             # of a latch that silently stops an operator-approved cohort.
@@ -3444,7 +3412,7 @@ class AutoPolymarketBuyer:
         overnight_age = _OvernightAgeExtension(picks)
         open_pick_ids = [str(row.get("pick_id") or "") for row in picks if row.get("status") == "open"]
         input_flags = _load_pick_input_flags(open_pick_ids)
-        # Any live pass may hold a live cohort (state cohorts or the legacy NCAAB v6 bucket).
+        # Any live pass may hold a live cohort.
         live_calibration_fields = (
             _load_pick_calibration_fields(open_pick_ids) if self.config.mode == "live" else {}
         )

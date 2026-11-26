@@ -82,11 +82,6 @@ WORKERS: dict[str, list[str]] = {
         "model_prediction.auto_buyer_worker",
     ],
     "rebuild-shadow": _launcher("run_rebuild"),
-    "manual-bet-sync": [
-        _VENV_PYTHON,
-        "-m",
-        "model_prediction.portfolio.manual_bet_ledger",
-    ],
     "calibrate": [
         _VENV_PYTHON,
         "-m",
@@ -125,7 +120,6 @@ DEFAULT_WORKER_TIMEOUTS: dict[str, float] = {
     # 5 minutes of work, plus up to auto_buyer_worker.LOCK_WAIT_SECONDS (600 s) spent
     # idle waiting for a daily-job or manual holder to release auto_buyer.lock.
     "auto-buyer": 1500.0,
-    "manual-bet-sync": 300.0,  # 5 minutes max
     "production": 900.0,  # 15 minutes max
     "calibrate": 1800.0,  # 30 minutes max
     # Polymarket capture is budgeted at 180 s; the rest covers ESPN and slow starts.

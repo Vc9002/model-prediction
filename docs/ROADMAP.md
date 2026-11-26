@@ -281,9 +281,13 @@ Still open:
   start-time check, dead audit dedup, always-true `hasattr`, unused `manual-bet-sync` worker, stale
   "30-minute" / "GTC" / "paper only" comments, American-odds comments and xlsx column,
   `not_authorized` fallback label, runtime-root clutter. Check `git log` before re-doing any of it.
-- **Removals that need an operator yes.** The legacy `ncaab_spread_v6_live_bucket` (still in the
-  state file, `enabled: false`) and its code path; the empty legacy whitelist pass; the tennis and
-  NCAAF buyer gates; dead state keys.
+- **Removals that needed an operator yes.** Done 2026-11-26 (operator "remove as listed"): the
+  `manual-bet-sync` worker and its launchd plist (the `manual_bet_ledger` module stays, the dashboard
+  uses it) and the legacy `ncaab_spread_v6_live_bucket` code (the config field stays as an inert
+  ignored kwarg because `nba_ml_v6_paper_trial.py` still passes it). Still open: the empty legacy
+  whitelist pass (blocked: the NBA ML v6 trial and its test still read `whitelist_models`; delete the
+  pass after that trial lands), the state key `ncaab_spread_v6_live_bucket` (delete from the runtime
+  file), and the tennis and NCAAF buyer gates (kept by decision).
 - **Total v6 loss limits (operator choice).** Total v6 has no proven edge and about 78% of its picks
   are overs, so a slate of same-direction overs loses together. Options: cap same-slate overs; narrow
   the window to 5-8%; flat 1U stakes. None is built.

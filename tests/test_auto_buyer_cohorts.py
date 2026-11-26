@@ -772,6 +772,62 @@ def test_cycle_disabled_four_cohorts_does_nothing(monkeypatch, tmp_path):
     assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_DISABLED"
 
 
+LEGACY_V6_BUCKET_STATE = {
+    "enabled": True,
+    "min_saved_edge": 0.05,
+    "max_saved_edge_exclusive": 0.08,
+}
+V6_ID = "ncaab-spread-v6"
+
+
+def test_old_state_keys_for_the_removed_v6_bucket_and_whitelist_load_and_buy_nothing_extra(
+    monkeypatch, tmp_path
+):
+    """A state file written before 2026-11-26 still carries ``ncaab_spread_v6_live_bucket`` and
+    ``whitelist_models``; both are ignored, so the cycle buys exactly what the cohorts buy."""
+    state = {
+        **_state(OPERATOR_COHORTS_FINAL, enabled=True),
+        "whitelist_models": [],
+        "ncaab_spread_v6_live_bucket": LEGACY_V6_BUCKET_STATE,
+    }
+    v6_row = _row(V6_ID, pick_id="legacy6", event="g7", edge="0.06", model_probability=0.57, ask=0.51)
+    calls = _cycle_harness(monkeypatch, tmp_path, state, [*_mixed_four_rows(), v6_row])
+    auto_executor.run_auto_buyer_cycle()
+    assert sorted(t.pick_id for t, _ in FakeExecutor.executed) == ["spread9", "total6"]
+    live = _ledger_rows(tmp_path / "auto_buyer_ledger.jsonl")
+    paper = _ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")
+    assert sorted(r["pick_id"] for r in live) == ["spread9", "total6"]
+    assert sorted(r["pick_id"] for r in paper) == ["ml15", "nba13"]
+    assert all(c.ncaab_spread_v6_live_bucket is None for c in calls["configs"])
+
+
+def test_v6_bucket_state_key_cannot_arm_a_live_config(tmp_path, decorate):
+    """Before 2026-11-26 this key turned a live config's ncaab-spread-v6 rows at 5-8% saved edge
+    into a buyable cohort that bypassed the blacklist and the disabled sport-market gate."""
+    state = {"ncaab_spread_v6_live_bucket": LEGACY_V6_BUCKET_STATE, "whitelist_models": []}
+    kwargs = auto_executor._base_auto_execution_kwargs_from_state(state)
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            **{
+                **kwargs,
+                "disabled_sport_markets": (("ncaab", "spread"),),
+                "blacklisted_models": (V6_ID,),
+                "edge_scaled_sizing_enabled": False,
+            },
+            mode="live",
+            execute_live=True,
+            require_model_timestamp=True,
+            capture_missing_slates=False,
+        ),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        data_root=tmp_path,
+    )
+    row = _row(V6_ID, pick_id="legacy6", event="g1", edge="0.06", model_probability=0.57, ask=0.51)
+    result = buyer.evaluate_and_execute([row])
+    assert FakeExecutor.executed == [] and FakeExecutor.constructed == 0
+    assert result.rejected_blacklist == 1
+
+
 def test_live_per_game_cap_is_shared_across_spread_and_total(tmp_path, decorate):
     rows = [
         _row(SPREAD_V7, pick_id="s", event="g1", edge="0.09", model_probability=0.60, ask=0.51, units=3.0),

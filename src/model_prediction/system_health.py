@@ -72,7 +72,7 @@ _SERVED_VALUE_MIN_ROWS = 10
 # produces within T, so T is the binding limit. Cadences are the Task Scheduler
 # triggers in scripts/register_windows_tasks.ps1. Workers absent from this
 # table use _SKIP_ESCALATION_DEFAULT.
-_SKIP_ESCALATION_DEFAULT = (3, 6.0)  # slowest cadences (calibrate 6 h, manual-bet-sync)
+_SKIP_ESCALATION_DEFAULT = (3, 6.0)  # slowest cadences (calibrate 6 h)
 _SKIP_ESCALATION: dict[str, tuple[int, float]] = {
     "daily": (3, 3.0),  # every 90 min 09:00-21:00 (each skip waits up to 45 min); 60 min timeout
     "production": (3, 6.0),  # every 3 h; 15 min timeout, no skip ever recorded
