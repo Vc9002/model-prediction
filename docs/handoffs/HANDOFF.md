@@ -15,7 +15,8 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 ## 0. LIVE auto-buyer (REAL MONEY), state at 2026-11-25 19:00 ET
 
 Cohorts unchanged: LIVE `ncaab-spread-v7` and `ncaab-total-v6` (saved and live-ask edge 5-12%); PAPER `ncaab-moneyline-v7m`
-and `nba-spread-margin-v9` (>=12%). $5/unit, $25/game, $500/day spend, $250/day loss stop, 35-min buy window. Operator
+(>=12%); 23:40 ET operator swap: paper `nba-spread-margin-v9` replaced by paper `nba-anchor-v10` spread and total [0, 25%)
+(NBA totals paper-only in code, 7f0e7517) plus paper `nba-elo-trend-lr-v5` moneyline [5%, 25%). $5/unit, $25/game, $500/day spend, $250/day loss stop, 35-min buy window. Operator
 decisions: spread v7 stays live at current stakes, judged ONLY on `ncaab-spread-v7` rows from 11-21 on (memory
 `feedback_spread-v7-scope-v7-id-only.md`); buy window stays on GROSS edge (fees recorded, not gated). Kill switch: use the
 dashboard toggle (a hand edit of `enabled` can be overwritten by a running cycle until the fix below lands).
