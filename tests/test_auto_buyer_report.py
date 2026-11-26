@@ -144,6 +144,7 @@ def runtime(tmp_path: Path) -> Path:
                 model=SPREAD_V7,
                 market="spread",
                 executed_at_utc="2026-11-25T20:40:00Z",
+                submitted_at_utc="2026-11-25T20:40:02Z",
                 event_start_utc=a_start,
                 fee_usd=0.10,
                 requested_shares=20.0,
@@ -155,6 +156,7 @@ def runtime(tmp_path: Path) -> Path:
                 model=TOTAL_V6,
                 market="total",
                 executed_at_utc="2026-11-25T23:40:00Z",
+                submitted_at_utc="2026-11-25T23:40:01Z",
                 event_start_utc=b_start,
                 result="loss",
                 pnl_usd=-10.0,
@@ -165,6 +167,7 @@ def runtime(tmp_path: Path) -> Path:
                 model=TOTAL_V6,
                 market="total",
                 executed_at_utc="2026-11-25T22:00:00Z",
+                submitted_at_utc="2026-11-25T22:00:00Z",
                 event_start_utc="2026-11-25T23:00:00Z",
                 status="open",
                 result="open",
@@ -182,6 +185,16 @@ def runtime(tmp_path: Path) -> Path:
                 result="open",
                 pnl_usd=0.0,
             ),
+            # A game from another ET date: counts in the cumulative record, never in a day's payload.
+            _buy(
+                "pold",
+                SLUG_A,
+                model=SPREAD_V7,
+                market="spread",
+                executed_at_utc="2026-11-24T20:00:00Z",
+                submitted_at_utc="2026-11-24T20:00:02Z",
+                event_start_utc="2026-11-24T21:00:00Z",
+            ),
         ],
     )
     _jsonl(
@@ -193,6 +206,7 @@ def runtime(tmp_path: Path) -> Path:
                 model=SPREAD_V7,
                 market="spread",
                 executed_at_utc="2026-11-25T20:40:30Z",
+                submitted_at_utc="2026-11-25T20:40:31Z",
                 event_start_utc=a_start,
                 entry_price=0.49,
             )
@@ -347,8 +361,10 @@ def test_close_is_the_last_open_quote_after_the_buy_and_before_tip(runtime):
     assert row["clv_cents"] == pytest.approx(5.0)
     assert row["clv_mid_cents"] == pytest.approx(4.0)
     assert row["close_seconds_before_tip"] == pytest.approx(180.0)
-    assert row["close_seconds_after_buy"] == pytest.approx(1020.0)
-    assert row["close_independent_of_buy"] is True
+    assert row["close_seconds_after_buy"] == pytest.approx(1018.0)
+    # 8 of its 20 shares filled later, from the resting fallback, at an unrecorded time.
+    assert row["resting_fallback_fill"] is True
+    assert row["close_independent_of_buy"] is False
     assert row["tip_window"] == "before_5pm_et"
     assert row["edge_bucket"] == "5-8%"
     assert row["cohort"] == "ncaab-spread-v7:spread:[0.05,0.12):live"
@@ -406,7 +422,7 @@ def test_daily_cohort_summary(runtime):
     assert day["pnl_net_usd"] == pytest.approx(9.90)
     assert day["roi"] == pytest.approx(0.99)
     assert day["clv_cents_mean"] == pytest.approx(5.0)
-    assert day["clv_independent_n"] == 1
+    assert day["clv_n"] == 1 and day["clv_independent_n"] == 0
     assert day["avg_saved_edge"] == pytest.approx(0.071)
     assert spread["tip_split"]["before_5pm_et"]["wins"] == 1
     assert spread["tip_split"]["5pm_or_later_et"]["orders"] == 0
@@ -511,6 +527,7 @@ def test_dashboard_daily_report_route_is_read_only(runtime, monkeypatch):
     assert code == 200
     assert body["report_date"] == DATE
     assert any(c["cohort"].startswith(SPREAD_V7) for c in body["cohorts"])
+    assert body["rows"] and {r["tip_date_et"] for r in body["rows"]} == {DATE}
     code, body = get("/api/auto-buyer/daily-report?date=not-a-date")
     assert code == 400
     assert before == {p: p.stat().st_mtime_ns for p in runtime.rglob("*") if p.is_file()}
@@ -521,3 +538,188 @@ def test_quotes_at_or_before_the_buy_are_never_a_close(runtime):
     assert row["close_status"] == "no_close_after_buy_before_tip"
     assert row["clv_cents"] is None
     assert row["buy_contract_line"] == pytest.approx(140.5)
+
+
+# ---------------------------------------------------------------- the buy anchor and the close
+
+A_START = "2026-11-25T21:00:00Z"
+LIVE_SPREAD_LABEL = "ncaab-spread-v7:spread:[0.05,0.12):live"
+
+
+def _mini(tmp_path: Path, buy: dict[str, Any], snaps: list[tuple[str, float, str, str]], **logs: Any) -> Path:
+    """One live spread row (tips 16:00 ET) with its own snapshots, and optional fill-log records."""
+    root = tmp_path / "mini"
+    root.mkdir(parents=True)
+    (root / "auto_buyer_state.json").write_text(
+        json.dumps({"cohorts": logs.get("cohorts", COHORTS)}), encoding="utf-8"
+    )
+    base = _buy(
+        "pq",
+        SLUG_A,
+        model=SPREAD_V7,
+        market="spread",
+        event_start_utc=A_START,
+        status="open",
+        result="open",
+        pnl_usd=0.0,
+    )
+    _jsonl(root / "auto_buyer_ledger.jsonl", [{**base, **buy}])
+    _jsonl(
+        root / "odds" / "ncaab" / DATE / "polymarket_snapshots.jsonl",
+        [_snap(SLUG_A, observed, ask, start=start, state=state) for observed, ask, start, state in snaps],
+    )
+    if logs.get("fills"):
+        _jsonl(root / "logs" / "auto_buyer_live_fills.jsonl", logs["fills"])
+    return root
+
+
+def _open(observed: str, ask: float, start: str = A_START) -> tuple[str, float, str, str]:
+    return observed, ask, start, "MARKET_STATE_OPEN"
+
+
+def _pq(root: Path) -> dict[str, Any]:
+    return _rows(report_mod.build_auto_buyer_report(root, DATE), "live", "pq")
+
+
+def test_a_snapshot_between_pass_start_and_submit_is_not_the_close(tmp_path):
+    # The pass stamps executed_at at its start; the slate capture then writes snapshots stamped at
+    # fetch time, all before the POST. None of them is a quote after the buy.
+    buy = {"executed_at_utc": "2026-11-25T20:30:00Z", "submitted_at_utc": "2026-11-25T20:41:00Z"}
+    before_submit = [
+        _open("2026-11-25T20:36:00Z", 0.58),
+        _open("2026-11-25T20:40:30Z", 0.57),
+        _open("2026-11-25T20:41:00Z", 0.56),  # at the submit instant: not after it
+    ]
+    row = _pq(_mini(tmp_path / "a", buy, before_submit))
+    assert row["close_status"] == "no_close_after_buy_before_tip"
+    assert row["clv_cents"] is None and row["close_independent_of_buy"] is None
+    assert row["buy_anchor_source"] == "submitted"
+    assert row["buy_anchor_utc"] == "2026-11-25T20:41:00Z"
+    after = _pq(_mini(tmp_path / "b", buy, [*before_submit, _open("2026-11-25T20:50:00Z", 0.55)]))
+    assert after["close_observed_at_utc"] == "2026-11-25T20:50:00Z"
+    assert after["close_seconds_after_buy"] == pytest.approx(540.0)
+    assert after["close_independent_of_buy"] is True
+
+
+def test_the_quote_that_priced_the_order_floors_the_anchor(tmp_path):
+    buy = {
+        "executed_at_utc": "2026-11-25T20:30:00Z",
+        "submitted_at_utc": "2026-11-25T20:41:00Z",
+        "quote_observed_at_utc": "2026-11-25T20:45:00Z",
+    }
+    snaps = [_open("2026-11-25T20:43:00Z", 0.58), _open("2026-11-25T20:50:00Z", 0.55)]
+    row = _pq(_mini(tmp_path / "a", buy, snaps))
+    assert row["close_observed_at_utc"] == "2026-11-25T20:50:00Z"
+    assert row["close_seconds_after_buy"] == pytest.approx(300.0)
+    only_early = _pq(_mini(tmp_path / "b", buy, snaps[:1]))
+    assert only_early["close_status"] == "no_close_after_buy_before_tip"
+
+
+def test_a_row_without_submit_time_joins_the_fill_log_by_order_id(tmp_path):
+    buy = {"executed_at_utc": "2026-11-25T20:30:00Z", "order_id": "O-1", "order_ids": ["O-1"]}
+    fills = [
+        {
+            "order_id": "O-1",
+            "order_ids": ["O-1"],
+            "sent_utc": "2026-11-25T20:41:00Z",
+            "tip_date_et": DATE,
+            "cohort": LIVE_SPREAD_LABEL,
+        }
+    ]
+    snaps = [_open("2026-11-25T20:36:00Z", 0.58), _open("2026-11-25T20:50:00Z", 0.55)]
+    row = _pq(_mini(tmp_path, buy, snaps, fills=fills))
+    assert row["buy_anchor_source"] == "fill_log"
+    assert row["close_observed_at_utc"] == "2026-11-25T20:50:00Z"
+    assert row["close_independent_of_buy"] is True
+
+
+def test_a_pass_start_anchor_is_flagged_and_never_counts_as_independent(tmp_path):
+    buy = {"executed_at_utc": "2026-11-25T20:30:00Z"}
+    row = _pq(_mini(tmp_path, buy, [_open("2026-11-25T20:50:00Z", 0.55)]))
+    assert row["buy_anchor_source"] == "pass_start"
+    assert row["close_status"] == "ok" and row["clv_cents"] == pytest.approx(5.0)
+    assert row["close_anchor_uncertain"] is True
+    assert row["close_independent_of_buy"] is False
+
+
+def test_a_resting_fallback_fill_is_anchored_on_submit_and_flagged(tmp_path):
+    buy = {
+        "executed_at_utc": "2026-11-25T20:30:00Z",
+        "submitted_at_utc": "2026-11-25T20:41:00Z",
+        "shares": 20.0,
+        "requested_shares": 20.0,
+        "primary_filled_shares": 12.0,
+    }
+    snaps = [_open("2026-11-25T20:50:00Z", 0.55)]
+    row = _pq(_mini(tmp_path / "a", buy, snaps))
+    assert row["resting_fallback_fill"] is True
+    assert row["buy_anchor_utc"] == "2026-11-25T20:41:00Z"
+    assert row["close_anchor_uncertain"] is True
+    assert row["close_independent_of_buy"] is False
+    assert row["clv_cents"] == pytest.approx(5.0)
+    whole = _pq(_mini(tmp_path / "b", {**buy, "primary_filled_shares": 20.0}, snaps))
+    assert whole["resting_fallback_fill"] is False and whole["close_independent_of_buy"] is True
+
+
+@pytest.mark.parametrize(
+    "unfilled",
+    [
+        {"shares": 0.0, "cost_usd": 0.0, "result": "void", "status": "settled"},
+        {"shares": 0.0, "cost_usd": 0.0, "result": "open", "status": "open"},
+    ],
+)
+def test_an_unfilled_row_gets_no_clv(tmp_path, unfilled):
+    buy = {"executed_at_utc": "2026-11-25T20:30:00Z", "submitted_at_utc": "2026-11-25T20:41:00Z", **unfilled}
+    root = _mini(tmp_path, buy, [_open("2026-11-25T20:50:00Z", 0.55)])
+    row = _pq(root)
+    assert row["close_status"] == "unfilled"
+    assert row["clv_cents"] is None and row["close_observed_at_utc"] is None
+    summary = next(
+        c for c in report_mod.build_auto_buyer_report(root, DATE)["cohorts"] if c["book"] == "live"
+    )
+    assert summary["day"]["clv_n"] == 0
+
+
+def test_a_snapshot_with_an_earlier_own_start_is_not_the_close_even_before_tip(tmp_path):
+    # Observed between the snapshot's own (earlier) start and the row's tip: in play by its own
+    # clock. `kickoff = tip` would take it and report 90c as the close.
+    buy = {"executed_at_utc": "2026-11-25T20:40:00Z", "submitted_at_utc": "2026-11-25T20:40:02Z"}
+    snaps = [
+        _open("2026-11-25T20:45:00Z", 0.55),  # the real close
+        _open("2026-11-25T20:58:00Z", 0.90, start="2026-11-25T20:50:00Z"),
+    ]
+    row = _pq(_mini(tmp_path, buy, snaps))
+    assert row["close_observed_at_utc"] == "2026-11-25T20:45:00Z"
+    assert row["close_price_tip"] == pytest.approx(0.55)
+
+
+def test_a_snapshot_with_a_garbage_start_is_skipped_not_trusted(tmp_path):
+    buy = {"executed_at_utc": "2026-11-25T20:40:00Z", "submitted_at_utc": "2026-11-25T20:40:02Z"}
+    snaps = [_open("2026-11-25T20:45:00Z", 0.55), _open("2026-11-25T20:56:00Z", 0.95, start="garbage")]
+    row = _pq(_mini(tmp_path, buy, snaps))
+    assert row["close_observed_at_utc"] == "2026-11-25T20:45:00Z"
+    assert row["close_price_tip"] == pytest.approx(0.55)
+
+
+def test_the_row_s_own_cohort_label_wins_over_the_current_state(tmp_path):
+    moved = [{**COHORTS[0], "min_saved_edge": 0.08}]
+    buy = {"cohort": LIVE_SPREAD_LABEL, "executed_at_utc": "2026-11-25T20:30:00Z"}
+    row = _pq(_mini(tmp_path / "a", buy, [], cohorts=moved))
+    assert row["cohort"] == LIVE_SPREAD_LABEL
+    derived = _pq(_mini(tmp_path / "b", {**buy, "cohort": None}, [], cohorts=moved))
+    assert derived["cohort"] == "ncaab-spread-v7:spread:[0.08,0.12):live"
+
+
+def test_cli_rejects_a_malformed_date(tmp_path):
+    from types import SimpleNamespace
+
+    with pytest.raises(ValueError, match="YYYY-MM-DD"):
+        report_mod.cmd_auto_buyer_report(SimpleNamespace(date="2026-13-45", out_dir=str(tmp_path)))
+
+
+def test_report_can_trim_rows_to_the_report_date(runtime):
+    full = report_mod.build_auto_buyer_report(runtime, DATE)
+    assert any(r["tip_date_et"] != DATE for r in full["rows"])
+    day = report_mod.build_auto_buyer_report(runtime, DATE, day_rows_only=True)
+    assert day["rows"] and {r["tip_date_et"] for r in day["rows"]} == {DATE}
+    assert day["cohorts"] == full["cohorts"]

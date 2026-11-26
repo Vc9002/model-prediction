@@ -1608,3 +1608,45 @@ def test_live_order_attempt_is_written_to_the_fill_log(tmp_path, decorate):
     assert record["cohort"] == SPREAD_V7_LIVE.label
     assert record["fill_path"] == "ioc_full"
     assert record["order_ids"] == ["sim-in"]
+
+
+def test_live_and_paper_rows_carry_the_send_time_after_the_pass_start(tmp_path, monkeypatch):
+    import itertools
+
+    from model_prediction.domain import parse_utc
+
+    def quote_with_observed(row):
+        decorated = _quote_from_row(row)
+        return {**decorated, "quote": {**decorated["quote"], "observed_at_utc": "2026-11-25T12:00:00Z"}}
+
+    monkeypatch.setattr("model_prediction.dashboard.orders._decorate_pick", quote_with_observed)
+    # A clock that advances on every read, so "pass start" and "send time" are distinct instants.
+    base = utc_now()
+    ticks = itertools.count()
+    monkeypatch.setattr(auto_executor, "utc_now", lambda: base + timedelta(seconds=next(ticks)))
+    row = _row(SPREAD_V7, pick_id="in", event="g1", edge="0.07", model_probability=0.58, ask=0.51)
+    live = _live_buyer(tmp_path).evaluate_and_execute([row])
+    (live_order,) = live.submitted_orders
+    assert parse_utc(live_order["submitted_at_utc"]) > parse_utc(live_order["timestamp_utc"])
+    paper = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            mode="paper",
+            cohorts=(SPREAD_V7_TWIN,),
+            whitelisted_models=(),
+            edge_scaled_sizing_enabled=False,
+            require_model_timestamp=True,
+            capture_missing_slates=False,
+            unit_value_usd=5.0,
+            max_game_stake_usd=25.0,
+            max_daily_spend_usd=250.0,
+        ),
+        audit=AuditLog(tmp_path / "paper-audit.jsonl"),
+        data_root=tmp_path / "paper",
+    ).evaluate_and_execute([row])
+    (paper_order,) = paper.dry_run_orders
+    assert parse_utc(paper_order["submitted_at_utc"]) > parse_utc(paper_order["timestamp_utc"])
+    # What the ledger keeps, so the report can anchor on it.
+    rows = _ledger_rows(tmp_path / "auto_buyer_ledger.jsonl")
+    assert rows[0]["submitted_at_utc"] == live_order["submitted_at_utc"]
+    assert rows[0]["quote_observed_at_utc"] == "2026-11-25T12:00:00Z"
+    assert rows[0]["executed_at_utc"] == live_order["timestamp_utc"]

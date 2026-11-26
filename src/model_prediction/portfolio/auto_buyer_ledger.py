@@ -120,6 +120,8 @@ _EXECUTION_PASSTHROUGH_FIELDS = (
     "cohort",
     "cohort_min_edge",
     "cohort_max_edge",
+    "submitted_at_utc",
+    "quote_observed_at_utc",
 )
 
 # Polymarket US taker fee per share: coefficient x p x (1 - p) on the price paid. The research code

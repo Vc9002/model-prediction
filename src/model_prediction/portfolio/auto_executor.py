@@ -3491,6 +3491,9 @@ class AutoPolymarketBuyer:
             # 7. Quote Staleness & Market State Check (with live refresh fallback)
             age_sec = float(quote.get("age_seconds") or 999999)
             max_quote_age = self.config.max_quote_age_seconds
+            # Of the quote that prices the order (the live refresh's own snapshot when one replaces
+            # it, since the rebuilt quote below keeps the old snapshot's time); read by the report.
+            quote_observed_at_utc = quote.get("observed_at_utc")
             fallback_requires_live_refresh = source_quote_age > max_quote_age
             if (
                 self.config.refresh_stale_quotes
@@ -3535,6 +3538,7 @@ class AutoPolymarketBuyer:
                         }
                         age_sec = 0.0
                         fallback_requires_live_refresh = False
+                        quote_observed_at_utc = live_snap.get("observed_at_utc")
                 except httpx.HTTPStatusError as throttled_again:
                     if throttled_again.response.status_code == 429:
                         gateway_rate_limited = True
@@ -3896,6 +3900,7 @@ class AutoPolymarketBuyer:
                     if is_topup and partial_info is not None
                     else None
                 ),
+                "quote_observed_at_utc": quote_observed_at_utc,
             }
 
             # Update bought_index to prevent intra-batch double buys
@@ -3934,6 +3939,8 @@ class AutoPolymarketBuyer:
                     {
                         "status": "paper_filled" if self.config.mode == "paper" else "dry_run_preview",
                         **order_payload,
+                        # The paper fill's moment, after the quote resolved (see the report's buy anchor).
+                        "submitted_at_utc": iso_utc(utc_now()),
                     }
                 )
                 current_spend += actual_cost
@@ -4000,6 +4007,10 @@ class AutoPolymarketBuyer:
             exec_row["market_slug"] = market_slug
             exec_row["rationale"] = f"auto_buy market_slug:{market_slug}"
 
+            # `timestamp_utc` is the pass start, before the slate capture and every quote refresh; this
+            # is the send time the CLV report anchors on. It reaches only the fill log and the ledger
+            # row, never the executor.
+            order_payload["submitted_at_utc"] = iso_utc(utc_now())
             # Only a gate refusal raised before anything was sent is "refused". An unknown outcome
             # and anything after the order exists are alarms that stop live buying for this pass.
             try:

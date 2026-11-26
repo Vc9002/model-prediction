@@ -557,7 +557,9 @@ class Handler(BaseHTTPRequestHandler):
                         _cached(
                             f"auto-buyer-daily-report:{report_day}",
                             30,
-                            lambda: build_auto_buyer_report(auto_executor.DATA, report_day),
+                            lambda: build_auto_buyer_report(
+                                auto_executor.DATA, report_day, day_rows_only=True
+                            ),
                         )
                     )
             elif route == "/api/auto-buyer/log":

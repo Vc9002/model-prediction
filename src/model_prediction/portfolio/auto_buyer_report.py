@@ -11,6 +11,14 @@ and strictly before tip (the earlier of the row's start and the snapshot's own s
 ``PolymarketSnapshotStore.closing_snapshot``. Every row says how long after the buy and before tip
 its close was observed; ``close_independent_of_buy`` is true only for a close at least
 ``INDEPENDENT_CLOSE_SECONDS`` after the buy, and the summary reports CLV both ways.
+
+The buy time is the moment the order was sent, not the ledger's ``executed_at_utc``: that is the
+pass's start, and the pass then captures fresh snapshots (stamped at fetch time) before it posts, so
+pre-order quotes would read as "after the buy". The anchor is the row's persisted
+``submitted_at_utc``, else the fill log's ``sent_utc`` joined on the order id, else (old rows only)
+the pass start, which ``buy_anchor_source`` names and which is never counted as independent. It is
+floored at the observed time of the quote that priced the order. A resting fallback that filled
+later has no recorded fill time, so it is anchored on its submit time and flagged.
 """
 
 from __future__ import annotations
@@ -22,7 +30,7 @@ import sqlite3
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +107,52 @@ def _cents(price: float | None, base: float | None) -> float | None:
     if price is None or base is None:
         return None
     return round((price - base) * 100.0, 2)
+
+
+def _fill_records(runtime_root: Path, report_date: str) -> list[dict[str, Any]]:
+    """The live fill log's records for games on ``report_date`` (an order's own tip date)."""
+    return [
+        r
+        for r in _read_jsonl(tracking_log_path(runtime_root, LIVE_FILL_LOG_NAME), contains=(report_date,))
+        if r.get("tip_date_et") == report_date
+    ]
+
+
+def _sent_by_order(records: Iterable[dict[str, Any]]) -> dict[str, datetime]:
+    """Latest send time per exchange order id across the fill-log records."""
+    sent: dict[str, datetime] = {}
+    for record in records:
+        when = _time(record.get("sent_utc"))
+        if when is None:
+            continue
+        ids = [str(i) for i in record.get("order_ids") or [] if i]
+        if record.get("order_id"):
+            ids.append(str(record["order_id"]))
+        for order_id in ids:
+            if order_id not in sent or when > sent[order_id]:
+                sent[order_id] = when
+    return sent
+
+
+def _buy_anchor(raw: dict[str, Any], sent: dict[str, datetime]) -> tuple[datetime | None, str]:
+    """When the order was sent, and where that time came from (see the module doc)."""
+    anchor: datetime | None
+    submitted = _time(raw.get("submitted_at_utc"))
+    if submitted is not None:
+        anchor, source = submitted, "submitted"
+    else:
+        ids = [str(i) for i in raw.get("order_ids") or [] if i]
+        if raw.get("order_id"):
+            ids.append(str(raw["order_id"]))
+        joined = [sent[i] for i in ids if i in sent]
+        if joined:
+            anchor, source = max(joined), "fill_log"
+        else:
+            anchor, source = _time(raw.get("executed_at_utc")), "pass_start"
+    priced_at = _time(raw.get("quote_observed_at_utc"))
+    if anchor is not None and priced_at is not None and priced_at > anchor:
+        anchor = priced_at
+    return anchor, source if anchor is not None else "missing"
 
 
 # ---------------------------------------------------------------- cohorts
@@ -271,7 +325,10 @@ def _closing_quotes(
 
 
 def _base_rows(
-    runtime_root: Path, cohorts: list[dict[str, Any]], context: dict[str, dict[str, Any]]
+    runtime_root: Path,
+    cohorts: list[dict[str, Any]],
+    context: dict[str, dict[str, Any]],
+    sent: dict[str, datetime],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for book, relative in _BOOKS:
@@ -282,14 +339,30 @@ def _base_rows(
             market = str(raw.get("market_type") or "").lower()
             saved_edge = pick.get("saved_edge")
             entry = None if raw.get("manual") else _match_cohort(book, model_id, market, saved_edge, cohorts)
+            # The cohort the order was placed under, written on the row, beats re-deriving it from
+            # a state file the operator may have edited since.
+            stored = raw.get("cohort")
+            stored_label = stored.strip() if isinstance(stored, str) and stored.strip() else None
+            if stored_label and not raw.get("manual"):
+                entry = next((c for c in cohorts if _cohort_label(c) == stored_label), None) or entry
             fill_price = _number(raw.get("avg_fill_price"))
             entry_price = _number(raw.get("entry_price"))
+            anchor, anchor_source = _buy_anchor(raw, sent)
+            shares = _number(raw.get("shares")) or 0.0
+            primary = _number(raw.get("primary_filled_shares"))
+            fallback_fill = primary is not None and shares > primary + 1e-6
+            if raw.get("manual"):
+                label = "manual"
+            elif stored_label:
+                label = stored_label
+            elif entry:
+                label = _cohort_label(entry)
+            else:
+                label = f"{model_id}:{market}:unlisted:{book}"
             rows.append(
                 {
                     "book": book,
-                    "cohort": _cohort_label(entry)
-                    if entry
-                    else ("manual" if raw.get("manual") else f"{model_id}:{market}:unlisted:{book}"),
+                    "cohort": label,
                     "paper_twin": bool(entry and entry.get("paper_twin") is True),
                     "pick_id": pick_id,
                     "order_id": raw.get("order_id"),
@@ -301,9 +374,10 @@ def _base_rows(
                     "token_side": str(raw.get("token_side") or "").lower(),
                     "status": raw.get("status"),
                     "result": str(raw.get("result") or "").lower(),
-                    "shares": _number(raw.get("shares")) or 0.0,
+                    "shares": shares,
                     "requested_shares": _number(raw.get("requested_shares")),
-                    "primary_filled_shares": _number(raw.get("primary_filled_shares")),
+                    "primary_filled_shares": primary,
+                    "resting_fallback_fill": fallback_fill,
                     "cost_usd": _number(raw.get("cost_usd")) or 0.0,
                     "pnl_usd": _number(raw.get("pnl_usd")),
                     "fee_usd": _number(raw.get("fee_usd")),
@@ -314,6 +388,13 @@ def _base_rows(
                     "edge_bucket": edge_bucket(saved_edge),
                     "in_preregistered_band": in_preregistered_band(saved_edge),
                     "executed_at_utc": raw.get("executed_at_utc"),
+                    "submitted_at_utc": raw.get("submitted_at_utc"),
+                    "buy_anchor_utc": iso_utc(anchor) if anchor is not None else None,
+                    "buy_anchor_source": anchor_source,
+                    # A pass-start anchor can sit before the order's own quote capture, and a resting
+                    # fallback fills at an unrecorded time after submit: the close is not provably
+                    # after the fill, so neither counts as an independent close.
+                    "close_anchor_uncertain": anchor_source == "pass_start" or fallback_fill,
                     "event_start_utc": raw.get("event_start_utc"),
                     **tip_fields(raw.get("event_start_utc")),
                     "pick_line": pick.get("line"),
@@ -354,11 +435,14 @@ def _attach_closes(runtime_root: Path, rows: list[dict[str, Any]], report_date: 
             closing_main_line=None,
             closing_main_line_reason=CLOSING_MAIN_LINE_REASON,
         )
-        buy, tip = _time(row["executed_at_utc"]), _time(row["event_start_utc"])
+        buy, tip = _time(row["buy_anchor_utc"]), _time(row["event_start_utc"])
         if row["tip_date_et"] != report_date:
             row["close_status"] = "not_in_report_date"
         elif row["cohort"] == "manual":
             row["close_status"] = "manual_row"
+        elif row["shares"] <= 0 or row["result"] == "void":
+            # A zero-fill IOC whose fallback expired owns no position: nothing to close against.
+            row["close_status"] = "unfilled"
         elif buy is None:
             row["close_status"] = "missing_buy_time"
         elif tip is None:
@@ -389,7 +473,8 @@ def _attach_closes(runtime_root: Path, rows: list[dict[str, Any]], report_date: 
             close_mid_tip=mid,
             close_seconds_before_tip=(tip - observed).total_seconds(),
             close_seconds_after_buy=after_buy,
-            close_independent_of_buy=after_buy >= INDEPENDENT_CLOSE_SECONDS,
+            close_independent_of_buy=after_buy >= INDEPENDENT_CLOSE_SECONDS
+            and not row["close_anchor_uncertain"],
             clv_cents=_cents(ask, row["buy_price"]),
             clv_mid_cents=_cents(mid, row["buy_price"]),
             buy_to_close_cents=_cents(ask, row["buy_price"]),
@@ -489,11 +574,10 @@ def _skip_reasons(runtime_root: Path, report_date: str, bought: set[tuple[str, s
     return {book: {cohort: dict(c) for cohort, c in by_cohort.items()} for book, by_cohort in counts.items()}
 
 
-def _fill_stats(runtime_root: Path, report_date: str) -> dict[str, dict[str, Any]]:
+def _fill_stats(fill_records: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     by_cohort: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for record in _read_jsonl(tracking_log_path(runtime_root, LIVE_FILL_LOG_NAME), contains=(report_date,)):
-        if record.get("tip_date_et") == report_date:
-            by_cohort[str(record.get("cohort"))].append(record)
+    for record in fill_records:
+        by_cohort[str(record.get("cohort"))].append(record)
     stats = {}
     for cohort, records in by_cohort.items():
         requested = sum(_number(r.get("requested_shares")) or 0.0 for r in records)
@@ -559,17 +643,26 @@ def _twin_comparison(rows: list[dict[str, Any]], report_date: str) -> list[dict[
 
 
 def build_auto_buyer_report(
-    runtime_root: Path | str, report_date: str, *, ledgers_db: Path | str | None = None
+    runtime_root: Path | str,
+    report_date: str,
+    *,
+    ledgers_db: Path | str | None = None,
+    day_rows_only: bool = False,
 ) -> dict[str, Any]:
-    """The report for one US-Eastern game date (by tip time). Reads only; writes nothing."""
+    """The report for one US-Eastern game date (by tip time). Reads only; writes nothing.
+
+    The summaries always use every date's rows (the cumulative figures need them); ``day_rows_only``
+    trims the returned ``rows`` to the report date, for a payload that has no use for the rest.
+    """
     root = Path(runtime_root)
     cohorts = _state_cohorts(root)
     pick_ids = [str(r.get("pick_id") or "") for _, rel in _BOOKS for r in _read_jsonl(root / rel)]
     context = _pick_context(Path(ledgers_db) if ledgers_db else root / "ledgers" / "ledgers.db", pick_ids)
-    rows = _base_rows(root, cohorts, context)
+    fill_records = _fill_records(root, report_date)
+    rows = _base_rows(root, cohorts, context, _sent_by_order(fill_records))
     _attach_closes(root, rows, report_date)
     bought = {(r["book"], r["pick_id"]) for r in rows}
-    fills = _fill_stats(root, report_date)
+    fills = _fill_stats(fill_records)
     summaries = []
     for book, cohort in sorted({(r["book"], r["cohort"]) for r in rows}):
         mine = [r for r in rows if (r["book"], r["cohort"]) == (book, cohort)]
@@ -608,14 +701,21 @@ def build_auto_buyer_report(
             "clv_cents": "close ask minus the entry (fill) price, in cents; positive = beat the close",
             "clv_mid_cents": "close midpoint minus the entry price, in cents",
             "close": "last open-book quote of the bought contract after the buy and before tip",
-            "close_independent_of_buy": f"close observed at least {INDEPENDENT_CLOSE_SECONDS:g} s after the buy",
+            "buy": (
+                "when the order was sent: the row's submitted_at_utc, else the fill log's sent_utc by order "
+                "id, else the pass start (buy_anchor_source), floored at the quote that priced the order"
+            ),
+            "close_independent_of_buy": (
+                f"close observed at least {INDEPENDENT_CLOSE_SECONDS:g} s after the buy, and the buy time "
+                "known (not the pass start, not a resting fallback fill)"
+            ),
             "pnl_net_usd": "ledger pnl_usd minus fee_usd where the row records a fee",
         },
         "cohorts": summaries,
         "skip_reasons": _skip_reasons(root, report_date, bought),
         "loss_stop_cycles": _loss_stop_cycles(root, report_date),
         "twin_comparison": _twin_comparison(rows, report_date),
-        "rows": rows,
+        "rows": [r for r in rows if r["tip_date_et"] == report_date] if day_rows_only else rows,
     }
 
 
@@ -728,6 +828,10 @@ def write_auto_buyer_report(report: dict[str, Any], out_dir: Path | str) -> dict
         "edge_bucket",
         "in_preregistered_band",
         "executed_at_utc",
+        "buy_anchor_utc",
+        "buy_anchor_source",
+        "resting_fallback_fill",
+        "close_anchor_uncertain",
         "buy_price",
         "close_status",
         "close_observed_at_utc",
@@ -788,8 +892,15 @@ def cmd_auto_buyer_report(args: Any) -> dict[str, Any]:
     """``python -m model_prediction auto-buyer-report [--date D] [--out-dir DIR]``."""
     from ..runtime_paths import RuntimePaths
 
+    try:
+        report_date = (
+            date.fromisoformat(args.date).isoformat()
+            if args.date
+            else utc_now().astimezone(EASTERN).date().isoformat()
+        )
+    except ValueError:
+        raise ValueError(f"--date must be YYYY-MM-DD, got {args.date!r}") from None
     paths = RuntimePaths.resolve()
-    report_date = args.date or utc_now().astimezone(EASTERN).date().isoformat()
     report = build_auto_buyer_report(paths.runtime_root, report_date, ledgers_db=paths.ledgers_db)
     out_dir = Path(args.out_dir) if args.out_dir else paths.runtime_root / "reports" / "auto_buyer"
     written = write_auto_buyer_report(report, out_dir)
