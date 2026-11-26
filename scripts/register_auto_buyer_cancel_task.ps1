@@ -34,10 +34,10 @@ $trigger.Repetition = (New-ScheduledTaskTrigger -Once -At '08:00' -RepetitionInt
 $settings = $src.Settings
 $settings.Enabled = $true
 
-$existing = Get-ScheduledTask -TaskName $NewTaskName -ErrorAction SilentlyContinue
-if ($existing) { Unregister-ScheduledTask -TaskName $NewTaskName -Confirm:$false }
+# -Force replaces an existing task in one call, so a registration that fails can never leave the
+# backstop deleted (removing it first and then registering would).
 Register-ScheduledTask -TaskName $NewTaskName -Action $action -Trigger $trigger -Settings $settings `
-    -Principal $src.Principal `
+    -Principal $src.Principal -Force `
     -Description 'model-prediction auto-buyer cancel backstop (cancel-only by order id, own lock, never places orders)' | Out-Null
 
 $t = Get-ScheduledTask -TaskName $NewTaskName

@@ -1248,7 +1248,8 @@ def cancel_resting_live_fallbacks(
     """Cancel, by order id, the live book's resting fallbacks that are due (D-02, D-01 backstop).
 
     ``stop_before`` (the backstop's run deadline) is checked before the order read and before each
-    cancel; ids not reached are listed in ``deadline_skipped`` and left for the next run.
+    cancel; ids not reached are listed in ``deadline_skipped`` and left for the next run, and those
+    whose game has already started also in ``deadline_skipped_started``.
 
     Due means every unreconciled true fallback when ``cancel_all`` (the kill switch), otherwise
     those whose event starts within ``start_lead_seconds`` (an unparseable start counts as due).
@@ -1271,6 +1272,7 @@ def cancel_resting_live_fallbacks(
     moment = now or utc_now()
     horizon = moment + timedelta(seconds=float(start_lead_seconds))
     due: dict[str, str | None] = {}
+    started: set[str] = set()
     for r in read_auto_buyer_ledger(jsonl_path=j_path):
         fid = str(r.get("fallback_order_id") or "")
         if not fid or r.get("fallback_reconciled") or not _is_resting_fallback_leg(r):
@@ -1287,11 +1289,18 @@ def cancel_resting_live_fallbacks(
             except (TypeError, ValueError):
                 pass
         due.setdefault(fid, r.get("market_slug") or None)
+        try:
+            game_started = parse_utc(str(r.get("event_start_utc") or "")) <= moment
+        except (TypeError, ValueError):
+            game_started = True  # an unreadable start is treated as the worst case
+        if game_started:
+            started.add(fid)
     summary["candidates"] = len(due)
     if not due:
         return summary
     if stop_before is not None and stop_before():
         summary["deadline_skipped"] = list(due)
+        summary["deadline_skipped_started"] = [fid for fid in due if fid in started]
         return summary
 
     live_executor = executor if executor is not None else _default_live_executor(j_path.parent)
@@ -1312,6 +1321,8 @@ def cancel_resting_live_fallbacks(
             continue
         if stop_before is not None and stop_before():
             summary.setdefault("deadline_skipped", []).append(fid)
+            if fid in started:
+                summary.setdefault("deadline_skipped_started", []).append(fid)
             continue
         try:
             _cancel_by_id(live_executor, fid, slug)

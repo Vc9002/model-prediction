@@ -287,7 +287,12 @@ def test_supervisor_registers_the_backstop_worker():
     assert WORKERS["auto-buyer-cancel"] == [_VENV_PYTHON, "-m", "model_prediction.auto_buyer_cancel_worker"]
     # The worker stops starting cancels at its own deadline, well inside the supervisor's kill.
     assert DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"] == 115.0
-    assert worker.RUN_DEADLINE_SECONDS <= DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"] - 20
+    # The deadline is only checked BEFORE a call starts, so the run can end one full exchange call
+    # (15 s timeout x 3 attempts plus backoff) after it: the real bound is deadline + one call.
+    assert (
+        worker.RUN_DEADLINE_SECONDS + worker.MAX_EXCHANGE_CALL_SECONDS
+        < DEFAULT_WORKER_TIMEOUTS["auto-buyer-cancel"]
+    )
 
 
 def test_windows_task_script_registers_the_backstop_every_two_minutes():
@@ -314,9 +319,12 @@ def test_standalone_registration_snippet_registers_only_the_backstop():
     assert "run auto-buyer-cancel" in snippet
     assert "Start-ScheduledTask" not in snippet
     assert "Unregister-ScheduledTask -TaskName 'ModelPrediction-AutoBuyer'" not in snippet
-    # A non-admin S4U run must stop before it unregisters anything.
+    # A non-admin S4U run must stop before it changes any task.
     guard = re.search(_ADMIN_GUARD.format(cond=r"-not "), snippet, re.MULTILINE)
-    assert guard and guard.start() < snippet.index("Unregister-ScheduledTask")
+    assert guard and guard.start() < snippet.index("Register-ScheduledTask -TaskName")
+    # Replace in one call: a registration that fails must never leave the backstop deleted.
+    assert "Unregister-ScheduledTask" not in snippet
+    assert re.search(r"Register-ScheduledTask -TaskName \$NewTaskName[^|]*-Force\b", snippet)
     # The copied settings would carry the source task's Enabled flag; the backstop is always enabled.
     assert "$settings.Enabled = $true" in snippet
     assert "-Settings $settings" in snippet
@@ -486,7 +494,7 @@ def test_run_deadline_stops_new_cancels_and_exits_cleanly(runtime, monkeypatch, 
     _write(runtime, [_row("gtd-1", start_seconds=20.0), _row("gtd-2", start_seconds=25.0)])
     exchange = _exchange(monkeypatch)
     # Clock reads: run start, before the order read, before cancel 1, before cancel 2.
-    ticks = iter([0.0, 30.0, 60.0, 120.0, 130.0, 140.0])
+    ticks = iter([0.0, 10.0, 20.0, 100.0, 110.0, 120.0])
     monkeypatch.setattr(worker, "_monotonic", lambda: next(ticks))
     code, out = _run(capsys)
     assert code == 0
@@ -504,3 +512,42 @@ def test_deadline_before_the_order_read_sends_nothing(runtime, monkeypatch, caps
     code, out = _run(capsys)
     assert code == 0 and exchange.calls == []
     assert out["deadline_skipped"] == ["gtd-1"]
+
+
+def _deadline_after_first(monkeypatch) -> None:
+    # Clock reads: run start, before the order read, before cancel 1, before cancel 2.
+    ticks = iter([0.0, 10.0, 20.0, 100.0, 110.0, 120.0])
+    monkeypatch.setattr(worker, "_monotonic", lambda: next(ticks))
+
+
+def test_deadline_skip_of_a_started_game_exits_non_zero(runtime, monkeypatch, capsys):
+    # gtd-2's game began 10 s ago and its fallback is still resting: skipping it must be visible.
+    _write(runtime, [_row("gtd-1", start_seconds=-20.0), _row("gtd-2", start_seconds=-10.0)])
+    exchange = _exchange(monkeypatch)
+    _deadline_after_first(monkeypatch)
+    code, out = _run(capsys)
+    assert exchange.cancelled == ["gtd-1"]
+    assert out["deadline_skipped"] == ["gtd-2"] and out["deadline_skipped_started"] == ["gtd-2"]
+    assert code == 1 and out["status"] == "error"
+
+
+def test_deadline_skip_under_the_kill_switch_exits_non_zero(runtime, monkeypatch, capsys):
+    _write(
+        runtime,
+        [_row("gtd-1", start_seconds=600.0), _row("gtd-2", start_seconds=600.0)],
+        enabled=False,
+    )
+    exchange = _exchange(monkeypatch)
+    _deadline_after_first(monkeypatch)
+    code, out = _run(capsys)
+    assert exchange.cancelled == ["gtd-1"]
+    assert out["deadline_skipped"] == ["gtd-2"]
+    assert code == 1 and out["status"] == "error"
+
+
+def test_deadline_skip_of_a_game_not_yet_started_stays_ok_while_enabled(runtime, monkeypatch, capsys):
+    _write(runtime, [_row("gtd-1", start_seconds=20.0), _row("gtd-2", start_seconds=25.0)])
+    _exchange(monkeypatch)
+    _deadline_after_first(monkeypatch)
+    code, out = _run(capsys)
+    assert code == 0 and out["status"] == "ok" and out["deadline_skipped"] == ["gtd-2"]
