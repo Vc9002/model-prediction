@@ -184,15 +184,45 @@ def test_recorded_market_missing_from_the_snapshots_falls_back_to_name_matching(
     assert (quote["market_slug"], quote["side"]) == (_NEG, "long")
 
 
-def test_recorded_market_whose_line_no_longer_agrees_falls_back_to_the_exact_line(snapshots) -> None:
+def test_recorded_market_whose_line_disagrees_with_the_row_is_refused(snapshots) -> None:
+    """Deliberate contract change (2026-11-25): this used to fall back to name matching, which would
+    have found the -3.5 market for a row whose own pin says +3.5. A captured market that contradicts
+    the row is a corrupt pin or a wrong row, and either way the row is not bought. Only a market that
+    was never captured falls back (the test above)."""
     snapshots(_REAL_UCA)
 
-    # Recorded against the +3.5 market, but the row's line is -3.5: the pin is not trusted and the
-    # exact-line name match finds the -3.5 market instead.
-    quote = backtests._pick_quote(_pinned("away", -3.5, _POS, "long"))
+    # Recorded against the +3.5 market, but the row's line is -3.5.
+    assert backtests._pick_quote(_pinned("away", -3.5, _POS, "long")) is None
+    # Its short side is Jacksonville -3.5: a Jacksonville row at -3.5 agrees, so it is still quoted.
+    assert backtests._pick_quote(_pinned("home", -3.5, _POS, "short"))["market_slug"] == _POS
 
-    assert quote is not None
-    assert (quote["market_slug"], quote["side"]) == (_NEG, "long")
+
+def test_recorded_market_line_check_stands_alone_when_no_other_guard_applies(snapshots) -> None:
+    """Names cannot match and no second contract exists, so only the line comparison can refuse."""
+    snapshots([_spread(_POS, _UNKNOWN, 3.5, 0.99, 0.32)])
+
+    assert backtests._pick_quote(_pinned("away", -3.5, _POS, "long")) is None
+    assert backtests._pick_quote(_pinned("away", 3.5, _POS, "long"))["side"] == "long"
+
+    snapshots([_total_snapshot()])
+    assert backtests._pick_quote(_total_row("under", 141.5, "short")) is None
+    assert backtests._pick_quote(_total_row("under", 140.5, "short"))["side"] == "short"
+
+
+def test_recorded_total_whose_line_disagrees_with_the_row_is_refused(snapshots) -> None:
+    other_line = "tsc-cbb-cark-jax-2026-11-21-141pt5"
+    snapshots([_total_snapshot(), _total_snapshot(other_line, line=141.5)])
+
+    assert backtests._pick_quote(_total_row("under", 140.5, "short"))["side"] == "short"
+    # Recorded against the 140.5 slug, but the row says 141.5: name matching would find the 141.5
+    # market, and must not be asked.
+    assert backtests._pick_quote(_total_row("under", 141.5, "short")) is None
+
+
+def test_recorded_market_with_an_unreadable_line_is_refused(snapshots) -> None:
+    snapshots([{**_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51), "line": "n/a"}])
+
+    assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
 
 
 def test_recorded_side_that_a_decisive_name_match_contradicts_is_refused(snapshots) -> None:
@@ -226,6 +256,78 @@ def test_recorded_market_from_another_event_is_refused(snapshots) -> None:
     snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, event_id="999999")])
 
     assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
+
+
+_TOTAL = "tsc-cbb-cark-jax-2026-11-21-140pt5"
+
+
+def _total_snapshot(slug: str = _TOTAL, **extra) -> dict:
+    return {
+        **_spread(slug, "", 140.5, 0.5, 0.5),
+        "market_type": "total",
+        "team": None,
+        "long": {"description": "Over", "ask": 0.48},
+        "short": {"description": "Under", "ask": 0.54},
+        **extra,
+    }
+
+
+def _total_row(selection: str, line: float, side: str, slug: str = _TOTAL) -> dict:
+    return {
+        **_row(selection, line, f"x market_slug={slug} token_side={side}"),
+        "market_type": "total",
+    }
+
+
+@pytest.mark.parametrize("row_event_id", ["", None])
+def test_recorded_market_is_refused_when_the_row_has_no_event_id(snapshots, row_event_id) -> None:
+    """The pin's only same-game check compares event ids, and it used to be skipped when either was
+    empty, which left a recorded slug unchecked against the row's game."""
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51)])
+
+    assert backtests._pick_quote({**_pinned("away", -3.5, _NEG, "long"), "event_id": row_event_id}) is None
+
+
+@pytest.mark.parametrize("snapshot_event_id", ["", None])
+def test_recorded_market_is_refused_when_the_snapshot_has_no_event_id(snapshots, snapshot_event_id) -> None:
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, event_id=snapshot_event_id)])
+
+    assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
+
+
+def test_recorded_total_of_another_game_at_the_same_line_is_refused(snapshots) -> None:
+    """Same event id and the same 140.5 line, but the snapshot's title names a different game: the
+    pin must not stand in for the game check name matching makes."""
+    snapshots([_total_snapshot(event_title="Duke vs. Kentucky")])
+
+    assert backtests._pick_quote(_total_row("under", 140.5, "short")) is None
+    snapshots([_total_snapshot()])
+    assert backtests._pick_quote(_total_row("under", 140.5, "short"))["side"] == "short"
+
+
+def test_recorded_spread_whose_title_names_another_game_is_refused(snapshots) -> None:
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, event_title="Duke vs. Kentucky")])
+
+    assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
+
+
+@pytest.mark.parametrize("marker", ["-1st-", "-h1-", "-h2-", "-fh-", "-sh-", "-f5-"])
+def test_recorded_half_game_market_is_refused(snapshots, marker) -> None:
+    slug = f"asc-cbb-cark-jax{marker}2026-11-21-neg-3pt5"
+    snapshots([_spread(slug, _UNKNOWN, -3.5, 0.50, 0.51)])
+
+    assert backtests._pick_quote(_pinned("away", -3.5, slug, "long")) is None
+
+
+def test_recorded_market_is_refused_when_a_second_game_matches_the_row_by_name(snapshots) -> None:
+    """The name path never guesses between two contracts for the same teams (a doubleheader); the
+    pin must not either, even though its own event id still agrees."""
+    other_game = _spread("asc-cbb-cark-jax-2026-11-21-b-neg-3pt5", "UCA", -3.5, 0.40, 0.61, event_id="999999")
+    snapshots([_spread(_NEG, "UCA", -3.5, 0.50, 0.51), other_game])
+
+    assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
+    snapshots([_spread(_NEG, "UCA", -3.5, 0.50, 0.51)])
+    assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long"))["ask"] == 0.50
 
 
 def test_recorded_market_ignores_quotes_from_after_the_start(snapshots) -> None:

@@ -419,24 +419,43 @@ def _moneyline_side_by_name(row: dict, snapshot: dict) -> str | None:
     return "long" if matches_long else "short"
 
 
-def _pinned_side(row: dict, snapshot: dict, side: str, market_type: str) -> str | None:
-    """``side`` when the recorded market still agrees with the row, "refuse" when it contradicts
-    it, or None when its line no longer matches (the caller then falls back to name matching).
+# Contracts on part of a game share its teams and event id with the full-game markets.
+_PARTIAL_GAME_SLUG_MARKERS = ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-", "-fh-", "-sh-")
+
+
+def _is_partial_game_slug(slug: str) -> bool:
+    return any(marker in slug.casefold() for marker in _PARTIAL_GAME_SLUG_MARKERS)
+
+
+def _pinned_side(row: dict, snapshot: dict, side: str, market_type: str) -> str:
+    """``side`` when the captured recorded market agrees with the row, else "refuse".
+
+    There is no third answer: once the recorded market is in the snapshots, anything that does
+    not line up (a missing or different event id, another game's title, a half-game contract, a
+    line the row does not carry) is a wrong pin or a wrong row, not a reason to match by name.
+    Only a market that was never captured falls back to name matching, in the caller.
 
     Name matching is only a cross-check here: a decisive name answer that disagrees with the
     recorded side refuses the row; an indecisive one (an abbreviation no alias knows) does not."""
     row_event = str(row.get("event_id") or "")
     snapshot_event = str(snapshot.get("event_id") or "")
-    if row_event and snapshot_event and row_event != snapshot_event:
+    # Both ids must exist: an empty one used to skip this check, leaving the slug unchecked
+    # against the row's game.
+    if not row_event or not snapshot_event or row_event != snapshot_event:
+        return "refuse"
+    if _is_partial_game_slug(str(snapshot.get("market_slug") or "")):
+        return "refuse"
+    # The same game check the name path makes (event_title carries both teams).
+    if snapshot.get("event_title") and not _row_matches_snapshot_event(row, snapshot):
         return "refuse"
     if market_type == "spread":
         row_line = _row_line(row)
         try:
             market_line = float(snapshot.get("line"))  # type: ignore[arg-type]
         except (TypeError, ValueError):
-            return None
+            return "refuse"
         if row_line is None or not _lines_match(row_line, market_line if side == "long" else -market_line):
-            return None
+            return "refuse"
         role = match_spread_side(row, row_line, snapshot.get("team"), market_line).market_team
         selection = str(row.get("selection") or "").casefold()
         if role in ("away", "home") and (role == selection) != (side == "long"):
@@ -447,9 +466,9 @@ def _pinned_side(row: dict, snapshot: dict, side: str, market_type: str) -> str 
         try:
             market_line = float(snapshot.get("line"))  # type: ignore[arg-type]
         except (TypeError, ValueError):
-            return None
+            return "refuse"
         if not _lines_match(row_line, market_line):
-            return None
+            return "refuse"
         description = str((snapshot.get(side) or {}).get("description") or "").casefold().strip()
         if description != str(row.get("selection") or "").casefold().strip():
             return "refuse"
@@ -533,13 +552,7 @@ def _pick_quote(row: dict) -> dict | None:
     if not snapshots:
         return None
     recorded = _recorded_market(row) if market_type in ("moneyline", "spread", "total") else None
-    if recorded is not None:
-        pinned = _pinned_snapshot(snapshots, recorded[0], event_start, market_type)
-        pinned_side = _pinned_side(row, pinned, recorded[1], market_type) if pinned is not None else None
-        if pinned_side == "refuse":
-            return None
-        if pinned is not None and pinned_side is not None:
-            return _quote_from_snapshot(pinned, pinned_side, event_start)
+    pinned = _pinned_snapshot(snapshots, recorded[0], event_start, market_type) if recorded else None
     latest: dict[str, dict] = {}
     for snapshot in snapshots:
         if snapshot.get("timestamp_valid") is False:
@@ -554,10 +567,7 @@ def _pick_quote(row: dict) -> dict | None:
         elif snapshot_market_type != market_type:
             continue
         slug = str(snapshot.get("market_slug") or "")
-        if not slug or any(
-            marker in slug.casefold()
-            for marker in ("-f5-", "-f3-", "-f7-", "-1st-", "-h1-", "-h2-", "-fh-", "-sh-")
-        ):
+        if not slug or _is_partial_game_slug(slug):
             continue
         if market_type == "moneyline":
             away = str(row.get("away_team") or "")
@@ -609,6 +619,14 @@ def _pick_quote(row: dict) -> dict | None:
             if (long_desc == expected_description) == (short_desc == expected_description):
                 continue
         latest[slug] = snapshot
+    if recorded is not None and pinned is not None:
+        # The recorded market was captured, so name matching is not a fallback: it is the
+        # doubleheader guard. Another contract matching this row by name means the same teams play
+        # twice, and the name path would refuse; so does the pin.
+        pinned_side = _pinned_side(row, pinned, recorded[1], market_type)
+        if pinned_side == "refuse" or any(slug != recorded[0] for slug in latest):
+            return None
+        return _quote_from_snapshot(pinned, pinned_side, event_start)
     if not latest:
         return None
     if len(latest) > 1:
