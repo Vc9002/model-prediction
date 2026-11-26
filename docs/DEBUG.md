@@ -1,5 +1,40 @@
 # DEBUG.md — Current Project Audit and Reproduction Guide
 
+## 2026-11-26 — Operator decisions b/c/e, Telegram control, pinned-market refuse
+
+Operator answers (2026-11-26): (b) run the P1 one-shot; (c) remove dead code as listed; (d) Telegram 142 unpinned by the
+operator; (e) a pinned market with no usable snapshot is refused, never name-matched; Telegram control "full + cancel orders".
+(a) total v6 loss limits stays open. Every code change below went through the critical-review loop.
+
+- **P1 injury confirmation** (`scripts/ncaab_research/confirmation/confirm_p1_261122.py read`, the single logged read):
+  CONFIRMED. Pooled spread corr delta vs v7 +0.0048 (one-sided 95% lower +0.0021, day-cluster bootstrap, n 20,826 games,
+  564 days); 2018 +0.010, 2019 +0.006, 2020 +0.003, 2022 -0.001. Margin RMSE 11.276 vs v7 11.286 vs closing line 11.132:
+  a small accuracy gain that still trails the market. Nothing promoted.
+- **Dead code (3767c9ff, PASS WITH NITS):** removed the `manual-bet-sync` supervisor worker (and its launchd plist; the
+  `manual_bet_ledger` module stays for the dashboard) and the legacy `ncaab_spread_v6_live_bucket` live gate. On the old code
+  that key, if enabled, could arm a live buy of an ncaab-spread-v6 row past the blacklist and the disabled-market gate (red
+  test). `AutoExecutionConfig.ncaab_spread_v6_live_bucket` stays as an inert field because another session's untracked
+  `nba_ml_v6_paper_trial.py` passes it. The whitelist pass stays: paper trials use it. Runtime key deleted with a backup
+  (`auto_buyer_state.pre_drop_v6_bucket_20261126T065736Z.json`, version 1300 -> 1301).
+- **Pinned-market refuse (ce7565f8, 9c245f0f, 57701e0d; three review cycles, PASS WITH NITS):** a pick that carries a recorded
+  market slug and token side is never name-matched. It is refused, with the reason in the dashboard `buy_block_reason` and the
+  buyer skip log (`pinned_market_refused`), when the slug was never captured (the day-1 and day+1 files are searched first; a
+  neighbour-day hit needs the exchange start within 300 s of the row start), when no snapshot was observed before the earlier of
+  the row start and the exchange start, or when the pinned side has no ask. Cycle 2 found that the neighbour-day search alone
+  would have quoted an in-play snapshot when the exchange moved the tip earlier; fixed by the earlier-start rule, which the
+  dashboard readiness check also uses. Timezone-naive or unreadable times fail closed instead of raising. "Scan prices" now
+  re-captures the blocking pinned slug on the day whose file holds it.
+- **Telegram control (dd7b56d7, f2c429bb, 40f20d0b, plus the poll interval; three review cycles, PASS WITH NITS):** repo CLI
+  `python -m model_prediction.telegram_control` and the Rainmeter `TelegramBot.py`. Cycle 1 found that `/cancel <prefix>`
+  could cancel an order the operator never saw (time-ordered ids share prefixes): the bot now sends only full ids from its last
+  `/orders` list (10 min) with `--exact`. Cycle 2 found that `/liveoff` checked `live_switch_on`, which is False whenever the
+  master is off, so it could report OFF with `live_enabled` still true: all switch commands now verify the flag itself, and the
+  switch save is never time-bounded (only the cancel sweep after it). `/pause` turns real money off before the master. Open nit:
+  `Telegram.py` names its temp file by PID only, so the heartbeat thread and the main thread share it (overlap needs a write
+  slower than 5 s).
+- Dashboard restarted onto 57701e0d (listener PID 21136). `scripts/stop_dashboard.ps1` disables the
+  `ModelPredictionDashboard` task; re-enable it after a stop, or the next logon will not start the dashboard.
+
 ## 2026-11-25/26 — Live auto-buyer day one: fixes, ops batch, switches, tracking, research (quick-261125-hih Task 4 and follow-ups)
 
 State at 2026-11-26 ~05:00 UTC (runtime `auto_buyer_state.json`, read-only): `enabled: true`,
@@ -1097,7 +1132,7 @@ Season-forward (fit on seasons < S, score S, 2023..2026), pooled, pushes dropped
 
 Operator: "regrade" and "escalation for repeated exit-75 skips". Follow-up to the 2026-11-22 review fixes below.
 
-- **Re-grade (`scripts/regrade_nonbinary_esports_voids.py`, tests in `tests/test_regrade_nonbinary_esports_voids.py`).** Candidates are the rows still carrying the stored void reason `esports market settled to a non-binary price` (identity-scoped, no time window): 206 esports moneyline rows (CS2 198, Dota2 7, LoL 1, across Main/Flat/research/gated). The one darts row (`market resolved terminal with non-binary prices [0.7, 0.3]`) is not esports and was left alone. Each row is matched to a BO3 series only when both team names resolve, exactly one finished series with a winner starts within 12 h of the event start, and it has a winner; otherwise it stays a push. Result: **1 of 206 confirmed and re-graded** (`671c5cf4932049de`, Flat CS2 EAC Rising vs Eternal Fire Academy, pick on home, push 0U to loss -1.5U, correction reason on the event chain). The other 205 stay void: 159 CS2 have no BO3 series near the start (BO3 covers Aug-Nov, 4,967 finished CS2 matches, but not these lower-tier fixtures), 38 CS2 team names do not resolve to a BO3 team, 7 Dota2 and 1 LoL have no series. They are not guessed from last-trade prices. Applied with `--apply --expect-count 1` under the daily lock; backup `E:\model-prediction-runtimeackups\ledgers.pre-esports-regrade.20261122T082343Z.db`; event chain intact. The 569 rows voided with `esports market terminal (...)` were already BO3-checked at void time and are out of scope. The xlsx `model_ledgers` mirror was not touched (SQLite is the authority).
+- **Re-grade (`scripts/regrade_nonbinary_esports_voids.py`, tests in `tests/test_regrade_nonbinary_esports_voids.py`).** Candidates are the rows still carrying the stored void reason `esports market settled to a non-binary price` (identity-scoped, no time window): 206 esports moneyline rows (CS2 198, Dota2 7, LoL 1, across Main/Flat/research/gated). The one darts row (`market resolved terminal with non-binary prices [0.7, 0.3]`) is not esports and was left alone. Each row is matched to a BO3 series only when both team names resolve, exactly one finished series with a winner starts within 12 h of the event start, and it has a winner; otherwise it stays a push. Result: **1 of 206 confirmed and re-graded** (`671c5cf4932049de`, Flat CS2 EAC Rising vs Eternal Fire Academy, pick on home, push 0U to loss -1.5U, correction reason on the event chain). The other 205 stay void: 159 CS2 have no BO3 series near the start (BO3 covers Aug-Nov, 4,967 finished CS2 matches, but not these lower-tier fixtures), 38 CS2 team names do not resolve to a BO3 team, 7 Dota2 and 1 LoL have no series. They are not guessed from last-trade prices. Applied with `--apply --expect-count 1` under the daily lock; backup `E:\model-prediction-runtime\backups\ledgers.pre-esports-regrade.20261122T082343Z.db`; event chain intact. The 569 rows voided with `esports market terminal (...)` were already BO3-checked at void time and are out of scope. The xlsx `model_ledgers` mirror was not touched (SQLite is the authority).
 - **Exit-75 escalation (`system_health.py`, `43b3f796`, `93f8cf9c`).** A worker whose latest run is `skipped` goes DOWN only when the streak (every skipped row newer than the worker's last non-skipped row) has at least N rows spanning at least T hours: daily 3/3 h, production 3/6 h, auto-buyer 12/3 h (15-min cadence), pre-tip captures 6/1 h, default 3/6 h (`_SKIP_ESCALATION`, sized from `runs.db`: longest daily streak 2 rows, longest auto-buyer 7 rows / 3.0 h on 2026-10-31, the 12-skip rule at 3 h would have tripped it). Shorter streaks degrade as before; the recording of exit 75 is unchanged. `scripts/health_and_data_gap_monitor.py` is unchanged and still reports any non-completed latest daily row as WARNING.
 
 ## 2026-11-22 — Project-review fixes: non-binary void, supervisor exit 75, NBA v7/v9 blend sign, v9 key drift (quick-261121-xaw, quick-261121-xbn)

@@ -176,7 +176,9 @@ def _retry_toggle(ctx: _Context, call: Any, value: bool) -> dict[str, Any]:
 
 
 _ABANDONED: list[threading.Thread] = []
-_SAVE_POLL_SECONDS = 0.05
+# Each poll opens the state file; on Windows an open handle makes another writer's os.replace fail
+# (WinError 5), and the buyer's and dashboard's saves do not retry that, so poll gently.
+_SAVE_POLL_SECONDS = 0.5
 
 
 def _live_flag_is_off(raw: dict[str, Any] | None) -> bool:

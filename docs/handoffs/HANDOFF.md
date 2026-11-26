@@ -10,7 +10,8 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 0. **Auto-buyer (live OFF, paper ON; operator decisions and open items), section 0 below.**
 1. **Operator, hardware (blocks trust in everything else):** run a real RAM test, see section 1.
 2. Check the first scheduled daily runs after the daily-speed merge, section 2.
-3. Decide whether to fetch 2014-2021 player boxes to confirm NCAAB P1 (player availability), section 4.
+3. NCAAB P1 (player availability) confirmation read is DONE (11-26, CONFIRMED, small; behind the market line). Promotion into v7
+   needs a walk-forward ablation and an operator decision, section 4.
 
 ## 0. Auto-buyer: LIVE OFF, PAPER ON, state at 2026-11-26 ~05:00 UTC
 
@@ -30,19 +31,36 @@ messages, `/open`, `/today`) lives outside the repo in the Rainmeter `@Resources
 `*.pre-telegram-v2.bak`.
 
 **Next action first:**
-1. **Operator decisions waiting:** (a) total v6 loss-limit options if live comes back (cap same-slate overs, narrow to 5-8%, flat 1U);
-   (b) the NCAAB injury P1 sealed one-shot `scripts/ncaab_research/confirmation/confirm_p1_261122.py read` needs a yes; (c) removals:
-   legacy `ncaab_spread_v6_live_bucket` (state key, `enabled: false`) and its code, the empty whitelist pass, tennis/NCAAF gates, dead
-   state keys, and the unused `manual-bet-sync` worker (last run 2026-10-04); (d) unpin Telegram message 142; (e) when a pinned
-   recorded market has no qualifying pregame snapshot, `_pick_quote` falls back to name matching. Recommended: refuse instead.
+1. **Operator decision waiting:** (a) total v6 loss-limit options if live comes back (cap same-slate overs, narrow to 5-8%, flat 1U).
+   Decided and done 11-26: (b) P1 one-shot read run: CONFIRMED (corr delta +0.0048, one-sided 95% lower +0.0021, n 20,826; margin
+   RMSE 11.276 vs v7 11.286 vs line 11.132), card `outputs/ncaab/research_261120/P1_player_availability/confirmation_v5.md`;
+   (c) removed the `manual-bet-sync` worker and the legacy v6 live bucket (3767c9ff), state key deleted (backup
+   `auto_buyer_state.pre_drop_v6_bucket_20261126T065736Z.json`); the whitelist pass STAYS (paper trials incl. the other session's
+   NBA ML v6 trial use it; the scheduled global pass is also the ungoverned live path when no `cohorts` key exists, removable only
+   as a separate real-money change); tennis/NCAAF gates kept; (d) Telegram 142 unpinned by the operator; (e) refuse, see below.
 2. **Before any live re-enable:** the first live GTD fallback (11-26 00:01 UTC, total v6 over, 20 shares) was cancelled
    `cancelled_unverified_gtd` on a 404 read-back, before the retry fix. No fallback has been read back through the new path
-   (`fallback_verified_via` is empty), so whether the exchange echoes `tif`/`goodTillTime` is unproven. The dashboard is on the current code (restarted after Task 3 at 19:25 ET
-   and after each later batch; listener PID 27384 since 00:10:50 ET).
-3. **Cleanup batch landed** (ac9a5b82, critical-reviewed PASS WITH NITS). Two low-risk nits open: compute the P1
+   (`fallback_verified_via` is empty), so whether the exchange echoes `tif`/`goodTillTime` is unproven. The dashboard is on the current code (see item 4).
+3. **Telegram control (operator: "full + cancel orders").** Repo CLI `python -m model_prediction.telegram_control` (dd7b56d7,
+   f2c429bb, 40f20d0b) + the Rainmeter `TelegramBot.py` (backups `*.pre-telegram-control*.bak`): `/status`, `/orders`, `/cancel N`
+   (exact full id from the last `/orders` list <= 10 min, `--exact`, never cancel-all), `/liveoff`, `/pause` (live off then master
+   off), `/resume` (paper only, live forced off), `/liveon` (6-digit code, 60 s, single use). Owner chat + user id only, forwarded
+   messages refused. Audit `E:\model-prediction-runtime\auto_buyer_telegram_audit.jsonl`. Only read-only `status`/`orders` have run
+   against the real runtime; the account-wide open-orders read is unproven with real resting orders (union with ledger markets and a
+   `partial` flag cover it). PASS WITH NITS after 3 review cycles (DEBUG 2026-11-26); open nit: `Telegram.py` temp file
+   is named by PID only (heartbeat thread and main thread share it).
+4. **Pinned-market refuse (operator (e)), ce7565f8 + 9c245f0f + 57701e0d, PASS WITH NITS after 3 cycles.** A pick with a recorded
+   market is never name-matched: refused (with a reason in the dashboard and the buyer skip log) when its slug was never captured
+   (day-1/day+1 files searched first, exchange start within 300 s), or no snapshot is pregame against min(row start, exchange start),
+   or the pinned side has no ask. Naive/unreadable times fail closed. Dashboard restarted onto it (listener PID 21136, 11-26 ~02:30 ET;
+   note `stop_dashboard.ps1` disables the task, re-enable with `Enable-ScheduledTask ModelPredictionDashboard`). Follow-ups:
+   `polymarket_execute._verify_live_side_and_timing` should also use the exchange start; `_event_already_started` should fail closed
+   on an unparseable start; `_pick_quote_refusal` is test-only; dead-code nits (manual_bet_ledger `_run_scheduled_sync` docstring
+   still points at the removed worker; test_auto_buyer_cohorts.py ~786 docstring overstates `whitelist_models` being ignored).
+5. **Cleanup batch landed** (ac9a5b82, critical-reviewed PASS WITH NITS). Two low-risk nits open: compute the P1
    `_p1_in_progress` live set before `PlayerBoxIndex.load` (college_basketball_forward.py ~466-469, a raise reloads the
    season index per game); catch `AttributeError` for a non-object `.parse_failed` marker (ncaab_boxscores.py ~365-370).
-4. **Early December:** re-test spread v7 once teams have 8+ games (same v7-id-only rule); read the pre-registered afternoon test
+6. **Early December:** re-test spread v7 once teams have 8+ games (same v7-id-only rule); read the pre-registered afternoon test
    (`docs/research/ncaab_spread_v7_afternoon_test.md`, one cut 17:00 ET) forward only; review cohorts on the paper twins and Flat rows,
    since live is paused.
 
@@ -119,8 +137,9 @@ messages, `/open`, `/today`) lives outside the repo in the Rainmeter `@Resources
   moneyline log loss -0.00065 (K-adj CI -0.0011..-0.0002), cover log loss -0.0008 (K-adj CI includes zero). Still **no edge**: its
   corr with (result minus closing line) is +0.003 (CI -0.011..+0.018), closing-line RMSE 11.19 vs 11.44; the shuffled-outcome control
   degrades it (corr delta -0.019), as a clean control should. **P2 returning production is NOT_ELIGIBLE** (late-fold corr delta
-  -0.0014; the RMSE and log-loss gains do not move corr vs the line). Next, only if wanted: fetch 2014-2021 player boxes and run the
-  sealed confirmation (2018-20 + 2022) for P1; expect a small accuracy gain on a market that already beats us, not an edge.
+  -0.0014; the RMSE and log-loss gains do not move corr vs the line). **P1 sealed confirmation read 2026-11-26: CONFIRMED**
+  (2018-20 + 2022, pooled corr delta +0.0048, one-sided 95% lower +0.0021; 2022 alone -0.0008). Small accuracy gain, no edge: margin
+  RMSE 11.276 vs v7 11.286 vs closing line 11.132. Next, only if wanted: walk-forward ablation of v7 + P1 and an operator promotion decision.
 - Rollback: moneyline first (`model_promotion rollback --sport NCAAB --market moneyline`), then spread.
 - Forward check: split on `COALESCE(json_extract(json_extract(decision_payload_json,'$.model_input_snapshot_json'),'$.features.margin_engine'),'v6')`; the v7 cohort includes `ncaab-moneyline-v7m` rows.
 - Open: the ledger `model_probability` column is raw while the payload is served (readers fixed); check settled NCAAB rows carry close != decision price.
