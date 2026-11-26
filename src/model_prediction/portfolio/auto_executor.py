@@ -1591,7 +1591,7 @@ def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
         # D-02: turning the buyer off also cancels the live book's resting fallbacks by order id,
         # right now and best effort, after the save so a failed cancel never blocks or undoes the
         # kill switch. Cancel-only (no ledger write): this runs in the dashboard process without
-        # daily.lock; every disabled cycle, daily reconcile and the backstop cancel again.
+        # auto_buyer.lock; every disabled cycle, daily reconcile and the backstop cancel again.
         try:
             from .auto_buyer_ledger import cancel_resting_live_fallbacks
 

@@ -1047,7 +1047,7 @@ def cancel_resting_live_fallbacks(
     Due means every unreconciled true fallback when ``cancel_all`` (the kill switch), otherwise
     those whose event starts within ``start_lead_seconds`` (an unparseable start counts as due).
     Cancel-only: it reads the ledger and never writes it. There is no ledger lock, and its callers
-    (the dashboard toggle, the backstop worker) do not hold daily.lock, so restating fills stays
+    (the dashboard toggle, the backstop worker) do not hold auto_buyer.lock, so restating fills stays
     with ``reconcile_pending_auto_buyer_fallbacks`` under that lock. With nothing due it builds no
     executor and makes no network call. It never calls a cancel-all or batch endpoint: one
     ``order_snapshots`` read (failure tolerated) and one cancel per id.
