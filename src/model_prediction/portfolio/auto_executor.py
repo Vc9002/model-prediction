@@ -3452,7 +3452,10 @@ class AutoPolymarketBuyer:
                 continue
 
             # 10. Sizing & Edge check against real Polymarket CLOB ask (mirrors Main Ledger sport hurdles)
-            edge = model_prob - clob_ask
+            # The order goes out at the ask rounded to a cent, up to half a cent above the quote, so
+            # the edge is measured at that sent price, not the unrounded ask.
+            limit_price = max(0.01, min(0.99, round(clob_ask, 2)))
+            edge = model_prob - limit_price
             skip_log.note(live_edge=edge)
             if cohort is not None:
                 # A cohort is bounded by its own window on the live-ask edge, not by the sport
@@ -3556,8 +3559,6 @@ class AutoPolymarketBuyer:
                 is_topup = True
             else:
                 spend_for_order = target_spend
-
-            limit_price = max(0.01, min(0.99, round(clob_ask, 2)))
 
             # Compute shares: spend_for_order / limit_price, minimum min_shares
             shares = max(self.config.min_shares, round(spend_for_order / limit_price, 2))
