@@ -1370,7 +1370,10 @@ def test_audit_unknown_and_dangling_intent_block_live_dedup_but_rejected_does_no
         data_root=tmp_path,
     )
     paper_index = paper._build_bought_index()
-    assert "dangling" in paper_index["pick_ids"]
+    # The audit log holds real-money orders only, so a paper cohort book never reads it: its paper
+    # twin must be able to copy the live book's buys (dedup is its own paper ledger).
+    assert "dangling" not in paper_index["pick_ids"]
+    assert ("s-dang", "long") not in paper_index["market_sides"]
     assert ("ev-d", "home") not in paper_index["event_selections"], "a live fill never blocks a paper game"
     assert ("ev-d", "spread") not in paper_index["event_markets"]
 

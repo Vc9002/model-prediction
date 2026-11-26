@@ -540,6 +540,25 @@ class Handler(BaseHTTPRequestHandler):
                         lambda: summarize_auto_buyer_performance(_read_paper_auto_buyer_ledger()),
                     )
                 )
+            elif route == "/api/auto-buyer/daily-report":
+                # Read-only: built from the ledgers, snapshots and tracking logs; writes no file.
+                from datetime import date
+
+                from model_prediction.portfolio import auto_executor
+                from model_prediction.portfolio.auto_buyer_report import build_auto_buyer_report
+
+                try:
+                    report_day = date.fromisoformat(query.get("date") or _today()).isoformat()
+                except ValueError:
+                    self._send({"error": "date must be YYYY-MM-DD"}, code=400)
+                else:
+                    self._send(
+                        _cached(
+                            f"auto-buyer-daily-report:{report_day}",
+                            30,
+                            lambda: build_auto_buyer_report(auto_executor.DATA, report_day),
+                        )
+                    )
             elif route == "/api/auto-buyer/log":
                 log_path = resolve_auto_buyer_log_path()
                 if log_path.exists():

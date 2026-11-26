@@ -1291,3 +1291,240 @@ def test_dashboard_manual_run_refuses_while_the_writer_lock_is_held(monkeypatch,
     assert code == 200
     assert body == {"status": "ran"}
     assert ran == [{"force": True}]
+
+
+# ---------------------------------------------------------------- tracking: paper twins, skip log, fill log
+
+
+class AuditingFakeExecutor(FakeExecutor):
+    """FakeExecutor that writes the audit events the real PolymarketExecutor writes for a buy."""
+
+    def __init__(self, audit: Any = None, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._audit = audit
+
+    def execute(self, ticket: Any, pick_row: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        event_fields = {
+            "event_id": pick_row.get("event_id"),
+            "selection": str(pick_row.get("selection") or "").casefold() or None,
+            "market_type": pick_row.get("market_type"),
+        }
+        self._audit.append(
+            "order_intent",
+            ticket.pick_id,
+            {
+                "intent_id": f"i-{ticket.pick_id}",
+                "market_slug": ticket.market_slug,
+                "token_side": ticket.token_side,
+                "action": "buy",
+                **event_fields,
+            },
+        )
+        sub = super().execute(ticket, pick_row, **kwargs)
+        self._audit.append(
+            "order_executed",
+            ticket.pick_id,
+            {
+                "intent_id": f"i-{ticket.pick_id}",
+                "market_slug": ticket.market_slug,
+                "token_side": ticket.token_side,
+                "action": "buy",
+                **event_fields,
+            },
+        )
+        return sub
+
+
+TWIN_SPREAD = _entry(mode="paper", paper_twin=True, note="paper twin of D-02")
+TWIN_TOTAL = _entry(model_id=TOTAL_V6, market="total", mode="paper", paper_twin=True)
+LIVE_TOTAL = _entry(model_id=TOTAL_V6, market="total", mode="live")
+SPREAD_V7_TWIN = BuyCohort(SPREAD_V7, "ncaab", "spread", 0.05, 0.12, "paper")
+
+
+def test_paper_twin_of_a_live_cohort_parses_and_keeps_the_live_cohort():
+    parsed = _parse_cohorts({"cohorts": [_entry(), TWIN_SPREAD, LIVE_TOTAL, TWIN_TOTAL]})
+    assert parsed.errors == ()
+    assert set(parsed.active) == {
+        SPREAD_V7_LIVE,
+        SPREAD_V7_TWIN,
+        BuyCohort(TOTAL_V6, "ncaab", "total", 0.05, 0.12, "live"),
+        BuyCohort(TOTAL_V6, "ncaab", "total", 0.05, 0.12, "paper"),
+    }
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        _entry(paper_twin=True),  # a live cohort cannot be a twin
+        _entry(mode="paper", paper_twin="true"),
+        _entry(mode="paper", paper_twin=1),
+    ],
+)
+def test_malformed_paper_twin_is_ignored_and_named(bad):
+    parsed = _parse_cohorts({"cohorts": [bad]})
+    assert parsed.active == ()
+    assert len(parsed.errors) == 1
+
+
+def test_twin_overlapping_another_paper_cohort_is_still_dropped():
+    parsed = _parse_cohorts(
+        {
+            "cohorts": [
+                _entry(),
+                TWIN_SPREAD,
+                {**TWIN_SPREAD, "min_saved_edge": 0.08, "max_saved_edge_exclusive": 0.1},
+            ]
+        }
+    )
+    # Two twins of one model overlap each other (same book): both go, the live cohort stays.
+    assert parsed.active == (SPREAD_V7_LIVE,)
+    assert len(parsed.errors) == 1
+
+
+def test_paper_cohort_index_ignores_live_audit_and_manual_order_sources(tmp_path):
+    audit = AuditLog(tmp_path / "audit.jsonl")
+    audit.append(
+        "order_executed",
+        "spread9",
+        {
+            "market_slug": "asc-cbb-g1-2026-11-25-neg-3pt5",
+            "token_side": "long",
+            "action": "buy",
+            "event_id": "g1",
+            "selection": "home",
+            "market_type": "spread",
+        },
+    )
+    paper = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(mode="paper", dedup_own_ledger_only=True, cohorts=(SPREAD_V7_TWIN,)),
+        audit=audit,
+        data_root=tmp_path,
+    )._build_bought_index()
+    assert "spread9" not in paper["pick_ids"]
+    assert ("asc-cbb-g1-2026-11-25-neg-3pt5", "long") not in paper["market_sides"]
+    live = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(mode="live", dedup_own_ledger_only=True, cohorts=(SPREAD_V7_LIVE,)),
+        audit=audit,
+        data_root=tmp_path,
+    )._build_bought_index()
+    assert "spread9" in live["pick_ids"]
+    assert ("g1", "home") in live["event_selections"]
+
+
+def _twin_state() -> dict[str, Any]:
+    return {**_state([_entry(), TWIN_SPREAD, LIVE_TOTAL, TWIN_TOTAL], enabled=True), "whitelist_models": []}
+
+
+def _twin_rows() -> list[dict[str, Any]]:
+    return [
+        _row(SPREAD_V7, pick_id="spread9", event="g1", edge="0.09", model_probability=0.60, ask=0.51),
+        _row(
+            TOTAL_V6,
+            pick_id="total6",
+            event="g2",
+            market="total",
+            edge="0.06",
+            model_probability=0.57,
+            ask=0.51,
+        ),
+    ]
+
+
+def test_cycle_paper_twin_buys_the_same_picks_as_live(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "PolymarketExecutor", AuditingFakeExecutor)
+    _cycle_harness(monkeypatch, tmp_path, _twin_state(), _twin_rows())
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert sorted(t.pick_id for t, _ in FakeExecutor.executed) == ["spread9", "total6"]
+    live = _ledger_rows(tmp_path / "auto_buyer_ledger.jsonl")
+    paper = _ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")
+    assert sorted(r["pick_id"] for r in live) == ["spread9", "total6"]
+    assert sorted(r["pick_id"] for r in paper) == ["spread9", "total6"]
+    assert summary["cohort_passes"]["paper"]["rejected_dedup"] == 0
+    # A second cycle buys nothing more in either book: each book's own dedup still holds.
+    auto_executor.run_auto_buyer_cycle()
+    assert len(FakeExecutor.executed) == 2
+    assert len(_ledger_rows(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")) == 2
+
+
+def test_paper_twin_fills_never_block_or_cap_the_live_book(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    # A paper twin already bought both picks, at a cost above every live cap.
+    _write_ledger(
+        tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl",
+        [
+            {
+                **_today_row(
+                    pick_id=row["pick_id"], event_id=row["event_id"], market_type=row["market_type"]
+                ),
+                "status": "open",
+                "cost_usd": 600.0,
+                "shares": 1000,
+                "market_slug": row["market_slug"],
+                "token_side": "long",
+                "selection": row["selection"],
+            }
+            for row in _twin_rows()
+        ],
+    )
+    _cycle_harness(monkeypatch, tmp_path, _twin_state(), _twin_rows())
+    summary = auto_executor.run_auto_buyer_cycle()
+    assert sorted(t.pick_id for t, _ in FakeExecutor.executed) == ["spread9", "total6"]
+    live_pass = summary["cohort_passes"]["live"]
+    assert live_pass["rejected_dedup"] == 0 and live_pass["rejected_budget"] == 0
+
+
+def test_cycle_writes_cohort_skip_reasons_outside_state(monkeypatch, tmp_path):
+    rows = [
+        _row(SPREAD_V7, pick_id="spread9", event="g1", edge="0.09", model_probability=0.60, ask=0.51),
+        _row(SPREAD_V7, pick_id="live-low", event="g2", edge="0.07", model_probability=0.53, ask=0.51),
+        _row(SPREAD_V7, pick_id="far", event="g3", edge="0.07", start_minutes=300),
+    ]
+    calls = _cycle_harness(monkeypatch, tmp_path, _twin_state(), rows)
+    auto_executor.run_auto_buyer_cycle()
+    import json
+
+    skips = [
+        json.loads(line)
+        for line in (tmp_path / "logs" / "auto_buyer_skip_reasons.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    by_book = {(s["book"], s["pick_id"]): s for s in skips}
+    assert set(by_book) == {("live", "live-low"), ("live", "far"), ("paper", "live-low"), ("paper", "far")}
+    low = by_book[("live", "live-low")]
+    assert low["reason"] == "rejected_low_edge"
+    assert low["ask"] == pytest.approx(0.51)
+    assert low["live_edge"] == pytest.approx(0.02)
+    assert low["cohort"] == SPREAD_V7_LIVE.label
+    assert low["tip_window"] in {"before_5pm_et", "5pm_or_later_et"}
+    assert by_book[("live", "far")]["reason"] == "rejected_future_slate"
+    saved = calls["saved"][-1]["last_run"]
+    assert all("skip_records" not in p for p in saved["cohort_passes"].values())
+    assert all("skip_records" not in s for s, _ in calls["history"])
+
+
+def test_preview_writes_no_tracking_logs(monkeypatch, tmp_path):
+    _cycle_harness(monkeypatch, tmp_path, _twin_state(), _twin_rows())
+    auto_executor.run_auto_buyer_cycle(preview=True)
+    assert not (tmp_path / "logs").exists()
+
+
+def test_live_order_attempt_is_written_to_the_fill_log(tmp_path, decorate):
+    import json
+
+    rows = [
+        _row(SPREAD_V7, pick_id="in", event="g1", edge="0.07", model_probability=0.58, ask=0.51),
+        _row(SPREAD_V7, pick_id="live-low", event="g2", edge="0.07", model_probability=0.53, ask=0.51),
+    ]
+    _live_buyer(tmp_path).evaluate_and_execute(rows)
+    (record,) = [
+        json.loads(line)
+        for line in (tmp_path / "logs" / "auto_buyer_live_fills.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert record["pick_id"] == "in"
+    assert record["outcome"] == "submitted"
+    assert record["cohort"] == SPREAD_V7_LIVE.label
+    assert record["fill_path"] == "ioc_full"
+    assert record["order_ids"] == ["sim-in"]

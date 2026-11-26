@@ -91,6 +91,19 @@ def parser() -> argparse.ArgumentParser:
         "--date", default=eastern_today().isoformat(), help="ISO date; defaults to today in US-Eastern time"
     )
 
+    buyer_report = commands.add_parser(
+        "auto-buyer-report",
+        help="daily auto-buyer cohort report: record, P&L, CLV at the pre-tip close, skips, tip-time split",
+    )
+    buyer_report.add_argument(
+        "--date", default=None, help="US-Eastern game (tip) date; defaults to today in US-Eastern time"
+    )
+    buyer_report.add_argument(
+        "--out-dir",
+        default=None,
+        help="defaults to <runtime root>/reports/auto_buyer; files go in <out-dir>/<date>",
+    )
+
     forecast = commands.add_parser("forecast", help="pregame learned LR + confidence-gate moneyline slate")
     forecast.add_argument("--sport", choices=SPORTS + ESPORTS_TITLES + ("euroleague", "nbl"))
     forecast.add_argument("--all", action="store_true")

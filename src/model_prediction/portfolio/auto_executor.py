@@ -41,6 +41,14 @@ from model_prediction.data_sources.polymarket_execute import (
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
 from model_prediction.portfolio.auto_buyer_ledger import event_key_from_slug, is_fallback_submit_unknown
+from model_prediction.portfolio.auto_buyer_tracking import (
+    LIVE_FILL_LOG_NAME,
+    SKIP_LOG_NAME,
+    CohortSkipRecorder,
+    append_jsonl_records,
+    execute_with_fill_log,
+    tracking_log_path,
+)
 from model_prediction.runtime_paths import RuntimePaths, load_dotenv_into_environ
 
 _paths = RuntimePaths.resolve()
@@ -261,7 +269,10 @@ COHORT_MARKETS = frozenset({"moneyline", "spread", "total"})
 COHORT_REQUIRED_KEYS = frozenset(
     {"model_id", "sport", "market", "min_saved_edge", "max_saved_edge_exclusive", "mode", "enabled"}
 )
-COHORT_OPTIONAL_KEYS = frozenset({"note", "approved_by", "approved_at_utc"})
+# `paper_twin: true` marks a paper cohort that copies a live cohort's window so the two books can be
+# compared pick for pick. Only a twin may overlap a cohort of the other book; it is an explicit key so
+# that code without twin support rejects the entry and keeps the live cohort it overlaps.
+COHORT_OPTIONAL_KEYS = frozenset({"note", "approved_by", "approved_at_utc", "paper_twin"})
 # Phantom-edge guard for every cohort: a live-ask edge above 25% is far more often a bad quote than
 # a mispriced market, and no window may reach above it. Same value as the NCAAB paper trial's sanity
 # ceiling; the measured ML v7m cohort's largest saved edge is 19.6%, so it drops none of those rows.
@@ -338,6 +349,13 @@ def _parse_one_cohort(entry: Any) -> tuple[BuyCohort | None, str | None]:
     mode = entry["mode"]
     if not isinstance(mode, str) or mode not in COHORT_MODES:
         return None, f"mode must be exactly 'paper' or 'live', got {mode!r}"
+    if "paper_twin" in entry and (
+        not isinstance(entry["paper_twin"], bool) or (entry["paper_twin"] and mode != "paper")
+    ):
+        return (
+            None,
+            f"paper_twin must be true or false on a paper cohort, got {entry['paper_twin']!r} ({mode})",
+        )
     minimum = _cohort_edge(entry["min_saved_edge"])
     ceiling = COHORT_EXECUTION_EDGE_CEILING
     if minimum is None or not 0 <= minimum < ceiling:
@@ -363,7 +381,9 @@ def _parse_cohorts(state: dict[str, Any]) -> CohortParse:
 
     Every bad entry is ignored and named in ``errors`` (and logged); a value that is not a list
     yields no cohorts. Two enabled cohorts of the same model/sport/market with overlapping windows
-    are both dropped: a row must belong to at most one book.
+    are both dropped: a row must belong to at most one book of each mode. The one exception is a
+    ``paper_twin`` paper cohort overlapping a live cohort: the twin deliberately buys the same rows
+    in the paper book, whose caps and dedup never touch the live book.
     """
     if COHORTS_STATE_KEY not in state:
         return CohortParse((), ())
@@ -383,6 +403,8 @@ def _parse_cohorts(state: dict[str, Any]) -> CohortParse:
     for position, (index_a, a) in enumerate(candidates):
         for index_b, b in candidates[position + 1 :]:
             if (a.model_id, a.sport, a.market) != (b.model_id, b.sport, b.market):
+                continue
+            if a.mode != b.mode and raw[index_a if a.mode == "paper" else index_b].get("paper_twin") is True:
                 continue
             a_max = math.inf if a.max_saved_edge_exclusive is None else a.max_saved_edge_exclusive
             b_max = math.inf if b.max_saved_edge_exclusive is None else b.max_saved_edge_exclusive
@@ -495,6 +517,8 @@ class AutoExecutionResult:
     # stopped early in this pass, if it did.
     alarms: list[dict[str, Any]] = field(default_factory=list)
     live_halt_reason: str | None = None
+    # Why each cohort row was not bought in this pass (auto_buyer_tracking.CohortSkipRecorder).
+    cohort_skips: list[dict[str, Any]] = field(default_factory=list)
 
 
 INPUT_FLAG_FIELDS = ("input_qualified", "weather_inputs_verified")
@@ -1868,6 +1892,8 @@ def _cohort_pass_summary(
         "orders": orders,
         "alarms": res.alarms,
         "live_halt_reason": res.live_halt_reason,
+        # Popped before the history append and the state save; written to the skip log instead.
+        "skip_records": res.cohort_skips,
     }
 
 
@@ -2198,6 +2224,9 @@ def run_auto_buyer_cycle(
         history_path=paper_history_path if global_mode == "paper" else AUTO_BUYER_CYCLE_HISTORY_PATH,
     )
     for book, pass_summary in cohort_passes.items():
+        append_jsonl_records(
+            tracking_log_path(DATA, SKIP_LOG_NAME), pass_summary.pop("skip_records", None) or []
+        )
         _append_auto_buyer_cycle_history(
             {
                 "executed_at_utc": run_summary["executed_at_utc"],
@@ -2424,9 +2453,17 @@ class AutoPolymarketBuyer:
         # block a whole game, so they apply only to the live book (or the legacy shared index): a
         # live fill must never block a paper cohort's row (the 31d per-book dedup design).
         audit_event_keys = self.config.mode == "live" or not self.config.dedup_own_ledger_only
+        # A paper cohort book indexes its own paper ledger only. The audit log, the dashboard orders
+        # file and polymarket_picks.xlsx record real-money orders alone; their pick ids and market
+        # sides would stop a paper twin from copying the live book's buys.
+        paper_book_only = self.config.mode == "paper" and self.config.dedup_own_ledger_only
 
         # 1. Audit logs (self.audit, data_root / audit.jsonl, data_root / audit_log.jsonl)
-        audit_paths = [self.audit.path, self.data_root / "audit.jsonl", self.data_root / "audit_log.jsonl"]
+        audit_paths = (
+            []
+            if paper_book_only
+            else [self.audit.path, self.data_root / "audit.jsonl", self.data_root / "audit_log.jsonl"]
+        )
         seen_paths: set[Path] = set()
         for log_path in audit_paths:
             resolved = log_path.resolve()
@@ -2498,7 +2535,7 @@ class AutoPolymarketBuyer:
 
         # 2. Dashboard orders file (dashboard/orders.json)
         dashboard_orders_file = _paths.repo_root / "dashboard" / "orders.json"
-        if dashboard_orders_file.exists():
+        if dashboard_orders_file.exists() and not paper_book_only:
             try:
                 orders_data = json.loads(dashboard_orders_file.read_text(encoding="utf-8"))
                 for ord_entry in orders_data.get("orders") or []:
@@ -2530,7 +2567,7 @@ class AutoPolymarketBuyer:
 
         # 3. Polymarket edge ledger (data/polymarket_picks.xlsx)
         poly_ledger_file = self.data_root / "polymarket_picks.xlsx"
-        if poly_ledger_file.exists():
+        if poly_ledger_file.exists() and not paper_book_only:
             try:
                 from ..xlsx_ledger import read_xlsx_rows
 
@@ -2954,6 +2991,7 @@ class AutoPolymarketBuyer:
 
         now = utc_now()
         result = AutoExecutionResult()
+        skip_log = CohortSkipRecorder(book=self.config.mode, enabled=bool(self.config.cohorts), now=now)
 
         totals_root = (
             self.paper_data_root
@@ -2971,6 +3009,10 @@ class AutoPolymarketBuyer:
         ):
             result.total_evaluated = len(picks)
             result.rejected_daily_loss_breaker = len(picks)
+            skip_log.reject_all(
+                picks, lambda row: _match_cohort(row, self.config), "rejected_daily_loss_breaker"
+            )
+            skip_log.finish(result)
             return result
 
         if (
@@ -3025,6 +3067,7 @@ class AutoPolymarketBuyer:
             event_id = str(row.get("event_id") or "")
             selection = str(row.get("selection") or "").lower()
             cohort = _match_cohort(row, self.config)
+            skip_log.observe(row, cohort, result)
 
             # 1. Status filter (must be open). Checked first, ahead of every other
             # gate: the pick-source files (main/flat/gated/research) are append-only
@@ -3312,6 +3355,7 @@ class AutoPolymarketBuyer:
             market_slug = str(quote["market_slug"])
             token_side = str(quote["side"]).lower()
             clob_ask = float(quote.get("ask") or 0.0)
+            skip_log.note(ask=clob_ask, market_slug=market_slug)
 
             # 8. Precise Deduplication check on resolved market_slug and token_side
             if self._is_already_bought(
@@ -3409,6 +3453,7 @@ class AutoPolymarketBuyer:
 
             # 10. Sizing & Edge check against real Polymarket CLOB ask (mirrors Main Ledger sport hurdles)
             edge = model_prob - clob_ask
+            skip_log.note(live_edge=edge)
             if cohort is not None:
                 # A cohort is bounded by its own window on the live-ask edge, not by the sport
                 # floors or the global max edge (both would drop the measured cohort rows).
@@ -3697,7 +3742,11 @@ class AutoPolymarketBuyer:
             # Only a gate refusal raised before anything was sent is "refused". An unknown outcome
             # and anything after the order exists are alarms that stop live buying for this pass.
             try:
-                sub = executor.execute(
+                sub = execute_with_fill_log(
+                    executor.execute,
+                    log_path=tracking_log_path(self.data_root, LIVE_FILL_LOG_NAME),
+                    order_payload=order_payload,
+                    source_row=row,
                     ticket=ticket,
                     pick_row=exec_row,
                     execute_flag=True,
@@ -3912,4 +3961,5 @@ class AutoPolymarketBuyer:
             # Polite pacing to respect exchange rate limits
             time.sleep(0.25)
 
+        skip_log.finish(result)
         return result

@@ -250,6 +250,10 @@ def main(argv: list[str] | None = None) -> None:
             output = cmd_freeze_production(args, config, registry, bans, ledger, audit, data_root)
         elif args.command == "compare-champion":
             output = cmd_compare_champion(args, config, registry, bans, ledger, audit, data_root)
+        elif args.command == "auto-buyer-report":
+            from ..portfolio.auto_buyer_report import cmd_auto_buyer_report
+
+            output = cmd_auto_buyer_report(args)
         else:
             raise ValueError(f"unknown command: {args.command}")
         print(json.dumps(output, indent=2, sort_keys=True, default=str))
