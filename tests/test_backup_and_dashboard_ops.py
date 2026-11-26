@@ -150,3 +150,33 @@ def test_dashboard_main_exits_quietly_when_the_port_is_taken(monkeypatch, capsys
     assert "busy" in capsys.readouterr().err
     assert started == []
     assert not (tmp_path / "server.pid").exists()
+
+
+def test_nightly_main_backs_up_databases_and_auto_buyer_files(monkeypatch, tmp_path):
+    import sqlite3
+
+    backup = _backup_module()
+    runtime = tmp_path / "runtime"
+    files = _seed_runtime(runtime)
+    monkeypatch.setenv("MODEL_PREDICTION_RUNTIME_ROOT", str(runtime))
+    from model_prediction.runtime_paths import RuntimePaths
+
+    paths = RuntimePaths.resolve(require_external_runtime=True)
+    for db in (paths.ledgers_db, paths.runs_db, paths.production_db):
+        db.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(db) as conn:
+            conn.execute("CREATE TABLE t (x INTEGER)")
+    old = runtime / "backups" / "auto_buyer" / "20200101T000000Z"
+    old.mkdir(parents=True)
+    monkeypatch.setattr("sys.argv", ["backup_runtime_databases.py"])
+    assert backup.main() == 0
+    dated = sorted((runtime / "backups" / "auto_buyer").iterdir())
+    assert len(dated) == 1 and dated[0] != old  # the 2020 copy aged out, today's stays
+    for relative, data in files.items():
+        assert (dated[0] / relative).read_bytes() == data
+        assert (runtime / relative).read_bytes() == data
+    assert sorted(p.name.split(".")[0] for p in (runtime / "backups").glob("*.db")) == [
+        "ledgers",
+        "production",
+        "runs",
+    ]

@@ -24,7 +24,9 @@ from .stealth_runtime import enable_background_priority
 
 # The worker holds auto_buyer.lock, never daily.lock: waiting on daily.lock let a 40-minute daily run
 # block live settlement and buys (2026-11-25). Only the daily job's own buyer steps, a manual settle or
-# a dashboard action share this lock, and each holds it for minutes at most.
+# a dashboard action share this lock, and each holds it for minutes at most. A hold past the wait is
+# a visible exit-75 skip, and that holder (usually the daily job's own buy step) has just done the
+# same reconcile, settle and buy pass.
 LOCK_WAIT_SECONDS = AUTO_BUYER_LOCK_WAIT_SECONDS
 
 # The pre-tip close capture runs after the buys and must finish well inside the supervisor's

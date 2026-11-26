@@ -159,38 +159,52 @@ def test_disabled_or_paper_only_cycles_never_read_the_balance(monkeypatch, tmp_p
 
 
 class _BalanceExecutor:
-    answer: ClassVar[Any] = None
+    """Answers ``account_balance`` from ``answers`` in order (the last one repeats)."""
+
+    answers: ClassVar[list[Any]] = []
+    calls: ClassVar[int] = 0
 
     def __init__(self, **_kwargs: Any) -> None:
         pass
 
     def account_balance(self) -> dict[str, Any]:
-        if isinstance(_BalanceExecutor.answer, BaseException):
-            raise _BalanceExecutor.answer
-        return _BalanceExecutor.answer
+        answer = _BalanceExecutor.answers[min(_BalanceExecutor.calls, len(_BalanceExecutor.answers) - 1)]
+        _BalanceExecutor.calls += 1
+        if isinstance(answer, BaseException):
+            raise answer
+        return answer
+
+
+def _busy() -> ExecutionGateError:
+    return ExecutionGateError("REFUSED by Polymarket US (503): busy", status_code=503)
 
 
 @pytest.mark.parametrize(
-    ("answer", "status"),
+    ("answers", "status", "calls"),
     [
-        (lambda: {"available_cash_usd": 42.5}, "ok"),
-        (lambda: {"available_cash_usd": None, "current_balance_usd": 50.0}, "unavailable"),
+        (lambda: [{"available_cash_usd": 42.5}], "ok", 1),
+        (lambda: [{"available_cash_usd": None, "current_balance_usd": 50.0}], "unavailable", 1),
         (
-            lambda: ExecutionGateError("REFUSED by Polymarket US (403): forbidden", status_code=403),
+            lambda: [ExecutionGateError("REFUSED by Polymarket US (403): forbidden", status_code=403)],
             "auth_error",
+            1,
         ),
-        (lambda: ExecutionGateError("REFUSED: POLYMARKET_KEY_ID is not set."), "auth_error"),
-        (lambda: ExecutionGateError("REFUSED by Polymarket US (503): busy", status_code=503), "unavailable"),
-        (lambda: OSError("network down"), "unavailable"),
+        (lambda: [ExecutionGateError("REFUSED: POLYMARKET_KEY_ID is not set.")], "auth_error", 1),
+        (lambda: [_busy()], "unavailable", 3),
+        (lambda: [OSError("network down")], "unavailable", 3),
+        (lambda: [_busy(), {"available_cash_usd": 42.5}], "ok", 2),
     ],
 )
-def test_live_cash_check_outcomes(monkeypatch, tmp_path, answer, status):
+def test_live_cash_check_outcomes(monkeypatch, tmp_path, answers, status, calls):
     monkeypatch.setattr(auto_executor, "DATA", tmp_path)
     monkeypatch.setattr(auto_executor, "PolymarketExecutor", _BalanceExecutor)
-    _BalanceExecutor.answer = answer()
+    monkeypatch.setattr(auto_executor.time, "sleep", lambda *_a: None)
+    _BalanceExecutor.answers = answers()
+    _BalanceExecutor.calls = 0
     assert REAL_LIVE_CASH_CHECK is not None, "auto_executor._live_cash_check is missing"
     result = REAL_LIVE_CASH_CHECK()
     assert result["status"] == status
+    assert _BalanceExecutor.calls == calls  # auth and a well-formed answer are never retried
     if status == "ok":
         assert result["available_cash_usd"] == 42.5
 

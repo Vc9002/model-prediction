@@ -1212,6 +1212,11 @@ def _tip_time_refusal(row_start: datetime, exchange_start_raw: Any, now: datetim
     return None
 
 
+# _request does not retry a 5xx, and the gateway answered 503 five times in the 2026-11-25 logs: one
+# blip must not block a cycle's live buying and fail the run.
+LIVE_CASH_CHECK_RETRY_DELAYS = (0.0, 1.0, 3.0)
+
+
 def _live_cash_check() -> dict[str, Any]:
     """Read the account's buying power once for this cycle (read-only GET, no order).
 
@@ -1219,17 +1224,40 @@ def _live_cash_check() -> dict[str, Any]:
     ``unavailable`` (network, 5xx, or no parseable USD buying power -- unknown, never zero). Anything
     but ``ok`` stops live buying for the cycle: a live pass never trades on an unknown balance.
     """
-    try:
-        executor = PolymarketExecutor(audit=AuditLog(DATA / "audit.jsonl"), confirm=lambda _prompt: "N")
-        balance = executor.account_balance()
-    except ExecutionGateError as exc:
-        status = "auth_error" if classify_gate_refusal(exc) == "auth" else "unavailable"
-        return {"status": status, "detail": str(exc)[:300]}
-    except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError, AttributeError) as exc:
-        return {"status": "unavailable", "detail": f"{type(exc).__name__}: {exc}"[:300]}
-    if balance.get("available_cash_usd") is None:
-        return {"status": "unavailable", "detail": "balance response carried no USD buying power", **balance}
-    return {"status": "ok", **balance}
+    outcome: dict[str, Any] = {"status": "unavailable", "detail": "balance not read"}
+    for attempt, delay in enumerate(LIVE_CASH_CHECK_RETRY_DELAYS):
+        if delay:
+            time.sleep(delay)
+        try:
+            executor = PolymarketExecutor(audit=AuditLog(DATA / "audit.jsonl"), confirm=lambda _prompt: "N")
+            balance = executor.account_balance()
+        except ExecutionGateError as exc:
+            if classify_gate_refusal(exc) == "auth":
+                # Credentials do not heal between retries; fail at once.
+                return {"status": "auth_error", "detail": str(exc)[:300], "attempts": attempt + 1}
+            outcome = {"status": "unavailable", "detail": str(exc)[:300], "attempts": attempt + 1}
+            continue
+        except (
+            httpx.HTTPError,
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+            RuntimeError,
+            AttributeError,
+        ) as exc:
+            detail = f"{type(exc).__name__}: {exc}"[:300]
+            outcome = {"status": "unavailable", "detail": detail, "attempts": attempt + 1}
+            continue
+        if balance.get("available_cash_usd") is None:
+            # A well-formed answer without buying power will not change on a retry.
+            return {
+                "status": "unavailable",
+                "detail": "balance response carried no USD buying power",
+                **balance,
+            }
+        return {"status": "ok", **balance}
+    return outcome
 
 
 def _auth_or_balance_refusal_alarm(orders: list[dict[str, Any]]) -> dict[str, Any] | None:
