@@ -307,13 +307,13 @@ def test_a_kill_switch_that_cannot_be_written_is_not_reported_as_done(env, monke
     _write_state(env, LIVE_STATE)
 
     def _hang(_enabled=None, **_kw):
-        threading.Event().wait(3)
+        threading.Event().wait(0.05)
         raise OSError("never saved")
 
     monkeypatch.setattr(auto_executor, "toggle_live_trading", _hang)
     monkeypatch.setattr(telegram_control, "SWEEP_WAIT_SECONDS", 0.2)
     result = _run("live-off")
-    assert result["ok"] is False and "ALARM" in result["message"]
+    assert result["ok"] is False and "NOT confirmed" in result["message"]
 
 
 def test_the_live_switch_audit_line_names_telegram_as_its_source(env):
@@ -905,7 +905,7 @@ def test_liveon_in_legacy_live_mode_is_called_out_as_ungoverned(env):
     assert "no real order will be placed" not in result["message"]
 
 
-def test_the_cli_arms_an_overall_deadline_and_it_prints_one_json_object(env, monkeypatch, capsys):
+def test_the_cli_arms_an_overall_deadline_and_it_prints_one_json_object(env, monkeypatch, capfd):
     armed: list[tuple[float, Any]] = []
 
     class _Timer:
@@ -924,11 +924,11 @@ def test_the_cli_arms_an_overall_deadline_and_it_prints_one_json_object(env, mon
     assert telegram_control.main(["status"]) == 0
     assert armed[0][0] == telegram_control.CLI_DEADLINE_SECONDS == 150.0
     assert armed[-1][0] == "cancelled"
-    capsys.readouterr()
+    capfd.readouterr()
     exits: list[int] = []
     monkeypatch.setattr(telegram_control.os, "_exit", exits.append)
     armed[0][1]()
-    out = json.loads(capsys.readouterr().out)
+    out = json.loads(capfd.readouterr().out)
     assert out["ok"] is False and "UNKNOWN" in out["message"] and exits == [1]
 
 
@@ -954,3 +954,150 @@ def test_cancel_and_liveon_messages_have_no_american_odds_or_secrets_even_on_exc
     blob = json.dumps(results)
     assert "SUPERSECRETVALUE" not in blob
     assert re.search(r"(?<![\w.:-])[+-]\d{3}(?!\d)", re.sub(r"\d{4}-\d{2}-\d{2}", "", blob)) is None
+
+
+# ------------------------------------------------------------------ fix round 2 (re-review 2026-11-26)
+
+
+def _flaky_live_toggle(monkeypatch, fail_times: int, delay: float):
+    """toggle_live_trading that loses the state lock ``fail_times`` times (each after ``delay`` s), then writes."""
+    real = auto_executor.toggle_live_trading
+    calls = {"n": 0}
+
+    def _contended(enabled=None, **kw):
+        calls["n"] += 1
+        threading.Event().wait(delay)
+        if calls["n"] <= fail_times:
+            raise OSError("state file locked")
+        return real(enabled, **kw)
+
+    monkeypatch.setattr(auto_executor, "toggle_live_trading", _contended)
+    return calls
+
+
+def test_liveoff_with_the_master_off_waits_for_a_slow_state_write_and_verifies_the_flag(env, monkeypatch):
+    """Master off + a contended state lock: the old code gave up after the sweep wait and trusted
+    live_switch_on (False whenever the master is off), so /liveoff said OFF while live_enabled stayed true."""
+    _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": True})
+    calls = _flaky_live_toggle(monkeypatch, fail_times=2, delay=0.25)
+    monkeypatch.setattr(telegram_control, "SWEEP_WAIT_SECONDS", 0.1)
+    result = _run("live-off")
+    assert calls["n"] == 3
+    assert result["ok"] is True
+    assert _state(env)["live_enabled"] is False, "the flag must be saved before the reply says OFF"
+
+
+def test_liveoff_never_reports_off_while_the_flag_is_still_true_with_the_master_off(env, monkeypatch):
+    _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": True})
+    monkeypatch.setattr(
+        auto_executor, "toggle_live_trading", lambda *a, **k: {}
+    )  # "succeeds", writes nothing
+    result = _run("live-off")
+    assert result["ok"] is False and "ALARM" in result["message"]
+    assert _state(env)["live_enabled"] is True
+
+
+def test_liveoff_that_never_saves_is_not_confirmed(env, monkeypatch):
+    _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": True})
+    _flaky_live_toggle(monkeypatch, fail_times=99, delay=0.02)
+    monkeypatch.setattr(telegram_control, "SWEEP_WAIT_SECONDS", 0.05)
+    result = _run("live-off")
+    assert result["ok"] is False and "NOT confirmed" in result["message"]
+    assert _state(env)["live_enabled"] is True
+
+
+def test_liveoff_sweep_pending_is_reported_only_after_the_flag_reads_off_with_the_master_off(
+    env, monkeypatch
+):
+    _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": True})
+    _write_ledger(env.root / "auto_buyer_ledger.jsonl", [_row("ioc-1", fallback="gtd-1")])
+    env.exchange.orders = [_order("gtd-1")]
+    release = threading.Event()
+    real_cancel = env.exchange.cancel
+
+    def _slow_cancel(*args, **kwargs):
+        release.wait(5)
+        return real_cancel(*args, **kwargs)
+
+    env.exchange.cancel = _slow_cancel
+    monkeypatch.setattr(telegram_control, "SWEEP_WAIT_SECONDS", 0.3)
+    try:
+        result = _run("live-off")
+        assert _state(env)["live_enabled"] is False
+    finally:
+        release.set()
+    assert result["ok"] is True and "still running" in result["message"]
+
+
+def test_pause_with_a_slow_live_write_still_ends_with_the_flag_off_or_says_it_is_not(env, monkeypatch):
+    _write_state(env, LIVE_STATE)
+    monkeypatch.setattr(auto_executor, "toggle_live_trading", lambda *a, **k: {})  # the live write is lost
+    result = _run("pause")
+    assert result["ok"] is False and "could NOT be set off" in result["message"]
+    assert _state(env)["enabled"] is False and _state(env)["live_enabled"] is True
+
+
+def test_resume_bounds_the_master_on_sweep_but_not_the_master_write(env, monkeypatch):
+    _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": False})
+    _write_ledger(env.root / "auto_buyer_ledger.jsonl", [_row("ioc-1", fallback="gtd-1")])
+    env.exchange.orders = [_order("gtd-1")]
+    release = threading.Event()
+    real_cancel = env.exchange.cancel
+
+    def _slow_cancel(*args, **kwargs):
+        release.wait(5)
+        return real_cancel(*args, **kwargs)
+
+    env.exchange.cancel = _slow_cancel
+    monkeypatch.setattr(telegram_control, "SWEEP_WAIT_SECONDS", 0.3)
+    try:
+        result = _run("resume")
+        assert _state(env)["enabled"] is True and _state(env)["live_enabled"] is False
+    finally:
+        release.set()
+    assert result["ok"] is True and "still running" in result["message"]
+
+
+def test_resume_waits_for_a_slow_master_write(env, monkeypatch):
+    path = _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": False})
+    real = auto_executor.toggle_auto_buyer
+    calls = {"n": 0}
+
+    def _contended(enabled=None):
+        calls["n"] += 1
+        threading.Event().wait(0.25)
+        if calls["n"] == 1:
+            raise OSError("state file locked")
+        return real(enabled)
+
+    monkeypatch.setattr(auto_executor, "toggle_auto_buyer", _contended)
+    monkeypatch.setattr(telegram_control, "SWEEP_WAIT_SECONDS", 0.1)
+    result = _run("resume")
+    assert result["ok"] is True and json.loads(path.read_text(encoding="utf-8"))["enabled"] is True
+
+
+def test_the_deadline_answer_goes_to_the_real_stdout_even_inside_a_running_handler(env, monkeypatch, capfd):
+    """run_command redirects stdout to stderr for the whole handler; the deadline callback fires inside it."""
+    exits: list[int] = []
+    monkeypatch.setattr(telegram_control.os, "_exit", exits.append)
+
+    def _handler(_ctx, _args):
+        telegram_control._deadline_exit()
+        return {"ok": True, "message": "late"}
+
+    monkeypatch.setitem(telegram_control._HANDLERS, "status", _handler)
+    _write_state(env, LIVE_STATE)
+    capfd.readouterr()
+    telegram_control.run_command("status", [])
+    captured = capfd.readouterr()
+    answer = json.loads(captured.out.strip().splitlines()[0])
+    assert answer["ok"] is False and "UNKNOWN" in answer["message"] and exits == [1]
+    assert "UNKNOWN" not in captured.err
+
+
+def test_resume_does_not_report_success_when_the_master_write_was_lost(env, monkeypatch):
+    path = _write_state(env, {**LIVE_STATE, "enabled": False, "live_enabled": False})
+    monkeypatch.setattr(auto_executor, "toggle_auto_buyer", lambda *a, **k: {})  # "succeeds", writes nothing
+    result = _run("resume")
+    assert result["ok"] is False and "ALARM" in result["message"]
+    assert json.loads(path.read_text(encoding="utf-8"))["enabled"] is False

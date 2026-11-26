@@ -176,13 +176,34 @@ def _retry_toggle(ctx: _Context, call: Any, value: bool) -> dict[str, Any]:
 
 
 _ABANDONED: list[threading.Thread] = []
+_SAVE_POLL_SECONDS = 0.05
 
 
-def _toggle(ctx: _Context, call: Any, value: bool, *, sweep: bool) -> dict[str, Any]:
-    """Run a switch write. The toggles save first and then sweep the ledger's resting orders; with ``sweep`` the
-    caller waits for the sweep at most ``SWEEP_WAIT_SECONDS``, so a slow exchange never delays the reply (or the
-    bot's timeout) once the switch itself is saved. The result then carries a pending sweep, and the caller still
-    re-reads the state file, so an unsaved switch is never reported as done."""
+def _live_flag_is_off(raw: dict[str, Any] | None) -> bool:
+    # Strict: a missing key follows the master switch, so only an explicit false counts as off.
+    return raw is not None and raw.get("live_enabled") is False
+
+
+def _live_flag_is_on(raw: dict[str, Any] | None) -> bool:
+    return raw is not None and raw.get("live_enabled") is True
+
+
+def _master_is_off(raw: dict[str, Any] | None) -> bool:
+    return raw is not None and raw.get("enabled") is False
+
+
+def _master_is_on(raw: dict[str, Any] | None) -> bool:
+    return raw is not None and raw.get("enabled") is True
+
+
+def _toggle(ctx: _Context, call: Any, value: bool, *, saved: Any, sweep: bool) -> dict[str, Any]:
+    """Run a switch write. The toggles save first and then sweep the ledger's resting orders.
+
+    The SAVE is never bounded here (only the CLI's overall deadline ends it): the caller waits until the state
+    file shows the switch at its target (``saved``), or until the write fails. With ``sweep`` the wait for the
+    cancel sweep that follows the save is capped at ``SWEEP_WAIT_SECONDS``, so a slow exchange never delays the
+    reply once the switch itself is saved; that result carries a pending sweep. Callers still re-read the state
+    file before saying anything is done."""
     box: dict[str, Any] = {}
 
     def work() -> None:
@@ -193,12 +214,23 @@ def _toggle(ctx: _Context, call: Any, value: bool, *, sweep: bool) -> dict[str, 
 
     worker = threading.Thread(target=work, name="telegram-control-toggle", daemon=True)
     worker.start()
-    worker.join(SWEEP_WAIT_SECONDS if sweep else None)
+    saved_at: float | None = None
+    while worker.is_alive():
+        worker.join(_SAVE_POLL_SECONDS)
+        if saved_at is None:
+            try:
+                raw = _raw_state(ctx)
+            except Exception:  # noqa: BLE001 -- a file caught mid-write: look again
+                raw = None
+            if saved(raw):
+                saved_at = time.monotonic()
+        elif sweep and time.monotonic() - saved_at > SWEEP_WAIT_SECONDS:
+            break
     if "error" in box:
         raise box["error"]
     if "state" in box:
         return box["state"]
-    _ABANDONED.append(worker)
+    _ABANDONED.append(worker)  # only reached after the save was seen
     return {"kill_switch_cancel": {"status": "pending"}}
 
 
@@ -206,11 +238,14 @@ def _toggle_live(ctx: _Context, value: bool) -> dict[str, Any]:
     def call(v: bool) -> dict[str, Any]:
         return ctx.executor_module.toggle_live_trading(v, source="telegram")
 
-    return _toggle(ctx, call, value, sweep=not value)
+    target = _live_flag_is_on if value else _live_flag_is_off
+    return _toggle(ctx, call, value, saved=target, sweep=not value)
 
 
 def _toggle_master(ctx: _Context, value: bool) -> dict[str, Any]:
-    return _toggle(ctx, ctx.executor_module.toggle_auto_buyer, value, sweep=not value)
+    # The master-on of /resume sweeps too (live is off at that point), so both directions are bounded.
+    target = _master_is_on if value else _master_is_off
+    return _toggle(ctx, ctx.executor_module.toggle_auto_buyer, value, saved=target, sweep=True)
 
 
 def _kill_switch_note(state: dict[str, Any]) -> tuple[str, bool]:
@@ -220,7 +255,7 @@ def _kill_switch_note(state: dict[str, Any]) -> tuple[str, bool]:
         return "", False
     if summary.get("status") == "pending":
         return (
-            " The switch is saved; the cancel sweep of resting live orders is still running, see /orders.",
+            " The cancel sweep of resting live orders is still running, see /orders.",
             False,
         )
     if summary.get("status") == "error":
@@ -290,48 +325,41 @@ def _cmd_live_off(ctx: _Context, _args: list[str]) -> dict[str, Any]:
         state = _toggle_live(ctx, False)
     except Exception as exc:  # noqa: BLE001 -- reported: the switch is NOT confirmed off
         return _fail(f"Real money was NOT confirmed off ({_error_text(exc)}). Check /status now.")
-    raw = _raw_state(ctx)
-    if raw is None or ctx.ledger_module.live_switch_on(raw):
+    # The FLAG, not live_switch_on: that reads False whenever the master is off, even with live_enabled still
+    # true, and a later master-on would then bring real money back with no code.
+    if not _live_flag_is_off(_raw_state(ctx)):
         return _fail("ALARM: the state file still reads real money ON after /liveoff. Check /status now.")
     note, cancel_failed = _kill_switch_note(state)
     return _ok(
-        "Real money OFF. Paper keeps running." + note,
+        "Real money OFF (saved). Paper keeps running." + note,
         live_enabled=False,
         live_trading_active=False,
         cancel_failed=cancel_failed,
     )
 
 
-def _live_flag_is_off(raw: dict[str, Any] | None) -> bool:
-    # Strict: a missing key follows the master switch, so only an explicit false counts as off.
-    return raw is not None and raw.get("live_enabled") is False
-
-
 def _cmd_pause(ctx: _Context, _args: list[str]) -> dict[str, Any]:
     """Real money off FIRST, then the master. Pausing the master alone left ``live_enabled`` true, so any later
     master-on (the dashboard) would have brought real money back with no code."""
-    notes: list[str] = []
-    failed = False
+    states: list[dict[str, Any]] = []
+    unconfirmed = ""
     if not _live_flag_is_off(_raw_state(ctx)):
         try:
-            note, bad = _kill_switch_note(_toggle_live(ctx, False))
+            states.append(_toggle_live(ctx, False))
         except Exception as exc:  # noqa: BLE001 -- the master switch is still tried: it stops live too
-            note, bad = f" Real money was NOT confirmed off first ({_error_text(exc)}).", True
-        notes.append(note)
-        failed = failed or bad
+            unconfirmed = f" Real money was NOT confirmed off first ({_error_text(exc)})."
     try:
-        note, bad = _kill_switch_note(_toggle_master(ctx, False))
+        states.append(_toggle_master(ctx, False))
     except Exception as exc:  # noqa: BLE001 -- reported: the switch is NOT confirmed off
         return _fail(f"The buyer was NOT confirmed paused ({_error_text(exc)}). Check /status now.")
-    notes.append(note)
-    failed = failed or bad
     raw = _raw_state(ctx)
-    if raw is None or raw.get("enabled") is True or ctx.ledger_module.live_switch_on(raw):
-        return _fail(
-            "ALARM: the state file still reads the buyer or real money ON after /pause. Check /status now."
-        )
+    notes = [unconfirmed] + [_kill_switch_note(st)[0] for st in states]
+    failed = any(_kill_switch_note(st)[1] for st in states)
+    if raw is None or raw.get("enabled") is True:
+        return _fail("ALARM: the state file still reads the buyer ON after /pause. Check /status now.")
     if not _live_flag_is_off(raw):
-        # The master is off, but a later master-on (the dashboard) would bring real money back with no code.
+        # The master is off (re-read above), but a later master-on (the dashboard) would bring real money back
+        # with no code.
         return _fail(
             "Auto-buyer paused, but the real-money flag could NOT be set off: switching the master back on "
             "would restore real money. Send /liveoff now." + "".join(notes),
@@ -340,7 +368,7 @@ def _cmd_pause(ctx: _Context, _args: list[str]) -> dict[str, Any]:
             live_trading_active=False,
         )
     return _ok(
-        "Real money OFF and auto-buyer paused: paper and live are both off."
+        "Real money OFF and auto-buyer paused (saved): paper and live are both off."
         + "".join(notes)
         + " /resume brings paper back (live stays off).",
         enabled=False,
@@ -365,16 +393,21 @@ def _cmd_resume(ctx: _Context, _args: list[str]) -> dict[str, Any]:
         if not _live_flag_is_off(raw):
             return _fail("Not resumed: the state file does not read real money OFF after the first step.")
     try:
-        _toggle_master(ctx, True)
+        state = _toggle_master(ctx, True)
     except Exception as exc:  # noqa: BLE001 -- reported; live is already off
         return _fail(f"Resume failed ({_error_text(exc)}). Real money is OFF; check /status.")
     raw = _raw_state(ctx)
-    if raw is None or ctx.ledger_module.live_switch_on(raw):
+    if not _master_is_on(raw) or not _live_flag_is_off(raw):
         with contextlib.suppress(Exception):
             _toggle_live(ctx, False)
-        return _fail("ALARM: real money read ON after /resume; it was switched off again. Check /status now.")
+        return _fail(
+            "ALARM: after /resume the state file does not read the buyer ON with real money OFF; real money "
+            "was switched off again. Check /status now."
+        )
+    note, _bad = _kill_switch_note(state)
+    sweep = note if "still running" in note or _bad else ""
     return _ok(
-        "Paper auto-buyer back ON. Real money is still OFF: use /liveon for real money.",
+        "Paper auto-buyer back ON. Real money is still OFF: use /liveon for real money." + sweep,
         enabled=True,
         live_enabled=False,
         live_trading_active=False,
@@ -811,15 +844,15 @@ def run_command(command: str, args: list[str]) -> dict[str, Any]:
 def _deadline_exit() -> None:
     """Last resort: answer with one JSON object and end the process. The kill switches write their state first,
     so what can still be unknown at this point is the cancel sweep or the follow-up read."""
-    print(
-        json.dumps(
-            _fail(
-                f"The control command ran past {CLI_DEADLINE_SECONDS:g} s: the outcome is UNKNOWN. "
-                "Send /status (and /orders)."
-            )
-        ),
-        flush=True,
+    # sys.__stdout__, not sys.stdout: run_command redirects stdout to stderr (process-wide) while a handler runs,
+    # and the bot reads only stdout.
+    answer = _fail(
+        f"The control command ran past {CLI_DEADLINE_SECONDS:g} s: the outcome is UNKNOWN. "
+        "Send /status (and /orders)."
     )
+    out = sys.__stdout__ or sys.stdout
+    out.write(json.dumps(answer) + "\n")
+    out.flush()
     os._exit(1)
 
 
