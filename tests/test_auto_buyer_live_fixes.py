@@ -720,6 +720,15 @@ def test_setters_refuse_to_overwrite_a_malformed_state_file(cycle):
     assert path.read_text(encoding="utf-8") == "{not json"
 
 
+def test_a_whole_state_save_refuses_to_overwrite_a_malformed_file(cycle):
+    path = cycle["state_file"]
+    path.write_text("{not json", encoding="utf-8")
+    defaults = auto_executor.load_auto_buyer_state()
+    with pytest.raises(auto_executor.AutoBuyerStateUnreadableError):
+        auto_executor.save_auto_buyer_state(defaults)
+    assert path.read_text(encoding="utf-8") == "{not json"
+
+
 # ---------------------------------------------------------------- 2. hard live caps
 
 
