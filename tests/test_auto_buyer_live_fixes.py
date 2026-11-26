@@ -44,6 +44,13 @@ def _isolate(monkeypatch, tmp_path):
     monkeypatch.delenv("POLYMARKET_KEY_ID", raising=False)
     monkeypatch.setattr(auto_buyer_ledger, "log_auto_buyer_event", lambda *a, **k: None)
     monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", _no_default_executor)
+    # A recorder call without explicit paths must never write the repo data/ tree.
+    monkeypatch.setattr(
+        auto_buyer_ledger, "AUTO_BUYER_XLSX_PATH", tmp_path / "default" / "auto_buyer_picks.xlsx"
+    )
+    monkeypatch.setattr(
+        auto_buyer_ledger, "AUTO_BUYER_JSONL_PATH", tmp_path / "default" / "auto_buyer_ledger.jsonl"
+    )
     # Never the repo or runtime state file: reconcile reads the global edge window from it.
     monkeypatch.setattr(auto_executor, "AUTO_BUYER_STATE_FILE", tmp_path / "state" / "auto_buyer_state.json")
     monkeypatch.setattr("model_prediction.data_sources.polymarket_us.PolymarketUSClient", _NoExchange)
