@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .data_sources.espn import _probable
+from .data_sources.ncaab_boxscores import player_box_root
 from .domain import EASTERN, parse_utc
 from .features.base import FeatureStore
 from .features.batter_offense import matchup_offense_pit_gap
@@ -32,6 +33,12 @@ from .features.mlb_player_availability import (
 )
 from .features.mlb_player_availability import (
     matchup_player_availability as matchup_mlb_player_availability,
+)
+from .features.ncaab_player_availability import FEATURE_NAMES as NCAAB_AVAILABILITY_FEATURE_NAMES
+from .features.ncaab_player_availability import (
+    PlayerBoxIndex,
+    ncaab_season_year,
+    p1_margin_adjustment,
 )
 from .features.park_factors_pit import park_factor_at
 from .features.player_availability import FEATURE_NAMES as AVAILABILITY_FEATURE_NAMES
@@ -422,6 +429,36 @@ def _compute_features(
             for name in wanted & MLB_POSITION_PLAYER_FEATURE_NAMES:
                 features[name] = 0.0
             unavailable.append(str(error).split(":", 1)[0].strip() or "mlb_position_players_unavailable")
+    if wanted & NCAAB_AVAILABILITY_FEATURE_NAMES:
+        # Shadow-only, inert until an artifact's feature_names lists one of these names (none does;
+        # the served NCAAB engines do not run through this function at all). Null inputs give 0.0,
+        # which is P1's own rule: no adjustment, the base model's margin bit for bit.
+        if sport != "ncaab":
+            raise ValueError(
+                "NO_CALL_NCAAB_AVAILABILITY_UNSUPPORTED: prior-game box availability feature is NCAAB-only"
+            )
+        try:
+            p1 = p1_margin_adjustment(
+                home_team,
+                away_team,
+                event_start,
+                history,
+                PlayerBoxIndex.load(player_box_root(data_root), observed_at, ncaab_season_year(event_start)),
+            )
+            if p1.adjustment is None:
+                raise ValueError(f"{p1.reason}: ncaab player availability unavailable")
+            p1_values = {
+                "ncaab_p1_avail_top7_prev1_diff": float(p1.home.avail_top7_prev1 or 0.0)
+                - float(p1.away.avail_top7_prev1 or 0.0),
+                "ncaab_p1_top7_out3plus_share_diff": float(p1.home.top7_minutes_share_out_3plus or 0.0)
+                - float(p1.away.top7_minutes_share_out_3plus or 0.0),
+                "ncaab_p1_margin_adjustment": float(p1.adjustment),
+            }
+            features.update({name: value for name, value in p1_values.items() if name in wanted})
+        except (KeyError, TypeError, ValueError, OSError) as error:
+            for name in wanted & NCAAB_AVAILABILITY_FEATURE_NAMES:
+                features[name] = 0.0
+            unavailable.append(str(error).split(":", 1)[0].strip() or "ncaab_availability_unavailable")
     _init_providers()
     if "park_factor_pit" in wanted:
         # PIT-correct empirical park factor from cached history -- exactly

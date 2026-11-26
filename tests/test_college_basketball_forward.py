@@ -959,3 +959,68 @@ def test_ncaab_serves_raw_when_the_calibrator_fails_the_guard(tmp_path, monkeypa
     assert report["calibration"]["moneyline"]["reason"] == "sample_too_small"
     assert float(row["serving_probability"]) == pytest.approx(0.80)
     assert row["calibration_method"] == "identity"
+
+
+# --- P1 player availability is a shadow field only (2026-11-25) ------------------------------------------
+
+
+def _p1_shadow_run(root, monkeypatch, *, margin_engine="v7", shadow=None):
+    root.mkdir()
+    day = _routing_fixture(root, monkeypatch)
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward.ProductionModelRegistry.load",
+        _registry("ncaab-spread-v7"),
+    )
+    factory, _built = _fake_spread_model("ncaab-spread-v7", "h7", margin_engine)
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ncaab_spread_v7_model", factory)
+    if shadow is not None:
+        monkeypatch.setattr("model_prediction.college_basketball_forward.p1_margin_adjustment", shadow)
+    flat = MultiSportPickLedger(root, flat=True)
+    config = {"models": {"NCAAB": {"decline_non_d1": False}}}
+    report = forecast_ncaab_sport(data_root=root, args_date=day, config=config, flat_ledger=flat)
+    assert not report["errors"] and report["flat_logged"] == 1
+    row = flat.rows()[0]
+    return row, json.loads(row["model_input_snapshot_json"])["features"]
+
+
+_SERVED_FIELDS = (
+    "model_probability",
+    "model_probability_raw",
+    "market_implied_probability",
+    "edge",
+    "units",
+    "confidence_score",
+)
+
+
+def test_p1_shadow_never_changes_the_served_pick(tmp_path, monkeypatch):
+    from model_prediction.features import ncaab_player_availability as avail
+
+    side = avail.TeamAvailability("Home", None, 0.2, 0.8, 5, 5, "prev")
+
+    def large(home, away, tip, history, index):
+        return avail.P1Adjustment(25.0, None, side, side)
+
+    def broken(*_args):
+        raise RuntimeError("shadow blew up")
+
+    no_boxes, no_boxes_features = _p1_shadow_run(tmp_path / "none", monkeypatch)
+    shifted, shifted_features = _p1_shadow_run(tmp_path / "large", monkeypatch, shadow=large)
+    failed, failed_features = _p1_shadow_run(tmp_path / "raise", monkeypatch, shadow=broken)
+    assert no_boxes["model_probability"] not in (None, "")
+    for name in _SERVED_FIELDS:
+        assert no_boxes[name] not in (None, ""), name
+        assert no_boxes[name] == shifted[name] == failed[name], name
+    # the shadow itself is recorded, and only in the snapshot
+    assert no_boxes_features["shadow_p1_status"] == avail.INSUFFICIENT_HISTORY
+    assert "shadow_p1_adjustment" not in no_boxes_features
+    assert shifted_features["shadow_p1_status"] == "ok"
+    assert shifted_features["shadow_p1_adjustment"] == 25.0
+    assert shifted_features["shadow_p1_inputs.home_avail_top7_prev1"] == 0.2
+    assert shifted_features["shadow_p1_inputs.coef_avail"] == avail.P1_COEF_AVAIL
+    assert failed_features["shadow_p1_status"] == "error"
+
+
+def test_p1_shadow_is_recorded_only_on_v7_margins(tmp_path, monkeypatch):
+    _row, features = _p1_shadow_run(tmp_path / "v6", monkeypatch, margin_engine="v6")
+    assert not any(key.startswith("shadow_p1") for key in features)

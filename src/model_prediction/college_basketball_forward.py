@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import re
 import unicodedata
@@ -15,12 +16,14 @@ from .calibration import IdentityCalibrator
 from .college_contract_evidence import build_candidate_evidence, save_candidate_evidence
 from .config import PROJECT_ROOT
 from .data_sources.espn import ESPNClient
+from .data_sources.ncaab_boxscores import player_box_root
 from .data_sources.polymarket_us import PolymarketUSClient, probability_to_american
 from .domain import League, MarketType, ModelOrigin, PickRequest, parse_utc, utc_now
 from .eligibility import EligibilityResult
 from .entities import CanonicalTeam
 from .feature_capture import contract_snapshot_json
 from .features.base import FeatureStore
+from .features.ncaab_player_availability import PlayerBoxIndex, ncaab_season_year, p1_margin_adjustment
 from .ledger import DuplicatePickError, defer_sqlite_xlsx_exports
 from .models.basketball import UpcomingGame
 from .models.ncaab_spread_v5 import ncaab_spread_v5_model
@@ -33,6 +36,8 @@ from .models.ncaab_spread_v6 import (
 )
 from .models.ncaab_total_v6 import ncaab_total_v6_model
 from .production_registry import ProductionModelRegistry
+
+_logger = logging.getLogger(__name__)
 
 ncaab_spread_model = ncaab_spread_v6_model
 ncaab_total_model = ncaab_total_v6_model
@@ -399,6 +404,43 @@ def _model_line_divergence(
     if kind == "total":
         return abs(float(mean) - float(decision_line))
     return None
+
+
+def _p1_shadow_fields(
+    decisions: list[dict[str, Any]], history: list[Any], data_root: Any, observed: datetime
+) -> dict[int, dict[str, Any]]:
+    """Forward-logging-only P1 player-availability fields keyed by id(decision), v7 margins only.
+
+    Never feeds model_probability, edge or units: the fields are merged into the snapshot after every
+    served number is fixed. Any failure degrades to a status string, never into the slate.
+    """
+    out: dict[int, dict[str, Any]] = {}
+    indexes: dict[int, PlayerBoxIndex] = {}
+    by_game: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for decision in decisions:
+        basis = getattr(decision["prediction"], "feature_basis", None) or {}
+        if decision["kind"] == "total" or basis.get("margin_engine") != "v7":
+            continue
+        key = (decision["home"], decision["away"], str(decision["start"]))
+        if key not in by_game:
+            try:
+                tip = parse_utc(key[2])
+                season = ncaab_season_year(tip)
+                if season not in indexes:
+                    indexes[season] = PlayerBoxIndex.load(player_box_root(data_root), observed, season)
+                p1 = p1_margin_adjustment(key[0], key[1], tip, history, indexes[season])
+                fields: dict[str, Any] = {
+                    "shadow_p1_status": p1.reason or "ok",
+                    "shadow_p1_inputs": p1.shadow_inputs(),
+                }
+                if p1.adjustment is not None:
+                    fields["shadow_p1_adjustment"] = round(p1.adjustment, 4)
+            except Exception:
+                _logger.warning("NCAAB P1 shadow failed for %s", key, exc_info=True)
+                fields = {"shadow_p1_status": "error"}
+            by_game[key] = fields
+        out[id(decision)] = by_game[key]
+    return out
 
 
 def _apply_same_direction_total_cap(decisions: list[dict[str, Any]], cap: int) -> None:
@@ -934,6 +976,14 @@ def forecast_ncaab_sport(
             # gate just declined.
             result["declined_slots"].append(["NCAAB", str(decision["identity"]), decision["kind"]])
 
+    # Shadow only (P1 player availability, not promoted): computed after every served number above is
+    # fixed and merged into the snapshot alone.
+    try:
+        p1_shadow = _p1_shadow_fields(decisions, history, data_root, observed)
+    except Exception:
+        _logger.warning("NCAAB P1 shadow failed for the slate", exc_info=True)
+        p1_shadow = {}
+
     with defer_sqlite_xlsx_exports():
         for decision in decisions:
             if decision["decline_reason"]:
@@ -989,6 +1039,7 @@ def forecast_ncaab_sport(
                         "history_games": len(history),
                         "history_scores_sha256": history_digest,
                         "history_cutoff_date": args_date,
+                        **p1_shadow.get(id(decision), {}),
                         **(
                             {"main_line_source": main_line_source.get(game_key, "slate_price")}
                             if kind == "total"
