@@ -362,6 +362,7 @@ def test_index_load_reads_the_tree_and_skips_unreadable_files(tmp_path: Path) ->
     records = _records()
     tree = _write_tree(tmp_path, records)
     (tree / records[0]["game_date"] / "broken.json").write_text("{", encoding="utf-8")
+    (tree / records[0]["game_date"] / "malformed.json").write_text("{}", encoding="utf-8")
     index = avail.PlayerBoxIndex.load(tree, NOW, 2027)
     assert len(index.by_event) == len(records)
 

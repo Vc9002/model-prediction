@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -124,36 +125,46 @@ class TeamBox:
 class PlayerBoxIndex:
     """Captured player boxes of one season, as known at ``as_of`` (observed_at_utc <= as_of)."""
 
-    def __init__(self, records: list[dict[str, Any]], as_of: datetime, season_year: int) -> None:
+    def __init__(self, records: Iterable[dict[str, Any]], as_of: datetime, season_year: int) -> None:
         self.as_of = as_of
         self.season_year = season_year
         self.by_event: dict[str, dict[str, TeamBox]] = {}
         self.by_team: dict[str, list[TeamBox]] = defaultdict(list)
         for record in records:
-            if parse_utc(str(record["observed_at_utc"])) > as_of:
-                continue
-            start = parse_utc(str(record["event_start_utc"]))
-            if ncaab_season_year(start) != season_year:
-                continue
-            sides: dict[str, TeamBox] = {}
-            for side, other in (("home", "away"), ("away", "home")):
-                team = record[side]
-                played = {
-                    str(p["athlete_id"]): float(p.get("minutes") or 0)
-                    for p in team.get("players") or []
-                    if p.get("athlete_id") is not None and float(p.get("minutes") or 0) > 0
-                }
-                box = TeamBox(str(record["event_id"]), start, box_quality(team, record[other]), played)
-                sides[str(team["team_name"])] = box
-                self.by_team[str(team["team_name"])].append(box)
-            self.by_event[str(record["event_id"])] = sides
+            self.add(record)
+
+    def add(self, record: dict[str, Any]) -> None:
+        """Reduce one record to its two team sides; a record the decision could not have seen is ignored."""
+        if parse_utc(str(record["observed_at_utc"])) > self.as_of:
+            return
+        start = parse_utc(str(record["event_start_utc"]))
+        if ncaab_season_year(start) != self.season_year:
+            return
+        sides: dict[str, TeamBox] = {}
+        for side, other in (("home", "away"), ("away", "home")):
+            team = record[side]
+            played = {
+                str(p["athlete_id"]): float(p.get("minutes") or 0)
+                for p in team.get("players") or []
+                if p.get("athlete_id") is not None and float(p.get("minutes") or 0) > 0
+            }
+            sides[str(team["team_name"])] = TeamBox(
+                str(record["event_id"]), start, box_quality(team, record[other]), played
+            )
+        self.by_event[str(record["event_id"])] = sides
+        for name, box in sides.items():
+            self.by_team[name].append(box)
 
     @classmethod
     def load(cls, root: str | Path, as_of: datetime, season_year: int) -> PlayerBoxIndex:
-        """Read the season's ``<root>/<scoreboard date>/<event_id>.json`` files once."""
+        """Read the season's ``<root>/<scoreboard date>/<event_id>.json`` files, one at a time.
+
+        Each file is reduced as it is read (a season of raw records is hundreds of MB by March), and an
+        unreadable or malformed file is skipped: it counts as not captured, so its teams fail closed.
+        """
+        index = cls((), as_of, season_year)
         first_day = f"{season_year - 1}-07-01"
         last_day = (as_of.astimezone(EASTERN).date() + timedelta(days=1)).isoformat()
-        records = []
         base = Path(root)
         if base.exists():
             for folder in sorted(base.iterdir()):
@@ -161,11 +172,10 @@ class PlayerBoxIndex:
                     continue
                 for path in sorted(folder.glob("*.json")):
                     try:
-                        records.append(json.loads(path.read_text(encoding="utf-8")))
-                    except (OSError, ValueError):
-                        # Unreadable counts as not captured: the team fails closed (STALE / MISSING).
+                        index.add(json.loads(path.read_text(encoding="utf-8")))
+                    except (OSError, ValueError, KeyError, TypeError, AttributeError):
                         continue
-        return cls(records, as_of, season_year)
+        return index
 
 
 @dataclass(frozen=True)

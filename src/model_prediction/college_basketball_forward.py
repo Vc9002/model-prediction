@@ -416,6 +416,7 @@ def _p1_shadow_fields(
     """
     out: dict[int, dict[str, Any]] = {}
     indexes: dict[int, PlayerBoxIndex] = {}
+    season_history: dict[int, list[Any]] = {}
     by_game: dict[tuple[str, str, str], dict[str, Any]] = {}
     for decision in decisions:
         basis = getattr(decision["prediction"], "feature_basis", None) or {}
@@ -428,7 +429,9 @@ def _p1_shadow_fields(
                 season = ncaab_season_year(tip)
                 if season not in indexes:
                     indexes[season] = PlayerBoxIndex.load(player_box_root(data_root), observed, season)
-                p1 = p1_margin_adjustment(key[0], key[1], tip, history, indexes[season])
+                    # every team scan would otherwise walk all seasons of history
+                    season_history[season] = [g for g in history if ncaab_season_year(g.start) == season]
+                p1 = p1_margin_adjustment(key[0], key[1], tip, season_history[season], indexes[season])
                 fields: dict[str, Any] = {
                     "shadow_p1_status": p1.reason or "ok",
                     "shadow_p1_inputs": p1.shadow_inputs(),
