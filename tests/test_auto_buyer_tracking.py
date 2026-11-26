@@ -238,6 +238,17 @@ def test_fill_log_failure_never_reaches_the_buy_path(tmp_path, monkeypatch):
     )
 
 
+@pytest.mark.parametrize("weird", [["not", "a", "dict"], None, "submitted"])
+def test_fill_log_never_raises_on_a_malformed_result(tmp_path, weird):
+    log = tmp_path / "fills.jsonl"
+    out = tracking.execute_with_fill_log(
+        lambda **_k: weird, log_path=log, order_payload=_payload(), source_row=_pick_row(), ticket=_ticket()
+    )
+    assert out is weird
+    (record,) = _read(log)
+    assert record["outcome"] == "submitted"
+
+
 # ---------------------------------------------------------------- skip recorder
 
 

@@ -88,5 +88,5 @@ the opposite direction (afternoon better) is reported but changes nothing.
 - Picks and results: `ledgers/ledgers.db` (`ledger_records`), read-only.
 - Buys: `auto_buyer_ledger.jsonl` (live) and `paper_auto_buyer/auto_buyer_ledger.jsonl` (paper).
 - Tracking records: `logs/auto_buyer_live_fills.jsonl` and `logs/auto_buyer_skip_reasons.jsonl`,
-  plus `python -m model_prediction auto-buyer-report --date <ET date>`. All paths are under the
-  runtime root.
+  plus `python -m model_prediction.cli auto-buyer-report --date <ET date>` (or the
+  `model-prediction auto-buyer-report` console script). All paths are under the runtime root.

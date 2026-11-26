@@ -22,7 +22,7 @@ import sqlite3
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -73,12 +73,19 @@ def _time(value: Any) -> datetime | None:
         return None
 
 
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+def _read_jsonl(path: Path, *, contains: tuple[str, ...] = ()) -> list[dict[str, Any]]:
+    """Parse a JSONL file, skipping without parsing every line that holds none of ``contains``.
+
+    The tracking logs grow by one record per cohort row per cycle; the prefilter keeps a dashboard
+    request from parsing all of them on a host that has run short of memory.
+    """
     if not path.exists():
         return []
     rows = []
     with path.open(encoding="utf-8") as handle:
         for line in handle:
+            if contains and not any(token in line for token in contains):
+                continue
             try:
                 item = json.loads(line)
             except ValueError:
@@ -295,6 +302,8 @@ def _base_rows(
                     "status": raw.get("status"),
                     "result": str(raw.get("result") or "").lower(),
                     "shares": _number(raw.get("shares")) or 0.0,
+                    "requested_shares": _number(raw.get("requested_shares")),
+                    "primary_filled_shares": _number(raw.get("primary_filled_shares")),
                     "cost_usd": _number(raw.get("cost_usd")) or 0.0,
                     "pnl_usd": _number(raw.get("pnl_usd")),
                     "fee_usd": _number(raw.get("fee_usd")),
@@ -322,7 +331,9 @@ def _base_rows(
     return rows
 
 
-def _attach_closes(runtime_root: Path, rows: list[dict[str, Any]]) -> None:
+def _attach_closes(runtime_root: Path, rows: list[dict[str, Any]], report_date: str) -> None:
+    """Close quote, CLV and line-move fields for the report date's rows; other rows stay null, so
+    one request scans only that date's snapshot files."""
     wanted: list[tuple[int, str, str, datetime, datetime]] = []
     for key, row in enumerate(rows):
         row.update(
@@ -344,7 +355,9 @@ def _attach_closes(runtime_root: Path, rows: list[dict[str, Any]]) -> None:
             closing_main_line_reason=CLOSING_MAIN_LINE_REASON,
         )
         buy, tip = _time(row["executed_at_utc"]), _time(row["event_start_utc"])
-        if row["cohort"] == "manual":
+        if row["tip_date_et"] != report_date:
+            row["close_status"] = "not_in_report_date"
+        elif row["cohort"] == "manual":
             row["close_status"] = "manual_row"
         elif buy is None:
             row["close_status"] = "missing_buy_time"
@@ -403,6 +416,9 @@ def _book_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
     staked_settled = sum(r["cost_usd"] for r in settled)
     with_close = [r for r in rows if r["clv_cents"] is not None]
     independent = [r for r in with_close if r["close_independent_of_buy"]]
+    # The ledger restates shares after reconcile, so these include resting fallbacks that filled later.
+    sized = [r for r in rows if r["requested_shares"]]
+    requested = sum(r["requested_shares"] for r in sized)
     return {
         "orders": len(rows),
         "filled_orders": sum(1 for r in rows if r["shares"] > 0),
@@ -425,6 +441,12 @@ def _book_stats(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "clv_independent_mid_cents_mean": _mean(r["clv_mid_cents"] for r in independent),
         "avg_saved_edge": _mean(r["saved_edge"] for r in rows),
         "avg_live_edge": _mean(r["live_edge"] for r in rows),
+        "requested_shares": round(requested, 2),
+        "final_filled_shares": round(sum(r["shares"] for r in sized), 2),
+        "final_fill_rate": round(sum(r["shares"] for r in sized) / requested, 4) if requested > 0 else None,
+        "fallback_filled_shares": round(
+            sum(max(0.0, r["shares"] - (r["primary_filled_shares"] or 0.0)) for r in sized), 2
+        ),
     }
 
 
@@ -441,18 +463,26 @@ def _max_drawdown(rows: list[dict[str, Any]]) -> float:
 
 
 def _skip_reasons(runtime_root: Path, report_date: str, bought: set[tuple[str, str]]) -> dict[str, Any]:
-    terminal: dict[tuple[str, str], dict[str, Any]] = {}
-    for record in _read_jsonl(tracking_log_path(runtime_root, SKIP_LOG_NAME)):
+    """Count each unbought cohort pick once, by the reason of its last skip before tip.
+
+    An open row keeps matching its cohort after tip, so every later cycle logs it as started; the
+    last pre-tip record says why it was never bought. A pick with no pre-tip record keeps its latest.
+    """
+    terminal: dict[tuple[str, str], tuple[bool, datetime, dict[str, Any]]] = {}
+    for record in _read_jsonl(tracking_log_path(runtime_root, SKIP_LOG_NAME), contains=(report_date,)):
         if record.get("tip_date_et") != report_date:
             continue
+        cycle = _time(record.get("cycle_at_utc"))
+        if cycle is None:
+            continue
+        tip = _time(record.get("tip_utc"))
+        rank = (tip is None or cycle < tip, cycle)
         key = (str(record.get("book") or ""), str(record.get("pick_id") or ""))
         previous = terminal.get(key)
-        if previous is None or str(record.get("cycle_at_utc") or "") >= str(
-            previous.get("cycle_at_utc") or ""
-        ):
-            terminal[key] = record
+        if previous is None or rank >= previous[:2]:
+            terminal[key] = (*rank, record)
     counts: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
-    for key, record in terminal.items():
+    for key, (_pre_tip, _cycle, record) in terminal.items():
         if key in bought:
             continue
         counts[key[0]][str(record.get("cohort"))][str(record.get("reason"))] += 1
@@ -461,7 +491,7 @@ def _skip_reasons(runtime_root: Path, report_date: str, bought: set[tuple[str, s
 
 def _fill_stats(runtime_root: Path, report_date: str) -> dict[str, dict[str, Any]]:
     by_cohort: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for record in _read_jsonl(tracking_log_path(runtime_root, LIVE_FILL_LOG_NAME)):
+    for record in _read_jsonl(tracking_log_path(runtime_root, LIVE_FILL_LOG_NAME), contains=(report_date,)):
         if record.get("tip_date_et") == report_date:
             by_cohort[str(record.get("cohort"))].append(record)
     stats = {}
@@ -484,7 +514,9 @@ def _loss_stop_cycles(runtime_root: Path, report_date: str) -> dict[str, int]:
     hits = {}
     for book, relative in _HISTORY.items():
         count = 0
-        for record in _read_jsonl(runtime_root / relative):
+        # An ET date's cycles carry that UTC date or the next one.
+        next_day = (datetime.fromisoformat(report_date) + timedelta(days=1)).date().isoformat()
+        for record in _read_jsonl(runtime_root / relative, contains=(report_date, next_day)):
             if record.get("pass") != f"cohort_{book}":
                 continue
             executed = _time(record.get("executed_at_utc"))
@@ -535,7 +567,7 @@ def build_auto_buyer_report(
     pick_ids = [str(r.get("pick_id") or "") for _, rel in _BOOKS for r in _read_jsonl(root / rel)]
     context = _pick_context(Path(ledgers_db) if ledgers_db else root / "ledgers" / "ledgers.db", pick_ids)
     rows = _base_rows(root, cohorts, context)
-    _attach_closes(root, rows)
+    _attach_closes(root, rows, report_date)
     bought = {(r["book"], r["pick_id"]) for r in rows}
     fills = _fill_stats(root, report_date)
     summaries = []
@@ -559,7 +591,10 @@ def build_auto_buyer_report(
                     bucket: _book_stats([r for r in day if r["edge_bucket"] == bucket])
                     for bucket in sorted({str(r["edge_bucket"]) for r in day})
                 },
-                "cumulative": {**_book_stats(to_date), "max_drawdown_usd": _max_drawdown(to_date)},
+                "cumulative": {
+                    **{k: v for k, v in _book_stats(to_date).items() if "clv" not in k},
+                    "max_drawdown_usd": _max_drawdown(to_date),
+                },
                 "fills": fills.get(cohort, {}) if book == "live" else {},
             }
         )

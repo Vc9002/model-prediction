@@ -146,6 +146,8 @@ def runtime(tmp_path: Path) -> Path:
                 executed_at_utc="2026-11-25T20:40:00Z",
                 event_start_utc=a_start,
                 fee_usd=0.10,
+                requested_shares=20.0,
+                primary_filled_shares=12.0,
             ),
             _buy(
                 "pb",
@@ -254,6 +256,18 @@ def runtime(tmp_path: Path) -> Path:
                 "cohort": "c",
                 "reason": "rejected_low_edge",
                 "cycle_at_utc": "2026-11-25T20:25:00Z",
+                "tip_utc": "2026-11-25T22:00:00Z",
+                "tip_date_et": DATE,
+                "tip_window": "5pm_or_later_et",
+            },
+            # The open row keeps matching after tip; that started record is not why pk went unbought.
+            {
+                "book": "live",
+                "pick_id": "pk",
+                "cohort": "c",
+                "reason": "rejected_started",
+                "cycle_at_utc": "2026-11-25T22:10:00Z",
+                "tip_utc": "2026-11-25T22:00:00Z",
                 "tip_date_et": DATE,
                 "tip_window": "5pm_or_later_et",
             },
@@ -397,6 +411,9 @@ def test_daily_cohort_summary(runtime):
     assert spread["tip_split"]["before_5pm_et"]["wins"] == 1
     assert spread["tip_split"]["5pm_or_later_et"]["orders"] == 0
     assert spread["fills"]["attempts"] == 2
+    assert day["final_fill_rate"] == pytest.approx(1.0)
+    assert day["fallback_filled_shares"] == pytest.approx(8.0)
+    assert "clv_cents_mean" not in spread["cumulative"]
     assert spread["fills"]["outcomes"] == {"submitted": 1, "refused": 1}
     total = next(c for c in report["cohorts"] if c["cohort"].startswith(TOTAL_V6))
     assert total["day"]["losses"] == 1

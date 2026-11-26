@@ -236,9 +236,30 @@ def _outcome_of(error: BaseException) -> str:
     return "error"
 
 
-def _log_fill(log_path: Path | str, **fields: Any) -> None:
+def _log_fill(
+    log_path: Path | str,
+    *,
+    sub: Any,
+    error: BaseException | None,
+    sent: datetime,
+    started: float,
+    **fields: Any,
+) -> None:
+    """Build and append one record. Everything, the outcome included, is computed in here, so a
+    malformed result or a broken record can never raise into the buy path after an order exists."""
     try:
-        append_jsonl_records(log_path, [_fill_record(**fields)])
+        result = sub if isinstance(sub, dict) else {}
+        outcome = _outcome_of(error) if error is not None else str(result.get("status") or "submitted")
+        record = _fill_record(
+            outcome=outcome,
+            sub=result if error is None else None,
+            error=error,
+            sent_utc=sent,
+            returned_utc=utc_now(),
+            latency_ms=(time.monotonic() - started) * 1000,
+            **fields,
+        )
+        append_jsonl_records(log_path, [record])
     except Exception:  # a broken record must never reach the buy path
         _logger.warning("auto-buyer live fill record failed", exc_info=True)
 
@@ -259,34 +280,13 @@ def execute_with_fill_log(
     ticket = kwargs.get("ticket")
     sent = utc_now()
     started = time.monotonic()
+    fields = {"order_payload": order_payload, "pick_row": source_row, "ticket": ticket}
     try:
         sub = execute(**kwargs)
     except Exception as error:
-        _log_fill(
-            log_path,
-            outcome=_outcome_of(error),
-            order_payload=order_payload,
-            pick_row=source_row,
-            ticket=ticket,
-            sub=None,
-            error=error,
-            sent_utc=sent,
-            returned_utc=utc_now(),
-            latency_ms=(time.monotonic() - started) * 1000,
-        )
+        _log_fill(log_path, sub=None, error=error, sent=sent, started=started, **fields)
         raise
-    _log_fill(
-        log_path,
-        outcome=str((sub or {}).get("status") or "submitted"),
-        order_payload=order_payload,
-        pick_row=source_row,
-        ticket=ticket,
-        sub=sub if isinstance(sub, dict) else {},
-        error=None,
-        sent_utc=sent,
-        returned_utc=utc_now(),
-        latency_ms=(time.monotonic() - started) * 1000,
-    )
+    _log_fill(log_path, sub=sub, error=None, sent=sent, started=started, **fields)
     return sub
 
 
