@@ -289,8 +289,18 @@ COHORT_EXECUTION_EDGE_CEILING = 0.25
 # 2026-11-24 (operator directive). The code-level always-off sports stay off for cohorts too.
 COHORT_SPORTS = frozenset({"nba", "ncaab", "nfl", "mlb", "wnba"})
 # Code-level categorical blocks a cohort can never lift (state-file blocks it can): MLB moneylines
-# (pulled 2026-09-02) and NBA totals (operator 2026-11-13: must not reach the paper ledger).
-COHORT_BLOCKED_SPORT_MARKETS = frozenset({("mlb", "moneyline"), ("nba", "total")})
+# (pulled 2026-09-02).
+COHORT_BLOCKED_SPORT_MARKETS = frozenset({("mlb", "moneyline")})
+# Blocked for live cohorts only. NBA totals were pulled from every path 2026-11-13; the operator
+# re-opened them for paper cohorts on 2026-11-25 (nba-anchor-v10 totals), real money stays blocked.
+COHORT_LIVE_BLOCKED_SPORT_MARKETS = frozenset({("nba", "total")})
+
+
+def _cohort_market_blocked(sport: str, market: str, mode: str) -> bool:
+    pair = (sport, market)
+    return pair in COHORT_BLOCKED_SPORT_MARKETS or (
+        mode != "paper" and pair in COHORT_LIVE_BLOCKED_SPORT_MARKETS
+    )
 
 
 @dataclass(frozen=True)
@@ -352,11 +362,11 @@ def _parse_one_cohort(entry: Any) -> tuple[BuyCohort | None, str | None]:
     market = entry["market"]
     if not isinstance(market, str) or market not in COHORT_MARKETS:
         return None, f"market must be one of {sorted(COHORT_MARKETS)}, got {market!r}"
-    if (sport.strip().lower(), market) in COHORT_BLOCKED_SPORT_MARKETS:
-        return None, f"{sport}:{market} is blocked in code for every auto-buyer path"
     mode = entry["mode"]
     if not isinstance(mode, str) or mode not in COHORT_MODES:
         return None, f"mode must be exactly 'paper' or 'live', got {mode!r}"
+    if _cohort_market_blocked(sport.strip().lower(), market, mode):
+        return None, f"{sport}:{market} is blocked in code for {mode} auto-buyer cohorts"
     if "paper_twin" in entry and (
         not isinstance(entry["paper_twin"], bool) or (entry["paper_twin"] and mode != "paper")
     ):
@@ -752,7 +762,7 @@ def _game_key(row: dict[str, Any]) -> str:
 
 def _row_in_cohort(row: dict[str, Any], cohort: BuyCohort) -> bool:
     """True when a saved pick row belongs to ``cohort``, with decision-time quote evidence."""
-    if cohort.sport not in COHORT_SPORTS or (cohort.sport, cohort.market) in COHORT_BLOCKED_SPORT_MARKETS:
+    if cohort.sport not in COHORT_SPORTS or _cohort_market_blocked(cohort.sport, cohort.market, cohort.mode):
         return False
     if str(row.get("model_id") or row.get("model_version") or "") != cohort.model_id:
         return False

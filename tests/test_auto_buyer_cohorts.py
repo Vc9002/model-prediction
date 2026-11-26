@@ -1200,7 +1200,7 @@ def test_daily_defers_live_reconcile_only_to_a_cycle_that_does_it(
         _entry(sport="ncaaf"),
         _entry(sport="nhl"),
         _entry(model_id="mlb-moneyline-v9-residual", sport="mlb", market="moneyline"),
-        _entry(model_id="nba-total-margin-v9", sport="nba", market="total", mode="paper"),
+        _entry(model_id="nba-anchor-v10", sport="nba", market="total", mode="live"),
         _entry(max_saved_edge_exclusive=0.30),
         _entry(min_saved_edge=0.25, max_saved_edge_exclusive=None, mode="paper"),
     ],
@@ -1209,6 +1209,25 @@ def test_parse_rejects_blocked_sports_markets_and_wide_windows(bad):
     parsed = _parse_cohorts({"cohorts": [bad]})
     assert parsed.active == ()
     assert len(parsed.errors) == 1
+
+
+def test_nba_total_cohort_is_paper_only():
+    # Operator 2026-11-25: NBA totals re-opened for paper cohorts (nba-anchor-v10); live stays blocked.
+    paper = _entry(
+        model_id="nba-anchor-v10",
+        sport="nba",
+        market="total",
+        min_saved_edge=0.0,
+        max_saved_edge_exclusive=0.25,
+        mode="paper",
+    )
+    parsed = _parse_cohorts({"cohorts": [paper]})
+    assert parsed.errors == ()
+    assert [c.label for c in parsed.active] == ["nba-anchor-v10:total:[0,0.25):paper"]
+    row = _row("nba-anchor-v10", pick_id="t1", event="n1", market="total", league="nba")
+    assert _row_in_cohort(row, parsed.active[0])
+    live = BuyCohort("nba-anchor-v10", "nba", "total", 0.0, 0.25, "live")
+    assert not _row_in_cohort(row, live)
 
 
 def test_hand_built_cohort_cannot_reach_a_blocked_sport_or_skip_the_edge_ceiling(tmp_path, decorate):
