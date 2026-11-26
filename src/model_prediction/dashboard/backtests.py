@@ -524,8 +524,9 @@ def _pick_quote(row: dict) -> dict | None:
     ticket-building stage always refused first.
 
     A row that recorded the market and side it was priced against (the NCAAB forecast writes
-    ``market_slug=... token_side=...``, 2026-11-25) is quoted on exactly that market and side; name
-    matching below is the fallback when that market was not captured or its line no longer agrees.
+    ``market_slug=... token_side=...``, 2026-11-25) is quoted on exactly that market and side, or
+    refused when the captured market does not line up with the row (_pinned_side). Name matching
+    below is the fallback only when that market was never captured.
     """
     market_type = row.get("market_type")
     if market_type not in ("moneyline", "spread", "total", "nrfi"):

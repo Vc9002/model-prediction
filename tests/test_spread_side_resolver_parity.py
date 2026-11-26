@@ -115,8 +115,11 @@ def test_gate_names_the_team_refusal(team: str, expected: str) -> None:
 
 # ------------------------------------------------------------------ real NCAAB triples
 #
-# tests/fixtures/ncaab_spread_side_triples.json: 320 (away, home, polymarket team, line, selection,
-# row line, event title) triples cut from the real data, with the side each must resolve to.
+# tests/fixtures/ncaab_spread_side_triples.json: 602 (away, home, polymarket team, line, selection,
+# row line, event title) triples cut from the real data, each with the side it must resolve to.
+# 150 real games are sampled at random for the broad group (3 selection/line combinations each), and
+# every game involving one of the 13 new aliases, UML vs UMass, the one mislabelled ledger row and
+# every game whose two schools share a place name are included whole.
 #
 # Where the inputs came from (both read-only, 2026-11-25):
 #   - ESPN names (away_team/home_team): the decision payloads of the NCAAB spread rows in
@@ -124,22 +127,28 @@ def test_gate_names_the_team_refusal(team: str, expected: str) -> None:
 #     same id keys both). The few schools whose only snapshot games have no ledger row (EIU, UML,
 #     "Tenn. State", "Ore. State" and their opponents) take their name from the same school's other
 #     ledger rows.
-#   - Polymarket team, line and event title: odds/ncaab/*/polymarket_snapshots.jsonl spread rows
-#     (valid timestamps only). A spread snapshot's own team/line describe its LONG side; SHORT is the
-#     opponent at the negated line.
+#   - Polymarket team, line, descriptions and event title: odds/ncaab/*/polymarket_snapshots.jsonl
+#     spread rows (valid timestamps only).
 #
-# How the expected side was derived, WITHOUT the code under test: the event title lists the two
-# teams "away vs. home", an orientation that holds on all 616 events whose ledger names decide it
-# (0 reversed; the other 44 differ only by abbreviation, e.g. "FDU vs. Butler" against "Fairleigh
-# Dickinson Knights"). The market's team is either exactly one title participant, or an abbreviation
-# whose school was identified by hand (UCA, NAU, EIU, UML, Tenn. State, Ore. State, plus two
-# long-form spellings). That fixes whether the market team is the away or the home side, and then
-# the rule is the market's own: a row on the market team at the market line is LONG, a row on the
-# opponent at the negated line is SHORT, every other (selection, line) pair is no match. The
-# "truth_side" field holds that; "expected_side" differs only where the resolver refuses on
-# purpose (UML in UMass Lowell vs UMass matches both row teams), and "expected_mapper_side"
-# differs only for the one real ledger row whose home team is mislabelled (Central Connecticut for
-# UConn), which only the mapper's title check can see.
+# How the expected side was derived, WITHOUT the code under test:
+#   1. A spread snapshot's team and line are its LONG side; SHORT is the opponent at the negated
+#      line. That comes from the data, not from match_spread_side's docstring: on all 92,050 valid
+#      pre-start spread rows long.description parses to `line` and short.description to `-line`
+#      (asserted below on every triple), and in 629 of the 630 (event, team) ladders with three or
+#      more rungs the long ask rises with the line (0 fall, 1 flat), as it must if the team is the
+#      one that has to cover that line; it would fall if `team` were the short side.
+#   2. The event title lists the two teams "away vs. home", an orientation that holds on all 616
+#      events whose ledger names decide it (0 reversed; the other 44 differ only by abbreviation, e.g.
+#      "FDU vs. Butler" against "Fairleigh Dickinson Knights").
+#   3. The market's team is either exactly one title participant, or an abbreviation whose school was
+#      identified by hand (UCA, NAU, EIU, UML, Tenn. State, Ore. State, plus two long-form spellings).
+#      That fixes whether it is the away or the home team.
+#   4. So a row on the market team at the market line is LONG, a row on the opponent at the negated
+#      line is SHORT, and every other (selection, line) pair is no match.
+# "truth_side" holds that; "expected_side" differs only where the resolver refuses on purpose (UML in
+# UMass Lowell vs UMass matches both row teams), and "expected_mapper_side" differs only for the one
+# real ledger row whose home team is mislabelled (Central Connecticut for UConn), which only the
+# mapper's title check can see.
 
 _FIXTURE = Path(__file__).parent / "fixtures" / "ncaab_spread_side_triples.json"
 _TRIPLES = json.loads(_FIXTURE.read_text(encoding="utf-8"))["triples"]
@@ -182,6 +191,9 @@ def test_real_triples_resolve_the_same_side_in_the_core_the_gate_and_the_mapper(
     gate = _gate_side(row, {k: v for k, v in snapshot.items() if k != "event_title"})
     mapper = backtests._spread_side_for_row(row, snapshot)
 
+    # The data's own long/short convention the truth rests on (see the notes above).
+    assert float(triple["long_description"]) == triple["market_line"]
+    assert float(triple["short_description"]) == -triple["market_line"]
     assert core == triple["expected_side"]
     assert gate == triple["expected_side"]
     assert mapper == triple["expected_mapper_side"]
@@ -205,6 +217,6 @@ def test_fixture_covers_every_new_alias_the_refusals_and_a_broad_sample() -> Non
     assert any(t["truth_side"] and t["expected_side"] is None and t["refusal_reason"] for t in uml)
 
     broad = [t for t in _TRIPLES if t["group"] == "broad"]
-    assert len(broad) >= 150
+    assert len({t["event_id"] for t in broad}) >= 150
     assert {t["expected_side"] for t in broad} == {"long", "short", None}
     assert any(t["expected_mapper_side"] != t["expected_side"] for t in _TRIPLES)  # the mislabelled row

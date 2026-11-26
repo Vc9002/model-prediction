@@ -6,8 +6,9 @@ exchange abbreviated a school ("UCA" for Central Arkansas, 2026-11-25). The NCAA
 knew the market and side: the slate's sides carry the exchange's own away/home ordering. It now
 writes ``market_slug=<slug> token_side=<long|short>`` into the row's rationale (the established
 place a row records its market, and a column the buyer's dashboard rows carry), and _pick_quote uses
-that market and side when present. Name matching is the fallback when the recorded market was not
-captured or its line no longer agrees, and a decisive name match that disagrees refuses the row.
+that market and side when present. Name matching is the fallback only when the recorded market was
+never captured; a captured market that does not line up with the row (another game, a half-game
+contract, a different line) refuses it, as does a decisive name match that disagrees.
 """
 
 from __future__ import annotations
