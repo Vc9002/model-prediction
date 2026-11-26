@@ -56,12 +56,14 @@ def _approval_start(raw: Any) -> datetime | None:
     text = str(raw or "").strip()
     if not text:
         return None
-    if _DATE_ONLY.match(text):
-        day = datetime.fromisoformat(text)
-        return day.replace(tzinfo=_EASTERN).astimezone(UTC)
     try:
+        if _DATE_ONLY.match(text):
+            # A date that matches the shape but not the calendar ("2026-02-30") or sits at the
+            # edge of datetime's range raises here; it is as unreadable as any other bad value.
+            day = datetime.fromisoformat(text)
+            return day.replace(tzinfo=_EASTERN).astimezone(UTC)
         return parse_utc(text)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -197,8 +199,10 @@ def live_cohort_drawdown_report(
     """Per active live cohort: settled record, ROI, last-30 ROI and drawdown, with advisory warnings.
 
     Rows are the live ledger's rows of the cohort's model, sport and market executed on or after its
-    ``approved_at_utc`` (a date means midnight Eastern). Void zero-fill, manual and submit_unknown rows
-    are excluded. A warning fires when the last-30 settled ROI is below -10% with at least 15 settled,
+    ``approved_at_utc`` (a date means midnight Eastern; an unreadable approval drops the window, so
+    every row counts). A row whose own ``executed_at_utc`` is present but unreadable is kept, a blank
+    one skipped. Void zero-fill, manual and submit_unknown rows are excluded. A warning fires when the
+    last-30 settled ROI is below -10% with at least 15 settled,
     or when the CURRENT drawdown from peak reaches ``drawdown_warning_usd`` (state key, default 100)
     or ``drawdown_warning_units`` (state key, default 20). Current, not maximum, so the warning clears
     on recovery; the maximum is reported alongside. Never raises: an error returns ``status: error``.

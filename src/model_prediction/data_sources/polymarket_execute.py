@@ -231,6 +231,17 @@ def _row_line(pick_row: dict[str, str]) -> float:
         raise ExecutionGateError("REFUSED: pick row has no valid line to verify against.") from error
 
 
+def _market_line_value(market_line: Any) -> float:
+    """The live market line as a float, or a gate refusal: a line the quote carries but we cannot
+    read (a 400-digit integer, text) must not surface as a raw OverflowError or ValueError."""
+    try:
+        return float(market_line)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ExecutionGateError(
+            f"REFUSED: the live market line is not a readable number ({str(market_line)[:40]!r})."
+        ) from error
+
+
 def _resolve_moneyline_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> str:
     selected_team = _row_selected_team(pick_row)
     if not selected_team:
@@ -286,6 +297,7 @@ def _resolve_spread_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> 
     # Shared with dashboard/backtests.py::_spread_side_for_row: the market team must be exactly one
     # of the row's two teams (the 2026-11-25 "UCA" wrong-side bug), then the line or its negation.
     # No event-title check here: the live snapshot carries no title, and the ticket names the slug.
+    _market_line_value(market_line)  # an unreadable live line refuses here, not inside the matcher
     match = match_spread_side(pick_row, row_line, market_team, market_line)
     if match.market_team in ("both", "neither"):
         raise ExecutionGateError(
@@ -309,7 +321,7 @@ def _resolve_total_side(pick_row: dict[str, str], snapshot: dict[str, Any]) -> s
         )
     row_line = _row_line(pick_row)
     market_line = snapshot.get("line")
-    if market_line is None or not _lines_match(row_line, float(market_line)):
+    if market_line is None or not _lines_match(row_line, _market_line_value(market_line)):
         raise ExecutionGateError(
             f"REFUSED: pick row line {row_line} does not match the live market's total line ({market_line})."
         )
@@ -403,7 +415,7 @@ def _ioc_fill_is_final(order: dict[str, Any], state: str) -> bool:
         return False
     try:
         return float(order.get("leavesQuantity")) == 0.0
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return False
 
 
@@ -418,7 +430,7 @@ def _reports_working_quantity(order: dict[str, Any]) -> bool:
         return False
     try:
         leaves = float(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return True
     return not math.isfinite(leaves) or leaves > 0.0
 
@@ -904,7 +916,7 @@ class PolymarketExecutor:
             raw_ask: Any = (snapshot.get(ticket.token_side) or {}).get("ask")
             try:
                 live_ask = float(raw_ask)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 live_ask = math.nan
             if not math.isfinite(live_ask):
                 raise ExecutionGateError(
@@ -1264,7 +1276,11 @@ class PolymarketExecutor:
             else:
                 try:
                     value = float(raw)
-                except (TypeError, ValueError, OverflowError):
+                except OverflowError:
+                    # Present but unreadable is not absent: a cancelled order with an unknown fill must
+                    # not read as a known zero (that rests a full-size fallback over a possible fill).
+                    return requested if state == "ORDER_STATE_FILLED" else None
+                except (TypeError, ValueError):
                     value = None
             if value is None:
                 if state == "ORDER_STATE_FILLED":
@@ -1518,7 +1534,7 @@ class PolymarketExecutor:
                 value = value.get("value")
             try:
                 parsed = float(value)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 return None
             return parsed if math.isfinite(parsed) else None
 

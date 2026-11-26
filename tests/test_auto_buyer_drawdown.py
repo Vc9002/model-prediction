@@ -321,6 +321,20 @@ def test_an_unparseable_executed_at_is_counted_but_a_blank_one_is_not(tmp_path):
     assert c["pnl_usd"] == pytest.approx(-20.0)
 
 
+@pytest.mark.parametrize(
+    "bad_approval", ["2026-02-30", "0001-01-01T00:00:00+05:00", "9999-12-31T23:59:59-05:00", "not-a-date"]
+)
+def test_an_unreadable_approval_drops_the_window_and_the_report_still_computes(tmp_path, bad_approval):
+    """A corrupt cohort approved_at_utc must not turn the advisory report into status:error: the
+    window is dropped, so every row of the cohort counts (the loss alarm only ever widens)."""
+    bad = {**SPREAD, "approved_at_utc": bad_approval}
+    rows = [_row("loss", -10.0, executed="2026-11-20T04:00:00Z"), _row("win", 4.0)]
+    report = _report(tmp_path, rows, cohorts=[bad])
+    assert report.get("status") != "error", report
+    c = _cohort(report)
+    assert (c["wins"], c["losses"]) == (1, 1)
+
+
 def test_rows_tagged_with_another_cohort_label_are_not_counted(tmp_path):
     """Rows carry the cohort label they were bought under; a row of the same model, sport and
     market bought under a different window (an earlier or replaced cohort) is not this cohort's."""

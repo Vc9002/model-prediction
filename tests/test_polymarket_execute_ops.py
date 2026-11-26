@@ -404,6 +404,7 @@ def test_http_refusals_carry_their_status_and_classify(tmp_path, exchange, monke
     [
         ([{"currency": "USD", "buyingPower": {"value": "206.08", "currency": "USD"}}], 206.08),
         ([{"currency": "USD", "buyingPower": 20}], 20.0),
+        pytest.param([{"currency": "USD", "buyingPower": 10**400}], None, id="overflowing-is-unknown"),
         ([{"currency": "USD", "currentBalance": 235.8}], None),
         ([], None),
     ],

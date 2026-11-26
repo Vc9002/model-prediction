@@ -1146,14 +1146,14 @@ class _OvernightAgeExtension:
                 self._runs = [
                     (parse_utc(str(run["started_at_utc"])), str(run.get("status") or "")) for run in history
                 ]
-            except (KeyError, TypeError, ValueError):
+            except (KeyError, TypeError, ValueError, OverflowError):
                 self._runs = None
         for pick in self._picks:
             if pick.get("status") != "open":
                 continue
             try:
                 created = parse_utc(str(pick.get("created_at_utc") or ""))
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 continue
             slot = self._slot(pick)
             if slot not in self._newest_by_slot or created > self._newest_by_slot[slot]:
@@ -1165,7 +1165,7 @@ class _OvernightAgeExtension:
         created_raw = str(row.get("created_at_utc") or "")
         try:
             created = parse_utc(created_raw)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return False
         # An empty or truncated history cannot show what ran after the pick.
         if not self._runs or not any(started <= created for started, _status in self._runs):
@@ -1389,6 +1389,17 @@ def _live_book_has_pending_orders(ledger_path: Path) -> bool:
     )
 
 
+def _warn_unreadable_row_counted(row: dict[str, Any], field: str, counted_toward: str) -> None:
+    """Name the row whose unreadable timestamp is being counted, so a tightened cap is traceable to
+    its cause instead of surfacing only as a bare budget or loss-breaker refusal."""
+    logger.warning(
+        "live-book row %s has an unreadable %s; counting it toward today's %s",
+        row.get("pick_id"),
+        field,
+        counted_toward,
+    )
+
+
 def _today_auto_buyer_totals(
     data_root: Path | str = DATA,
     *,
@@ -1407,8 +1418,10 @@ def _today_auto_buyer_totals(
 
     On the live book a row whose timestamp is present but unreadable counts toward today (spend: its
     ``executed_at_utc``; loss: a settled row whose start and settlement are both unreadable), so a
-    corrupt value tightens the cap and the stop instead of hiding real spend. A blank or missing value
-    still counts for nothing, and the paper book never counts either, so a legacy row can't pin it.
+    corrupt value tightens the cap and the stop instead of hiding real spend. A settled row with no
+    readable start counts toward the loss when its settlement stamp is present but unreadable, whether
+    the start is blank or corrupt. A blank or missing spend stamp still counts for nothing, and the paper
+    book never counts either, so a legacy row can't pin it. Each counted row is named in a warning.
     """
     from model_prediction.portfolio.auto_buyer_ledger import (
         is_manual_auto_buyer_record,
@@ -1437,7 +1450,10 @@ def _today_auto_buyer_totals(
         if row_scope is not None and not row_scope(row):
             continue
         executed_on = _et_date(row.get("executed_at_utc"))
-        if executed_on == today or (live_book and _unreadable(row.get("executed_at_utc"))):
+        spend_unreadable = live_book and _unreadable(row.get("executed_at_utc"))
+        if executed_on == today or spend_unreadable:
+            if spend_unreadable:
+                _warn_unreadable_row_counted(row, "executed_at_utc", "daily spend")
             fee = row_fee_usd(row) if live_book else 0.0
             spend += float(row.get("cost_usd") or 0.0) + fee + _pending_exposure_cost(row, with_fee=live_book)
 
@@ -1445,11 +1461,13 @@ def _today_auto_buyer_totals(
         if not row.get("settled_at_utc") or result not in ("win", "loss", "push"):
             continue
         settled_on = _et_date(row.get("event_start_utc")) or _et_date(row.get("settled_at_utc"))
-        both_unreadable = (
-            live_book and _unreadable(row.get("event_start_utc")) and _unreadable(row.get("settled_at_utc"))
-        )
-        if settled_on != today and not both_unreadable:
+        # No readable date for the row at all, and its settlement stamp is present: a corrupt stamp
+        # must tighten the loss stop, whether the start is blank or itself corrupt.
+        undatable = live_book and settled_on is None and _unreadable(row.get("settled_at_utc"))
+        if settled_on != today and not undatable:
             continue
+        if undatable:
+            _warn_unreadable_row_counted(row, "settled_at_utc", "daily loss stop")
         try:
             pnl = float(row.get("pnl_usd") or 0.0)
         except (TypeError, ValueError):
@@ -2356,7 +2374,15 @@ def run_auto_buyer_cycle(
             # D-02: while disabled, every cycle cancels the live book's resting fallbacks by id.
             reconciliation_summary = reconcile_pending_auto_buyer_fallbacks(cancel_all_resting=not live_on)
             settle_auto_buyer_ledger()
-        except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+            RuntimeError,
+            OverflowError,
+            ExecutionGateError,
+        ) as exc:
             logger.warning("Pre-cycle resting order reconciliation or settlement failed: %s", exc)
             if buying_live:
                 raise RuntimeError("Live auto-buyer stopped: pre-cycle reconciliation failed") from exc
@@ -2367,7 +2393,15 @@ def run_auto_buyer_cycle(
             from .auto_buyer_ledger import settle_auto_buyer_ledger
 
             settle_auto_buyer_ledger(data_root=PAPER_AUTO_BUYER_DATA_ROOT)
-        except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            TypeError,
+            RuntimeError,
+            OverflowError,
+            ExecutionGateError,
+        ) as exc:
             logger.warning("Pre-cycle paper-ledger settlement failed: %s", exc)
 
     cohort_passes: dict[str, Any] = {}
@@ -2685,7 +2719,7 @@ def _get_quarantined_underperforming_models(
         def settled_at_timestamp(row: dict[str, Any]) -> float:
             try:
                 return parse_utc(str(row.get("settled_at_utc") or "")).timestamp()
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 return float("-inf")
 
         rows.sort(key=settled_at_timestamp)
@@ -3558,7 +3592,7 @@ class AutoPolymarketBuyer:
             model_timestamp = row.get("created_at_utc") or row.get("observed_at_utc")
             try:
                 model_age_seconds = (now - parse_utc(str(model_timestamp))).total_seconds()
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 model_age_seconds = float("inf")
             live_cohort = cohort is not None and cohort.mode == "live"
             max_model_age_minutes = self.config.max_model_age_minutes
@@ -3586,7 +3620,7 @@ class AutoPolymarketBuyer:
                     source_quote_age = (
                         parse_utc(str(model_timestamp)) - parse_utc(str(source_quote_at))
                     ).total_seconds()
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     source_quote_age = float("inf")
                 if not 0 <= source_quote_age <= MAX_SOURCE_QUOTE_AGE_SECONDS:
                     result.rejected_stale_quote += 1
@@ -3705,6 +3739,7 @@ class AutoPolymarketBuyer:
                     ValueError,
                     KeyError,
                     TypeError,
+                    OverflowError,
                     RuntimeError,
                     ExecutionGateError,
                 ) as refresh_error:

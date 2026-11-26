@@ -528,8 +528,13 @@ def test_a_ticket_for_the_same_market_as_the_inline_slug_in_the_rationale_still_
     assert _audit_types(tmp_path) == ["order_intent", "order_executed"]
 
 
-@pytest.mark.parametrize("field", ["row_start", "observed_at"])
-def test_an_overflowing_timestamp_in_the_gate_refuses_cleanly_before_any_post(tmp_path, exchange, field):
+@pytest.mark.parametrize(
+    ("field", "message"),
+    [("row_start", "valid event_start_utc"), ("observed_at", "valid observed_at_utc")],
+)
+def test_an_overflowing_timestamp_in_the_gate_refuses_cleanly_before_any_post(
+    tmp_path, exchange, field, message
+):
     """A UTC conversion that leaves datetime's range raises OverflowError, not ValueError; it escaped the
     gate as a raw traceback instead of the ExecutionGateError refusal every other unreadable time gets."""
     start = _start()
@@ -539,7 +544,7 @@ def test_an_overflowing_timestamp_in_the_gate_refuses_cleanly_before_any_post(tm
         row["event_start_utc"] = _OVERFLOWING_TIME
     else:
         snapshot["observed_at_utc"] = _OVERFLOWING_TIME
-    with pytest.raises(pe.ExecutionGateError, match="valid (event_start_utc|observed_at_utc)"):
+    with pytest.raises(pe.ExecutionGateError, match=message):
         _executor(tmp_path, snapshot).execute(_ticket(start), row, execute_flag=True, user_command=True)
     assert exchange.calls == []
     assert _audit_types(tmp_path) == []
@@ -676,21 +681,20 @@ def test_a_lone_overflowing_open_order_is_not_adopted(tmp_path, exchange):
 
 
 @pytest.mark.parametrize(
-    ("state", "expected_fill"),
-    [("ORDER_STATE_FILLED", 10.0), ("ORDER_STATE_CANCELED", 0.0)],
+    ("state", "expected_fill", "fill_known"),
+    [("ORDER_STATE_FILLED", 10.0, True), ("ORDER_STATE_CANCELED", 0.0, False)],
 )
 def test_an_overflowing_cum_quantity_reads_as_unreadable_not_as_a_crash(
-    tmp_path, exchange, state, expected_fill
+    tmp_path, exchange, state, expected_fill, fill_known
 ):
-    """An unreadable cumQuantity already falls back to the terminal state (filled = requested, cancelled =
-    nothing); an overflowing one must take the same path instead of raising after the POST."""
+    """An overflowing cumQuantity must not raise after the POST: FILLED means the requested quantity, and a
+    cancelled order's fill stays unknown (never a known zero; see the fallback test below)."""
     start = _start()
 
     def primary(body):
         status, order = exchange.default_post(body)
-        order["state"] = state
-        order["cumQuantity"] = 10**400
-        return status, order
+        exchange.readback_overrides[order["id"]] = {"state": state, "cumQuantity": 10**400}
+        return status, {**order, "state": state, "cumQuantity": 10**400}
 
     exchange.post_script = [primary]
     result = _executor(tmp_path, _snapshot(start)).execute(
@@ -700,7 +704,85 @@ def test_an_overflowing_cum_quantity_reads_as_unreadable_not_as_a_crash(
         user_command=True,
     )
     assert result["filled_size_shares"] == expected_fill
+    assert result["fill_known"] is fill_known
     assert "order_executed" in _audit_types(tmp_path)
+
+
+@pytest.mark.parametrize("state", ["ORDER_STATE_CANCELED", "ORDER_STATE_EXPIRED", "ORDER_STATE_REJECTED"])
+def test_an_overflowing_cum_quantity_on_a_cancelled_ioc_is_unknown_and_rests_no_fallback(
+    tmp_path, exchange, state
+):
+    """An overflowing cumQuantity is not an absent one: read as absent, a cancelled IOC became a KNOWN zero
+    fill, so a full-size GTD fallback rested even if the IOC had really partly filled (the missed fill
+    would never be restated). It must stay unknown: polled, tracked, nothing rested."""
+    start = _start()
+
+    def primary(body):
+        status, order = exchange.default_post(body)
+        exchange.readback_overrides[order["id"]] = {"state": state, "cumQuantity": 10**400}
+        return status, {**order, "state": state, "cumQuantity": 10**400}
+
+    exchange.post_script = [primary]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+    )
+    assert len(exchange.order_posts()) == 1  # no GTD fallback leg
+    assert result["fill_known"] is False
+    assert result["fallback_status"] == "unknown_fill"
+    assert result["fallback_order_id"] == result["order_id"]
+    assert "order_executed" in _audit_types(tmp_path)
+
+
+def test_an_overflowing_leaves_quantity_counts_as_working_and_does_not_crash(tmp_path, exchange):
+    """_ioc_fill_is_final and _reports_working_quantity are a pair: both float() the same
+    leavesQuantity, so fixing one leaves the other raising after the POST. An overflowing value cannot
+    show nothing is working: the partial fill stays unknown, tracked, with no fallback rested."""
+    start = _start()
+
+    def primary(body):
+        status, order = exchange.default_post(body)  # PARTIALLY_FILLED, cumQuantity 4
+        exchange.orders[order["id"]]["leavesQuantity"] = 10**400
+        return status, {**order, "leavesQuantity": 10**400}
+
+    exchange.post_script = [primary]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+    )
+    assert len(exchange.order_posts()) == 1
+    assert result["fill_known"] is False
+    assert result["fallback_status"] == "unknown_fill"
+    assert "order_executed" in _audit_types(tmp_path)
+
+
+def test_an_overflowing_live_ask_refuses_cleanly_before_any_post(tmp_path, exchange):
+    start = _start()
+    with pytest.raises(pe.ExecutionGateError, match="live ask for long is missing"):
+        _executor(tmp_path, _snapshot(start, ask=10**400)).execute(
+            _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+        )
+    assert exchange.calls == []
+    assert _audit_types(tmp_path) == []
+
+
+@pytest.mark.parametrize("market_type", ["spread", "total"])
+@pytest.mark.parametrize("bad_line", [pytest.param(10**400, id="huge-int"), "garbage"])
+def test_an_unreadable_live_market_line_refuses_cleanly_before_any_post(
+    tmp_path, exchange, market_type, bad_line
+):
+    start = _start()
+    row = _pick_row(start, market_type=market_type)
+    snapshot = _snapshot(start, line=bad_line)
+    if market_type == "total":
+        row.update(selection="over", line="140.5")
+        snapshot.update(
+            team=None,
+            long={"description": "Over 140.5", "ask": 0.52},
+            short={"description": "Under 140.5", "ask": 0.50},
+        )
+    with pytest.raises(pe.ExecutionGateError, match="live market line"):
+        _executor(tmp_path, snapshot).execute(_ticket(start), row, execute_flag=True, user_command=True)
+    assert exchange.calls == []
+    assert _audit_types(tmp_path) == []
 
 
 @pytest.mark.parametrize(

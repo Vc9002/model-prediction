@@ -136,7 +136,7 @@ def _earliest_utc(*values: Any) -> str | None:
             continue
         try:
             parsed.append((parse_utc(str(value)), str(value)))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             continue
     return min(parsed, key=lambda pair: pair[0])[1] if parsed else None
 
@@ -1669,7 +1669,7 @@ def _with_offset_exits(
         held = float(row.get("shares"))
         entry = float(row.get("entry_price"))
         entered = parse_utc(str(row.get("executed_at_utc")))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return sell_trade
     merged = (
         dict(sell_trade)
@@ -1688,7 +1688,7 @@ def _with_offset_exits(
         try:
             if parse_utc(fill["time"]) <= entered:
                 continue
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             continue
         take = min(fill["shares"], held - merged["shares_sold"])
         if take <= 0:
@@ -2102,7 +2102,7 @@ def _resolve_closing_probability_for_auto_buyer(
             ask = float(side_obj["ask"])
             if 0 < ask < 1:
                 return round(ask, 6)
-    except (KeyError, ValueError, OSError, TypeError):
+    except (KeyError, ValueError, OSError, TypeError, OverflowError):
         logger.debug("Failed closing lookup for %s", slug, exc_info=True)
     return None
 
@@ -2315,8 +2315,12 @@ def settle_auto_buyer_ledger(
             # Tennis re-verification
             if sport in ("TENNIS", "WTA", "ATP"):
                 start_str = str(r.get("event_start_utc") or "")
-                s_dt = parse_utc(start_str) if start_str else now
-                if abs((now - s_dt).total_seconds()) > 3 * 86400:
+                try:
+                    s_dt = parse_utc(start_str) if start_str else now
+                except (TypeError, ValueError, OverflowError):
+                    # No readable start: the row keeps its settlement, as one past the window does.
+                    s_dt = None
+                if s_dt is None or abs((now - s_dt).total_seconds()) > 3 * 86400:
                     settled_count += 1
                     updated_records.append(r)
                     continue
@@ -2487,7 +2491,7 @@ def settle_auto_buyer_ledger(
         start_str = str(r.get("event_start_utc") or "")
         try:
             start_dt = parse_utc(start_str)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             updated_records.append(r)
             continue
 

@@ -634,6 +634,7 @@ def test_reconcile_treats_an_unreadable_start_as_started_and_cancels_by_id(tmp_p
     assert summary["cancelled_expired"] == want["cancelled_expired"] == 1
     assert summary["still_pending"] == want["still_pending"] == 0
     assert _ledger(j_path)[0]["fallback_reconciled"] is True
+    assert _ledger(j_path)[0]["cancellation_reason"] == "game_started"
 
 
 def test_started_fallback_missing_from_the_snapshot_is_cancelled_and_restated(tmp_path):

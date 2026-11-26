@@ -2120,6 +2120,6 @@ def _settle_auto_buyer_books(data_directory: Path) -> dict[str, Any]:
                 data_directory
             )
             output["auto_buyer_settlement"] = settle_auto_buyer_ledger(data_directory)
-        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as err:
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError, OverflowError) as err:
             logger.warning("Auto-buyer settlement failed: %s", err)
     return output
