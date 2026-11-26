@@ -18,7 +18,10 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 after the first live day (11-25, also the cumulative record: 24 settled buys) went 7-17, -$74.90 on $177 (`ncaab-spread-v7` 5-11 -$45.23, `ncaab-total-v6` 2-6
 -$29.67). Live cohorts stay configured and skipped (`LIVE_DISABLED`). Paper cohorts: `ncaab-moneyline-v7m` 12%+; paper twins
 (`paper_twin: true`, approved 11-26) of spread v7 and total v6 at saved edge [5%, 12%); `nba-anchor-v10` spread and total
-[0, 25%) and `nba-elo-trend-lr-v5` moneyline [5%, 25%) (NBA totals paper-only in code, 7f0e7517). $5/unit, $25/game, $500/day spend,
+[0, 25%), `nba-spread-margin-v9` spread 12%+ (restored 11-26 06:39Z alongside v10; backup
+`auto_buyer_state.pre_v9_paper_back_20261126T063905Z.json`; one buy per game+market, so a v9/v10 collision goes to whichever buys
+first, 3 of 34 recent games) and `nba-elo-trend-lr-v5` moneyline [5%, 25%) (NBA totals paper-only in code, 7f0e7517). Review each
+NBA paper cohort at ~50 buys: keep if mean close-price movement after fee is positive. $5/unit, $25/game, $500/day spend,
 $250/day loss stop, 35-min buy window. Switches: `enabled` is the master (false stops both books); `live_enabled` stops only the live
 book and cancels its resting orders by id; the dashboard has a separate "Live (real money)" button. Operator decisions: spread v7
 is judged ONLY on `ncaab-spread-v7` rows from 11-21 on (memory `feedback_spread-v7-scope-v7-id-only.md`); the buy window stays on
