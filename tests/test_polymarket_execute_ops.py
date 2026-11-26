@@ -256,3 +256,40 @@ def test_account_balance_without_credentials_refuses_as_auth(tmp_path):
     with pytest.raises(pe.ExecutionGateError) as refused:
         client.account_balance()
     assert pe.classify_gate_refusal(refused.value) == "auth"
+
+
+def test_ioc_still_partially_filled_after_every_poll_takes_the_polled_quantity(tmp_path, exchange):
+    """Seconds after the POST an IOC is no longer working, so a polled PARTIALLY_FILLED without
+    leavesQuantity is final; refusing it left the row unknown and never settled."""
+    exchange.sync_ioc = {"state": "ORDER_STATE_NEW", "cum": 0.0}
+
+    def partial_on_poll(body):
+        status, order = exchange.default_post(body)
+        exchange.readback_overrides[order["id"]] = {
+            "state": "ORDER_STATE_PARTIALLY_FILLED",
+            "cumQuantity": 4.0,
+        }
+        return status, order
+
+    exchange.post_script = [partial_on_poll]
+    result = _execute(tmp_path, exchange)
+    assert result["fill_known"] is True
+    assert result["filled_size_shares"] == 4.0
+    assert result["fallback_status"] == "resting"
+    assert result["fallback_resting_shares"] == 6.0
+
+
+def test_ioc_partial_from_the_synchronous_answer_alone_is_not_trusted(tmp_path, exchange):
+    """Every poll fails: the synchronous PARTIALLY_FILLED count may predate later fills."""
+    exchange.sync_ioc = {"state": "ORDER_STATE_PARTIALLY_FILLED", "cum": 4.0}
+
+    def unreadable(body):
+        status, order = exchange.default_post(body)
+        exchange.not_found[order["id"]] = 99
+        return status, order
+
+    exchange.post_script = [unreadable]
+    result = _execute(tmp_path, exchange)
+    assert len(exchange.order_posts()) == 1
+    assert result["fill_known"] is False
+    assert result["fallback_status"] == "unknown_fill"

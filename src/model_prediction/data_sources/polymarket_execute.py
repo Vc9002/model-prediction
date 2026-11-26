@@ -1290,9 +1290,9 @@ class PolymarketExecutor:
             nested = response.get("order")
             return nested if isinstance(nested, dict) else response
 
-        def fill_quantity(order: dict[str, Any], requested: float) -> float | None:
+        def fill_quantity(order: dict[str, Any], requested: float, *, settled: bool = False) -> float | None:
             state = str(order.get("state") or "").upper()
-            if marketable and not _ioc_fill_is_final(order, state):
+            if marketable and not settled and not _ioc_fill_is_final(order, state):
                 # An IOC's cumQuantity is final only in a terminal state. A synchronous "0" in NEW or
                 # PENDING read as a known zero fill, skipped the poll and rested a full-size fallback,
                 # doubling the position if the IOC then filled. Unknown here means poll.
@@ -1327,16 +1327,26 @@ class PolymarketExecutor:
             # endpoint before giving up: a fill we fail to observe here becomes
             # an untracked live position, and a full/partial fill we assume away
             # becomes a phantom ledger row. Neither is acceptable.
+            polled: dict[str, Any] | None = None
             for attempt in range(3):
                 try:
                     refreshed = self._request("GET", f"/v1/order/{order_id}", None)
-                    order = order_from(refreshed)
+                    order = polled = order_from(refreshed)
                     primary_filled = fill_quantity(order, ticket.size_shares)
                     if primary_filled is not None:
                         break
                 except ExecutionGateError:
                     pass
                 time.sleep(0.5 * (attempt + 1))
+            if (
+                primary_filled is None
+                and polled is not None
+                and str(polled.get("state") or "").upper() == "ORDER_STATE_PARTIALLY_FILLED"
+            ):
+                # Seconds after the POST an IOC is no longer working, so a polled partial that still
+                # reports no leavesQuantity is the exchange's final count. Never the synchronous
+                # answer alone: that count can predate the IOC's last fills.
+                primary_filled = fill_quantity(polled, ticket.size_shares, settled=True)
 
         order_ids = [order_id]
         fallback_order_id: str | None = None
