@@ -38,6 +38,8 @@ IOC = "TIME_IN_FORCE_IMMEDIATE_OR_CANCEL"
 GTD = "TIME_IN_FORCE_GOOD_TILL_DATE"
 GTC = "TIME_IN_FORCE_GOOD_TILL_CANCEL"
 SPREAD_V7 = "ncaab-spread-v7"
+# Converting this to UTC leaves datetime's range, which raises OverflowError rather than ValueError.
+_OVERFLOWING_TIME = "0001-01-01T00:00:00+05:00"
 
 
 # ------------------------------------------------------------------ fake exchange
@@ -511,6 +513,38 @@ def test_a_ticket_for_another_market_than_the_inline_slug_in_the_rationale_sends
     assert _audit_types(tmp_path) == []
 
 
+def test_a_ticket_for_the_same_market_as_the_inline_slug_in_the_rationale_still_executes(tmp_path, exchange):
+    """The binding only refuses a different market: a row whose inline slug IS the live quote's slug passes."""
+    start = _start()
+    exchange.ioc_fill = 10.0
+    rationale = (
+        f"Learned LR call at threshold 0.6000; executable ask 0.5200 ({SLUG}); model edge vs ask +0.0300."
+    )
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start), _pick_row(start, rationale=rationale), execute_flag=True, user_command=True
+    )
+    assert result["status"] == "submitted"
+    assert len(exchange.order_posts()) == 1
+    assert _audit_types(tmp_path) == ["order_intent", "order_executed"]
+
+
+@pytest.mark.parametrize("field", ["row_start", "observed_at"])
+def test_an_overflowing_timestamp_in_the_gate_refuses_cleanly_before_any_post(tmp_path, exchange, field):
+    """A UTC conversion that leaves datetime's range raises OverflowError, not ValueError; it escaped the
+    gate as a raw traceback instead of the ExecutionGateError refusal every other unreadable time gets."""
+    start = _start()
+    row = _pick_row(start)
+    snapshot = _snapshot(start)
+    if field == "row_start":
+        row["event_start_utc"] = _OVERFLOWING_TIME
+    else:
+        snapshot["observed_at_utc"] = _OVERFLOWING_TIME
+    with pytest.raises(pe.ExecutionGateError, match="valid (event_start_utc|observed_at_utc)"):
+        _executor(tmp_path, snapshot).execute(_ticket(start), row, execute_flag=True, user_command=True)
+    assert exchange.calls == []
+    assert _audit_types(tmp_path) == []
+
+
 def test_exchange_start_crossed_during_the_intent_append_sends_nothing(tmp_path, exchange, monkeypatch):
     row_start = _start(minutes=30)
     exchange_start = _start(minutes=10)
@@ -597,6 +631,76 @@ def test_ambiguous_fallback_is_adopted_only_on_one_exact_open_match(tmp_path, ex
         assert result["fallback_status"] == "submit_unknown"
         assert result["fallback_order_id"] is None
     assert result["filled_size_shares"] == 4.0
+
+
+@pytest.mark.parametrize("field", ["quantity", "price"])
+def test_an_overflowing_open_order_is_skipped_not_fatal_when_adopting_a_lost_fallback(
+    tmp_path, exchange, field
+):
+    """float() of a 400-digit int raises OverflowError; it escaped the per-order guard, so ``_submit``
+    ended after both POSTs without its ``order_executed`` audit. The bad order is skipped and the
+    exact match beside it is still adopted."""
+    start = _start()
+
+    def lost_fallback(body):
+        exchange.open_orders = [
+            _open_order(body, id="bad-1", **{field: 10**400}),
+            _open_order(body, id="adopt-ok"),
+        ]
+        exchange.orders["adopt-ok"] = exchange.open_orders[1]
+        return httpx.ReadTimeout("fallback response lost")
+
+    exchange.post_script = [exchange.default_post, lost_fallback]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+    )
+    assert result["fallback_status"] == "resting"
+    assert result["fallback_order_id"] == "adopt-ok"
+    assert "order_executed" in _audit_types(tmp_path)
+
+
+def test_a_lone_overflowing_open_order_is_not_adopted(tmp_path, exchange):
+    start = _start()
+
+    def lost_fallback(body):
+        exchange.open_orders = [_open_order(body, id="bad-1", quantity=10**400)]
+        return httpx.ReadTimeout("fallback response lost")
+
+    exchange.post_script = [exchange.default_post, lost_fallback]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+    )
+    assert result["fallback_status"] == "submit_unknown"
+    assert result["fallback_order_id"] is None
+    assert "order_executed" in _audit_types(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("state", "expected_fill"),
+    [("ORDER_STATE_FILLED", 10.0), ("ORDER_STATE_CANCELED", 0.0)],
+)
+def test_an_overflowing_cum_quantity_reads_as_unreadable_not_as_a_crash(
+    tmp_path, exchange, state, expected_fill
+):
+    """An unreadable cumQuantity already falls back to the terminal state (filled = requested, cancelled =
+    nothing); an overflowing one must take the same path instead of raising after the POST."""
+    start = _start()
+
+    def primary(body):
+        status, order = exchange.default_post(body)
+        order["state"] = state
+        order["cumQuantity"] = 10**400
+        return status, order
+
+    exchange.post_script = [primary]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start, ioc_fallback_resting=False, resting_expires_at_utc=None),
+        _pick_row(start),
+        execute_flag=True,
+        user_command=True,
+    )
+    assert result["filled_size_shares"] == expected_fill
+    assert "order_executed" in _audit_types(tmp_path)
 
 
 @pytest.mark.parametrize(

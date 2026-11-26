@@ -65,8 +65,9 @@ logger = logging.getLogger(__name__)
 
 _MARKET_SLUG_RE = re.compile(r"market_slug=([a-z0-9_\-]+)")
 _MARKET_SLUG_LEGACY_RE = re.compile(r"\(([a-z0-9_\-]+)\)\.?\s*$")
-# The NFL shadow writer's "ask 0.51 (slug); model edge ..." shape has the slug mid-sentence. Only a token with
-# a contract prefix counts (the prefixes cli/settle.py::_extract_market_slug accepts): a bare "(home)" or
+# The NFL shadow writer and the learned-LR writer (cli/forecast.py, which also appends its NOTE text after the
+# slug) put the contract mid-sentence as "ask 0.51 (slug); model edge ...". Only a token with a contract
+# prefix counts (the prefixes cli/settle.py::_extract_market_slug accepts): a bare "(home)" or
 # "(anchor-blended)" is not a contract and must not refuse a correct manual BUY.
 _MARKET_SLUG_INLINE_RE = re.compile(r"\(((?:aec|asc|tsc|atc|mkt)-[a-z0-9_\-]+)\)")
 _LIVE_QUOTE_MAXIMUM_AGE_SECONDS = 300
@@ -115,7 +116,8 @@ def _exchange_time(value: Any) -> datetime | None:
         return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # A 309-digit int is no float; it goes down the text path below, which returns None for it.
         number = None
     if number is not None and math.isfinite(number):
         # fromtimestamp accepts a negative epoch on Linux, and a pre-1970 expiry is never real.
@@ -858,7 +860,7 @@ class PolymarketExecutor:
             raise ExecutionGateError(f"REFUSED: no live side resolver for market_type {market_type!r}.")
         try:
             event_start = parse_utc(str(pick_row.get("event_start_utc", "")))
-        except ValueError as error:
+        except (ValueError, OverflowError) as error:
             raise ExecutionGateError(
                 "REFUSED: pick row has no valid event_start_utc to verify against."
             ) from error
@@ -881,7 +883,7 @@ class PolymarketExecutor:
             raise ExecutionGateError("REFUSED: event has already started.")
         try:
             observed_at = parse_utc(str(snapshot["observed_at_utc"]))
-        except (KeyError, ValueError) as error:
+        except (KeyError, ValueError, OverflowError) as error:
             raise ExecutionGateError("REFUSED: live quote has no valid observed_at_utc.") from error
         if (utc_now() - observed_at).total_seconds() > _LIVE_QUOTE_MAXIMUM_AGE_SECONDS:
             raise ExecutionGateError(
@@ -1168,7 +1170,7 @@ class PolymarketExecutor:
                     and str(order.get("tif") or order.get("timeInForce") or "") == _GOOD_TILL_DATE
                     and created >= placed_after - timedelta(seconds=_ADOPTION_CLOCK_SKEW_SECONDS)
                 )
-            except (TypeError, ValueError, AttributeError):
+            except (TypeError, ValueError, AttributeError, OverflowError):
                 continue
             if same and order.get("id"):
                 matches.append(str(order["id"]))
@@ -1262,7 +1264,7 @@ class PolymarketExecutor:
             else:
                 try:
                     value = float(raw)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     value = None
             if value is None:
                 if state == "ORDER_STATE_FILLED":

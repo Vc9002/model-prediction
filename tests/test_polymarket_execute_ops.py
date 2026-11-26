@@ -268,6 +268,7 @@ def test_exchange_time_reads_an_epoch_in_every_unit_as_the_same_instant(scale):
         "",
         None,
         "0001-01-01T00:00:00+05:00",
+        pytest.param(10**400, id="int-too-large-for-float"),
     ],
 )
 def test_exchange_time_is_none_for_anything_unreadable(value):
