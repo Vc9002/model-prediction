@@ -7,15 +7,18 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 
 ## Next action
 
-0. **Auto-buyer (live OFF, paper ON; operator decisions and open items), section 0 below.**
+0. **Auto-buyer (LIVE ON since 11-26 12:41 ET, $50/day loss stop; operator decisions and open items), section 0 below.**
 1. **Operator, hardware (blocks trust in everything else):** run a real RAM test, see section 1.
 2. Check the first scheduled daily runs after the daily-speed merge, section 2.
 3. NCAAB P1 (player availability) confirmation read is DONE (11-26, CONFIRMED, small; behind the market line). Promotion into v7
    needs a walk-forward ablation and an operator decision, section 4.
 
-## 0. Auto-buyer: LIVE OFF, PAPER ON, state at 2026-11-26 ~05:00 UTC
+## 0. Auto-buyer: LIVE ON (11-26 12:41 ET), $50/day loss stop
 
-**State (runtime `auto_buyer_state.json`):** `enabled: true`, `live_enabled: false`, `mode: paper`. The operator turned live off
+**LIVE BACK ON 2026-11-26 17:41Z at the operator's request:** `live_enabled: true`, `max_daily_loss_usd` 250 -> 50 for every day
+(operator: "for everyday stop loss of 50"); state v1327, backup `auto_buyer_state.pre_loss50_live_on_20261126T174152Z.json`.
+First run 17:42Z clean, 0 orders; live cash $95.95. Cohorts unchanged (decision (a) not taken); GTD read-back still unverified.
+Earlier history: the operator turned live off
 after the first live day (11-25, also the cumulative record: 24 settled buys) went 7-17, -$74.90 on $177 (`ncaab-spread-v7` 5-11 -$45.23, `ncaab-total-v6` 2-6
 -$29.67). Live cohorts stay configured and skipped (`LIVE_DISABLED`). Paper cohorts: `ncaab-moneyline-v7m` 12%+; paper twins
 (`paper_twin: true`, approved 11-26) of spread v7 and total v6 at saved edge [5%, 12%); `nba-anchor-v10` spread and total
