@@ -252,8 +252,8 @@ Found and left for a decision:
 
 #### 7. Live auto-buyer cohort reviews (OPEN, quick-261125-31d)
 
-Status 2026-11-26: **live is OFF** (`live_enabled: false`, `enabled: true`) after the live book went
-7-17, -$74.90 (spread v7 5-11, total v6 2-6). Paper twins of both live cohorts now run, so these
+Status 2026-11-26: **live is OFF** (`live_enabled: false`, `enabled: true`) after the first live day
+(also the cumulative record, 11-25): 7-17, -$74.90 on $177 (spread v7 5-11, total v6 2-6). Paper twins of both live cohorts now run, so these
 reviews read the twins and the Flat cohort until live is turned back on (an operator decision).
 
 - Review live cohort ncaab-spread-v7 5-12% after 30 settled live orders: realised ROI and CLV on
@@ -301,8 +301,6 @@ Still open:
   as `cancelled_unverified_gtd` on a 404 before the retry fix. No fallback has been confirmed through
   the retry path (`fallback_verified_via`), so whether the exchange echoes `tif`/`goodTillTime` is
   unproven. If live is turned back on, check the first fallback first.
-- **Dashboard restart after Task 3 not confirmed in the record.** The LIVE label, drawdown block and
-  the Live (real money) toggle reach the page only after a restart. Check the dashboard's start time.
 - **Unpin Telegram message 142 (operator).**
 - **Turning live back on** is the dashboard "Live (real money)" toggle; the buy window stays on gross
   edge, fees are recorded and never gate.

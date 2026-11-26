@@ -6,8 +6,9 @@ State at 2026-11-26 ~05:00 UTC (runtime `auto_buyer_state.json`, read-only): `en
 `live_enabled: false`, `mode: paper`. **Live is OFF, paper is ON.** The two live cohorts stay
 configured and skipped (`LIVE_DISABLED`, `skipped: live_enabled is not true`). Paper twins of both
 were added (`paper_twin: true`, approved 2026-11-26): `ncaab-spread-v7` and `ncaab-total-v6`,
-saved edge [5%, 12%). The live book's whole record since approval, from the cycle's own drawdown
-report (`last_run.live_drawdown`): **7-17, -$74.90**, cost $177.01, ROI -42.3%:
+saved edge [5%, 12%). Live trading began 2026-11-25 (enabled about 08:22Z), so the first live day and the cumulative record are
+the same: 24 settled buys, all with 11-25 ET tips, **7-17, -$74.90 on $177** (cost $177.01, ROI -42.3%; the
+cycle's own drawdown report, `last_run.live_drawdown`):
 `ncaab-spread-v7` 5-11, -$45.23 (ROI -40.7%, current drawdown $53.45); `ncaab-total-v6` 2-6,
 -$29.67 (ROI -45.0%). The 5-11 spread record fired the advisory last-30 ROI warning (-10% with at
 least 15 settled). The operator turned live OFF on those numbers; nothing was disabled in code.
@@ -26,7 +27,7 @@ messages, not repeated here.
   result).
 - The buy window stays on **gross** edge. Fees are recorded on every fill and shown as `net_edge`,
   but never gate a buy.
-- After the 7-17 live record (above): live OFF, paper ON, paper twins added.
+- After the first live day's 7-17 record (above): live OFF, paper ON, paper twins added.
 - Paper cohorts were swapped (23:40 ET 11-25): `nba-spread-margin-v9` paper replaced by paper
   `nba-anchor-v10` spread and total, saved edge [0, 25%), plus paper `nba-elo-trend-lr-v5`
   moneyline [5%, 25%). NBA totals were blocked in code for every cohort since 2026-11-13;
@@ -49,8 +50,7 @@ messages, not repeated here.
   (below) retries. **No fallback has been read back through the new retry path yet** (no
   `fallback_verified_via` value in the live ledger), so whether the exchange echoes `tif` and
   `goodTillTime` on `GET /v1/order/{id}` is still unproven.
-- Not recorded in this entry because it was not confirmed to the doc writer: the dashboard restart
-  after Task 3. Check `runs.db` and the dashboard's own start time before relying on the LIVE label.
+- **Dashboard restarts (confirmed).** The coordinator restarted the dashboard at 19:25 ET (after Task 3 landed at 19:22) and again after each later batch (22:51, 23:06, 23:08, 23:26, 23:51, 23:53, 00:06, 00:10); the current listener is PID 27384, started 2026-11-26 00:10:50 ET. The LIVE label, drawdown block and Live toggle are served.
 
 ### Defects found and fixed, by group
 

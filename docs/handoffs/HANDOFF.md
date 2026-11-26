@@ -15,7 +15,7 @@ version (NCAAB, NFL 7-12, NCAAF, NBA v10 logs) is archived verbatim in `docs/DEB
 ## 0. Auto-buyer: LIVE OFF, PAPER ON, state at 2026-11-26 ~05:00 UTC
 
 **State (runtime `auto_buyer_state.json`):** `enabled: true`, `live_enabled: false`, `mode: paper`. The operator turned live off
-after the live book's record since approval reached 7-17, -$74.90 (`ncaab-spread-v7` 5-11 -$45.23, `ncaab-total-v6` 2-6
+after the first live day (11-25, also the cumulative record: 24 settled buys) went 7-17, -$74.90 on $177 (`ncaab-spread-v7` 5-11 -$45.23, `ncaab-total-v6` 2-6
 -$29.67). Live cohorts stay configured and skipped (`LIVE_DISABLED`). Paper cohorts: `ncaab-moneyline-v7m` 12%+; paper twins
 (`paper_twin: true`, approved 11-26) of spread v7 and total v6 at saved edge [5%, 12%); `nba-anchor-v10` spread and total
 [0, 25%) and `nba-elo-trend-lr-v5` moneyline [5%, 25%) (NBA totals paper-only in code, 7f0e7517). $5/unit, $25/game, $500/day spend,
@@ -33,8 +33,8 @@ messages, `/open`, `/today`) lives outside the repo in the Rainmeter `@Resources
    state keys; (d) unpin Telegram message 142.
 2. **Before any live re-enable:** the first live GTD fallback (11-26 00:01 UTC, total v6 over, 20 shares) was cancelled
    `cancelled_unverified_gtd` on a 404 read-back, before the retry fix. No fallback has been read back through the new path
-   (`fallback_verified_via` is empty), so whether the exchange echoes `tif`/`goodTillTime` is unproven. Check the dashboard was restarted
-   after the Task 3 changes (LIVE label, Live toggle); that was not confirmed.
+   (`fallback_verified_via` is empty), so whether the exchange echoes `tif`/`goodTillTime` is unproven. The dashboard is on the current code (restarted after Task 3 at 19:25 ET
+   and after each later batch; listener PID 27384 since 00:10:50 ET).
 3. **Cleanup batch is in progress** in a parallel worktree (unused `force` param, unread `p_info`/index keys, duplicate assert, dead
    start-time check, dead audit dedup, always-true `hasattr`, unused `manual-bet-sync` worker, stale comments, American-odds comments and
    xlsx column, `not_authorized` label, runtime-root clutter). `git log` first; do not redo it.
