@@ -50,7 +50,9 @@ class _Strict:
             ],
         }
 
-    def cancel(self, order_id: str, *, user_command: bool, market_slug: str | None = None) -> dict[str, Any]:
+    def cancel(
+        self, order_id: str, *, user_command: bool, market_slug: str | None = None, stop_before: Any = None
+    ) -> dict[str, Any]:
         assert user_command is True
         self.calls.append(("cancel", order_id))
         if order_id in self.fail_cancel:
@@ -608,7 +610,9 @@ class _SlowExchange(_Strict):
         self.clock[0] += self.CALL_SECONDS * len(order_ids)
         return out
 
-    def cancel(self, order_id: str, *, user_command: bool, market_slug: str | None = None) -> dict[str, Any]:
+    def cancel(
+        self, order_id: str, *, user_command: bool, market_slug: str | None = None, stop_before: Any = None
+    ) -> dict[str, Any]:
         self.started_at.append(self.clock[0])
         out = super().cancel(order_id, user_command=user_command, market_slug=market_slug)
         self.clock[0] += self.CALL_SECONDS

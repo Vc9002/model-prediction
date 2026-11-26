@@ -305,6 +305,22 @@ def test_preview_cycle_computes_no_drawdown(tmp_path, monkeypatch):
     assert "live_drawdown" not in summary
 
 
+def test_an_unparseable_executed_at_is_counted_but_a_blank_one_is_not(tmp_path):
+    """The approval window may only ADD rows: a present-but-unreadable executed_at_utc counts toward
+    the drawdown (fail closed), while a blank or missing one keeps today's skip (fixtures omit it and
+    the real writer always writes iso_utc)."""
+    rows = [
+        _row("loss", -10.0, executed="garbage"),
+        _row("loss", -10.0, executed="0001-01-01T00:00:00+05:00"),
+        _row("loss", -10.0, executed=""),
+        _row("loss", -10.0, executed=None),
+        _row("win", 4.0, executed="2026-11-25T04:00:00Z"),  # readable and before approval: still skipped
+    ]
+    c = _cohort(_report(tmp_path, rows))
+    assert (c["wins"], c["losses"], c["settled"]) == (0, 2, 2)
+    assert c["pnl_usd"] == pytest.approx(-20.0)
+
+
 def test_rows_tagged_with_another_cohort_label_are_not_counted(tmp_path):
     """Rows carry the cohort label they were bought under; a row of the same model, sport and
     market bought under a different window (an earlier or replaced cohort) is not this cohort's."""

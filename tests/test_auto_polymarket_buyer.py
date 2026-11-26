@@ -2129,7 +2129,7 @@ def test_reconcile_cancels_resting_order_once_event_has_started(tmp_path):
                 "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
-        def cancel(self, order_id, user_command):
+        def cancel(self, order_id, user_command, market_slug=None, stop_before=None):
             assert user_command is True
             cancelled.append(order_id)
             return {"status": "cancelled", "order_id": order_id}
@@ -2224,7 +2224,7 @@ def test_reconcile_cancels_resting_order_when_edge_drops_below_min(tmp_path):
                 "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
-        def cancel(self, order_id, user_command, market_slug=None):
+        def cancel(self, order_id, user_command, market_slug=None, stop_before=None):
             assert user_command is True
             assert market_slug == "aec-lol-lds-dv1-2026-09-03"
             cancelled.append(order_id)
@@ -2269,7 +2269,7 @@ def test_reconcile_preserves_resting_order_when_edge_remains_strong(tmp_path):
                 "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
-        def cancel(self, order_id, user_command, market_slug=None):
+        def cancel(self, order_id, user_command, market_slug=None, stop_before=None):
             cancelled.append(order_id)
             return {"status": "cancelled", "order_id": order_id}
 
@@ -2312,7 +2312,7 @@ def test_reconcile_cancels_resting_order_when_market_moves_up_significantly(tmp_
                 "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
-        def cancel(self, order_id, user_command, market_slug=None):
+        def cancel(self, order_id, user_command, market_slug=None, stop_before=None):
             cancelled.append(order_id)
             return {"status": "cancelled", "order_id": order_id}
 
@@ -2349,7 +2349,7 @@ def test_reconcile_cancels_resting_order_when_market_closed(tmp_path):
                 "orders": [{"order_id": "resting-remainder", "order_state": state, "cum_quantity": 0.0}],
             }
 
-        def cancel(self, order_id, user_command, market_slug=None):
+        def cancel(self, order_id, user_command, market_slug=None, stop_before=None):
             cancelled.append(order_id)
             return {"status": "cancelled", "order_id": order_id}
 

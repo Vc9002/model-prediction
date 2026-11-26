@@ -912,10 +912,9 @@ def _cancel_by_id(
     a second (lookup) call behind the caller's single deadline check.
     """
     extra = {"stop_before": stop_before} if stop_before is not None and not market_slug else {}
-    try:
-        executor.cancel(order_id, user_command=True, market_slug=market_slug, **extra)
-    except TypeError:
-        executor.cancel(order_id, user_command=True)
+    # One call: a TypeError retry re-sent the cancel without its slug whenever the executor raised a
+    # TypeError of its own. Every caller already catches TypeError and records the failure.
+    executor.cancel(order_id, user_command=True, market_slug=market_slug, **extra)
 
 
 def reconcile_pending_auto_buyer_fallbacks(
@@ -1138,8 +1137,10 @@ def reconcile_pending_auto_buyer_fallbacks(
         market_slug = r.get("market_slug")
         try:
             started = parse_utc(str(r.get("event_start_utc") or "")) <= now
-        except ValueError:
-            started = False
+        except (TypeError, ValueError, OverflowError):
+            # As in cancel_resting_live_fallbacks: an unreadable start is the worst case, so the
+            # resting remainder is cancelled by its own id rather than left to rest past a tip-off.
+            started = True
 
         order = by_id.get(fid)
         state = ""
@@ -1355,12 +1356,12 @@ def cancel_resting_live_fallbacks(
             try:
                 if parse_utc(str(r.get("event_start_utc") or "")) > horizon:
                     continue
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 pass
         due.setdefault(fid, r.get("market_slug") or None)
         try:
             game_started = parse_utc(str(r.get("event_start_utc") or "")) <= moment
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             game_started = True  # an unreadable start is treated as the worst case
         if game_started:
             started.add(fid)

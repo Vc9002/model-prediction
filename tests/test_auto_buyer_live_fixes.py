@@ -246,7 +246,9 @@ class _Exchange:
             "not_found_order_ids": not_found,
         }
 
-    def cancel(self, order_id: str, user_command: bool, market_slug: str | None = None) -> dict[str, Any]:
+    def cancel(
+        self, order_id: str, user_command: bool, market_slug: str | None = None, stop_before: Any = None
+    ) -> dict[str, Any]:
         assert user_command is True
         self.cancel_calls.append(order_id)
         if self.cancel_error:
@@ -1363,7 +1365,7 @@ def test_toggle_live_off_saves_then_cancels_resting_orders_by_id(cycle, monkeypa
     seen: list[Any] = []
 
     class _SavedFirst(_Exchange):
-        def cancel(self, order_id, user_command, market_slug=None):
+        def cancel(self, order_id, user_command, market_slug=None, stop_before=None):
             seen.append(json.loads(path.read_text(encoding="utf-8")).get("live_enabled"))
             return super().cancel(order_id, user_command, market_slug)
 

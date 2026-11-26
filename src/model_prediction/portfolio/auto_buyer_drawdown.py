@@ -116,11 +116,16 @@ def _cohort_report(
         if tag and tag != cohort.label:
             continue
         if approved is not None:
+            executed_text = str(row.get("executed_at_utc") or "").strip()
             try:
-                if parse_utc(str(row.get("executed_at_utc") or "")) < approved:
+                if parse_utc(executed_text) < approved:
                     continue
-            except (TypeError, ValueError):
-                continue
+            except (TypeError, ValueError, OverflowError):
+                # A present-but-unreadable stamp is kept: this report is the loss alarm, so a row it
+                # cannot date counts toward the drawdown rather than hiding a loss. A blank or missing
+                # stamp keeps the old skip (the real writer always writes one; fixtures omit it).
+                if not executed_text:
+                    continue
         matched.append(row)
 
     def unit_of(row: dict[str, Any]) -> float:

@@ -539,7 +539,9 @@ class _Exchange:
                 orders.append({"order_id": oid, "order_state": state, "cum_quantity": cum})
         return {"status": "live", "orders": orders, "unavailable_order_ids": []}
 
-    def cancel(self, order_id: str, user_command: bool, market_slug: str | None = None) -> dict[str, Any]:
+    def cancel(
+        self, order_id: str, user_command: bool, market_slug: str | None = None, stop_before: Any = None
+    ) -> dict[str, Any]:
         assert user_command is True
         self.calls.append(("cancel", order_id))
         if self.cancel_error:
@@ -602,6 +604,36 @@ def test_snapshot_failure_still_cancels_a_started_fallback_by_id_and_voids_nothi
     assert row["fallback_reconciled"] is False
     assert row["cancel_requested_at_utc"]
     assert row["cancellation_reason"] == "game_started"
+
+
+@pytest.mark.parametrize("bad_start", ["", "not-a-time", "2026-11-26T19:00:00", "0001-01-01T00:00:00+05:00"])
+def test_reconcile_treats_an_unreadable_start_as_started_and_cancels_by_id(tmp_path, bad_start):
+    """An unreadable event_start_utc is the worst case (a game that may have tipped), as in
+    cancel_resting_live_fallbacks: the resting remainder is cancelled by its own id, through the same
+    branch and counter a genuinely started game reaches. A year-1 offset start used to raise
+    OverflowError out of the whole reconcile pass."""
+    control = tmp_path / "control"
+    control.mkdir()
+    _write_ledger(control / "auto_buyer_ledger.jsonl", [_fallback_row()])
+    want = reconcile_pending_auto_buyer_fallbacks(
+        data_root=control,
+        executor=_Exchange(
+            {"gtd-1": ("ORDER_STATE_NEW", 0.0)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", 0.0)}
+        ),
+    )
+    assert want["cancelled_expired"] == 1  # a really started game: the counter this path must reach
+
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(event_start_utc=bad_start)])
+    exchange = _Exchange(
+        {"gtd-1": ("ORDER_STATE_NEW", 0.0)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", 0.0)}
+    )
+    summary = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert exchange.cancelled == ["gtd-1"]
+    assert [name for name, _ in exchange.calls].count("cancel") == 1
+    assert summary["cancelled_expired"] == want["cancelled_expired"] == 1
+    assert summary["still_pending"] == want["still_pending"] == 0
+    assert _ledger(j_path)[0]["fallback_reconciled"] is True
 
 
 def test_started_fallback_missing_from_the_snapshot_is_cancelled_and_restated(tmp_path):
@@ -713,6 +745,45 @@ def test_cancel_only_helper_cancels_due_fallbacks_by_id_and_never_writes_the_led
     assert j_path.read_bytes() == before
 
 
+def test_cancel_only_helper_treats_an_overflowing_start_as_due_and_started(tmp_path):
+    """A year-1 start with an offset overflows astimezone(UTC): it must read as the worst case (due
+    and started), not raise out of the backstop worker."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row("big", event_start_utc="0001-01-01T00:00:00+05:00")])
+    exchange = _Exchange({"big": ("ORDER_STATE_NEW", 0.0)})
+    summary = auto_buyer_ledger.cancel_resting_live_fallbacks(
+        data_root=tmp_path, executor=exchange, cancel_all=False, reason="backstop_tipoff"
+    )
+    assert summary["candidates"] == 1 and summary["cancelled"] == ["big"]
+    deferred = auto_buyer_ledger.cancel_resting_live_fallbacks(
+        data_root=tmp_path,
+        executor=_Exchange({"big": ("ORDER_STATE_NEW", 0.0)}),
+        cancel_all=False,
+        reason="backstop_tipoff",
+        stop_before=lambda: True,
+    )
+    assert deferred["deadline_skipped"] == ["big"]
+    assert deferred["deadline_skipped_started"] == ["big"]
+
+
+def test_cancel_by_id_makes_one_call_and_propagates_a_typeerror():
+    """The old TypeError retry re-sent the cancel without the slug whenever the executor raised a
+    TypeError of its own; now it is one call and the caller's own TypeError handling records it."""
+
+    class _Boom:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def cancel(self, order_id, user_command, market_slug=None, stop_before=None):
+            self.calls += 1
+            raise TypeError("boom")
+
+    boom = _Boom()
+    with pytest.raises(TypeError, match="boom"):
+        auto_buyer_ledger._cancel_by_id(boom, "gtd-1", "asc-x")
+    assert boom.calls == 1
+
+
 def test_cancel_only_helper_builds_no_executor_when_nothing_is_due(tmp_path, monkeypatch):
     _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_fallback_row(start_minutes=10.0)])
     summary = auto_buyer_ledger.cancel_resting_live_fallbacks(
@@ -753,7 +824,7 @@ def test_toggle_off_saves_first_then_cancels_resting_fallbacks_by_id(tmp_path, m
     seen_enabled: list[Any] = []
 
     class _SavedFirst(_Exchange):
-        def cancel(self, order_id, user_command, market_slug=None):
+        def cancel(self, order_id, user_command, market_slug=None, stop_before=None):
             seen_enabled.append(json.loads(state_file.read_text(encoding="utf-8"))["enabled"])
             return super().cancel(order_id, user_command, market_slug)
 
