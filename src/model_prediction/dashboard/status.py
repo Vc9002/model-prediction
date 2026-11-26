@@ -337,7 +337,11 @@ def _auto_buyer_daily_loss_alert() -> dict[str, Any] | None:
     if threshold <= 0:
         return None
 
-    _, realized_pnl_today = _today_auto_buyer_totals()
+    # The buyer's own caps, so a corrupt ledger value shows the loss the buyer actually counts.
+    _, realized_pnl_today = _today_auto_buyer_totals(
+        unreadable_spend_usd=state.get("max_daily_spend_usd"),
+        unreadable_loss_usd=state.get("max_game_stake_usd"),
+    )
     if realized_pnl_today >= -threshold * 0.5:
         return None
 

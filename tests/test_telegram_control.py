@@ -225,6 +225,29 @@ def test_status_reports_switches_caps_spend_and_ledger_known_resting(env):
         assert needle in text
 
 
+def test_status_counts_a_nan_ledger_amount_at_the_states_own_caps_not_as_infinity(env):
+    """A NaN cost or pnl is counted by the buyer at the daily / per-game cap; /status shows the same finite
+    figures instead of 'inf' (and never a NaN that hides the loss)."""
+    _write_state(env, LIVE_STATE)
+    now = iso_utc(utc_now())
+    bad = _row(
+        "ioc-bad",
+        cost_usd=float("nan"),
+        executed_at_utc=now,
+        result="loss",
+        status="settled",
+        pnl_usd=float("nan"),
+        event_start_utc=now,
+        settled_at_utc=now,
+    )
+    _write_ledger(env.root / "auto_buyer_ledger.jsonl", [bad])
+    result = _run("status")
+    assert result["ok"] is True
+    assert result["live_spend_today_usd"] == 500.0
+    assert result["live_loss_today_usd"] == 25.0
+    assert "$500" in result["message"] and "inf" not in result["message"].lower()
+
+
 def test_status_with_live_off_says_not_active(env):
     _write_state(env, {**LIVE_STATE, "live_enabled": False})
     result = _run("status")

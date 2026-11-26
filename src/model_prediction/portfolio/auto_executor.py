@@ -1132,8 +1132,8 @@ class _OvernightAgeExtension:
         self._loaded = False
         self._runs: list[tuple[datetime, str]] | None = None
         self._newest_by_slot: dict[tuple[str, str, str], datetime] = {}
-        # Slots holding an open row whose created_at_utc cannot be read. Such a row may be the newest of
-        # its slot, so no sibling of it may take the extension (the extension is a relaxation).
+        # Slots holding an open row whose created_at_utc is present but cannot be read. Such a row may be
+        # the newest of its slot, so no sibling of it may take the extension (the extension is a relaxation).
         self._unreadable_slots: set[tuple[str, str, str]] = set()
 
     @staticmethod
@@ -1157,7 +1157,10 @@ class _OvernightAgeExtension:
             try:
                 created = parse_utc(str(pick.get("created_at_utc") or ""))
             except (TypeError, ValueError, OverflowError):
-                self._unreadable_slots.add(self._slot(pick))
+                # Only a PRESENT stamp that will not parse is unknown; a blank or missing one is the
+                # absent it always was and does not take the slot's extension away.
+                if str(pick.get("created_at_utc") or "").strip():
+                    self._unreadable_slots.add(self._slot(pick))
                 continue
             slot = self._slot(pick)
             if slot not in self._newest_by_slot or created > self._newest_by_slot[slot]:
@@ -1424,6 +1427,16 @@ def _readable_money(raw: Any) -> float | None:
     return value if math.isfinite(value) else None
 
 
+def _cap_or_inf(cap: Any) -> float:
+    """A configured dollar cap as the amount an unreadable ledger value counts for: the cap itself, or
+    infinity (refuse outright) when it is missing, not a number, negative or not finite."""
+    try:
+        value = float(cap)
+    except (TypeError, ValueError, OverflowError):
+        return math.inf
+    return value if math.isfinite(value) and value >= 0 else math.inf
+
+
 def _row_filled_cost(row: dict[str, Any], fee_in_caps: bool, unreadable_usd: float) -> float:
     """The row's filled cost for the per-game cap: ``cost_usd`` (plus its fee on the live book).
 
@@ -1448,8 +1461,8 @@ def _today_auto_buyer_totals(
     *,
     live_book: bool = True,
     row_scope: Callable[[dict[str, Any]], bool] | None = None,
-    unreadable_spend_usd: float = math.inf,
-    unreadable_loss_usd: float = math.inf,
+    unreadable_spend_usd: float | None = None,
+    unreadable_loss_usd: float | None = None,
     unreadable_rows: list[str] | None = None,
 ) -> tuple[float, float]:
     """Today's (ET calendar day) executed spend and the P&L the daily loss stop compares.
@@ -1476,11 +1489,13 @@ def _today_auto_buyer_totals(
     ``unreadable_loss_usd`` (callers pass the per-game cap, the most one game can lose). NaN used to
     poison the sum so ``nan <= -limit`` and ``nan + cost > cap`` were both False and the stop or cap
     silently switched off; garbage text used to skip the row (loss) or raise out of the totals (spend).
-    Both default to infinity (refuse) for display callers that know no cap. ``unreadable_rows``, when
-    given, collects ``pick_id (field)`` for every row counted for an unreadable field.
+    A missing or invalid cap means infinity (refuse outright). The display callers (dashboard alert,
+    Telegram /status) pass the state's own caps so the figure they show is the one the buyer acts on.
+    ``unreadable_rows``, when given, collects ``pick_id (field)`` for every row counted for an unreadable
+    field.
     """
-    spend_if_unreadable = unreadable_spend_usd if unreadable_spend_usd >= 0 else math.inf
-    loss_if_unreadable = unreadable_loss_usd if unreadable_loss_usd >= 0 else math.inf
+    spend_if_unreadable = _cap_or_inf(unreadable_spend_usd)
+    loss_if_unreadable = _cap_or_inf(unreadable_loss_usd)
     from model_prediction.portfolio.auto_buyer_ledger import (
         is_manual_auto_buyer_record,
         read_auto_buyer_ledger,

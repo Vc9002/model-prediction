@@ -906,8 +906,11 @@ def _snapshot_cum_quantity(order: dict[str, Any]) -> float | None:
     Only a missing field or a blank string is the readable zero it always was. A present value that
     does not parse (the string 'abc', a dict or list, an int too big for a float) or is not finite is
     an UNKNOWN fill: read as zero it voided a terminal row that may hold shares, and an overflowing one
-    raised out of the reconcile loop before the ledger write, losing every pass. Mirrors
-    ``fill_quantity`` in polymarket_execute, whose submit-time read must agree with this one.
+    raised out of the reconcile loop before the ledger write, losing every pass. The same present-versus-
+    absent rule as ``fill_quantity`` in polymarket_execute, with one deliberate asymmetry: at submit a
+    FILLED order with an unreadable count means the requested quantity (the exchange said filled), while
+    here a terminal order with an unreadable count stays unreconciled for a person to resolve, because
+    restating shares needs a real number.
     """
     raw = order.get("cum_quantity")
     if raw is None or (isinstance(raw, str) and not raw.strip()):

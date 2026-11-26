@@ -279,8 +279,15 @@ def _cmd_status(ctx: _Context, _args: list[str]) -> dict[str, Any]:
     ae._read_raw_auto_buyer_state()  # raises on an unreadable file: the loader would silently read defaults
     status = ae.auto_buyer_status()
     root = ctx.paths.runtime_root
-    live_spend, live_pnl = ae._today_auto_buyer_totals(root, live_book=True)
-    paper_spend, _paper_pnl = ae._today_auto_buyer_totals(root / "paper_auto_buyer", live_book=False)
+    # The buyer's own caps, so a corrupt ledger value shows what the buyer actually counts.
+    unreadable = {
+        "unreadable_spend_usd": status.get("max_daily_spend_usd"),
+        "unreadable_loss_usd": status.get("max_game_stake_usd"),
+    }
+    live_spend, live_pnl = ae._today_auto_buyer_totals(root, live_book=True, **unreadable)
+    paper_spend, _paper_pnl = ae._today_auto_buyer_totals(
+        root / "paper_auto_buyer", live_book=False, **unreadable
+    )
     live_loss = abs(min(live_pnl, 0.0))
     caps = {
         "daily_spend_usd": status.get("max_daily_spend_usd"),

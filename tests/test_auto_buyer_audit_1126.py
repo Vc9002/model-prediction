@@ -26,6 +26,9 @@ import pytest
 from test_auto_buyer_cohorts import (  # noqa: F401 -- _isolate is an autouse fixture, decorate a fixture
     _REAL_TODAY_TOTALS,
     SPREAD_V7,
+    SPREAD_V7_LIVE,
+    TOTAL_V6,
+    TOTAL_V6_LIVE,
     FakeExecutor,
     _cycle_harness,
     _entry,
@@ -582,6 +585,9 @@ def test_an_open_sibling_with_an_unreadable_created_at_blocks_the_slots_extensio
     assert auto_executor._OvernightAgeExtension([readable, broken]).allows(readable) is False
     other_slot = {**readable, "event_id": "other"}
     assert auto_executor._OvernightAgeExtension([other_slot, broken]).allows(other_slot) is True
+    # An ABSENT stamp (blank or missing) is not an unreadable one: it never took the extension away.
+    for absent in ({**slot, "pick_id": "c", "created_at_utc": ""}, {**slot, "pick_id": "d"}):
+        assert auto_executor._OvernightAgeExtension([readable, absent]).allows(readable) is True
 
 
 def test_quarantine_sorts_past_a_row_with_an_out_of_range_settlement_stamp(tmp_path):
@@ -855,3 +861,72 @@ def test_a_non_finite_total_from_any_source_trips_the_breaker_and_the_budget_che
     monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", lambda *_a, **_k: (float("nan"), 0.0))
     result = _live_buyer(tmp_path).evaluate_and_execute([row])
     assert FakeExecutor.executed == [] and result.rejected_budget == 1
+
+
+def _held_spread_on_g1(**fields: Any) -> dict[str, Any]:
+    """An open live spread on game g1, executed long ago (or never stamped), so the daily spend ignores it
+    and only the per-game exposure scan can see it."""
+    return {
+        "pick_id": "held",
+        "event_id": "g1",
+        "selection": "home",
+        "market_type": "spread",
+        "status": "open",
+        "order_id": "ioc-held",
+        "order_state": "ORDER_STATE_FILLED",
+        "fill_known": True,
+        "shares": 20.0,
+        "entry_price": 0.5,
+        "executed_at_utc": "",
+        "market_slug": "asc-cbb-g1-2026-11-25-neg-3pt5",
+        "token_side": "long",
+        **fields,
+    }
+
+
+@pytest.mark.usefixtures("decorate")
+@pytest.mark.parametrize(
+    ("held_cost", "buys"),
+    [(1.0, True), (25.0, False), (float("nan"), False), ("abc", False), (10**400, False)],
+    ids=[
+        "readable-small-buys",
+        "readable-at-cap-refused",
+        "nan-refused",
+        "garbage-refused",
+        "overflow-refused",
+    ],
+)
+def test_a_game_whose_held_row_has_no_readable_cost_reads_as_full_not_as_empty(tmp_path, held_cost, buys):
+    """The per-game exposure scan read a NaN cost as `nan + pending > 0` False and dropped the game from
+    the cap, so a second market on the same game bought past it; garbage text or an overflowing int raised
+    out of the whole pass. The row now counts at the per-game cap. (The held row is not stamped, so the
+    DAILY spend cannot be what refuses the candidate.)"""
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_held_spread_on_g1(cost_usd=held_cost)])
+    more = _row(TOTAL_V6, pick_id="t1", event="g1", market="total", model_probability=0.57, ask=0.51)
+    buyer = _live_buyer(tmp_path, cohorts=(SPREAD_V7_LIVE, TOTAL_V6_LIVE))
+    result = buyer.evaluate_and_execute([more])
+    assert bool(FakeExecutor.executed) is buys
+    assert result.rejected_budget == (0 if buys else 1)
+
+
+def test_the_dashboard_drawdown_alert_counts_unreadable_rows_at_the_states_own_caps(monkeypatch):
+    """The alert must show the loss the buyer counts (a NaN row at the per-game cap), not infinity."""
+    dashboard_status = importlib.import_module(
+        "model_prediction.dashboard.status"
+    )  # the package re-exports a function of that name
+
+    seen: dict[str, Any] = {}
+
+    def _totals_stub(*_args: Any, **kwargs: Any) -> tuple[float, float]:
+        seen.update(kwargs)
+        return 0.0, -kwargs["unreadable_loss_usd"]
+
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _totals_stub)
+    monkeypatch.setattr(
+        auto_executor,
+        "load_auto_buyer_state",
+        lambda: {"max_daily_spend_usd": 500.0, "max_game_stake_usd": 25.0, "max_daily_loss_usd": 40.0},
+    )
+    alert = dashboard_status._auto_buyer_daily_loss_alert()
+    assert seen == {"unreadable_spend_usd": 500.0, "unreadable_loss_usd": 25.0}
+    assert alert is not None and alert["level"] == "warn" and "$-25.00" in alert["text"]
