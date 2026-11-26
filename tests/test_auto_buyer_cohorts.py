@@ -1230,6 +1230,66 @@ def test_nba_total_cohort_is_paper_only():
     assert not _row_in_cohort(row, live)
 
 
+def test_nba_v10_and_ml_paper_cohorts_buy_near_zero_edge_rows(tmp_path, decorate):
+    # Operator cohorts 2026-11-25: v10 spread/total [0, 25%), NBA ML v5 [5%, 25%), paper, with the
+    # state file's edge-scaled sizing (min_edge 3.5%, max 12%, floor 0.5). A v10 call below 0 is not bought.
+    v10_spread = BuyCohort("nba-anchor-v10", "nba", "spread", 0.0, 0.25, "paper")
+    v10_total = BuyCohort("nba-anchor-v10", "nba", "total", 0.0, 0.25, "paper")
+    ml = BuyCohort("nba-elo-trend-lr-v5", "nba", "moneyline", 0.05, 0.25, "paper")
+    common = {"league": "nba", "units": 1.0, "ask": 0.51}
+    rows = [
+        _row("nba-anchor-v10", pick_id="sp", event="n1", edge="0.005", model_probability=0.515, **common),
+        _row(
+            "nba-anchor-v10",
+            pick_id="to",
+            event="n1",
+            market="total",
+            edge="0.005",
+            model_probability=0.515,
+            **common,
+        ),
+        _row("nba-anchor-v10", pick_id="neg", event="n2", edge="-0.01", model_probability=0.50, **common),
+        _row(
+            "nba-elo-trend-lr-v5",
+            pick_id="ml",
+            event="n3",
+            market="moneyline",
+            edge="0.06",
+            model_probability=0.57,
+            **common,
+        ),
+    ]
+    buyer = AutoPolymarketBuyer(
+        config=AutoExecutionConfig(
+            mode="paper",
+            cohorts=(v10_spread, v10_total, ml),
+            whitelisted_models=(),
+            disabled_sport_markets=(("nba", "total"),),
+            capture_missing_slates=False,
+            require_model_timestamp=True,
+            edge_scaled_sizing_enabled=True,
+            edge_scaling_min_fraction=0.5,
+            min_edge=0.035,
+            max_edge=0.12,
+            unit_value_usd=5.0,
+            max_game_stake_usd=25.0,
+            max_daily_spend_usd=500.0,
+        ),
+        audit=AuditLog(tmp_path / "audit.jsonl"),
+        data_root=tmp_path,
+    )
+    result = buyer.evaluate_and_execute(rows)
+    orders = {o["pick_id"]: o for o in result.dry_run_orders}
+    assert sorted(orders) == ["ml", "sp", "to"]
+    assert all(o["status"] == "paper_filled" for o in orders.values())
+    assert orders["sp"]["cohort"] == v10_spread.label
+    assert orders["to"]["cohort"] == v10_total.label
+    # 1U x $5 at the 0.5 sizing floor (edge below min_edge), and the same on the game's total.
+    assert 2.0 <= float(orders["sp"]["cost_usd"]) <= 2.6
+    assert 2.0 <= float(orders["to"]["cost_usd"]) <= 2.6
+    assert FakeExecutor.executed == []
+
+
 def test_hand_built_cohort_cannot_reach_a_blocked_sport_or_skip_the_edge_ceiling(tmp_path, decorate):
     ncaaf = BuyCohort("cfb-structural-v5.2", "ncaaf", "spread", 0.05, 0.12, "live")
     row = _row("cfb-structural-v5.2", pick_id="cfb", event="c1", league="ncaaf")
