@@ -657,10 +657,11 @@ def test_decorating_a_refused_pinned_pick_resolves_the_quote_once(monkeypatch, s
     assert decorated["buy_block_reason"] == decorated["quote_refusal_reason"]
 
 
-def test_scan_prices_recaptures_the_blocking_pinned_slug(monkeypatch) -> None:
+def test_scan_prices_recaptures_the_blocking_pinned_slug(monkeypatch, snapshots) -> None:
     """A pinned row with no usable quote still names its recorded slug, so "scan prices" re-captures
     exactly the contract that is blocking it."""
     orders = importlib.import_module("model_prediction.dashboard.orders")
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.97, 0.03, observed_at_utc=_POST_TIP)])
     row = {
         **_pinned("away", -3.5, _NEG, "long"),
         "status": "open",
@@ -682,3 +683,218 @@ def test_scan_prices_recaptures_the_blocking_pinned_slug(monkeypatch) -> None:
         "--contract",
         f"ncaab@2026-11-21={_NEG}",
     ]
+
+
+# ------------------------------------------------------ the exchange's own start bounds "pregame"
+
+_EARLIER = "2026-11-21T20:00:00Z"  # the exchange moved the game an hour before the row's start
+
+
+@pytest.mark.parametrize(
+    ("observed", "quoted"),
+    [("2026-11-21T20:18:00Z", False), ("2026-11-21T19:55:00Z", True)],
+)
+def test_pin_is_pregame_only_before_the_earlier_of_row_and_exchange_start(
+    snapshots, observed, quoted
+) -> None:
+    """The buy gates only look at the row's start. A quote taken after the exchange's earlier tip but
+    before the row's start must not pass as pregame (it is buyable in-play)."""
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, event_start_utc=_EARLIER, observed_at_utc=observed)])
+    row = _pinned("away", -3.5, _NEG, "long")
+
+    assert (backtests._pick_quote(row) is not None) is quoted
+    if not quoted:
+        assert "no qualifying pregame snapshot" in backtests._pick_quote_refusal(row)
+
+
+@pytest.mark.parametrize("start", ["not-a-time", "", None, "2026-11-21T21:00:00"], ids=str)
+def test_pin_snapshot_without_a_readable_aware_exchange_start_does_not_qualify(snapshots, start) -> None:
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, event_start_utc=start)])
+    row = _pinned("away", -3.5, _NEG, "long")
+
+    assert backtests._pick_quote(row) is None
+    assert "no qualifying pregame snapshot" in backtests._pick_quote_refusal(row)
+
+
+def test_name_matching_also_stops_at_the_exchanges_earlier_start(snapshots) -> None:
+    after_exchange_start = _spread(_ALT, "UCA", -3.5, 0.44, 0.57, event_start_utc=_EARLIER)
+    after_exchange_start["observed_at_utc"] = "2026-11-21T20:18:00Z"
+    snapshots([after_exchange_start])
+    assert backtests._pick_quote(_row("away", -3.5)) is None
+
+    before = {**after_exchange_start, "observed_at_utc": "2026-11-21T19:55:00Z"}
+    snapshots([before])
+    assert backtests._pick_quote(_row("away", -3.5))["market_slug"] == _ALT
+
+
+def test_quote_carries_the_exchange_start_and_readiness_uses_the_earlier_start(snapshots) -> None:
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    future = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
+    past = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
+    row = {
+        **_pinned("away", -3.5, _NEG, "long"),
+        "status": "open",
+        "units": 1.0,
+        "pick_tag": "qualified",
+        "event_start_utc": future,
+    }
+    quote = {"fresh": True, "market_state": "MARKET_STATE_OPEN", "event_start_utc": past, "ask": 0.5}
+
+    assert orders._event_already_started(row) is False
+    assert orders._event_already_started(row, quote) is True
+    assert orders._event_already_started(row, {**quote, "event_start_utc": future}) is False
+    assert orders._order_readiness(row, quote) == (False, "game has already started")
+
+    snapshots(
+        [
+            _spread(
+                _NEG,
+                _UNKNOWN,
+                -3.5,
+                0.50,
+                0.51,
+                event_start_utc=_EARLIER,
+                observed_at_utc="2026-11-21T19:55:00Z",
+            )
+        ]
+    )
+    exposed = backtests._pick_quote(_pinned("away", -3.5, _NEG, "long"))
+    assert exposed["event_start_utc"] == _EARLIER
+
+
+@pytest.mark.parametrize(
+    ("exchange_start", "quoted"),
+    [("2026-11-21T21:04:00Z", True), ("2026-11-21T21:06:00Z", False), ("2026-11-21T22:00:00Z", False)],
+)
+def test_pin_found_under_a_neighbour_day_needs_the_exchange_start_within_tolerance(
+    day_files, exchange_start, quoted
+) -> None:
+    """A capture filed under another ET day than the row is only the same game when the exchange's
+    start agrees with the row's within the live buyer's tip-time tolerance (300 s)."""
+    day_files(
+        {
+            "2026-11-21": [_name_candidate()],
+            "2026-11-22": [_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, event_start_utc=exchange_start)],
+        }
+    )
+    row = _pinned("away", -3.5, _NEG, "long")
+
+    assert (backtests._pick_quote(row) is not None) is quoted
+    if not quoted:
+        assert "captured under another ET day" in backtests._pick_quote_refusal(row)
+
+
+def test_same_day_pin_keeps_no_tolerance_check_beyond_pregame(snapshots) -> None:
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, event_start_utc="2026-11-21T22:00:00Z")])
+
+    assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is not None
+
+
+# ------------------------------------------------ neighbour probes never poison the negative cache
+
+
+def test_a_next_day_file_created_after_a_probe_is_seen(monkeypatch, tmp_path: Path) -> None:
+    paths = {day: tmp_path / f"snap-{day}.jsonl" for day in ("2026-11-20", "2026-11-21", "2026-11-22")}
+    paths["2026-11-21"].write_text(json.dumps(_name_candidate()) + "\n", encoding="utf-8")
+    monkeypatch.setattr(backtests, "_resolve_snapshot_path", lambda _sport, day: paths[day])
+    row = _pinned("away", -3.5, _NEG, "long")
+
+    assert backtests._pick_quote(row) is None  # probes 11-20 and 11-22: neither exists yet
+    assert not {paths["2026-11-20"], paths["2026-11-22"]} & backtests._MISSING_PATHS
+
+    paths["2026-11-22"].write_text(
+        json.dumps(_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51)) + "\n", encoding="utf-8"
+    )
+
+    assert backtests._pick_quote(row)["market_slug"] == _NEG
+
+
+# ------------------------------------------------------------- timezone-naive times fail closed
+
+
+@pytest.mark.parametrize("pinned", [True, False])
+def test_naive_observed_time_disqualifies_the_snapshot(snapshots, pinned) -> None:
+    snapshots([_spread(_NEG, "UCA", -3.5, 0.50, 0.51, observed_at_utc="2026-11-21T20:55:53")])
+    row = _pinned("away", -3.5, _NEG, "long") if pinned else _row("away", -3.5)
+
+    assert backtests._pick_quote(row) is None  # was a TypeError out of the observed >= start compare
+
+
+@pytest.mark.parametrize("start", ["2026-11-21T21:00:00", "not-a-time", ""])
+def test_row_without_an_aware_event_start_gets_no_quote_and_a_pinned_row_a_reason(snapshots, start) -> None:
+    snapshots(_REAL_UCA)
+    pinned = {**_pinned("away", -3.5, _NEG, "long"), "event_start_utc": start}
+    unpinned = {**_row("away", -3.5), "event_start_utc": start}
+
+    assert backtests._pick_quote(pinned) is None
+    assert backtests._pick_quote_refusal(pinned) == (
+        f"recorded market {_NEG}: row has no timezone-aware event start"
+    )
+    assert backtests._pick_quote(unpinned) is None
+    assert backtests._pick_quote_refusal(unpinned) is None
+
+
+# ----------------------------------------------- scan prices names the day whose file holds the slug
+
+
+def _scan_command(monkeypatch, orders, rows) -> list[str]:
+    monkeypatch.setattr(orders, "_resolve_runner", lambda: ["model-prediction"])
+    monkeypatch.setattr(orders, "_load_archive", lambda: {"pick_ids": []})
+    monkeypatch.setattr(orders, "_all_ledger_rows_for_price_scan", lambda: rows)
+    return orders._action_command("refresh_prices", {"date": "2026-11-21"})
+
+
+def test_scan_prices_names_the_day_of_the_file_that_holds_the_slug(monkeypatch, day_files) -> None:
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    day_files({"2026-11-21": [_name_candidate()], "2026-11-22": [_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51)]})
+    row = {**_pinned("away", -3.5, _NEG, "long"), "status": "open", "pick_id": "p1"}
+
+    command = _scan_command(monkeypatch, orders, [row])
+
+    # The quote resolves from the 11-22 file, so the refresh must name 11-22, not the row's 11-21.
+    assert command[-2:] == ["--contract", f"ncaab@2026-11-22={_NEG}"]
+
+
+def test_scan_prices_skips_a_pin_that_no_day_file_holds(monkeypatch, day_files) -> None:
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    day_files({"2026-11-21": [_name_candidate()]})
+    row = {**_pinned("away", -3.5, _NEG, "long"), "status": "open", "pick_id": "p1"}
+
+    assert "--contract" not in _scan_command(monkeypatch, orders, [row])
+
+
+def test_scan_prices_contract_is_refreshable_through_the_real_refresh_function(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Run the emitted --contract through refresh_contract_snapshots against real stores: it only
+    extends a slug already in the named day's file, so a wrong day shows up as a failure."""
+    from model_prediction.data_sources.polymarket_us import (
+        PolymarketSnapshotStore,
+        refresh_contract_snapshots,
+    )
+
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    stored = _spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51)
+    PolymarketSnapshotStore.for_sport_date(tmp_path, "ncaab", "2026-11-22").append(stored)
+    PolymarketSnapshotStore.for_sport_date(tmp_path, "ncaab", "2026-11-21").append(_name_candidate())
+    monkeypatch.setattr(
+        backtests,
+        "_resolve_snapshot_path",
+        lambda sport, day: PolymarketSnapshotStore.for_sport_date(tmp_path, sport, day).path,
+    )
+    row = {**_pinned("away", -3.5, _NEG, "long"), "status": "open", "pick_id": "p1"}
+
+    command = _scan_command(monkeypatch, orders, [row])
+    contracts = []
+    for value in command[command.index("--contract") :][1::2]:
+        sport_day, _, slug = value.partition("=")
+        sport, _, day = sport_day.partition("@")
+        contracts.append({"sport": sport, "market_slug": slug, "game_date": day})
+
+    class Client:
+        def snapshot(self, slug: str) -> dict:
+            return {**stored, "market_slug": slug, "observed_at_utc": _OBSERVED}
+
+    result = refresh_contract_snapshots(Client(), contracts, tmp_path, "2026-11-21")
+
+    assert (result["refreshed"], result["status"]) == (1, "ok")

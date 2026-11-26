@@ -331,16 +331,33 @@ def _snapshot_cache_put(path: Path, mtime: float, size: int, records: list[dict]
 _MISSING_PATHS: set[Path] = set()
 
 
-def _load_snapshot_file(path: Path) -> list[dict]:
+def _parse_aware(value: object) -> datetime | None:
+    """An ISO timestamp as a timezone-aware datetime, or None when it is unreadable or naive.
+
+    A naive time cannot be ordered against the aware start times (TypeError), and it cannot be shown
+    to be pregame, so it is treated as unreadable."""
+    try:
+        parsed = datetime.fromisoformat(str(value or ""))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _load_snapshot_file(path: Path, *, remember_missing: bool = True) -> list[dict]:
     """Read and parse a polymarket_snapshots.jsonl file with mtime caching.
 
     Avoids re-opening and parsing large JSON Lines files thousands of times
     during bulk ledger decoration.
+
+    ``remember_missing=False`` is for probes of a day that may simply not exist yet (the day after a
+    row's, where a midnight-straddling capture is filed): such a file can appear later, so its
+    absence is neither read from nor written to the permanent negative cache.
     """
-    if path in _MISSING_PATHS:
+    if remember_missing and path in _MISSING_PATHS:
         return []
     if not path.exists():
-        _MISSING_PATHS.add(path)
+        if remember_missing:
+            _MISSING_PATHS.add(path)
         return []
     try:
         stat = path.stat()
@@ -362,14 +379,7 @@ def _load_snapshot_file(path: Path) -> list[dict]:
                     continue
                 try:
                     snapshot = json.loads(line)
-                    obs = snapshot.get("observed_at_utc")
-                    if obs:
-                        try:
-                            snapshot["_observed_dt"] = datetime.fromisoformat(str(obs))
-                        except ValueError:
-                            snapshot["_observed_dt"] = None
-                    else:
-                        snapshot["_observed_dt"] = None
+                    snapshot["_observed_dt"] = _parse_aware(snapshot.get("observed_at_utc"))
                     records.append(snapshot)
                 except json.JSONDecodeError:
                     continue
@@ -400,14 +410,19 @@ def _recorded_market(row: dict) -> tuple[str, str] | None:
 def _pinned_snapshot(
     snapshots: list[dict], slug: str, event_start: datetime, market_type: str
 ) -> dict | None:
-    """Newest valid pregame snapshot of the recorded market (a max-scan: the file is ingest-ordered)."""
+    """Newest valid pregame snapshot of the recorded market (a max-scan: the file is ingest-ordered).
+
+    Pregame is judged against the earlier of the row's start and the exchange's own start for the
+    contract: the buy gates only look at the row's start, so a game the exchange moved earlier must
+    not pass as pregame on a quote taken after its real tip. Fail closed: an unreadable observation
+    time or exchange start cannot be shown to precede the start."""
     newest: dict | None = None
     for snapshot in snapshots:
         if snapshot.get("market_slug") != slug or snapshot.get("timestamp_valid") is False:
             continue
         observed = snapshot.get("_observed_dt")
-        # Fail closed: an unreadable observation time cannot be shown to precede the start.
-        if observed is None or observed >= event_start:
+        exchange_start = _parse_aware(snapshot.get("event_start_utc"))
+        if observed is None or exchange_start is None or observed >= min(event_start, exchange_start):
             continue
         if snapshot.get("market_type") != market_type:
             continue
@@ -494,11 +509,12 @@ def _quote_from_snapshot(snapshot: dict, side_name: str, event_start: datetime) 
     if not 0 < ask < 1:
         return None
     observed = str(snapshot.get("observed_at_utc") or "")
-    try:
-        observed_at = datetime.fromisoformat(observed)
-        age_seconds = max(0, int((datetime.now(UTC) - observed_at).total_seconds()))
-    except ValueError:
+    observed_at = _parse_aware(observed)
+    if observed_at is None:
         return None  # callers already skip these; never quote a price whose age is unknown
+    age_seconds = max(0, int((datetime.now(UTC) - observed_at).total_seconds()))
+    exchange_start = _parse_aware(snapshot.get("event_start_utc"))
+    start = event_start if exchange_start is None else min(event_start, exchange_start)
     return {
         "market_slug": snapshot.get("market_slug"),
         "side": side_name,
@@ -513,7 +529,7 @@ def _quote_from_snapshot(snapshot: dict, side_name: str, event_start: datetime) 
         # The exchange's own start, which the live buyer cross-checks against the row's tip time.
         "event_start_utc": snapshot.get("event_start_utc"),
         "price_role": "pregame_close",
-        "seconds_before_start": max(0, int((event_start - observed_at).total_seconds())),
+        "seconds_before_start": max(0, int((start - observed_at).total_seconds())),
     }
 
 
@@ -537,9 +553,16 @@ def _pick_quote_refusal(row: dict) -> str | None:
     return refusals[0] if refusals else None
 
 
-def _day_snapshots(odds_sport: str, sport: str, day: str) -> list[dict]:
-    """The stored snapshots for one ET day, under the odds sport's folder then the league's."""
+def _day_snapshots(odds_sport: str, sport: str, day: str, *, probe: bool = False) -> list[dict]:
+    """The stored snapshots for one ET day, under the odds sport's folder then the league's.
+
+    ``probe`` reads a neighbouring day without touching the permanent negative cache (see
+    _load_snapshot_file), so a file created after the probe is seen by the next call."""
     path = _resolve_snapshot_path(odds_sport, day)
+    if probe:
+        if not path.exists():
+            path = _resolve_snapshot_path(sport, day)
+        return _load_snapshot_file(path, remember_missing=False)
     if path in _MISSING_PATHS or not path.exists():
         _MISSING_PATHS.add(path)
         path = _resolve_snapshot_path(sport, day)
@@ -548,6 +571,45 @@ def _day_snapshots(odds_sport: str, sport: str, day: str) -> list[dict]:
 
 def _has_slug(snapshots: list[dict], slug: str) -> bool:
     return any(snapshot.get("market_slug") == slug for snapshot in snapshots)
+
+
+def _odds_sport(sport: str) -> str:
+    """The odds folder a league's snapshots are stored under."""
+    if sport in ("cs2", "lol", "dota2", "valorant", "r6", "rainbow_six", "cod", "ow", "rl"):
+        return "esports"
+    return "ncaaf" if sport in ("cfb", "college_football") else sport
+
+
+def _neighbour_day_with_slug(odds_sport: str, sport: str, event_start: datetime, slug: str):
+    """(ET day, snapshots) of the day before or after the row's day that holds ``slug``, or None.
+
+    Captures are filed under the exchange start's ET date, which differs from the row's across
+    midnight."""
+    row_day = event_start.astimezone(EASTERN).date()
+    for offset in (-1, 1):
+        day = (row_day + timedelta(days=offset)).isoformat()
+        neighbour = _day_snapshots(odds_sport, sport, day, probe=True)
+        if _has_slug(neighbour, slug):
+            return day, neighbour
+    return None
+
+
+def _recorded_market_day(row: dict) -> str | None:
+    """The ET day whose snapshot file actually holds the row's recorded slug, or None.
+
+    This is the day a re-capture of that slug must name: the refresh only extends contracts already
+    in that day's file."""
+    recorded = _recorded_market(row)
+    sport = str(row.get("league") or row.get("sport") or "").lower()
+    event_start = _parse_aware(row.get("event_start_utc"))
+    if recorded is None or event_start is None or (sport not in SPORTS and sport != "esports"):
+        return None
+    odds_sport = _odds_sport(sport)
+    row_day = event_start.astimezone(EASTERN).date().isoformat()
+    if _has_slug(_day_snapshots(odds_sport, sport, row_day), recorded[0]):
+        return row_day
+    found = _neighbour_day_with_slug(odds_sport, sport, event_start, recorded[0])
+    return found[0] if found else None
 
 
 def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
@@ -587,28 +649,22 @@ def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
     sport = str(row.get("league") or row.get("sport") or "").lower()
     if sport not in SPORTS and sport != "esports":
         return None
-    try:
-        event_start = datetime.fromisoformat(str(row.get("event_start_utc") or ""))
-    except ValueError:
-        return None
-    day = event_start.astimezone(EASTERN).date().isoformat()
-    odds_sport = (
-        "esports"
-        if sport in ("cs2", "lol", "dota2", "valorant", "r6", "rainbow_six", "cod", "ow", "rl")
-        else ("ncaaf" if sport in ("cfb", "college_football") else sport)
-    )
-    snapshots = _day_snapshots(odds_sport, sport, day)
     recorded = _recorded_market(row) if market_type in ("moneyline", "spread", "total") else None
+    # A naive or unreadable start cannot be ordered against the snapshots' aware times.
+    event_start = _parse_aware(row.get("event_start_utc"))
+    if event_start is None:
+        if recorded is not None:
+            refusals.append(f"recorded market {recorded[0]}: row has no timezone-aware event start")
+        return None
+    odds_sport = _odds_sport(sport)
+    snapshots = _day_snapshots(odds_sport, sport, event_start.astimezone(EASTERN).date().isoformat())
+    from_neighbour = False
     if recorded is not None and not _has_slug(snapshots, recorded[0]):
-        row_day = event_start.astimezone(EASTERN).date()
-        for offset in (-1, 1):
-            neighbour = _day_snapshots(odds_sport, sport, (row_day + timedelta(days=offset)).isoformat())
-            if _has_slug(neighbour, recorded[0]):
-                snapshots = neighbour
-                break
-        else:
+        found = _neighbour_day_with_slug(odds_sport, sport, event_start, recorded[0])
+        if found is None:
             refusals.append(f"recorded market {recorded[0]}: never captured for this day; not name-matched")
             return None
+        snapshots, from_neighbour = found[1], True
     if not snapshots:
         return None
     pinned = _pinned_snapshot(snapshots, recorded[0], event_start, market_type) if recorded else None
@@ -618,13 +674,31 @@ def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
             f"(post-tip, timestamp-invalid, unreadable time or another market type); not name-matched"
         )
         return None
+    if from_neighbour and pinned is not None:
+        # The capture sits under another ET day than the row, so the exchange's start is not where the
+        # row says: only a gap within the live buyer's own tolerance is the same game.
+        from model_prediction.portfolio.auto_executor import TIP_TIME_TOLERANCE_SECONDS
+
+        exchange_start = _parse_aware(pinned.get("event_start_utc"))
+        gap = abs((exchange_start - event_start).total_seconds()) if exchange_start else None
+        if gap is None or gap > TIP_TIME_TOLERANCE_SECONDS:
+            refusals.append(
+                f"recorded market {recorded[0]}: captured under another ET day and its exchange start "
+                f"is not the row's start (gap {'unknown' if gap is None else f'{gap / 60:.1f} min'}); "
+                f"not quoted"
+            )
+            return None
     latest: dict[str, dict] = {}
     for snapshot in snapshots:
         if snapshot.get("timestamp_valid") is False:
             continue
         snapshot_observed = snapshot.get("_observed_dt")
-        if snapshot_observed is None or snapshot_observed >= event_start:
+        if snapshot_observed is None:
             continue  # unreadable observation time: cannot be shown to be pregame
+        # Same rule as the pin: the exchange's own start, when it carries one, can only tighten it.
+        exchange_start = _parse_aware(snapshot.get("event_start_utc"))
+        if snapshot_observed >= (event_start if exchange_start is None else min(event_start, exchange_start)):
+            continue
         snapshot_market_type = snapshot.get("market_type")
         if market_type == "moneyline":
             if snapshot_market_type not in {"moneyline", "team_win"}:

@@ -31,6 +31,7 @@ except ImportError:  # pragma: no cover
 from model_prediction.dashboard.backtests import (
     _pick_quote,
     _recorded_market,
+    _recorded_market_day,
 )
 from model_prediction.dashboard.common import (
     _CACHE,
@@ -288,13 +289,19 @@ def _reconcile_orders_locked() -> None:
         _save_orders(payload)
 
 
-def _event_already_started(row: dict) -> bool:
-    event_start = str(row.get("event_start_utc") or "")
-    try:
-        game_time = datetime.fromisoformat(event_start)
-    except (ValueError, TypeError):
-        return False
-    return game_time < datetime.now(UTC)
+def _event_already_started(row: dict, quote: dict | None = None) -> bool:
+    """Whether the row's game has started, by the earlier of its start and the quote's exchange start.
+
+    The quote carries the exchange's own start for the contract; a game the exchange moved earlier
+    than the row's ESPN time has started when the exchange says so."""
+    starts = []
+    for raw in (row.get("event_start_utc"), (quote or {}).get("event_start_utc")):
+        try:
+            starts.append(datetime.fromisoformat(str(raw or "")))
+        except (ValueError, TypeError):
+            continue
+    now = datetime.now(UTC)
+    return any(start < now for start in starts if start.tzinfo is not None)
 
 
 def _is_manual_order(row: dict) -> bool:
@@ -324,7 +331,7 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     if quote.get("market_state") != "MARKET_STATE_OPEN":
         return False, "market is not open"
     # Block orders on past games
-    if _event_already_started(row):
+    if _event_already_started(row, quote):
         return False, "game has already started"
     missing = [name for name in ("POLYMARKET_KEY_ID", "POLYMARKET_SECRET_KEY") if not os.environ.get(name)]
     if missing:
@@ -590,7 +597,7 @@ def preview_order(payload: dict) -> dict:
         # update again. Validating a resting sell's "don't cross the bid"
         # check against that frozen number would be actively misleading,
         # not just imprecise, so this one case is still blocked.
-        if _event_already_started(row):
+        if _event_already_started(row, quote):
             return {"status": "refused", "error": "game has already started; quote can no longer update"}
         bid = quote.get("bid")
         if bid is not None and price <= float(bid):
@@ -676,7 +683,7 @@ def submit_order(payload: dict) -> dict:
         # progress has no live quote to validate against (_pick_quote only
         # ever returns pregame snapshots), so re-check here too rather than
         # trust that preview-time state still holds at submission time.
-        if _event_already_started(row):
+        if _event_already_started(row, quote):
             return {"status": "refused", "error": "game has already started; quote can no longer update"}
         bid = quote.get("bid")
         if bid is not None and ticket["price"] <= float(bid):
@@ -1046,12 +1053,18 @@ def _action_command(name: str, payload: dict) -> list[str]:
             elif sport == "cfb":
                 sport = "ncaaf"
             slug = str(quote.get("market_slug") or "").strip()
-            if not slug:
-                # A pinned row with no usable quote is blocked by its recorded market: re-capture that.
-                recorded = _recorded_market(row)
-                slug = recorded[0] if recorded else ""
+            pinned_day = None
+            recorded = _recorded_market(row)
+            if recorded:
+                # A pinned row is re-captured on its recorded market, under the day whose file holds it
+                # (the refresh only extends contracts already stored there), even when its quote came
+                # from the day after the row's. No file holding it means there is nothing to refresh.
+                pinned_day = _recorded_market_day(row)
+                if pinned_day is None:
+                    continue
+                slug = recorded[0]
             try:
-                game_day = (
+                game_day = pinned_day or (
                     datetime.fromisoformat(str(row.get("event_start_utc") or ""))
                     .astimezone(EASTERN)
                     .date()

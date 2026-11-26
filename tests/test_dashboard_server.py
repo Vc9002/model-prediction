@@ -1062,7 +1062,7 @@ def test_scan_prices_targets_all_unique_open_visible_ledger_contracts(
         "settled": {"market_slug": "mlb-finished"},
         "archived": {"market_slug": "nfl-hidden"},
     }
-    patch_dash("_pick_quote", lambda row: quotes[row["pick_id"]])
+    patch_dash("_pick_quote", lambda row, refusals=None: quotes[row["pick_id"]])
 
     command = dashboard_server._action_command("refresh_prices", {"date": "2026-07-17"})
 
@@ -2024,7 +2024,8 @@ def test_submit_sell_also_refuses_once_the_game_has_already_started(
     # Game has since started -- flip the row and the quote lookup used by submit_order.
     pick["event_start_utc"] = "2020-01-01T00:00:00Z"
     patch_dash(
-        "_pick_quote", lambda row: {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33}
+        "_pick_quote",
+        lambda row, refusals=None: {"market_slug": "mlb-example", "side": "long", "bid": 0.30, "ask": 0.33},
     )
 
     result = dashboard_server.submit_order({"nonce": preview["nonce"]})
@@ -2070,7 +2071,7 @@ def test_pnl_fallback_formula_matches_pricing_profit_units() -> None:
 
 
 def test_decorated_pick_preserves_recorded_zero_pnl_and_zero_units(patch_dash) -> None:
-    patch_dash("_pick_quote", lambda _: {"ask": 0.20})
+    patch_dash("_pick_quote", lambda _row, _refusals=None: {"ask": 0.20})
     patch_dash("_order_readiness", lambda *_: (False, "not executable"))
     patch_dash("_latest_order_for_pick", lambda *_: None)
     patch_dash("_manual_research_eligibility", lambda _: (False, "no"))
@@ -2093,7 +2094,7 @@ def test_decorated_pick_preserves_recorded_zero_pnl_and_zero_units(patch_dash) -
 
 
 def test_decorated_pick_does_not_invent_size_or_zero_pnl_for_unscored_result(patch_dash) -> None:
-    patch_dash("_pick_quote", lambda _: {"ask": 0.20})
+    patch_dash("_pick_quote", lambda _row, _refusals=None: {"ask": 0.20})
     patch_dash("_order_readiness", lambda *_: (False, "not executable"))
     patch_dash("_latest_order_for_pick", lambda *_: None)
     patch_dash("_manual_research_eligibility", lambda _: (False, "no"))
@@ -2128,7 +2129,7 @@ def test_decorated_pick_does_not_invent_size_or_zero_pnl_for_unscored_result(pat
 def test_decorated_pick_fallback_uses_decision_price_not_current_quote(
     sportsbook, decision_price, decimal_odds, expected, patch_dash
 ) -> None:
-    patch_dash("_pick_quote", lambda _: {"ask": 0.20})
+    patch_dash("_pick_quote", lambda _row, _refusals=None: {"ask": 0.20})
     patch_dash("_order_readiness", lambda *_: (False, "not executable"))
     patch_dash("_latest_order_for_pick", lambda *_: None)
     patch_dash("_manual_research_eligibility", lambda _: (False, "no"))
