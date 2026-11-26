@@ -65,6 +65,7 @@ def test_quote_fetched_after_cycle_start_is_not_stale(tmp_path, monkeypatch):
         lambda _self, _slug: {
             "observed_at_utc": iso_utc(utc_now()),
             "market_state": "MARKET_STATE_OPEN",
+            "event_start_utc": pick["event_start_utc"],
             "long": {"ask": 0.5},
         },
     )

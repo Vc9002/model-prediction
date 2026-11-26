@@ -10,8 +10,10 @@ from __future__ import annotations
 import gzip
 import json
 import secrets
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import yaml
@@ -24,6 +26,7 @@ except ImportError:  # pragma: no cover
 
 from http.server import BaseHTTPRequestHandler
 
+from model_prediction.auto_buyer_lock import auto_buyer_lock_path
 from model_prediction.config import load_config, polymarket_edge_enabled
 from model_prediction.daily_lock import acquire_lock
 from model_prediction.dashboard.backtests import (
@@ -148,8 +151,26 @@ def _read_paper_auto_buyer_ledger() -> list[dict]:
 
 
 def _auto_buyer_run_lock_path() -> Path:
-    """The writer lock the scheduled auto-buyer worker and the daily run hold."""
-    return RuntimePaths.resolve(require_external_runtime=False).daily_lock
+    """auto_buyer.lock: held by the buyer worker's cycle and the daily job's buyer steps."""
+    return auto_buyer_lock_path(RuntimePaths.resolve(require_external_runtime=False))
+
+
+def _run_under_auto_buyer_lock(action: Callable[[], Any]) -> tuple[int, Any]:
+    """Run a dashboard write to the Auto-Buyer ledgers under auto_buyer.lock, non-blocking.
+
+    A settle or paper-trial run rewrites the same ledger a buyer cycle reads and appends to; racing
+    one loses rows or double-counts the caps. A held lock answers 409 instead of waiting.
+    """
+    lock = acquire_lock(_auto_buyer_run_lock_path())
+    if lock is None:
+        return 409, {
+            "status": "refused",
+            "error": "a scheduled auto-buyer or daily run holds the Auto-Buyer lock; retry shortly",
+        }
+    try:
+        return 200, action()
+    finally:
+        lock.close()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -751,7 +772,8 @@ class Handler(BaseHTTPRequestHandler):
             from model_prediction.portfolio.ncaab_paper_trial import run_ncaab_spread_paper_trial
 
             try:
-                self._send(run_ncaab_spread_paper_trial())
+                code, body = _run_under_auto_buyer_lock(run_ncaab_spread_paper_trial)
+                self._send(body, code=code)
             except (OSError, TypeError, ValueError, RuntimeError) as error:
                 self._send({"status": "error", "error": str(error)}, code=500)
         elif parsed.path == "/api/auto-buyer/settle":
@@ -764,7 +786,8 @@ class Handler(BaseHTTPRequestHandler):
                 req_mode = str(state.get("mode", "paper"))
             req_mode = str(req_mode).lower()
             root = PAPER_AUTO_BUYER_DATA_ROOT if req_mode == "paper" else None
-            self._send(settle_auto_buyer_ledger(data_root=root))
+            code, body = _run_under_auto_buyer_lock(lambda: settle_auto_buyer_ledger(data_root=root))
+            self._send(body, code=code)
         else:
             self._send({"error": "unknown route"}, code=404)
 

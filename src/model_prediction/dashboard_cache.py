@@ -388,6 +388,28 @@ class DashboardCache:
             wb.close()
 
 
+def read_sqlite_authority_picks(tier: str, *, paths: RuntimePaths | None = None) -> list[dict[str, Any]]:
+    """One tier's rows straight from the canonical SQLite ledger, in the cache's row shape.
+
+    For the live buyer, which must never act on an xlsx projection: unlike ``DashboardCache`` this
+    ignores MODEL_PREDICTION_LEDGER_AUTHORITY, shares no table another process can rewrite between a
+    refresh and a read, and raises on any failure instead of returning [] or falling back. The JSON
+    round trip gives exactly the values a cache read returns.
+    """
+    resolved = paths if paths is not None else RuntimePaths.resolve()
+    if not resolved.ledgers_db.is_file():
+        raise FileNotFoundError(f"canonical ledger database is missing: {resolved.ledgers_db}")
+    store = RuntimeLedgerStore(resolved)
+    try:
+        return [
+            json.loads(json.dumps(DashboardCache._dashboard_row(row)))
+            for row in store.pick_rows(tier=tier)
+            if row.get("status") not in RETIRED_STATUSES
+        ]
+    finally:
+        store.close()
+
+
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     """Convert a SQLite row to a dict, unpacking payload_json."""
     d = dict(row)

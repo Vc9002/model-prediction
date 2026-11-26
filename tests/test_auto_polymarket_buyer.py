@@ -198,7 +198,12 @@ def test_ncaab_live_bucket_uses_normal_stake_sizing(tmp_path, monkeypatch):
     buyer = AutoPolymarketBuyer(
         config=config,
         audit=AuditLog(tmp_path / "audit.jsonl"),
-        live_quote_fn=lambda slug: {"market_slug": slug, "ask": 0.50, "side": "long"},
+        live_quote_fn=lambda slug: {
+            "market_slug": slug,
+            "ask": 0.50,
+            "side": "long",
+            "event_start_utc": base["event_start_utc"],
+        },
         data_root=tmp_path,
     )
     result = buyer.evaluate_and_execute(
@@ -1035,6 +1040,7 @@ def test_live_buyer_sets_resting_fallback_and_records_actual_fill(monkeypatch, t
             "ask": 0.51,
             "market_slug": "aec-lol-lds-dv1-2026-09-03",
             "side": "long",
+            "event_start_utc": iso_utc(now + timedelta(hours=12)),
         },
         data_root=tmp_path,
     )
@@ -1134,6 +1140,7 @@ def test_live_buyer_records_zero_fill_primary_with_resting_fallback(monkeypatch,
             "ask": 0.51,
             "market_slug": "aec-lol-lds-dv1-2026-09-03",
             "side": "long",
+            "event_start_utc": iso_utc(now + timedelta(hours=12)),
         },
         data_root=tmp_path,
     )

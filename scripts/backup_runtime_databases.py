@@ -21,15 +21,113 @@ This gives you a restorable, timestamped local copy to point that at.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import os
+import re
+import shutil
 import sqlite3
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from model_prediction.auto_buyer_lock import auto_buyer_lock_path
+from model_prediction.daily_lock import acquire_lock, release_lock
 from model_prediction.runtime_paths import RuntimePaths
+
+# The Auto-Buyer's flat files (real-money ledger and state, the paper book, the cycle histories),
+# relative to the runtime root. They are not SQLite, so they get dated plain copies in their own
+# subdirectory with their own retention: the live and paper ledgers share a file name, which the
+# per-stem pruning of the database copies below would mix up.
+AUTO_BUYER_BACKUP_FILES = (
+    Path("auto_buyer_ledger.jsonl"),
+    Path("auto_buyer_state.json"),
+    Path("logs") / "auto_buyer_cycle_history.jsonl",
+    Path("paper_auto_buyer") / "auto_buyer_ledger.jsonl",
+    Path("paper_auto_buyer") / "logs" / "auto_buyer_cycle_history.jsonl",
+)
+AUTO_BUYER_BACKUP_SUBDIR = "auto_buyer"
+AUTO_BUYER_KEEP_DAYS = 30
+# Long enough for one buyer cycle to finish its writes; past it the copy goes ahead unlocked.
+AUTO_BUYER_LOCK_WAIT_SECONDS = 120.0
+_STAMP_DIR = re.compile(r"^\d{8}T\d{6}Z$")
+
+
+def backup_auto_buyer_files(
+    runtime_root: Path,
+    dest_dir: Path,
+    stamp: str,
+    *,
+    lock_path: Path | None = None,
+    lock_wait_seconds: float = AUTO_BUYER_LOCK_WAIT_SECONDS,
+) -> list[dict]:
+    """Copy each Auto-Buyer file into ``dest_dir/auto_buyer/<stamp>/`` (same relative path).
+
+    Copy only: each source is opened read-only and never moved, truncated or rewritten. The copy
+    runs under auto_buyer.lock when it can be had, so no buyer cycle is mid-write; a busy lock is
+    recorded (``locked: false``) and the copy still runs, since a missed night is worse than a copy
+    whose last JSONL line may be torn.
+    """
+    target_root = dest_dir / AUTO_BUYER_BACKUP_SUBDIR / stamp
+    lock = acquire_lock(lock_path, wait_seconds=lock_wait_seconds) if lock_path is not None else None
+    try:
+        results = []
+        for relative in AUTO_BUYER_BACKUP_FILES:
+            source = runtime_root / relative
+            if not source.is_file():
+                results.append({"source": str(source), "status": "skipped_missing"})
+                continue
+            dest_path = target_root / relative
+            try:
+                data = source.read_bytes()
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                with dest_path.open("xb") as handle:
+                    handle.write(data)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                copied = hashlib.sha256(dest_path.read_bytes()).hexdigest()
+                status = "ok" if copied == hashlib.sha256(data).hexdigest() else "copy_mismatch"
+            except OSError as exc:
+                results.append({"source": str(source), "status": "failed", "error": str(exc)})
+                continue
+            results.append(
+                {
+                    "source": str(source),
+                    "dest": str(dest_path),
+                    "bytes": len(data),
+                    "sha256": copied,
+                    "locked": lock is not None,
+                    "status": status,
+                }
+            )
+        return results
+    finally:
+        release_lock(lock)
+
+
+def prune_auto_buyer_backups(dest_dir: Path, keep_days: int, now: datetime) -> list[str]:
+    """Delete dated Auto-Buyer copy directories older than ``keep_days``; never the newest one.
+
+    Age comes from the directory's own stamp, not mtime, and only directories named exactly like a
+    stamp are touched, so anything else an operator parks under the folder survives.
+    """
+    base = dest_dir / AUTO_BUYER_BACKUP_SUBDIR
+    if not base.is_dir():
+        return []
+    dated = []
+    for path in base.iterdir():
+        if path.is_dir() and _STAMP_DIR.match(path.name):
+            dated.append((datetime.strptime(path.name, "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC), path))
+    dated.sort()
+    cutoff = now - timedelta(days=keep_days)
+    pruned = []
+    for stamped_at, path in dated[:-1]:
+        if stamped_at < cutoff:
+            shutil.rmtree(path)
+            pruned.append(str(path))
+    return pruned
 
 
 def _backup_one(source: Path, dest_dir: Path, stamp: str) -> dict:
@@ -76,19 +174,32 @@ def main() -> int:
     parser.add_argument(
         "--keep", type=int, default=14, help="how many timestamped copies of each db to retain"
     )
+    parser.add_argument(
+        "--auto-buyer-keep-days",
+        type=int,
+        default=AUTO_BUYER_KEEP_DAYS,
+        help="days of dated Auto-Buyer ledger/state copies to retain",
+    )
     args = parser.parse_args()
 
     paths = RuntimePaths.resolve(require_external_runtime=True)
     dest_dir = Path(args.dest) if args.dest else paths.runtime_root / "backups"
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    now = datetime.now(UTC)
+    stamp = now.strftime("%Y%m%dT%H%M%SZ")
 
     sources = [paths.ledgers_db, paths.runs_db, paths.production_db]
     if paths.research_db.exists():
         sources.append(paths.research_db)
 
     results = [_backup_one(source, dest_dir, stamp) for source in sources]
+    results.extend(
+        backup_auto_buyer_files(paths.runtime_root, dest_dir, stamp, lock_path=auto_buyer_lock_path(paths))
+    )
     for result in results:
         print(result)
+    auto_buyer_pruned = prune_auto_buyer_backups(dest_dir, args.auto_buyer_keep_days, now)
+    if auto_buyer_pruned:
+        print(f"pruned {len(auto_buyer_pruned)} old Auto-Buyer backup dir(s): {auto_buyer_pruned}")
 
     # Retention: keep the most recent --keep copies per source stem.
     pruned = []

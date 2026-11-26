@@ -36,6 +36,17 @@ def _clear_runtime_root_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("MODEL_PREDICTION_RUNTIME_ROOT", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _live_cash_check_stubbed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A live buyer cycle reads the account balance once (a real GET). Every test gets ample cash and
+    no network; the tests of the check itself override ``_live_cash_check`` or call the executor."""
+    from model_prediction.portfolio import auto_executor
+
+    monkeypatch.setattr(
+        auto_executor, "_live_cash_check", lambda: {"status": "ok", "available_cash_usd": 1_000_000.0}
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _dashboard_live_files_redirected(tmp_path_factory: pytest.TempPathFactory) -> None:
     """Keep the whole test session off the live dashboard/server.log and cache_snapshot.pkl.

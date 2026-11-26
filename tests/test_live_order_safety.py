@@ -92,7 +92,11 @@ class FakeExchange:
             state = (
                 "ORDER_STATE_FILLED" if filled >= float(body["quantity"]) else "ORDER_STATE_PARTIALLY_FILLED"
             )
-            return 200, dict(self.store(body, prefix="ioc", state=state, cum=filled))
+            order = self.store(body, prefix="ioc", state=state, cum=filled)
+            # An IOC never rests: the exchange cancels the unfilled part, so nothing is left working.
+            # The executor trusts a partial IOC fill as final only when the order says so.
+            order["leavesQuantity"] = 0.0
+            return 200, dict(order)
         return 200, dict(self.store(body, prefix="gtd", state="ORDER_STATE_NEW", cum=0.0))
 
     def __call__(self, method: str, url: str, headers=None, json=None, timeout=None, **_kw):
@@ -1229,6 +1233,7 @@ def _cycle_harness(monkeypatch, tmp_path: Path, rows: list[dict[str, Any]]) -> d
                 "fresh": True,
                 "age_seconds": 5,
                 "market_state": "MARKET_STATE_OPEN",
+                "event_start_utc": row.get("event_start_utc"),
             },
         }
 

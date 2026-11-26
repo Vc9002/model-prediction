@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import socket
 import sqlite3
 import subprocess  # noqa: F401 -- re-export for compat (tests patch dashboard_server.subprocess.run)
 import sys
@@ -424,6 +425,28 @@ def _warm_caches(forever: bool = False) -> None:
         list(pool.map(_warm, warmers))
 
 
+def _bind_single_instance(server: ThreadingHTTPServer) -> None:
+    """Bind and listen so that a second dashboard on the same port fails instead of sharing it.
+
+    On Windows SO_REUSEADDR (what ``allow_reuse_address`` sets) lets a second socket bind a port a
+    live server is already listening on, so a second launch (start_dashboard.ps1 falls back to a
+    direct start when the task's server is not listening within 3 s) ran a second server silently.
+    SO_EXCLUSIVEADDRUSE makes that bind fail. POSIX keeps SO_REUSEADDR, which there only skips
+    TIME_WAIT and never admits a second listener.
+    """
+    if sys.platform == "win32":
+        server.allow_reuse_address = False
+        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+    else:
+        server.allow_reuse_address = True
+    try:
+        server.server_bind()
+        server.server_activate()
+    except OSError:
+        server.server_close()
+        raise
+
+
 def main() -> None:
     enable_background_priority()
     arguments = argparse.ArgumentParser()
@@ -436,8 +459,8 @@ def main() -> None:
     my_pid = os.getpid()
     try:
         ThreadingHTTPServer.daemon_threads = True
-        ThreadingHTTPServer.allow_reuse_address = True
-        server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler)
+        server = ThreadingHTTPServer(("127.0.0.1", options.port), Handler, bind_and_activate=False)
+        _bind_single_instance(server)
         PID_FILE.write_text(str(my_pid))  # Write only after successful bind
         _SWR["on"] = True  # serve stale + refresh in background (server process only)
         loaded = _cache_snapshot_load()
@@ -450,7 +473,8 @@ def main() -> None:
         print(f"dashboard: session token (for direct API calls): {_DASHBOARD_TOKEN}")
         server.serve_forever()
     except OSError as exc:
-        if exc.errno == 48 or getattr(exc, "winerror", None) == 10048 or exc.errno == 10048:
+        # 10013 (WSAEACCES) is what Windows returns when the holder bound the port exclusively.
+        if exc.errno in (48, 10048) or getattr(exc, "winerror", None) in (10048, 10013):
             print(f"dashboard: port {options.port} busy — is another instance running?", file=sys.stderr)
         else:
             raise

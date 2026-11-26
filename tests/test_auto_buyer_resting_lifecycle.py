@@ -164,6 +164,8 @@ def _quote_from_row(row: dict[str, Any]) -> dict[str, Any]:
             "fresh": True,
             "age_seconds": 5,
             "market_state": "MARKET_STATE_OPEN",
+            # The exchange snapshot's own start; a live buy needs it to agree with the row's tip time.
+            "event_start_utc": row.get("event_start_utc"),
         },
     }
 
@@ -826,12 +828,16 @@ def test_daily_reconcile_cancels_all_unless_enabled_is_the_boolean_true(monkeypa
 def _run_daily_calls(name: str) -> list[ast.Call]:
     from model_prediction.cli import daily
 
-    tree = ast.parse(inspect.getsource(daily.run_daily).replace("\r\n", "\n"))
-    return [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == name
-    ]
+    # Steps 11b/12/12b live in _run_auto_buyer_steps (under auto_buyer.lock), which run_daily calls once.
+    calls: list[ast.Call] = []
+    for function in (daily.run_daily, daily._run_auto_buyer_steps):
+        tree = ast.parse(inspect.getsource(function).replace("\r\n", "\n"))
+        calls += [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == name
+        ]
+    return calls
 
 
 def test_daily_own_reconcile_calls_pass_the_kill_switch_flag():

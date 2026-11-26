@@ -80,9 +80,56 @@ _FALLBACK_MIN_LIFETIME_SECONDS = 60
 # D-01: the exchange's own gameStartTime clamps the ticket's expiry to start minus this lead.
 _FALLBACK_EXCHANGE_START_LEAD_SECONDS = 90
 _GTD_READBACK_TOLERANCE_SECONDS = 2.0
+# The first read, then retries after 0.5, 1 and 2 s (3.5 s of waiting) while a just-placed fallback
+# still answers 404: the exchange showed it within that window on 2026-11-25.
+_GTD_READBACK_RETRY_DELAYS = (0.0, 0.5, 1.0, 2.0)
+# The POST takes the long enum. No read-back body with these fields has been recorded yet, so the
+# short spelling is accepted too: both mean GTD, and anything else (GTC, missing) still cancels.
+_GOOD_TILL_DATE_SPELLINGS = frozenset({_GOOD_TILL_DATE, "GOOD_TILL_DATE"})
 # An adopted fallback must have been created at or after its intent, give or take clock skew.
 _ADOPTION_CLOCK_SKEW_SECONDS = 5.0
 _AUDIT_ERRORS = (OSError, TimeoutError, ValueError, TypeError, RuntimeError)
+
+
+def _is_order_not_found(error: BaseException) -> bool:
+    return getattr(error, "status_code", None) == 404 or "Order not found" in str(error)
+
+
+def _exchange_time(value: Any) -> datetime | None:
+    """An exchange timestamp: RFC 3339 text (what the POST sends), or epoch seconds or milliseconds,
+    which some order payloads echo instead. None when absent or unreadable."""
+    if value is None or value == "":
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        number = None
+    if number is not None and math.isfinite(number):
+        return datetime.fromtimestamp(number / 1000.0 if number > 1e11 else number, tz=UTC)
+    try:
+        return parse_utc(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _gtd_order_mismatch(order: dict[str, Any], good_till_time: str) -> str | None:
+    """None when ``order`` (a read-back or an open-orders entry) rests GTD with the requested expiry.
+
+    Field names follow the order POST (``tif``, ``goodTillTime``); ``timeInForce`` and
+    ``expireTime`` are read as well because no read-back body has been recorded to confirm which
+    names the exchange echoes, and a name we fail to read must cancel, never pass.
+    """
+    tif = str(order.get("tif") or order.get("timeInForce") or "")
+    if tif not in _GOOD_TILL_DATE_SPELLINGS:
+        return f"tif {tif or 'missing'}"
+    raw_expiry = order.get("goodTillTime") or order.get("expireTime")
+    reported = _exchange_time(raw_expiry)
+    if reported is None:
+        return f"goodTillTime {raw_expiry!r} missing or unreadable"
+    drift = abs((reported - parse_utc(good_till_time)).total_seconds())
+    if drift > _GTD_READBACK_TOLERANCE_SECONDS:
+        return f"goodTillTime {raw_expiry} is {drift:.0f}s from {good_till_time}"
+    return None
 
 
 def _idempotency_key(intent_id: str, leg: str) -> str:
@@ -392,7 +439,53 @@ API_HOST = "https://api.polymarket.us"
 
 
 class ExecutionGateError(RuntimeError):
-    """Raised whenever any gate condition fails. Nothing was submitted."""
+    """Raised whenever any gate condition fails. Nothing was submitted.
+
+    ``status_code`` is the exchange's HTTP status when the refusal came from an HTTP response, so a
+    caller can tell an auth or balance refusal from a gate check without parsing the message.
+    """
+
+    def __init__(self, message: str = "", *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+# Order states after which an order's fill no longer changes (same set as
+# auto_buyer_ledger._TERMINAL_ORDER_STATES, which imports this module and so cannot be imported here).
+_TERMINAL_ORDER_STATES = frozenset(
+    {"ORDER_STATE_FILLED", "ORDER_STATE_CANCELED", "ORDER_STATE_EXPIRED", "ORDER_STATE_REJECTED"}
+)
+
+
+def _ioc_fill_is_final(order: dict[str, Any], state: str) -> bool:
+    """Whether an IOC's reported cumQuantity can no longer grow: a terminal state, or a partial fill
+    that reports nothing left working (leavesQuantity 0). Anything else is still being processed."""
+    if state in _TERMINAL_ORDER_STATES:
+        return True
+    if state != "ORDER_STATE_PARTIALLY_FILLED":
+        return False
+    try:
+        return float(order.get("leavesQuantity")) == 0.0
+    except (TypeError, ValueError):
+        return False
+
+
+# Our own refusal texts for missing or unusable credentials (raised before any request is signed).
+_CREDENTIAL_REFUSAL_MARKERS = (" is not set", "is not a valid base64 Ed25519 secret key")
+_BALANCE_REFUSAL = re.compile(r"insufficient|balance|buying.?power|funds", re.IGNORECASE)
+
+
+def classify_gate_refusal(error: BaseException) -> str | None:
+    """``"auth"`` for a 401/403 or missing/invalid credentials, ``"balance"`` for an exchange 4xx that
+    names balance or funds, else None (a gate check, a market problem, a 5xx or a network error)."""
+    if not isinstance(error, ExecutionGateError):
+        return None
+    status = error.status_code
+    if status in (401, 403) or any(marker in str(error) for marker in _CREDENTIAL_REFUSAL_MARKERS):
+        return "auth"
+    if status is not None and 400 <= status < 500 and _BALANCE_REFUSAL.search(str(error)):
+        return "balance"
+    return None
 
 
 class OrderSubmitUnknownError(RuntimeError):
@@ -736,6 +829,7 @@ class PolymarketExecutor:
             "fallback_resting_shares": submission.get("fallback_resting_shares"),
             "fallback_error": submission.get("fallback_error"),
             "good_till_time": submission.get("good_till_time"),
+            "fallback_verified_via": submission.get("fallback_verified_via"),
             "intent_id": intent_id,
             "idempotency_key": submission.get("idempotency_key"),
             "fallback_idempotency_key": submission.get("fallback_idempotency_key"),
@@ -920,7 +1014,8 @@ class PolymarketExecutor:
                     continue
                 detail = error.response.text[:500]
                 raise ExecutionGateError(
-                    f"REFUSED by Polymarket US ({error.response.status_code}): {detail}"
+                    f"REFUSED by Polymarket US ({error.response.status_code}): {detail}",
+                    status_code=error.response.status_code,
                 ) from error
             except (httpx.HTTPError, ValueError) as error:
                 if attempt < max_retries - 1:
@@ -998,7 +1093,9 @@ class PolymarketExecutor:
                     f"REFUSED by Polymarket US (429): rate limited on every attempt: {body_text}"
                 )
             if 400 <= status < 500 and status != 409 and "ABORTED" not in body_text:
-                raise last_unknown or ExecutionGateError(f"REFUSED by Polymarket US ({status}): {body_text}")
+                raise last_unknown or ExecutionGateError(
+                    f"REFUSED by Polymarket US ({status}): {body_text}", status_code=status
+                )
             output: Any = None
             if 200 <= status < 300:
                 try:
@@ -1039,22 +1136,43 @@ class PolymarketExecutor:
                 expiry = min(expiry, clamp)
         return expiry
 
-    def _gtd_readback_problem(self, order_id: str, good_till_time: str) -> str | None:
-        """None when the exchange reports ``order_id`` as GOOD_TILL_DATE expiring as requested."""
-        try:
-            response = self._request("GET", f"/v1/order/{order_id}", None)
+    def _verify_gtd_fallback(
+        self, order_id: str, good_till_time: str, market_slug: str
+    ) -> tuple[str | None, str]:
+        """``(problem, verified_via)``: problem is None when the exchange shows ``order_id`` resting
+        GOOD_TILL_DATE with the requested expiry; ``verified_via`` is ``order_readback``,
+        ``open_orders`` or ``none`` (nothing confirmed it).
+
+        A just-placed order can answer 404 "Order not found" for a moment (2026-11-25: fallback
+        DYR1NJ7G15P7 read back 404, then the cancel of that same id succeeded), so a not-found is
+        retried with short backoff, then checked in the market's open orders. Only an order that
+        neither read confirms, or one that either shows with the wrong tif or expiry, is unverified.
+        """
+        problem = "read-back not attempted"
+        for delay in _GTD_READBACK_RETRY_DELAYS:
+            if delay:
+                time.sleep(delay)
+            try:
+                response = self._request("GET", f"/v1/order/{order_id}", None)
+            except Exception as error:  # noqa: BLE001 -- an unreadable order is unverified, whatever the cause
+                problem = f"read-back failed ({type(error).__name__}: {error})"
+                if _is_order_not_found(error):
+                    continue
+                break
             nested = response.get("order")
             order = nested if isinstance(nested, dict) else response
-            tif = str(order.get("tif") or order.get("timeInForce") or "")
-            if tif != _GOOD_TILL_DATE:
-                return f"read-back tif {tif or 'missing'}"
-            reported = parse_utc(str(order.get("goodTillTime") or ""))
-            drift = abs((reported - parse_utc(good_till_time)).total_seconds())
-            if drift > _GTD_READBACK_TOLERANCE_SECONDS:
-                return f"read-back goodTillTime {order.get('goodTillTime')} is {drift:.0f}s from {good_till_time}"
-        except Exception as error:  # noqa: BLE001 -- an unreadable order is unverified, whatever the cause
-            return f"read-back failed ({type(error).__name__}: {error})"
-        return None
+            mismatch = _gtd_order_mismatch(order, good_till_time)
+            return (None, "order_readback") if mismatch is None else (f"read-back {mismatch}", "none")
+        try:
+            listed = [o for o in self.open_orders([market_slug]) if str(o.get("id") or "") == order_id]
+        except Exception as error:  # noqa: BLE001 -- as above: unverified
+            return f"{problem}; open-orders read failed ({type(error).__name__}: {error})", "none"
+        if not listed:
+            return f"{problem}; not in the open orders for {market_slug}", "none"
+        mismatch = _gtd_order_mismatch(listed[0], good_till_time)
+        if mismatch is not None:
+            return f"{problem}; open orders show {mismatch}", "none"
+        return None, "open_orders"
 
     def _adopt_open_fallback(
         self,
@@ -1173,6 +1291,12 @@ class PolymarketExecutor:
             return nested if isinstance(nested, dict) else response
 
         def fill_quantity(order: dict[str, Any], requested: float) -> float | None:
+            state = str(order.get("state") or "").upper()
+            if marketable and not _ioc_fill_is_final(order, state):
+                # An IOC's cumQuantity is final only in a terminal state. A synchronous "0" in NEW or
+                # PENDING read as a known zero fill, skipped the poll and rested a full-size fallback,
+                # doubling the position if the IOC then filled. Unknown here means poll.
+                return None
             raw = order.get("cumQuantity")
             if raw is None:
                 value = None
@@ -1182,7 +1306,6 @@ class PolymarketExecutor:
                 except (TypeError, ValueError):
                     value = None
             if value is None:
-                state = str(order.get("state") or "").upper()
                 if state == "ORDER_STATE_FILLED":
                     return requested
                 if state in {"ORDER_STATE_CANCELED", "ORDER_STATE_EXPIRED", "ORDER_STATE_REJECTED"}:
@@ -1220,6 +1343,9 @@ class PolymarketExecutor:
         fallback_status = "not_authorized"
         fallback_resting_shares = 0.0
         fallback_error: str | None = None
+        # Which read confirmed the resting fallback (order_readback, open_orders) or none; kept so the
+        # audit shows which exchange path and field names actually work.
+        fallback_verified_via: str | None = None
         good_till_time: str | None = None
         # A resting GTC order is legitimately "not yet filled", so unknown-fill
         # tracking only applies to marketable IOC orders whose fill we could not
@@ -1269,7 +1395,9 @@ class PolymarketExecutor:
                     fallback_resting_shares = remainder
                 if fallback_order_id:
                     order_ids.append(fallback_order_id)
-                    problem = self._gtd_readback_problem(fallback_order_id, good_till_time)
+                    problem, fallback_verified_via = self._verify_gtd_fallback(
+                        fallback_order_id, good_till_time, ticket.market_slug
+                    )
                     if problem is not None:
                         fallback_error = problem
                         try:
@@ -1322,6 +1450,7 @@ class PolymarketExecutor:
             "fallback_resting_shares": fallback_resting_shares,
             "fallback_error": fallback_error,
             "good_till_time": good_till_time,
+            "fallback_verified_via": fallback_verified_via,
             "fill_known": fill_known,
             "intent_id": intent_id,
             "idempotency_key": primary_key,
@@ -1385,6 +1514,45 @@ class PolymarketExecutor:
             "balances": balances.get("balances") or [],
             "positions_eof": positions_eof,
             "activities_eof": activities_eof,
+            "observed_at_utc": iso_utc(utc_now()),
+        }
+
+    def account_balance(self) -> dict[str, Any]:
+        """Read-only USD balance (GET /v1/account/balances), for the live buyer's pre-pass cash check.
+
+        ``available_cash_usd`` is the exchange's ``buyingPower`` (cash not already reserved by open
+        orders), or None when the response carries no parseable USD buying power. None means unknown,
+        never zero. Raises ExecutionGateError (``status_code`` set) when the request is refused.
+        """
+        missing = [name for name in (KEY_ID_ENV, SECRET_KEY_ENV) if not self.environ.get(name)]
+        if missing:
+            raise ExecutionGateError(f"REFUSED: {', '.join(missing)} is not set.")
+        response = self._request("GET", "/v1/account/balances")
+        balances = response.get("balances")
+        usd = next(
+            (
+                item
+                for item in (balances if isinstance(balances, list) else [])
+                if isinstance(item, dict) and item.get("currency") == "USD"
+            ),
+            {},
+        )
+
+        def amount(value: Any) -> float | None:
+            if isinstance(value, dict):
+                value = value.get("value")
+            try:
+                parsed = float(value)
+            except (TypeError, ValueError):
+                return None
+            return parsed if math.isfinite(parsed) else None
+
+        buying_power = amount(usd.get("buyingPower"))
+        return {
+            "available_cash_usd": buying_power,
+            "buying_power_usd": buying_power,
+            "current_balance_usd": amount(usd.get("currentBalance")),
+            "open_orders_usd": amount(usd.get("openOrders")),
             "observed_at_utc": iso_utc(utc_now()),
         }
 
@@ -1475,7 +1643,8 @@ class PolymarketExecutor:
             ) from error
         if 400 <= response.status_code < 500:
             raise ExecutionGateError(
-                f"REFUSED by Polymarket US ({response.status_code}): {response.text[:500]}"
+                f"REFUSED by Polymarket US ({response.status_code}): {response.text[:500]}",
+                status_code=response.status_code,
             )
         try:
             output = response.json()

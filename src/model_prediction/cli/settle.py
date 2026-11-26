@@ -2022,18 +2022,7 @@ def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:
         # Resolve any resting IOC-fallback orders before settlement, so a
         # fallback that filled overnight is reflected in today's shares/cost
         # rather than waiting for the next cycle.
-        try:
-            from ..portfolio.auto_buyer_ledger import (
-                reconcile_pending_auto_buyer_fallbacks,
-                settle_auto_buyer_ledger,
-            )
-
-            output["auto_buyer_fallback_reconciliation"] = reconcile_pending_auto_buyer_fallbacks(
-                data_directory
-            )
-            output["auto_buyer_settlement"] = settle_auto_buyer_ledger(data_directory)
-        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as err:
-            logger.warning("Auto-buyer settlement failed: %s", err)
+        output.update(_settle_auto_buyer_books(data_directory))
     else:
         if not args.pick_id or args.away_score is None or args.home_score is None:
             raise ValueError("provide --pick-id with --away-score/--home-score, or --all-unsettled")
@@ -2063,4 +2052,33 @@ def run_settle(args, config, registry, bans, ledger, audit, data_root) -> dict:
             closing_consensus_line=args.closing_consensus_line,
             closing_raw_probability=closing_probability,
         )
+    return output
+
+
+def _settle_auto_buyer_books(data_directory: Path) -> dict[str, Any]:
+    """Reconcile resting fallbacks, then settle, under auto_buyer.lock (see auto_buyer_lock.py).
+
+    The 15-minute buyer worker no longer waits on daily.lock, so this daily-step-1 rewrite of the
+    Auto-Buyer ledger must exclude a concurrent buyer cycle itself. A busy lock skips: the worker's
+    cycle reconciles and settles the live book on its own.
+    """
+    from ..auto_buyer_lock import AUTO_BUYER_LOCK_WAIT_SECONDS, hold_auto_buyer_lock
+
+    output: dict[str, Any] = {}
+    with hold_auto_buyer_lock(AUTO_BUYER_LOCK_WAIT_SECONDS) as auto_buyer_lock:
+        if auto_buyer_lock is None:
+            logger.warning("Auto-buyer settlement skipped: auto_buyer.lock still held")
+            return {"auto_buyer_settlement": {"status": "skipped", "reason": "auto_buyer_lock_busy"}}
+        try:
+            from ..portfolio.auto_buyer_ledger import (
+                reconcile_pending_auto_buyer_fallbacks,
+                settle_auto_buyer_ledger,
+            )
+
+            output["auto_buyer_fallback_reconciliation"] = reconcile_pending_auto_buyer_fallbacks(
+                data_directory
+            )
+            output["auto_buyer_settlement"] = settle_auto_buyer_ledger(data_directory)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as err:
+            logger.warning("Auto-buyer settlement failed: %s", err)
     return output

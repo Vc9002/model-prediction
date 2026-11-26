@@ -16,11 +16,13 @@ import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Any
 
+from ..auto_buyer_lock import AUTO_BUYER_LOCK_WAIT_SECONDS, hold_auto_buyer_lock
 from ..college_basketball_forward import forecast_ncaab_sport
 from ..config import PROJECT_ROOT, is_sport_daily_enabled, ledger_path, polymarket_edge_enabled
 from ..daily_lock import acquire_lock, release_lock
@@ -346,6 +348,100 @@ def _run_auto_buyer_step12(forecast_date: str | None) -> dict[str, Any]:
         logger.warning("Automated Polymarket buyer cycle failed", exc_info=True)
         auto_buyer_result = {"status": "error"}
     return auto_buyer_result
+
+
+def _run_auto_buyer_steps(
+    args: Any, data_directory: Path, lap: Any
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Steps 11b, 12 and 12b under auto_buyer.lock; all three skip when it stays held.
+
+    The buyer worker no longer waits on daily.lock, so these steps (the only ones here that touch
+    the Auto-Buyer ledgers or run a buy pass) must exclude a concurrent worker cycle themselves.
+    A skip is safe: the worker's own cycle reconciles and settles the live book.
+    """
+    # A verification run touches no Auto-Buyer file, so it never waits on the buyer.
+    guard = nullcontext(True) if _skip_auto_buyer_for_verification() else hold_auto_buyer_lock()
+    with guard as auto_buyer_lock:
+        if auto_buyer_lock is None:
+            logger.warning(
+                "Auto-Buyer lock still held after %.0fs; steps 11b/12/12b skipped",
+                AUTO_BUYER_LOCK_WAIT_SECONDS,
+            )
+            busy = {"status": "skipped", "reason": "auto_buyer_lock_busy"}
+            return dict(busy), dict(busy), dict(busy)
+        # Step 11b: Automated Auto-Buyer Settlement & Pre-Cycle Fallback Reconciliation
+        #
+        # run_auto_buyer_cycle() (step 12) performs its own pre-cycle reconcile +
+        # settle pass immediately before evaluating picks, whenever the buyer is
+        # actually going to run. Doing that same live-order reconciliation here
+        # too -- with no state change in between -- doubles the live exchange
+        # calls (order-status lookups, cancel-eligibility checks) for zero
+        # benefit. So this step is the *only* reconciliation pass when the buyer
+        # cycle won't run this invocation (disabled, or verification override),
+        # and defers to step 12's internal pass otherwise.
+        _auto_buyer_will_run = _auto_buyer_cycle_owns_live_reconcile()
+
+        auto_buyer_settle_result: dict[str, Any] = (
+            {"status": "deferred_to_cycle", "reason": "auto_buyer_cycle_runs_own_reconcile_and_settle"}
+            if _auto_buyer_will_run
+            else {"status": "skipped"}
+        )
+        if not args.skip_settlement and not _auto_buyer_will_run and not _skip_auto_buyer_for_verification():
+            try:
+                from ..portfolio.auto_buyer_ledger import (
+                    reconcile_pending_auto_buyer_fallbacks,
+                    settle_auto_buyer_ledger,
+                )
+
+                reconcile_pending_auto_buyer_fallbacks(
+                    data_directory, cancel_all_resting=_daily_cancels_all_resting()
+                )
+                auto_buyer_settle_result = settle_auto_buyer_ledger(data_directory)
+            except Exception:
+                logger.warning("Automated Auto-Buyer settlement failed", exc_info=True)
+                auto_buyer_settle_result = {"status": "error"}
+
+        lap("auto_buyer_settle_11b")
+
+        # Step 12: Automated Polymarket Buyer (if enabled in dashboard state)
+        auto_buyer_result: dict[str, Any]
+        if _auto_buyer_is_decoupled():
+            logger.info("Auto-Buyer purchase cycle delegated to independent worker")
+            auto_buyer_result = {
+                "status": "skipped",
+                "reason": "independent_auto_buyer_worker",
+            }
+        elif _skip_auto_buyer_for_verification():
+            logger.info("Auto-Buyer skipped by explicit verification override")
+            auto_buyer_result = {
+                "status": "skipped",
+                "reason": "verification_override",
+            }
+        else:
+            auto_buyer_result = _run_auto_buyer_step12(args.date)
+
+        lap("auto_buyer_cycle_12")
+
+        # Step 12b: reconcile any resting Auto-Buyer fallback orders (IOC
+        # partial/zero fills left resting at the same price -- see DEBUG.md's
+        # 2026-09-03 entry) against live exchange state, and cancel any that
+        # are still open once their event has started.
+        fallback_reconcile_result: dict[str, Any] = {"status": "skipped"}
+        if not _skip_auto_buyer_for_verification():
+            try:
+                from ..portfolio.auto_buyer_ledger import reconcile_pending_auto_buyer_fallbacks
+
+                fallback_reconcile_result = {
+                    "status": "ok",
+                    **reconcile_pending_auto_buyer_fallbacks(
+                        data_directory, cancel_all_resting=_daily_cancels_all_resting()
+                    ),
+                }
+            except Exception:
+                logger.warning("Auto-Buyer fallback reconciliation failed", exc_info=True)
+                fallback_reconcile_result = {"status": "error"}
+        lap("fallback_reconcile_12b")
+    return auto_buyer_settle_result, auto_buyer_result, fallback_reconcile_result
 
 
 def _with_timed_exports(function):
@@ -1811,78 +1907,11 @@ def run_daily(args, config, registry, bans, ledger, audit, data_root) -> dict:
 
     _lap("polymarket_edge_scan_settle")
 
-    # Step 11b: Automated Auto-Buyer Settlement & Pre-Cycle Fallback Reconciliation
-    #
-    # run_auto_buyer_cycle() (step 12) performs its own pre-cycle reconcile +
-    # settle pass immediately before evaluating picks, whenever the buyer is
-    # actually going to run. Doing that same live-order reconciliation here
-    # too -- with no state change in between -- doubles the live exchange
-    # calls (order-status lookups, cancel-eligibility checks) for zero
-    # benefit. So this step is the *only* reconciliation pass when the buyer
-    # cycle won't run this invocation (disabled, or verification override),
-    # and defers to step 12's internal pass otherwise.
-    _auto_buyer_will_run = _auto_buyer_cycle_owns_live_reconcile()
-
-    auto_buyer_settle_result: dict[str, Any] = (
-        {"status": "deferred_to_cycle", "reason": "auto_buyer_cycle_runs_own_reconcile_and_settle"}
-        if _auto_buyer_will_run
-        else {"status": "skipped"}
+    # Steps 11b, 12 and 12b share the buyer's own lock with the 15-minute worker, not daily.lock
+    # (auto_buyer_lock.py: lock order and why).
+    auto_buyer_settle_result, auto_buyer_result, fallback_reconcile_result = _run_auto_buyer_steps(
+        args, data_directory, _lap
     )
-    if not args.skip_settlement and not _auto_buyer_will_run and not _skip_auto_buyer_for_verification():
-        try:
-            from ..portfolio.auto_buyer_ledger import (
-                reconcile_pending_auto_buyer_fallbacks,
-                settle_auto_buyer_ledger,
-            )
-
-            reconcile_pending_auto_buyer_fallbacks(
-                data_directory, cancel_all_resting=_daily_cancels_all_resting()
-            )
-            auto_buyer_settle_result = settle_auto_buyer_ledger(data_directory)
-        except Exception:
-            logger.warning("Automated Auto-Buyer settlement failed", exc_info=True)
-            auto_buyer_settle_result = {"status": "error"}
-
-    _lap("auto_buyer_settle_11b")
-
-    # Step 12: Automated Polymarket Buyer (if enabled in dashboard state)
-    auto_buyer_result: dict[str, Any]
-    if _auto_buyer_is_decoupled():
-        logger.info("Auto-Buyer purchase cycle delegated to independent worker")
-        auto_buyer_result = {
-            "status": "skipped",
-            "reason": "independent_auto_buyer_worker",
-        }
-    elif _skip_auto_buyer_for_verification():
-        logger.info("Auto-Buyer skipped by explicit verification override")
-        auto_buyer_result = {
-            "status": "skipped",
-            "reason": "verification_override",
-        }
-    else:
-        auto_buyer_result = _run_auto_buyer_step12(args.date)
-
-    _lap("auto_buyer_cycle_12")
-
-    # Step 12b: reconcile any resting Auto-Buyer fallback orders (IOC
-    # partial/zero fills left resting at the same price -- see DEBUG.md's
-    # 2026-09-03 entry) against live exchange state, and cancel any that
-    # are still open once their event has started.
-    fallback_reconcile_result: dict[str, Any] = {"status": "skipped"}
-    if not _skip_auto_buyer_for_verification():
-        try:
-            from ..portfolio.auto_buyer_ledger import reconcile_pending_auto_buyer_fallbacks
-
-            fallback_reconcile_result = {
-                "status": "ok",
-                **reconcile_pending_auto_buyer_fallbacks(
-                    data_directory, cancel_all_resting=_daily_cancels_all_resting()
-                ),
-            }
-        except Exception:
-            logger.warning("Auto-Buyer fallback reconciliation failed", exc_info=True)
-            fallback_reconcile_result = {"status": "error"}
-    _lap("fallback_reconcile_12b")
 
     report = {
         "ncaab_boxscores_capture": ncaab_boxscores_result,

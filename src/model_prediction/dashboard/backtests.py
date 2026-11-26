@@ -689,6 +689,8 @@ def _pick_quote(row: dict) -> dict | None:
         "age_seconds": age_seconds,
         "fresh": age_seconds <= 300,
         "market_state": snapshot.get("market_state"),
+        # The exchange's own start, which the live buyer cross-checks against the row's tip time.
+        "event_start_utc": snapshot.get("event_start_utc"),
         "price_role": "pregame_close",
         "seconds_before_start": max(0, int((event_start - observed_at).total_seconds())),
     }

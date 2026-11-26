@@ -696,7 +696,12 @@ def test_ioc_partial_fill_rests_remainder_at_same_price_not_chased(tmp_path, mon
         assert path == "/v1/orders"
         post_payloads.append(payload)
         if len(post_payloads) == 1:
-            return {"id": "primary-partial", "state": "ORDER_STATE_PARTIALLY_FILLED", "cumQuantity": 0.88}
+            return {
+                "id": "primary-partial",
+                "state": "ORDER_STATE_PARTIALLY_FILLED",
+                "cumQuantity": 0.88,
+                "leavesQuantity": 0,
+            }
         return {"id": "resting-remainder", "state": "ORDER_STATE_NEW", "cumQuantity": 0.0}
 
     monkeypatch.setattr(client, "_request", fake_request)
@@ -823,7 +828,12 @@ def test_ioc_partial_fill_without_resting_flag_leaves_remainder_unfilled(tmp_pat
 
     def fake_request(method, path, payload=None):
         post_payloads.append(payload)
-        return {"id": "primary-partial", "state": "ORDER_STATE_PARTIALLY_FILLED", "cumQuantity": 0.88}
+        return {
+            "id": "primary-partial",
+            "state": "ORDER_STATE_PARTIALLY_FILLED",
+            "cumQuantity": 0.88,
+            "leavesQuantity": 0,
+        }
 
     monkeypatch.setattr(client, "_request", fake_request)
     partial_ticket = OrderTicket(

@@ -98,6 +98,7 @@ _EXECUTION_PASSTHROUGH_FIELDS = (
     "good_till_time",
     "fallback_status",
     "fallback_error",
+    "fallback_verified_via",
 )
 
 

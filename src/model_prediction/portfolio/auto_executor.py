@@ -31,11 +31,13 @@ logger = logging.getLogger("model_prediction.auto_executor")
 
 from model_prediction.audit import AuditLog
 from model_prediction.calibration_pipeline import calibrate_for_serving
+from model_prediction.daily_lock import acquire_lock, release_lock
 from model_prediction.data_sources.polymarket_execute import (
     ExecutionGateError,
     OrderSubmitUnknownError,
     OrderTicket,
     PolymarketExecutor,
+    classify_gate_refusal,
 )
 from model_prediction.domain import iso_utc, parse_utc, utc_now
 from model_prediction.portfolio.auto_buyer_ledger import event_key_from_slug, is_fallback_submit_unknown
@@ -435,6 +437,10 @@ class AutoExecutionConfig:
     # C9: re-read the state file before every live submission and stop the pass unless `enabled`
     # is still exactly True, so the kill switch also stops a cycle that is already running.
     recheck_enabled_before_submit: bool = False
+    # The account's buying power read once per live cycle (run_auto_buyer_cycle). A live pass stops
+    # with an `insufficient_cash` alarm before any order that would take this pass's committed spend
+    # above it. None: no cash check (paper, preview and direct test construction).
+    available_cash_usd: float | None = None
 
     def __post_init__(self) -> None:
         if self.execute_live and self.mode != "live":
@@ -474,6 +480,9 @@ class AutoExecutionResult:
     rejected_daily_loss_breaker: int = 0
     rejected_quarantined_model: int = 0
     rejected_live_calibration: int = 0
+    # Live only: the row's tip time and the exchange snapshot's event start disagree by more than
+    # TIP_TIME_TOLERANCE_SECONDS, the earlier of the two has passed, or the snapshot has no start.
+    rejected_tip_time_mismatch: int = 0
     # Live rows aged 180-360 minutes that passed the model-age gate by the D-03 overnight extension.
     live_overnight_age_extended: int = 0
     cohort_matched: int = 0
@@ -1180,6 +1189,71 @@ def _alarm(
     }
 
 
+# Every timing gate reads the row's ESPN tip time; the exchange's own event start is the second
+# opinion. Five minutes absorbs the two feeds' rounding, not a rescheduled game.
+TIP_TIME_TOLERANCE_SECONDS = 300.0
+
+
+def _tip_time_refusal(row_start: datetime, exchange_start_raw: Any, now: datetime) -> str | None:
+    """Why a live buy must not go out on these two start times, or None when they agree and neither
+    has passed. A snapshot with no parseable start refuses (every NCAAB snapshot row carries one)."""
+    try:
+        exchange_start = parse_utc(str(exchange_start_raw or ""))
+    except (TypeError, ValueError):
+        return "exchange snapshot has no event start; tip time unverified"
+    gap = abs((exchange_start - row_start).total_seconds())
+    if gap > TIP_TIME_TOLERANCE_SECONDS:
+        return (
+            f"tip time mismatch: row {iso_utc(row_start)} vs exchange {iso_utc(exchange_start)} "
+            f"({gap / 60:.1f} min)"
+        )
+    if now >= min(row_start, exchange_start):
+        return f"event started at {iso_utc(min(row_start, exchange_start))} (earlier of row and exchange)"
+    return None
+
+
+def _live_cash_check() -> dict[str, Any]:
+    """Read the account's buying power once for this cycle (read-only GET, no order).
+
+    ``status``: ``ok`` with ``available_cash_usd``; ``auth_error`` (401/403 or missing credentials);
+    ``unavailable`` (network, 5xx, or no parseable USD buying power -- unknown, never zero). Anything
+    but ``ok`` stops live buying for the cycle: a live pass never trades on an unknown balance.
+    """
+    try:
+        executor = PolymarketExecutor(audit=AuditLog(DATA / "audit.jsonl"), confirm=lambda _prompt: "N")
+        balance = executor.account_balance()
+    except ExecutionGateError as exc:
+        status = "auth_error" if classify_gate_refusal(exc) == "auth" else "unavailable"
+        return {"status": status, "detail": str(exc)[:300]}
+    except (httpx.HTTPError, OSError, ValueError, KeyError, TypeError, RuntimeError, AttributeError) as exc:
+        return {"status": "unavailable", "detail": f"{type(exc).__name__}: {exc}"[:300]}
+    if balance.get("available_cash_usd") is None:
+        return {"status": "unavailable", "detail": "balance response carried no USD buying power", **balance}
+    return {"status": "ok", **balance}
+
+
+def _auth_or_balance_refusal_alarm(orders: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """An alarm when a live pass sent orders and every one the exchange answered was refused for
+    auth, credentials or balance (and none was placed). Refusals by our own gates before any request
+    (stale quote, side check, started game) are not exchange answers and are left out of the count."""
+    exchange_answers = [
+        o
+        for o in orders
+        if o.get("status") != "refused" or o.get("refusal_kind") or o.get("http_status") is not None
+    ]
+    if not exchange_answers or any(
+        o.get("refusal_kind") not in ("auth", "balance") for o in exchange_answers
+    ):
+        return None
+    kinds = sorted({str(o["refusal_kind"]) for o in exchange_answers})
+    return _alarm(
+        "live_orders_refused_" + "_and_".join(kinds),
+        pick_id=",".join(str(o.get("pick_id") or "") for o in exchange_answers)[:200],
+        market_slug=",".join(str(o.get("market_slug") or "") for o in exchange_answers)[:200],
+        detail=str(exchange_answers[0].get("error") or ""),
+    )
+
+
 def _live_book_has_pending_orders(ledger_path: Path) -> bool:
     """An unreconciled resting fallback, an open row whose fill is unknown (the selection
     ``reconcile_pending_auto_buyer_fallbacks`` works on), or an open fallback leg whose outcome is
@@ -1291,6 +1365,11 @@ def read_state_file_version(path: Path) -> int:
     return _coerce_state_version(data.get(STATE_VERSION_KEY))
 
 
+# Leaf lock around the state file's compare-and-replace: one small write, so a long wait means a stuck
+# writer, and the save fails loudly instead of hanging the caller.
+STATE_FILE_LOCK_WAIT_SECONDS = 30.0
+
+
 def write_versioned_state_file(path: Path, state: dict[str, Any], *, temp_path: Path) -> int:
     """Atomically save ``state`` to ``path``, bumping its ``_state_version``.
 
@@ -1298,22 +1377,34 @@ def write_versioned_state_file(path: Path, state: dict[str, Any], *, temp_path: 
     strictly greater than the version this ``state`` dict was read at -- not
     ``!=``, because ``load_auto_buyer_state`` can seed from the repo copy when
     the runtime file is missing, so a missing or older live file must never
-    raise. The re-read/compare/replace sequence here is not lock-protected; it
-    closes the read-modify-write window that spans a whole multi-minute cycle,
-    not a sub-millisecond race between two near-simultaneous writers.
+    raise. The version check closes the read-modify-write window that spans a
+    whole multi-minute cycle; the re-read/compare/replace itself runs under
+    ``<name>.lock``, so two near-simultaneous writers (a cycle ending while the
+    dashboard kill switch saves) can never both pass the compare at one version
+    or interleave on the shared temp file. That lock is a leaf (see
+    auto_buyer_lock.py): nothing else is acquired while it is held, and it is
+    held for one small file write, so the kill switch never waits on a cycle.
     """
     expected = _coerce_state_version(state.get(STATE_VERSION_KEY))
-    live = read_state_file_version(path)
-    if live > expected:
-        raise StateVersionConflictError(
-            f"{path} advanced to version {live} (read at {expected}); reload and retry"
-        )
-    new_version = expected + 1
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path.write_text(
-        json.dumps({**state, STATE_VERSION_KEY: new_version}, indent=2) + "\n", encoding="utf-8"
-    )
-    temp_path.replace(path)
+    lock = acquire_lock(path.with_name(path.name + ".lock"), wait_seconds=STATE_FILE_LOCK_WAIT_SECONDS)
+    if lock is None:
+        raise TimeoutError(
+            f"{path} is held by another writer past {STATE_FILE_LOCK_WAIT_SECONDS:.0f}s; not saved"
+        )
+    try:
+        live = read_state_file_version(path)
+        if live > expected:
+            raise StateVersionConflictError(
+                f"{path} advanced to version {live} (read at {expected}); reload and retry"
+            )
+        new_version = expected + 1
+        temp_path.write_text(
+            json.dumps({**state, STATE_VERSION_KEY: new_version}, indent=2) + "\n", encoding="utf-8"
+        )
+        temp_path.replace(path)
+    finally:
+        release_lock(lock)
     # Reflect the bumped version back onto the caller's dict so a second save
     # of the same object (e.g. two sequential set_* calls) does not self-conflict.
     state[STATE_VERSION_KEY] = new_version
@@ -1653,7 +1744,19 @@ def _cycle_gate_kwargs(state: dict[str, Any]) -> dict[str, Any]:
 def _read_cohort_candidate_picks() -> list[dict[str, Any]]:
     """Flat-ledger rows only. The cohorts were measured on ``ledger_tier='flat'`` rows, and a Main
     copy would otherwise win the merge with its own units and reason code; gated research rows are
-    never cohort candidates."""
+    never cohort candidates.
+
+    Read straight from the canonical SQLite ledger, never the dashboard cache or an xlsx projection:
+    the cache falls back to parsing workbooks on any error (and defaults to xlsx authority when the
+    env var is unset), and the workbooks lag the ledger until the daily job's deferred export. Raises
+    on any read failure; the live pass then buys nothing (``run_auto_buyer_cycle``)."""
+    from model_prediction.dashboard_cache import read_sqlite_authority_picks
+
+    return _merge_auto_buyer_pick_sources(read_sqlite_authority_picks("flat"))
+
+
+def _read_paper_cohort_fallback_picks() -> list[dict[str, Any]]:
+    """The paper book's fallback when the SQLite read fails: the dashboard reader, xlsx included."""
     from model_prediction.dashboard.picks import read_flat_picks
 
     return _merge_auto_buyer_pick_sources(read_flat_picks())
@@ -1875,19 +1978,62 @@ def run_auto_buyer_cycle(
             logger.warning("Pre-cycle paper-ledger settlement failed: %s", exc)
 
     cohort_passes: dict[str, Any] = {}
-    cohort_picks = (
-        _read_cohort_candidate_picks() if run_cohort_passes and (live_cohorts or paper_cohorts) else []
-    )
+    # Live-buying alarms raised outside a pass (unreadable picks, balance); raised with the pass alarms.
+    cycle_alarms: list[dict[str, Any]] = []
+    cohort_picks: list[dict[str, Any]] = []
+    live_blocked: str | None = None
+    if run_cohort_passes and (live_cohorts or paper_cohorts):
+        try:
+            cohort_picks = _read_cohort_candidate_picks()
+        except Exception as exc:  # noqa: BLE001 -- any read failure fails the live pass closed
+            detail = f"{type(exc).__name__}: {exc}"[:300]
+            logger.error("Cohort picks unreadable from the SQLite ledger authority: %s", detail)
+            live_blocked = f"cohort picks unreadable from the SQLite ledger authority ({detail})"
+            if cohort_live_execute:
+                cycle_alarms.append(
+                    _alarm("live_picks_unreadable", pick_id="", market_slug="", detail=detail)
+                )
+            cohort_picks = _read_paper_cohort_fallback_picks() if paper_cohorts else []
+    cash_check: dict[str, Any] | None = None
+    if should_execute or (cohort_live_execute and live_blocked is None):
+        cash_check = _live_cash_check()
+        if cash_check["status"] != "ok":
+            logger.error("Live buying skipped this cycle: account balance %s", cash_check)
+            cycle_alarms.append(
+                _alarm(
+                    f"live_balance_{cash_check['status']}",
+                    pick_id="",
+                    market_slug="",
+                    detail=str(cash_check.get("detail") or ""),
+                )
+            )
+            live_blocked = live_blocked or f"account balance {cash_check['status']}"
+            should_execute = False
+    available_cash = cash_check.get("available_cash_usd") if cash_check else None
     if live_cohorts and not run_cohort_passes:
         cohort_passes["live"] = _skipped_cohort_pass("LIVE_DISABLED", live_cohorts)
+    elif live_cohorts and live_blocked is not None:
+        cohort_passes["live"] = {
+            **_skipped_cohort_pass("LIVE_BLOCKED", live_cohorts),
+            "skipped": live_blocked,
+        }
     elif live_cohorts:
         # First, so the live book is evaluated before any paper fill of this cycle exists.
         live_config = _cohort_pass_config(
-            state, cohorts=live_cohorts, mode="live", execute_live=cohort_live_execute, **pass_overrides
+            state,
+            cohorts=live_cohorts,
+            mode="live",
+            execute_live=cohort_live_execute,
+            **{**pass_overrides, "available_cash_usd": available_cash if cohort_live_execute else None},
         )
         live_res = AutoPolymarketBuyer(config=live_config).evaluate_and_execute(
             [dict(r) for r in cohort_picks]
         )
+        refusal_alarm = (
+            _auth_or_balance_refusal_alarm(live_res.submitted_orders) if cohort_live_execute else None
+        )
+        if refusal_alarm is not None:
+            live_res.alarms.append(refusal_alarm)
         if preview:
             live_label = "LIVE_PREVIEW"
         else:
@@ -1914,10 +2060,14 @@ def run_auto_buyer_cycle(
         ),
         refresh_stale_quotes=should_execute,
         recheck_enabled_before_submit=should_execute,
+        available_cash_usd=available_cash if should_execute else None,
     )
 
     buyer = AutoPolymarketBuyer(config=config)
     res = buyer.evaluate_and_execute()
+    global_refusal_alarm = _auth_or_balance_refusal_alarm(res.submitted_orders) if should_execute else None
+    if global_refusal_alarm is not None:
+        res.alarms.append(global_refusal_alarm)
 
     if not should_execute and record_paper and global_mode == "paper":
         _record_paper_fills(res.dry_run_orders)
@@ -1999,6 +2149,8 @@ def run_auto_buyer_cycle(
         "cohort_passes": cohort_passes,
         "alarms": res.alarms,
         "live_halt_reason": res.live_halt_reason,
+        "live_cash_check": cash_check,
+        "cycle_alarms": cycle_alarms,
     }
 
     if preview:
@@ -2048,7 +2200,11 @@ def run_auto_buyer_cycle(
         save_auto_buyer_state(fresh)
     # Raised only after state and history are saved, so the alarm is on record whichever caller
     # catches it (the worker marks the run failed; daily step 12 logs it and still reconciles).
-    live_alarms = [*(res.alarms if should_execute else []), *cohort_passes.get("live", {}).get("alarms", [])]
+    live_alarms = [
+        *cycle_alarms,
+        *(res.alarms if should_execute else []),
+        *cohort_passes.get("live", {}).get("alarms", []),
+    ]
     if live_alarms:
         kinds = ", ".join(sorted({str(a.get("alarm")) for a in live_alarms}))
         logger.error("Live auto-buyer alarm(s): %s -- %s", kinds, live_alarms)
@@ -3024,6 +3180,7 @@ class AutoPolymarketBuyer:
                         "ask": mock_quote.get("ask") or float(row.get("market_implied_probability") or 0.50),
                         "fresh": True,
                         "market_state": "MARKET_STATE_OPEN",
+                        "event_start_utc": mock_quote.get("event_start_utc"),
                     }
                 except (RuntimeError, ValueError, KeyError, TypeError, OSError):
                     quote = None
@@ -3077,6 +3234,8 @@ class AutoPolymarketBuyer:
                             "fresh": True,
                             "age_seconds": 0,
                             "market_state": live_snap.get("market_state", "MARKET_STATE_OPEN"),
+                            "event_start_utc": live_snap.get("event_start_utc")
+                            or quote.get("event_start_utc"),
                         }
                         age_sec = 0.0
                         fallback_requires_live_refresh = False
@@ -3114,6 +3273,13 @@ class AutoPolymarketBuyer:
             if quote.get("market_state") != "MARKET_STATE_OPEN":
                 result.rejected_closed_market += 1
                 continue
+
+            if self.config.execute_live:
+                tip_refusal = _tip_time_refusal(event_start, quote.get("event_start_utc"), utc_now())
+                if tip_refusal is not None:
+                    logger.warning("Live buy refused for pick %s: %s", pick_id, tip_refusal)
+                    result.rejected_tip_time_mismatch += 1
+                    continue
 
             market_slug = str(quote["market_slug"])
             token_side = str(quote["side"]).lower()
@@ -3465,6 +3631,30 @@ class AutoPolymarketBuyer:
                 logger.warning("Auto-buyer disabled mid-pass; no further live submissions (pick %s)", pick_id)
                 result.live_halt_reason = "kill_switch"
                 break
+            available_cash = self.config.available_cash_usd
+            pass_committed = committed_spend - today_spend_usd
+            if available_cash is not None and pass_committed + actual_cost > available_cash + 1e-9:
+                logger.error(
+                    "Live buying stopped: pick %s needs $%.2f with $%.2f already committed this pass, "
+                    "but the account's buying power was $%.2f",
+                    pick_id,
+                    actual_cost,
+                    pass_committed,
+                    available_cash,
+                )
+                result.alarms.append(
+                    _alarm(
+                        "insufficient_cash",
+                        pick_id=pick_id,
+                        market_slug=market_slug,
+                        detail=(
+                            f"order ${actual_cost:.2f} + committed ${pass_committed:.2f} "
+                            f"> buying power ${available_cash:.2f}"
+                        ),
+                    )
+                )
+                result.live_halt_reason = "insufficient_cash"
+                break
             executor = PolymarketExecutor(
                 audit=self.audit,
                 confirm=lambda _prompt: "Y",
@@ -3552,6 +3742,10 @@ class AutoPolymarketBuyer:
                     {
                         "status": "refused",
                         "error": str(exc),
+                        # Lets the cycle tell "every order refused for auth or balance" (an alarm and a
+                        # failed run) from ordinary gate refusals.
+                        "http_status": exc.status_code,
+                        "refusal_kind": classify_gate_refusal(exc),
                         **order_payload,
                     }
                 )
@@ -3586,6 +3780,7 @@ class AutoPolymarketBuyer:
                 "fallback_status": fallback_status,
                 "fallback_resting_shares": sub.get("fallback_resting_shares"),
                 "fallback_error": sub.get("fallback_error"),
+                "fallback_verified_via": sub.get("fallback_verified_via"),
                 "good_till_time": sub.get("good_till_time"),
                 "fill_known": fill_known,
                 "intent_id": sub.get("intent_id"),

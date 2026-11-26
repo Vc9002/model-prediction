@@ -205,6 +205,8 @@ def _quote_from_row(row: dict[str, Any]) -> dict[str, Any]:
             "fresh": row.get("test_fresh", True),
             "age_seconds": row.get("test_age_seconds", 5),
             "market_state": row.get("test_market_state", "MARKET_STATE_OPEN"),
+            # The exchange snapshot's own start; a live buy needs it to agree with the row's tip time.
+            "event_start_utc": row.get("event_start_utc"),
         },
     }
 

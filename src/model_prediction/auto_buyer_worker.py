@@ -13,6 +13,7 @@ import time
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from .auto_buyer_lock import AUTO_BUYER_LOCK_WAIT_SECONDS, LOCK_BUSY_EXIT, auto_buyer_lock_path
 from .daily_lock import acquire_lock
 from .domain import utc_now
 from .portfolio.auto_executor import run_auto_buyer_cycle
@@ -21,12 +22,10 @@ from .pretip_close_capture import capture_pretip_closes
 from .runtime_paths import RuntimePaths
 from .stealth_runtime import enable_background_priority
 
-# The forecast holds the writer lock for 13-38 minutes and this worker starts
-# ten minutes after it. Skipping outright meant picks written by a refresh waited
-# for a later slot before any buyer saw them -- every post-forecast cycle from
-# 2026-11-09 to 11-11 was a skip. Waiting runs the cycle the moment the forecast
-# releases the lock; the bound keeps it clear of the next 30-minute trigger.
-FORECAST_LOCK_WAIT_SECONDS = 1200.0
+# The worker holds auto_buyer.lock, never daily.lock: waiting on daily.lock let a 40-minute daily run
+# block live settlement and buys (2026-11-25). Only the daily job's own buyer steps, a manual settle or
+# a dashboard action share this lock, and each holds it for minutes at most.
+LOCK_WAIT_SECONDS = AUTO_BUYER_LOCK_WAIT_SECONDS
 
 # The pre-tip close capture runs after the buys and must finish well inside the supervisor's
 # auto-buyer timeout (run_supervisor.DEFAULT_WORKER_TIMEOUTS["auto-buyer"], 1500 s, which
@@ -56,12 +55,12 @@ def main() -> int:
     started = time.monotonic()
     enable_background_priority()
     paths = RuntimePaths.resolve(require_external_runtime=False)
-    lock = acquire_lock(paths.lock_root / "daily.lock", wait_seconds=FORECAST_LOCK_WAIT_SECONDS)
+    lock = acquire_lock(auto_buyer_lock_path(paths), wait_seconds=LOCK_WAIT_SECONDS)
     if lock is None:
-        # A forecast still owns the writer lock after the wait. The next interval
-        # will retry; this is an expected coordination skip, not a buyer failure.
-        print(json.dumps({"status": "skipped", "reason": "DAILY_WRITER_ALREADY_RUNNING"}), flush=True)
-        return 0
+        # Exit 75 so the supervisor records `skipped` and system_health counts the streak; an exit 0
+        # here made every lock-wait timeout read as a completed cycle.
+        print(json.dumps({"status": "skipped", "reason": "AUTO_BUYER_LOCK_BUSY"}), flush=True)
+        return LOCK_BUSY_EXIT
     try:
         eastern_date = utc_now().astimezone(ZoneInfo("America/New_York")).date().isoformat()
         live_error = None
