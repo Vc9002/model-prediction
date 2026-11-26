@@ -10,7 +10,7 @@ import hashlib
 import json
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +42,11 @@ _ESPN_TEAM_SUBSTRING_FIELDS = ("displayName", "name", "abbreviation")
 # Polymarket US contract slugs; manual-sync rows carry one in event_id.
 _CONTRACT_SLUG_RE = re.compile(r"^(aec|asc|tsc|atc|mkt)-")
 
+
+# A doubleheader game is attributed to a row by start time only when it begins within this window of
+# the row's start and is at least the gap closer than the next game; anything looser is a guess.
+_NEAREST_GAME_WINDOW_SECONDS = timedelta(minutes=90).total_seconds()
+_NEAREST_GAME_MIN_GAP_SECONDS = timedelta(minutes=30).total_seconds()
 
 # Sentinel: the nearest exact game by start time is the one still being played.
 _PENDING_EXACT = "pending"
@@ -76,7 +81,8 @@ def _nearest_exact_game(
 ) -> Any:
     """Pick between several exact games (doubleheader) by the start closest to the row's real
     start. Returns the finished candidate, ``_PENDING_EXACT`` when an unfinished game is the
-    nearer one, or None when a start is missing or two games tie (grading would be a guess).
+    nearer one, or None when a start is missing, the nearest game is outside the window, or it is
+    not clearly closer than the next one (grading would be a guess).
     """
     contenders: list[tuple[float, Any]] = []
     for candidate in finished:
@@ -90,7 +96,9 @@ def _nearest_exact_game(
     if len(contenders) < 2:
         return None
     contenders.sort(key=lambda item: item[0])
-    if contenders[0][0] == contenders[1][0]:
+    if contenders[0][0] > _NEAREST_GAME_WINDOW_SECONDS:
+        return None
+    if contenders[1][0] - contenders[0][0] < _NEAREST_GAME_MIN_GAP_SECONDS:
         return None
     return contenders[0][1]
 
@@ -537,10 +545,12 @@ def settle_ledger_rows_against_espn(
                     home_name,
                     game_day,
                 )
-            elif pending_exact_starts or len(exact_hits) > 1:
-                # Several exact games on one day (doubleheader): only a real row start can say which
-                # one the bet was on. A placeholder or fallback start, a tie, or a game without a
-                # scheduled start leaves the row ambiguous. Known and accepted: a placeholder start
+            elif pending_exact_starts or (len(exact_hits) > 1 and not any(c[4] for c in exact_hits)):
+                # Several exact games of the row's own league on one day (doubleheader): only a real
+                # row start can say which one the bet was on. A placeholder or fallback start, a start
+                # far from or not clearly nearer one game, or a game without a scheduled start leaves
+                # the row ambiguous. Exact games of another league (men's and women's college for an
+                # NBA row) are never told apart by start time. Known and accepted: a placeholder start
                 # with one exact game final and the other postponed (never final) stays ambiguous
                 # with no 48h void; settle it with the manual override.
                 picked = (

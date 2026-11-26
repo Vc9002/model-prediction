@@ -865,7 +865,7 @@ def test_both_final_doubleheader_with_a_placeholder_start_stays_ambiguous(tmp_pa
 def test_doubleheader_with_a_start_equidistant_from_both_games_stays_ambiguous(tmp_path, caplog):
     with caplog.at_level("WARNING"):
         res = _doubleheader(
-            tmp_path, _recent_utc(1, 20), _recent_utc(1, 17), _recent_utc(1, 23), game2_final=True
+            tmp_path, _recent_utc(1, 20), _recent_utc(1, 19, 20), _recent_utc(1, 20, 40), game2_final=True
         )
     assert res["settled_count"] == 0
     assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
@@ -902,3 +902,77 @@ def test_tennis_row_queries_the_eastern_evening_of_a_utc_early_morning_start(tmp
     expected = (start - timedelta(days=1)).strftime("%Y%m%d")
     tour_days = {day for league, day in espn.calls if league in TENNIS_TOURS}
     assert tour_days == {expected}
+
+
+def _both_final_pair(tmp_path, row_start, game1_start, game2_start):
+    return _doubleheader(tmp_path, row_start, game1_start, game2_start, game2_final=True)
+
+
+@pytest.mark.parametrize(
+    ("minutes_from_game2", "settles"),
+    [(89, True), (91, False)],
+)
+def test_nearest_game_must_start_within_90_minutes_of_the_row_start(tmp_path, minutes_from_game2, settles):
+    from datetime import timedelta
+
+    game2 = _recent_utc(1, 23)
+    res = _both_final_pair(tmp_path, game2 - timedelta(minutes=minutes_from_game2), _recent_utc(1, 17), game2)
+    assert res["settled_count"] == int(settles)
+    row = read_manual_bets(data_root=tmp_path)[0]
+    if settles:
+        assert (row["away_score"], row["home_score"]) == ("7", "14")
+    else:
+        assert row["status"] == "open" and row["result"] == ""
+
+
+@pytest.mark.parametrize(
+    ("minutes_before_game2", "settles"),
+    [(14, True), (16, False), (30, False)],
+)
+def test_nearest_game_must_be_clearly_closer_than_the_other_one(tmp_path, minutes_before_game2, settles):
+    from datetime import timedelta
+
+    # Games 60 minutes apart: the row is 46 / 14 minutes from them (gap 32, settles) or 44 / 16 (gap 28)
+    # or a dead heat (30 / 30, gap 0).
+    game1, game2 = _recent_utc(1, 19), _recent_utc(1, 20)
+    res = _both_final_pair(tmp_path, game2 - timedelta(minutes=minutes_before_game2), game1, game2)
+    assert res["settled_count"] == int(settles)
+    row = read_manual_bets(data_root=tmp_path)[0]
+    if settles:
+        assert (row["away_score"], row["home_score"]) == ("7", "14")
+    else:
+        assert row["status"] == "open" and row["result"] == ""
+
+
+def test_nba_row_is_not_graded_off_two_exact_college_games_by_start_time(tmp_path):
+    from datetime import timedelta
+
+    from model_prediction.domain import utc_now
+
+    start = utc_now() - timedelta(hours=5)
+    record_manual_bet(
+        {
+            **_COLLEGE_BET,
+            "league": "NBA",
+            "away_team": "Minnesota",
+            "home_team": "Washington",
+            "event_start_utc": _iso_z(start),
+        },
+        data_root=tmp_path,
+    )
+
+    def college(event_id, mascots, scores, begins):
+        return _espn_event(
+            event_id,
+            _espn_team("Minnesota", mascots[0], "MINN", scores[0], "away"),
+            _espn_team("Washington", mascots[1], "WASH", scores[1], "home"),
+            start=_iso_z(begins),
+        )
+
+    mens = college("m", ("Golden Gophers", "Huskies"), (60, 70), start + timedelta(minutes=5))
+    womens = college("w", ("Golden Gophers", "Huskies"), (50, 55), start + timedelta(hours=4))
+    res = settle_manual_bets(
+        data_root=tmp_path, espn_client=_FakeScoreboard({"NCAAB": [mens], "WNCAAB": [womens]})
+    )
+    assert res["settled_count"] == 0
+    assert read_manual_bets(data_root=tmp_path)[0]["status"] == "open"
