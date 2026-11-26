@@ -1,0 +1,784 @@
+"""Live auto-buyer fixes of 2026-11-25 (operator-approved list, items 1-9).
+
+Nothing here reaches the exchange or ESPN: every executor, quote source and scoreboard is a stub,
+and the state file lives under ``tmp_path``.
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import timedelta
+from pathlib import Path
+from typing import Any, ClassVar
+from unittest.mock import MagicMock
+
+import pytest
+
+from model_prediction.audit import AuditLog
+from model_prediction.calibration_pipeline import ServingCalibration
+from model_prediction.domain import iso_utc, utc_now
+from model_prediction.portfolio import auto_buyer_ledger, auto_executor
+from model_prediction.portfolio.auto_buyer_ledger import (
+    reconcile_pending_auto_buyer_fallbacks,
+    settle_auto_buyer_ledger,
+)
+from model_prediction.portfolio.auto_executor import AutoExecutionConfig, AutoPolymarketBuyer, BuyCohort
+
+SPREAD_V7 = "ncaab-spread-v7"
+TOTAL_V6 = "ncaab-total-v6"
+SPREAD_LIVE = BuyCohort(SPREAD_V7, "ncaab", "spread", 0.05, 0.12, "live")
+TOTAL_LIVE = BuyCohort(TOTAL_V6, "ncaab", "total", 0.05, 0.12, "live")
+
+
+def _write_ledger(path: Path, rows: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+
+def _ledger(path: Path) -> list[dict[str, Any]]:
+    return auto_buyer_ledger.read_auto_buyer_ledger(jsonl_path=path)
+
+
+@pytest.fixture(autouse=True)
+def _isolate(monkeypatch, tmp_path):
+    monkeypatch.delenv("POLYMARKET_KEY_ID", raising=False)
+    monkeypatch.setattr(auto_buyer_ledger, "log_auto_buyer_event", lambda *a, **k: None)
+    monkeypatch.setattr(auto_buyer_ledger, "_default_live_executor", _no_default_executor)
+    # Never the repo or runtime state file: reconcile reads the global edge window from it.
+    monkeypatch.setattr(auto_executor, "AUTO_BUYER_STATE_FILE", tmp_path / "state" / "auto_buyer_state.json")
+    monkeypatch.setattr("model_prediction.data_sources.polymarket_us.PolymarketUSClient", _NoExchange)
+
+
+class _NoExchange:
+    def __init__(self, *_a: Any, **_k: Any) -> None:
+        raise RuntimeError("tests must never reach the exchange")
+
+
+def _no_default_executor(*_a: Any, **_k: Any) -> Any:
+    raise AssertionError("a default (real) executor must not be built in this test")
+
+
+# ---------------------------------------------------------------- buyer harness (no exchange)
+
+
+class _BuyExecutor:
+    """Stands in for PolymarketExecutor on the buy side. Never trades."""
+
+    executed: ClassVar[list[Any]] = []
+    fill_fraction: ClassVar[float] = 1.0
+
+    def __init__(self, **_kwargs: Any) -> None:
+        pass
+
+    def portfolio_snapshot(self) -> dict[str, Any]:
+        return {"positions": {}}
+
+    def execute(self, ticket: Any, pick_row: dict[str, Any], **_kwargs: Any) -> dict[str, Any]:
+        _BuyExecutor.executed.append((ticket, dict(pick_row)))
+        filled = round(ticket.size_shares * _BuyExecutor.fill_fraction, 2)
+        return {
+            "status": "submitted",
+            "order_id": f"sim-{ticket.pick_id}",
+            "order_ids": [f"sim-{ticket.pick_id}"],
+            "order_state": "ORDER_STATE_FILLED"
+            if filled >= ticket.size_shares
+            else "ORDER_STATE_PARTIALLY_FILLED",
+            "filled_size_shares": filled,
+            "estimated_filled_cost_usd": round(filled * ticket.price, 4),
+        }
+
+
+def _identity(_model: str, _market: str, probability: float, **_k: Any) -> ServingCalibration:
+    return ServingCalibration(probability, probability, False, "identity", "test_isolation")
+
+
+@pytest.fixture
+def buyer_env(monkeypatch):
+    _BuyExecutor.executed = []
+    _BuyExecutor.fill_fraction = 1.0
+    monkeypatch.setattr(auto_executor, "calibrate_for_serving", _identity)
+    monkeypatch.setattr(auto_executor, "PolymarketExecutor", _BuyExecutor)
+    monkeypatch.setattr(auto_executor, "_load_pick_input_flags", lambda *_a, **_k: {})
+    monkeypatch.setattr(auto_executor, "_read_daily_run_history", lambda *_a, **_k: None, raising=False)
+    monkeypatch.setattr(auto_executor, "_live_buying_still_enabled", lambda: True)
+    monkeypatch.setattr(auto_executor.time, "sleep", lambda *_a: None)
+    monkeypatch.setattr("model_prediction.dashboard.orders._decorate_pick", _quote_from_row)
+
+
+def _slug(market: str, event: str, line: str = "3pt5") -> str:
+    if market == "total":
+        return f"tsc-cbb-{event}-2026-11-25-{line}"
+    return f"asc-cbb-{event}-2026-11-25-neg-{line}"
+
+
+def _pick(
+    model_id: str,
+    *,
+    pick_id: str,
+    event: str,
+    market: str = "spread",
+    model_probability: float = 0.58,
+    ask: float = 0.50,
+    units: float = 2.0,
+    start_minutes: float = 20.0,
+) -> dict[str, Any]:
+    now = utc_now()
+    created = now - timedelta(minutes=1)
+    return {
+        "pick_id": pick_id,
+        "event_id": event,
+        "model_version": model_id,
+        "league": "ncaab",
+        "market_type": market,
+        "selection": "over" if market == "total" else "home",
+        "status": "open",
+        "decision": "CALL",
+        "reason_code": "FLAT_CALL",
+        "edge": "0.07",
+        "line": -3.5 if market == "spread" else 140.5,
+        "model_probability": model_probability,
+        "model_probability_raw": model_probability,
+        "calibration_method": "identity",
+        "market_probability": ask,
+        "units": units,
+        "home_team": f"{event}-home",
+        "away_team": f"{event}-away",
+        "market_slug": _slug(market, event),
+        "token_side": "long",
+        "test_ask": ask,
+        "created_at_utc": iso_utc(created),
+        "event_start_utc": iso_utc(now + timedelta(minutes=start_minutes)),
+        "market_quote_provenance": "archived_two_sided_bbo",
+        "market_quote_timestamp_valid": "True",
+        "market_quote_observed_at_utc": iso_utc(created - timedelta(minutes=1)),
+        "market_snapshot_hash": "abc",
+        "market_snapshot_archive_path": "archive.jsonl",
+    }
+
+
+def _quote_from_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **row,
+        "quote": {
+            "market_slug": row["market_slug"],
+            "side": "long",
+            "ask": row.get("test_ask"),
+            "fresh": True,
+            "age_seconds": 5,
+            "market_state": "MARKET_STATE_OPEN",
+        },
+    }
+
+
+def _live_buyer(tmp_path: Path, **overrides: Any) -> AutoPolymarketBuyer:
+    kwargs: dict[str, Any] = {
+        "mode": "live",
+        "execute_live": True,
+        "unit_value_usd": 5.0,
+        "max_game_stake_usd": 25.0,
+        "max_daily_spend_usd": 500.0,
+        "whitelisted_models": (),
+        "cohorts": (SPREAD_LIVE, TOTAL_LIVE),
+        "edge_scaled_sizing_enabled": False,
+        "require_model_timestamp": True,
+        "capture_missing_slates": False,
+        "dedup_own_ledger_only": True,
+    }
+    kwargs.update(overrides)
+    return AutoPolymarketBuyer(
+        config=AutoExecutionConfig(**kwargs), audit=AuditLog(tmp_path / "audit.jsonl"), data_root=tmp_path
+    )
+
+
+# ---------------------------------------------------------------- reconcile harness (no exchange)
+
+
+class _Exchange:
+    """Per-id reads and cancels only. ``states`` maps order id -> (state, cum); ids in
+    ``unavailable`` are reported the way ``order_snapshots`` reports a failed lookup."""
+
+    def __init__(
+        self,
+        states: dict[str, tuple[str, float]] | None = None,
+        *,
+        after_cancel: dict[str, tuple[str, float]] | None = None,
+        unavailable: tuple[str, ...] = (),
+        cancel_error: bool = False,
+    ) -> None:
+        self.states = dict(states or {})
+        self.after_cancel = dict(after_cancel or {})
+        self.unavailable = set(unavailable)
+        self.cancel_error = cancel_error
+        self.cancel_calls: list[str] = []
+        self.cancelled: list[str] = []
+
+    def order_snapshots(self, order_ids: list[str]) -> dict[str, Any]:
+        orders, missing = [], []
+        for oid in order_ids:
+            if oid in self.unavailable:
+                missing.append(oid)
+                continue
+            source = self.after_cancel if oid in self.cancelled and oid in self.after_cancel else self.states
+            if oid in source:
+                state, cum = source[oid]
+                orders.append({"order_id": oid, "order_state": state, "cum_quantity": cum})
+        return {"status": "live", "orders": orders, "unavailable_order_ids": missing}
+
+    def cancel(self, order_id: str, user_command: bool, market_slug: str | None = None) -> dict[str, Any]:
+        assert user_command is True
+        self.cancel_calls.append(order_id)
+        if self.cancel_error:
+            raise RuntimeError("cancel refused: order not found")
+        self.cancelled.append(order_id)
+        return {"status": "cancelled", "order_id": order_id}
+
+    def __getattr__(self, name: str) -> Any:
+        raise AssertionError(f"only per-id order_snapshots and cancel may be called, not {name}")
+
+
+def _fallback_row(
+    fid: str = "gtd-1",
+    *,
+    start_minutes: float = -5.0,
+    primary_shares: float = 0.0,
+    resting: float = 10.0,
+    **extra: Any,
+) -> dict[str, Any]:
+    row = {
+        "pick_id": f"pick-{fid}",
+        "order_id": f"ioc-{fid}",
+        "order_ids": [f"ioc-{fid}", fid],
+        "market_slug": _slug("spread", f"g-{fid}"),
+        "token_side": "long",
+        "event_id": f"g-{fid}",
+        "selection": "home",
+        "market_type": "spread",
+        "model_id": SPREAD_V7,
+        "model_probability": 0.58,
+        "event_start_utc": iso_utc(utc_now() + timedelta(minutes=start_minutes)),
+        "executed_at_utc": iso_utc(utc_now() - timedelta(minutes=30)),
+        "shares": primary_shares,
+        "cost_usd": round(primary_shares * 0.5, 4),
+        "primary_filled_shares": primary_shares,
+        "primary_filled_cost_usd": round(primary_shares * 0.5, 4),
+        "entry_price": 0.5,
+        "unit_value_usd": 5.0,
+        "status": "open",
+        "result": "open",
+        "order_state": "ORDER_STATE_PARTIALLY_FILLED" if primary_shares else "ORDER_STATE_CANCELED",
+        "fill_known": True,
+        "fallback_order_id": fid,
+        "fallback_reconciled": False,
+        "fallback_resting_shares": resting,
+    }
+    row.update(extra)
+    return row
+
+
+# ---------------------------------------------------------------- 7. same-orientation ESPN rematch
+
+
+def _no_gateway(monkeypatch):
+    from model_prediction.data_sources import polymarket_us
+
+    class _Unresolved:
+        def market(self, slug):
+            return {"status": "MARKET_STATUS_OPEN"}
+
+    monkeypatch.setattr(polymarket_us, "PolymarketUSClient", _Unresolved)
+
+
+def _espn_game(event_id, date, away, away_score, home, home_score, completed=True):
+    event = {
+        "id": event_id,
+        "competitions": [
+            {
+                "status": {"type": {"completed": completed}},
+                "competitors": [
+                    {"homeAway": "away", "team": {"displayName": away}, "score": away_score},
+                    {"homeAway": "home", "team": {"displayName": home}, "score": home_score},
+                ],
+            }
+        ],
+    }
+    if date is not None:
+        event["date"] = date
+    return event
+
+
+def _espn_by_date(boards):
+    espn = MagicMock()
+    espn.scoreboard.side_effect = lambda league, day: {"events": boards.get(day, [])}
+    return espn
+
+
+def _series_row(**overrides):
+    row = {
+        "order_id": "LIVE-series-1",
+        "sport": "NBA",
+        "away_team": "Boston Celtics",
+        "home_team": "New York Knicks",
+        "event_start_utc": "2026-11-25T00:30:00Z",
+        "executed_at_utc": "2026-11-25T00:00:00Z",
+        "market_slug": "test-series-total",
+        "market_type": "total",
+        "line": 220.5,
+        "selection": "over",
+        "token_side": "long",
+        "shares": 10.0,
+        "entry_price": 0.50,
+        "cost_usd": 5.0,
+        "unit_value_usd": 5.0,
+        "units": 1.0,
+        "status": "open",
+        "result": "open",
+        "fill_known": True,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_yesterdays_same_orientation_final_never_settles_todays_game(tmp_path, monkeypatch):
+    # Same teams, same home/away, consecutive days: yesterday's final is in the prev-day board and
+    # today's game is still in progress. The row must stay open.
+    _no_gateway(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(path, [_series_row()])
+    espn = _espn_by_date(
+        {
+            "20261124": [
+                _espn_game("y1", "2026-11-24T00:30Z", "Boston Celtics", "120", "New York Knicks", "118")
+            ],
+            "20261125": [
+                _espn_game(
+                    "t1",
+                    "2026-11-25T00:30Z",
+                    "Boston Celtics",
+                    "50",
+                    "New York Knicks",
+                    "48",
+                    completed=False,
+                )
+            ],
+        }
+    )
+    res = settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)
+    assert res["newly_settled"] == 0
+    assert _ledger(path)[0]["status"] == "open"
+
+
+def test_exact_match_without_an_espn_date_still_settles(tmp_path, monkeypatch):
+    _no_gateway(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(path, [_series_row()])
+    espn = _espn_by_date(
+        {"20261125": [_espn_game("t1", None, "Boston Celtics", "120", "New York Knicks", "118")]}
+    )
+    res = settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)
+    assert res["newly_settled"] == 1
+    assert res["changes"][0]["to_result"] == "win"
+
+
+def test_dated_exact_match_is_preferred_over_an_undated_one(tmp_path, monkeypatch):
+    _no_gateway(monkeypatch)
+    path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(path, [_series_row()])
+    espn = _espn_by_date(
+        {
+            "20261124": [_espn_game("u1", None, "Boston Celtics", "100", "New York Knicks", "100")],
+            "20261125": [
+                _espn_game("t1", "2026-11-25T00:30Z", "Boston Celtics", "120", "New York Knicks", "118")
+            ],
+        }
+    )
+    res = settle_auto_buyer_ledger(data_root=tmp_path, espn=espn)
+    assert res["newly_settled"] == 1
+    settled = _ledger(path)[0]
+    assert (settled["away_score"], settled["home_score"]) == (120, 118)
+
+
+# ---------------------------------------------------------------- 4. resting cancel uses the cohort window
+
+
+def test_live_cohort_buy_records_its_edge_window_on_the_row(tmp_path, buyer_env):
+    _BuyExecutor.fill_fraction = 0.5
+    pick = _pick(SPREAD_V7, pick_id="w1", event="gw1", model_probability=0.57, ask=0.50)
+    _live_buyer(tmp_path).evaluate_and_execute([pick])
+    row = _ledger(tmp_path / "auto_buyer_ledger.jsonl")[0]
+    assert row["cohort_min_edge"] == 0.05
+    assert row["cohort_max_edge"] == 0.12
+    assert row["cohort"] == SPREAD_LIVE.label
+
+
+def _quote(ask: float):
+    return lambda slug: {"market_state": "MARKET_STATE_OPEN", "long": {"ask": ask, "bid": 0.49}}
+
+
+def test_resting_cohort_fallback_is_cancelled_below_the_cohort_floor(tmp_path):
+    # Live ask 0.54 against a 58% model: 4% edge. Above the global 3.5% floor, below the cohort's 5%.
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(start_minutes=60.0, cohort_min_edge=0.05, cohort_max_edge=0.12)])
+    exchange = _Exchange(
+        {"gtd-1": ("ORDER_STATE_NEW", 0.0)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", 0.0)}
+    )
+    reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange, quote_fn=_quote(0.54))
+    assert exchange.cancel_calls == ["gtd-1"]
+    assert _ledger(j_path)[0]["cancellation_reason"].startswith("edge_degraded")
+
+
+def test_resting_cohort_fallback_is_cancelled_above_the_cohort_ceiling(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(start_minutes=60.0, cohort_min_edge=0.05, cohort_max_edge=0.08)])
+    exchange = _Exchange(
+        {"gtd-1": ("ORDER_STATE_NEW", 0.0)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", 0.0)}
+    )
+    reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange, quote_fn=_quote(0.49))
+    assert exchange.cancel_calls == ["gtd-1"]
+    assert _ledger(j_path)[0]["cancellation_reason"].startswith("edge_anomalous")
+
+
+def test_row_without_a_cohort_window_keeps_the_global_window(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(start_minutes=60.0)])
+    exchange = _Exchange({"gtd-1": ("ORDER_STATE_NEW", 0.0)})
+    reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange, quote_fn=_quote(0.54))
+    assert exchange.cancel_calls == []
+
+
+# ---------------------------------------------------------------- 8. top-up merge
+
+
+def _partial_row(order_id: str, *, shares: float = 6.0, **extra: Any) -> dict[str, Any]:
+    row = _fallback_row("unused", start_minutes=60.0, primary_shares=shares)
+    row.update(
+        {
+            "pick_id": "p1",
+            "order_id": order_id,
+            "order_ids": [order_id],
+            "market_slug": _slug("spread", "g1"),
+            "event_id": "g1",
+            "home_team": "g1-home",
+            "away_team": "g1-away",
+            "fallback_order_id": None,
+            "fallback_reconciled": True,
+            "fallback_resting_shares": 0.0,
+            "order_state": "ORDER_STATE_PARTIALLY_FILLED",
+            "model_units": 2.0,
+        }
+    )
+    row.update(extra)
+    return row
+
+
+def _topup_payload(**extra: Any) -> dict[str, Any]:
+    # Defaults describe a top-up whose own IOC fill is unknown (the executor reuses the fallback
+    # fields for it: fallback_order_id is the IOC's own id).
+    payload = {
+        "pick_id": "p1",
+        "market_slug": _slug("spread", "g1"),
+        "token_side": "long",
+        "is_topup": True,
+        "topup_of_order_id": "oid-partial",
+        "shares": 0.0,
+        "cost_usd": 0.0,
+        "limit_price": 0.5,
+        "unit_value_usd": 5.0,
+        "order_ids": ["ioc-topup"],
+        "fallback_order_id": "ioc-topup",
+        "fallback_status": "unknown_fill",
+        "fallback_resting_shares": 4.0,
+        "fill_known": False,
+        "target_spend": 10.0,
+    }
+    payload.update(extra)
+    return payload
+
+
+def test_unknown_fill_topup_is_reconciled_as_a_primary_not_cancelled_as_a_resting_leg(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    started = iso_utc(utc_now() - timedelta(minutes=5))
+    _write_ledger(j_path, [_partial_row("oid-partial", event_start_utc=started)])
+    auto_buyer_ledger.record_auto_buy_execution(
+        _topup_payload(), order_id="ioc-topup", order_state="ORDER_STATE_UNKNOWN", jsonl_path=j_path
+    )
+    # The started game would cancel a resting leg; an IOC whose read is missing is not one.
+    exchange = _Exchange(unavailable=("ioc-topup",))
+    reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert exchange.cancel_calls == []
+    backstop = auto_buyer_ledger.cancel_resting_live_fallbacks(
+        data_root=tmp_path, executor=exchange, cancel_all=False, reason="backstop"
+    )
+    assert backstop["candidates"] == 0
+    # Once the IOC reads terminal, its fill is added to the earlier legs, never in place of them.
+    exchange = _Exchange({"ioc-topup": ("ORDER_STATE_CANCELED", 3.0)})
+    reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    row = _ledger(j_path)[0]
+    assert row["shares"] == 9.0
+    assert row["fallback_reconciled"] is True and row["fill_known"] is True
+
+
+def test_topup_merges_into_the_partial_row_the_index_chose(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    dead = _partial_row(
+        "oid-dead", shares=0.0, order_state="ORDER_STATE_CANCELED", status="settled", result="void"
+    )
+    _write_ledger(j_path, [dead, _partial_row("oid-partial")])
+    auto_buyer_ledger.record_auto_buy_execution(
+        _topup_payload(
+            shares=2.0, cost_usd=1.0, fill_known=True, fallback_order_id=None, fallback_status="no_remainder"
+        ),
+        order_id="ioc-topup",
+        order_state="ORDER_STATE_FILLED",
+        jsonl_path=j_path,
+    )
+    rows = _ledger(j_path)
+    assert rows[0]["shares"] == 0.0 and rows[0]["order_ids"] == ["oid-dead"]
+    assert rows[1]["shares"] == 8.0 and "ioc-topup" in rows[1]["order_ids"]
+
+
+def test_topup_whose_partial_row_is_gone_gets_its_own_row(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_partial_row("oid-other")])
+    auto_buyer_ledger.record_auto_buy_execution(
+        _topup_payload(shares=2.0, cost_usd=1.0, fill_known=True, fallback_order_id=None),
+        order_id="ioc-topup",
+        order_state="ORDER_STATE_FILLED",
+        jsonl_path=j_path,
+    )
+    rows = _ledger(j_path)
+    assert len(rows) == 2
+    assert rows[0]["shares"] == 6.0
+    assert rows[1]["order_id"] == "ioc-topup" and rows[1]["shares"] == 2.0
+
+
+def test_buyer_topup_names_the_partial_row_it_sized_against(tmp_path, buyer_env):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    dead = _partial_row(
+        "oid-dead", shares=0.0, order_state="ORDER_STATE_CANCELED", status="cancelled", result="void"
+    )
+    _write_ledger(j_path, [dead, _partial_row("oid-partial", shares=4.0, cost_usd=2.0)])
+    pick = _pick(SPREAD_V7, pick_id="p1", event="g1", model_probability=0.57, ask=0.50, units=2.0)
+    _live_buyer(tmp_path).evaluate_and_execute([pick])
+    assert len(_BuyExecutor.executed) == 1
+    rows = _ledger(j_path)
+    assert rows[0]["order_ids"] == ["oid-dead"]
+    assert rows[1]["shares"] > 4.0
+
+
+# ---------------------------------------------------------------- 9. permanently missing fallback
+
+
+def test_cancel_of_a_permanently_missing_order_is_flagged_once_and_not_resent(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row()])
+    exchange = _Exchange(unavailable=("gtd-1",), cancel_error=True)
+    first = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert first["cancel_failed"] == ["gtd-1"]
+    assert "cancel_abandoned" not in first
+    second = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert second["cancel_abandoned"] == ["gtd-1"]
+    third = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert exchange.cancel_calls == ["gtd-1", "gtd-1"]
+    assert "cancel_abandoned" not in third
+    row = _ledger(j_path)[0]
+    assert row["cancel_abandoned_at_utc"]
+    assert row["fallback_reconciled"] is False and row["status"] == "open"
+
+
+def test_an_abandoned_cancel_resumes_when_the_order_reappears(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(cancel_abandoned_at_utc=iso_utc(utc_now()))])
+    exchange = _Exchange(
+        {"gtd-1": ("ORDER_STATE_NEW", 0.0)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", 0.0)}
+    )
+    reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert exchange.cancel_calls == ["gtd-1"]
+    assert "cancel_abandoned_at_utc" not in _ledger(j_path)[0]
+
+
+def test_a_cancel_that_fails_while_the_order_is_readable_is_never_abandoned(tmp_path):
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row()])
+    exchange = _Exchange({"gtd-1": ("ORDER_STATE_NEW", 0.0)}, cancel_error=True)
+    for _ in range(3):
+        summary = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+        assert "cancel_abandoned" not in summary
+    assert exchange.cancel_calls == ["gtd-1"] * 3
+
+
+# ---------------------------------------------------------------- cycle harness (state file in tmp)
+
+
+LIVE_STATE: dict[str, Any] = {
+    "enabled": True,
+    "mode": "paper",
+    "unit_value_usd": 5.0,
+    "max_daily_spend_units": 100.0,
+    "max_game_stake_units": 5.0,
+    "max_daily_spend_usd": 500.0,
+    "max_game_stake_usd": 25.0,
+    "max_daily_loss_usd": 250.0,
+    "whitelist_models": [],
+    "cohorts": [
+        {
+            "model_id": SPREAD_V7,
+            "sport": "ncaab",
+            "market": "spread",
+            "min_saved_edge": 0.05,
+            "max_saved_edge_exclusive": 0.12,
+            "mode": "live",
+            "enabled": True,
+        }
+    ],
+    "_state_version": 7,
+}
+
+
+@pytest.fixture
+def cycle(monkeypatch, tmp_path):
+    """run_auto_buyer_cycle against a real state file under tmp_path; every pass is recorded."""
+    state_file = tmp_path / "state" / "auto_buyer_state.json"
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(auto_executor, "AUTO_BUYER_STATE_FILE", state_file)
+    monkeypatch.setattr(auto_executor, "DATA", tmp_path)
+    monkeypatch.setattr(auto_executor, "PAPER_AUTO_BUYER_DATA_ROOT", tmp_path / "paper_auto_buyer")
+    monkeypatch.setattr(auto_executor, "_append_auto_buyer_cycle_history", lambda *_a, **_k: None)
+    monkeypatch.setattr(auto_executor, "_read_cohort_candidate_picks", list)
+    calls: dict[str, Any] = {"configs": [], "reconcile": [], "state_file": state_file}
+
+    def _evaluate(self, picks=None):
+        calls["configs"].append(self.config)
+        hook = calls.get("during_evaluate")
+        if hook is not None:
+            hook()
+        return auto_executor.AutoExecutionResult()
+
+    def _reconcile(**kwargs):
+        calls["reconcile"].append(kwargs)
+        return dict(calls.get("reconcile_result") or {})
+
+    monkeypatch.setattr(auto_executor.AutoPolymarketBuyer, "evaluate_and_execute", _evaluate)
+    monkeypatch.setattr(auto_buyer_ledger, "reconcile_pending_auto_buyer_fallbacks", _reconcile)
+    monkeypatch.setattr(auto_buyer_ledger, "settle_auto_buyer_ledger", lambda *_a, **_k: {})
+    return calls
+
+
+def _write_state(calls: dict[str, Any], state: dict[str, Any]) -> Path:
+    path = calls["state_file"]
+    path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return path
+
+
+# ---------------------------------------------------------------- 1. end-of-cycle save
+
+
+def test_a_hand_edit_made_during_the_cycle_survives_its_save(cycle):
+    path = _write_state(cycle, LIVE_STATE)
+
+    def _operator_turns_it_off():
+        # A hand edit: same _state_version, plus a key the loader never writes.
+        edited = {**LIVE_STATE, "enabled": False, "operator_note": "off at tip"}
+        path.write_text(json.dumps(edited, indent=2), encoding="utf-8")
+
+    cycle["during_evaluate"] = _operator_turns_it_off
+    auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert on_disk["enabled"] is False
+    assert on_disk["operator_note"] == "off at tip"
+    assert on_disk["cohorts"] == LIVE_STATE["cohorts"]
+    assert on_disk["last_daily_date"] == "2026-11-25"
+    assert "last_run" in on_disk
+    assert on_disk["_state_version"] == 8
+    # Only the cycle's own keys were added: no loader defaults, no derived values.
+    assert set(on_disk) == {*LIVE_STATE, "operator_note", "last_run", "last_daily_date"}
+
+
+@pytest.mark.parametrize("content", ["{not json", "[1, 2]"])
+def test_a_malformed_state_file_is_never_overwritten(cycle, content):
+    path = cycle["state_file"]
+    path.write_text(content, encoding="utf-8")
+    with pytest.raises(RuntimeError) as raised:
+        auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert "state_file_unreadable" in str(raised.value)
+    assert path.read_text(encoding="utf-8") == content
+    assert all(c.execute_live is False for c in cycle["configs"])
+
+
+def test_a_malformed_state_file_cancels_the_live_books_resting_orders(cycle, monkeypatch):
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    cycle["state_file"].write_text("{not json", encoding="utf-8")
+    with pytest.raises(RuntimeError):
+        auto_executor.run_auto_buyer_cycle()
+    assert cycle["reconcile"] == [{"cancel_all_resting": True}]
+
+
+def test_setters_refuse_to_overwrite_a_malformed_state_file(cycle):
+    path = cycle["state_file"]
+    path.write_text("{not json", encoding="utf-8")
+    with pytest.raises(auto_executor.AutoBuyerStateUnreadableError):
+        auto_executor.set_auto_buyer_mode("paper")
+    assert path.read_text(encoding="utf-8") == "{not json"
+
+
+# ---------------------------------------------------------------- 2. hard live caps
+
+
+def test_changing_1u_is_refused_while_a_live_cohort_is_on(cycle):
+    path = _write_state(cycle, LIVE_STATE)
+    with pytest.raises(ValueError, match="live cohort"):
+        auto_executor.set_auto_buyer_unit_value(50)
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert (on_disk["unit_value_usd"], on_disk["max_daily_spend_usd"]) == (5.0, 500.0)
+
+
+def _live_config(cycle) -> AutoExecutionConfig:
+    live = [c for c in cycle["configs"] if c.mode == "live"]
+    assert len(live) == 1
+    return live[0]
+
+
+def test_a_hand_edited_1u_never_scales_the_live_caps(cycle):
+    _write_state(cycle, {**LIVE_STATE, "unit_value_usd": 50.0})
+    auto_executor.run_auto_buyer_cycle()
+    config = _live_config(cycle)
+    assert config.execute_live is True
+    caps = (config.max_daily_spend_usd, config.max_game_stake_usd, config.max_daily_loss_usd)
+    assert caps == (500.0, 25.0, 250.0)
+
+
+def test_a_hand_edited_dollar_cap_applies_and_survives_a_toggle(cycle):
+    path = _write_state(cycle, {**LIVE_STATE, "max_daily_spend_usd": 300.0})
+    auto_executor.toggle_auto_buyer(True)
+    assert json.loads(path.read_text(encoding="utf-8"))["max_daily_spend_usd"] == 300.0
+    auto_executor.run_auto_buyer_cycle()
+    assert _live_config(cycle).max_daily_spend_usd == 300.0
+
+
+@pytest.mark.parametrize("missing", ["max_daily_spend_usd", "max_game_stake_usd", "max_daily_loss_usd"])
+def test_live_pass_refuses_to_run_without_a_written_dollar_cap(cycle, missing):
+    _write_state(cycle, {k: v for k, v in LIVE_STATE.items() if k != missing})
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm, match="live_caps_invalid"):
+        auto_executor.run_auto_buyer_cycle()
+    assert [c for c in cycle["configs"] if c.mode == "live"] == []
+
+
+def test_paper_unit_change_still_scales_the_unit_caps_without_a_live_cohort(cycle):
+    path = _write_state(cycle, {**LIVE_STATE, "cohorts": []})
+    auto_executor.set_auto_buyer_unit_value(10)
+    on_disk = json.loads(path.read_text(encoding="utf-8"))
+    assert (on_disk["max_daily_spend_usd"], on_disk["max_game_stake_usd"]) == (1000.0, 50.0)
+
+
+# ---------------------------------------------------------------- 9. the cycle alarms once
+
+
+def test_a_newly_abandoned_cancel_raises_a_live_alarm(cycle, monkeypatch):
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    _write_state(cycle, {**LIVE_STATE, "enabled": False})
+    cycle["reconcile_result"] = {"cancel_abandoned": ["gtd-9"]}
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+        auto_executor.run_auto_buyer_cycle()
+    assert [a["alarm"] for a in raised.value.alarms] == ["fallback_cancel_abandoned"]
+    assert raised.value.alarms[0]["order_ids"] == ["gtd-9"]
+    cycle["reconcile_result"] = {}
+    auto_executor.run_auto_buyer_cycle()

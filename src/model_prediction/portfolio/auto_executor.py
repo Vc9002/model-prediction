@@ -1378,6 +1378,17 @@ def _parse_disabled_sport_markets(state: dict[str, Any]) -> tuple[tuple[str, str
 
 
 STATE_VERSION_KEY = "_state_version"  # monotonic save counter for read-modify-write conflict detection
+# Names the dollar caps load_auto_buyer_state derived from units x 1U because the file lacks them.
+# Loader-only (never saved): the live pass refuses a derived cap (see _live_cap_problem).
+DERIVED_DOLLAR_CAPS_KEY = "_derived_dollar_caps"
+# Hard dollar caps of the live cohort pass. The 1U value never scales them.
+LIVE_DOLLAR_CAP_KEYS = ("max_daily_spend_usd", "max_game_stake_usd", "max_daily_loss_usd")
+
+
+class AutoBuyerStateUnreadableError(RuntimeError):
+    """The state file exists but does not parse to a JSON object. Nothing may overwrite it: the
+    loader reads it as defaults, and saving those would wipe the operator's cohorts and caps. A
+    RuntimeError, so the scheduled worker exits non-zero."""
 
 
 class StateVersionConflictError(RuntimeError):
@@ -1501,6 +1512,8 @@ def load_auto_buyer_state() -> dict[str, Any]:
             data = json.loads(state_file.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             data = {}
+        if not isinstance(data, dict):
+            data = {}
     state = {**default_state, **data}
     normalized_mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
     state["mode"] = normalized_mode if normalized_mode in AUTO_BUYER_MODES else DEFAULT_AUTO_BUYER_MODE
@@ -1520,34 +1533,48 @@ def load_auto_buyer_state() -> dict[str, Any]:
         max_edge = DEFAULT_AUTO_BUYER_MAX_EDGE
     state["max_edge"] = max_edge
 
-    def _unit_limit(unit_key: str, legacy_usd_key: str, default_units: float) -> float:
-        raw_units = data.get(unit_key)
-        if raw_units is None and data.get(legacy_usd_key) is not None:
-            try:
-                raw_units = float(data[legacy_usd_key]) / unit_value
-            except (TypeError, ValueError, ZeroDivisionError):
-                raw_units = None
+    def _positive(value: Any) -> float | None:
+        if isinstance(value, bool):
+            return None
         try:
-            parsed = float(raw_units if raw_units is not None else default_units)
+            parsed = float(value)
         except (TypeError, ValueError):
-            parsed = default_units
-        return parsed if math.isfinite(parsed) and parsed > 0 else default_units
+            return None
+        return parsed if math.isfinite(parsed) and parsed > 0 else None
 
-    daily_units = _unit_limit(
-        "max_daily_spend_units",
-        "max_daily_spend_usd",
-        DEFAULT_MAX_DAILY_SPEND_UNITS,
+    derived_caps: list[str] = []
+
+    def _cap(usd_key: str, unit_key: str, default_units: float) -> tuple[float, float]:
+        """(dollars, units). A dollar cap in the file is authoritative: until 2026-11-25 the units
+        won and the dollars were recomputed from them, so changing 1U from $5 to $50 multiplied the
+        live caps by ten and a hand edit of a dollar cap was silently ignored."""
+        file_usd = _positive(data.get(usd_key))
+        file_units = _positive(data.get(unit_key))
+        if file_usd is not None:
+            if file_units is not None and abs(file_units * unit_value - file_usd) > 0.005:
+                logger.warning(
+                    "auto-buyer state: %s=%s disagrees with %s=%s x 1U $%s; the dollar cap applies",
+                    usd_key,
+                    file_usd,
+                    unit_key,
+                    file_units,
+                    unit_value,
+                )
+            return file_usd, round(file_usd / unit_value, 4)
+        derived_caps.append(usd_key)
+        units = file_units if file_units is not None else default_units
+        return round(units * unit_value, 2), units
+
+    daily_usd, daily_units = _cap(
+        "max_daily_spend_usd", "max_daily_spend_units", DEFAULT_MAX_DAILY_SPEND_UNITS
     )
-    game_units = _unit_limit(
-        "max_game_stake_units",
-        "max_game_stake_usd",
-        DEFAULT_MAX_GAME_STAKE_UNITS,
-    )
+    game_usd, game_units = _cap("max_game_stake_usd", "max_game_stake_units", DEFAULT_MAX_GAME_STAKE_UNITS)
     state["unit_value_usd"] = unit_value
     state["max_daily_spend_units"] = daily_units
     state["max_game_stake_units"] = game_units
-    state["max_daily_spend_usd"] = round(daily_units * unit_value, 2)
-    state["max_game_stake_usd"] = round(game_units * unit_value, 2)
+    state["max_daily_spend_usd"] = daily_usd
+    state["max_game_stake_usd"] = game_usd
+    state[DERIVED_DOLLAR_CAPS_KEY] = derived_caps
     try:
         lookahead = float(state.get("max_event_lookahead_hours") or DEFAULT_MAX_EVENT_LOOKAHEAD_HOURS)
     except (TypeError, ValueError):
@@ -1587,15 +1614,73 @@ def load_auto_buyer_state() -> dict[str, Any]:
     return state
 
 
+def _read_raw_auto_buyer_state() -> dict[str, Any] | None:
+    """The state file exactly as written, None when it does not exist.
+
+    Raises ``AutoBuyerStateUnreadableError`` when it exists but is not a JSON object.
+    """
+    path = AUTO_BUYER_STATE_FILE
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise AutoBuyerStateUnreadableError(f"{path} is unreadable ({type(exc).__name__}: {exc})") from exc
+    if not isinstance(data, dict):
+        raise AutoBuyerStateUnreadableError(f"{path} holds a {type(data).__name__}, not a JSON object")
+    return data
+
+
 def save_auto_buyer_state(state: dict[str, Any]) -> None:
     """Save auto-buyer toggle state and settings atomically.
 
     Raises ``StateVersionConflictError`` if another writer advanced the file
-    on disk since ``state`` was loaded -- see ``write_versioned_state_file``.
+    on disk since ``state`` was loaded -- see ``write_versioned_state_file`` --
+    and ``AutoBuyerStateUnreadableError`` rather than overwrite a file that
+    exists but does not parse.
     """
+    _read_raw_auto_buyer_state()
+    to_write = {k: v for k, v in state.items() if k != DERIVED_DOLLAR_CAPS_KEY}
     write_versioned_state_file(
-        AUTO_BUYER_STATE_FILE, state, temp_path=AUTO_BUYER_STATE_FILE.with_suffix(".json.tmp")
+        AUTO_BUYER_STATE_FILE, to_write, temp_path=AUTO_BUYER_STATE_FILE.with_suffix(".json.tmp")
     )
+    state[STATE_VERSION_KEY] = to_write[STATE_VERSION_KEY]
+
+
+def _update_auto_buyer_state(updates: dict[str, Any]) -> None:
+    """Write only ``updates`` onto a fresh read of the state file.
+
+    Every other key stays exactly as written, so an operator's hand edit (a kill switch, a cap)
+    made while a cycle or a dashboard request was running survives. A hand edit does not bump
+    ``_state_version``, which is why saving a whole snapshot loaded minutes earlier switched a
+    hand-set ``enabled: false`` back on. A missing file is seeded from the loader's defaults.
+    """
+    for attempt in range(2):
+        raw = _read_raw_auto_buyer_state()
+        base = dict(raw) if raw is not None else load_auto_buyer_state()
+        base.update(updates)
+        try:
+            save_auto_buyer_state(base)
+            return
+        except StateVersionConflictError:
+            if attempt:
+                raise
+
+
+def _live_cap_problem(state: dict[str, Any]) -> str | None:
+    """Why the live cohort pass may not run on these caps, or None.
+
+    Live caps are hard dollars: each must be a positive number written in the file itself, never one
+    the loader derived from units x 1U.
+    """
+    derived = set(state.get(DERIVED_DOLLAR_CAPS_KEY) or ())
+    for key in LIVE_DOLLAR_CAP_KEYS:
+        value = state.get(key)
+        if key in derived or isinstance(value, bool) or not isinstance(value, (int, float)):
+            return f"live cap {key} must be a dollar amount in the state file, got {value!r}"
+        if not math.isfinite(float(value)) or float(value) <= 0:
+            return f"live cap {key} must be a positive dollar amount, got {value!r}"
+    return None
 
 
 def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
@@ -1604,13 +1689,10 @@ def toggle_auto_buyer(enabled: bool | None = None) -> dict[str, Any]:
     # scheduled real-money orders. A bare toggle of a non-boolean saved value fails safe to off.
     if enabled is not None and not isinstance(enabled, bool):
         raise ValueError(f"Auto-Buyer enabled must be true or false, got {enabled!r}")
+    current = load_auto_buyer_state()
+    new_enabled = (current.get("enabled") is False) if enabled is None else enabled
+    _update_auto_buyer_state({"enabled": new_enabled, "updated_at_utc": iso_utc(utc_now())})
     state = load_auto_buyer_state()
-    if enabled is None:
-        state["enabled"] = state.get("enabled") is False
-    else:
-        state["enabled"] = enabled
-    state["updated_at_utc"] = iso_utc(utc_now())
-    save_auto_buyer_state(state)
     if state["enabled"] is False:
         # D-02: turning the buyer off also cancels the live book's resting fallbacks by order id,
         # right now and best effort, after the save so a failed cancel never blocks or undoes the
@@ -1674,11 +1756,9 @@ def set_auto_buyer_mode(raw_mode: Any) -> dict[str, Any]:
     if mode not in AUTO_BUYER_MODES:
         raise ValueError(f"Auto-Buyer mode must be one of {sorted(AUTO_BUYER_MODES)}")
 
+    previous = load_auto_buyer_state().get("mode", DEFAULT_AUTO_BUYER_MODE)
+    _update_auto_buyer_state({"mode": mode, "updated_at_utc": iso_utc(utc_now())})
     state = load_auto_buyer_state()
-    previous = state.get("mode", DEFAULT_AUTO_BUYER_MODE)
-    state["mode"] = mode
-    state["updated_at_utc"] = iso_utc(utc_now())
-    save_auto_buyer_state(state)
     try:
         AuditLog(DATA / "audit.jsonl").append(
             "auto_buyer_mode_updated",
@@ -1700,6 +1780,14 @@ def set_auto_buyer_unit_value(raw_value: Any) -> dict[str, Any]:
         raise ValueError("Auto-Buyer 1U must be between $0.01 and $100,000.00")
 
     state = load_auto_buyer_state()
+    live = [c.label for c in _parse_cohorts(state).active if c.mode == "live"]
+    if live:
+        # The unit-based caps scale with 1U (paper semantics). Live caps are hard dollars, so the 1U
+        # value may not move while real money is on: turn the live cohorts off first.
+        raise ValueError(
+            "Auto-Buyer 1U cannot change while a live cohort is on "
+            f"({', '.join(live)}); live caps are fixed dollar amounts"
+        )
     previous = float(state.get("unit_value_usd") or DEFAULT_AUTO_BUYER_UNIT_VALUE_USD)
     state["unit_value_usd"] = round(value, 2)
     daily_units = float(state.get("max_daily_spend_units") or DEFAULT_MAX_DAILY_SPEND_UNITS)
@@ -1707,7 +1795,19 @@ def set_auto_buyer_unit_value(raw_value: Any) -> dict[str, Any]:
     state["max_daily_spend_usd"] = round(daily_units * state["unit_value_usd"], 2)
     state["max_game_stake_usd"] = round(game_units * state["unit_value_usd"], 2)
     state["updated_at_utc"] = iso_utc(utc_now())
-    save_auto_buyer_state(state)
+    _update_auto_buyer_state(
+        {
+            key: state[key]
+            for key in (
+                "unit_value_usd",
+                "max_daily_spend_units",
+                "max_game_stake_units",
+                "max_daily_spend_usd",
+                "max_game_stake_usd",
+                "updated_at_utc",
+            )
+        }
+    )
     try:
         AuditLog(DATA / "audit.jsonl").append(
             "auto_buyer_unit_value_updated",
@@ -1970,12 +2070,20 @@ def run_auto_buyer_cycle(
     runs no reconcile or settle, saves no state and appends no history.
     """
     state = load_auto_buyer_state()
+    # A state file that exists but does not parse loads as defaults (buyer off, no cohorts). Treat it
+    # as the kill switch for the live book too, and refuse to save over it at the end of the cycle.
+    try:
+        _read_raw_auto_buyer_state()
+        state_unreadable: str | None = None
+    except AutoBuyerStateUnreadableError as exc:
+        state_unreadable = str(exc)
+        logger.error("Auto-buyer state file unreadable; nothing buys this cycle: %s", exc)
     mode = str(state.get("mode") or DEFAULT_AUTO_BUYER_MODE).lower()
     if mode not in AUTO_BUYER_MODES:
         mode = DEFAULT_AUTO_BUYER_MODE
     state["mode"] = mode
     # Strict: only the boolean true enables (bool("false") is True).
-    cycle_enabled = state.get("enabled") is True
+    cycle_enabled = state.get("enabled") is True and state_unreadable is None
     # Cohort governance (quick-261125-31d): any `cohorts` key, even an empty or malformed one, puts
     # the legacy whitelist pass on paper, so only an operator-set live cohort can trade real money
     # from the scheduler. A separate local keeps the saved `mode` untouched in the state written back.
@@ -1998,8 +2106,15 @@ def run_auto_buyer_cycle(
     # capture); the live book below is still managed.
     run_cohort_passes = cycle_enabled or preview
     pass_overrides = _preview_pass_overrides(preview, preview_lookahead_hours)
+    # Live caps are hard dollars (fix 2026-11-25): a live pass with a missing or unit-derived cap
+    # does not run at all, and the cycle alarms.
+    live_cap_problem = _live_cap_problem(state) if live_cohorts and run_cohort_passes else None
+    if live_cap_problem is not None:
+        cohort_live_execute = False
     buying_live = should_execute or cohort_live_execute
-    manage_live_book = _cycle_manages_live_book(governed=governed, buying_live=buying_live, preview=preview)
+    manage_live_book = _cycle_manages_live_book(
+        governed=governed or state_unreadable is not None, buying_live=buying_live, preview=preview
+    )
 
     # Reconcile resting orders, update fills, and cancel stale/moved orders before evaluating new picks.
     # Under cohorts this also runs while nothing buys live (kill switch on, no live cohort parsed):
@@ -2066,6 +2181,17 @@ def run_auto_buyer_cycle(
     available_cash = cash_check.get("available_cash_usd") if cash_check else None
     if live_cohorts and not run_cohort_passes:
         cohort_passes["live"] = _skipped_cohort_pass("LIVE_DISABLED", live_cohorts)
+    elif live_cohorts and live_cap_problem is not None:
+        cohort_passes["live"] = {
+            "mode": "LIVE_REFUSED",
+            "cohorts": [c.label for c in live_cohorts],
+            "skipped": live_cap_problem,
+            "alarms": (
+                []
+                if preview
+                else [_alarm("live_caps_invalid", pick_id="", market_slug="", detail=live_cap_problem)]
+            ),
+        }
     elif live_cohorts and live_blocked is not None:
         cohort_passes["live"] = {
             **_skipped_cohort_pass("LIVE_BLOCKED", live_cohorts),
@@ -2237,31 +2363,35 @@ def run_auto_buyer_cycle(
             history_path=AUTO_BUYER_CYCLE_HISTORY_PATH if book == "live" else paper_history_path,
         )
 
-    state["last_run"] = run_summary
-    if forecast_date:
-        state["last_daily_date"] = forecast_date
-    try:
-        save_auto_buyer_state(state)
-    except StateVersionConflictError as exc:
-        # The cycle holds its state snapshot for the whole run (minutes for a
-        # live cycle), so an operator toggle in that window is expected, not a
-        # rare race. Re-apply only the keys THIS cycle owns onto a fresh load --
-        # the operator's concurrent change (e.g. disabling the live buyer)
-        # wins, and the cycle's own telemetry is still recorded rather than
-        # silently dropped. A second consecutive conflict propagates.
-        logger.warning("Auto-buyer state conflict at end of cycle, re-applying onto fresh state: %s", exc)
-        fresh = load_auto_buyer_state()
-        fresh["last_run"] = run_summary
-        if forecast_date:
-            fresh["last_daily_date"] = forecast_date
-        save_auto_buyer_state(fresh)
-    # Raised only after state and history are saved, so the alarm is on record whichever caller
-    # catches it (the worker marks the run failed; daily step 12 logs it and still reconciles).
     live_alarms = [
         *cycle_alarms,
         *(res.alarms if should_execute else []),
         *cohort_passes.get("live", {}).get("alarms", []),
     ]
+    for order_id in reconciliation_summary.get("cancel_abandoned") or []:
+        # Raised once: reconcile lists a row here only on the run that first flags it.
+        live_alarms.append(
+            _alarm(
+                "fallback_cancel_abandoned",
+                pick_id="",
+                market_slug="",
+                detail="resting order missing from the exchange and its cancel keeps failing; "
+                "no further cancels are sent; resolve the ledger row by hand",
+                order_ids=[order_id],
+            )
+        )
+    # The cycle held its state snapshot for minutes; only the keys it owns are written, onto a
+    # fresh read, so an operator's change in that window (a hand-set `enabled: false`) wins.
+    owned: dict[str, Any] = {"last_run": run_summary}
+    if forecast_date:
+        owned["last_daily_date"] = forecast_date
+    try:
+        _update_auto_buyer_state(owned)
+    except AutoBuyerStateUnreadableError as exc:
+        logger.error("Auto-buyer state file not saved (left as found): %s", exc)
+        live_alarms.append(_alarm("state_file_unreadable", pick_id="", market_slug="", detail=str(exc)))
+    # Raised only after state and history are saved, so the alarm is on record whichever caller
+    # catches it (the worker marks the run failed; daily step 12 logs it and still reconciles).
     if live_alarms:
         kinds = ", ".join(sorted({str(a.get("alarm")) for a in live_alarms}))
         logger.error("Live auto-buyer alarm(s): %s -- %s", kinds, live_alarms)
@@ -3636,6 +3766,17 @@ class AutoPolymarketBuyer:
                 "event_id": row.get("event_id"),
                 "line": row.get("line"),
                 "cohort": cohort.label if cohort is not None else None,
+                # Reconcile cancels a resting remainder once the live ask leaves this window; the
+                # global min/max edge would let a live-cohort remainder rest below the cohort floor.
+                "cohort_min_edge": cohort.min_saved_edge if cohort is not None else None,
+                "cohort_max_edge": cohort.max_saved_edge_exclusive if cohort is not None else None,
+                # The ledger merges a top-up into exactly this row, not the first one sharing its
+                # pick id or contract.
+                "topup_of_order_id": (
+                    str((partial_info.get("ledger_row") or {}).get("order_id") or "")
+                    if is_topup and partial_info is not None
+                    else None
+                ),
             }
 
             # Update bought_index to prevent intra-batch double buys

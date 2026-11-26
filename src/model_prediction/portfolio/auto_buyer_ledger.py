@@ -99,6 +99,9 @@ _EXECUTION_PASSTHROUGH_FIELDS = (
     "fallback_status",
     "fallback_error",
     "fallback_verified_via",
+    "cohort",
+    "cohort_min_edge",
+    "cohort_max_edge",
 )
 
 
@@ -183,17 +186,23 @@ def _scoreboard_team_key(name: str, league: str) -> str:
 _ESPN_REVERSED_MATCH_WINDOW = timedelta(hours=12)
 
 
-def _espn_event_near_start(event: dict[str, Any], start_dt: datetime) -> bool:
-    """True when the ESPN event's own date is within the window of ``start_dt``. Missing or
-    unparseable dates are False: a reversed pairing without a time cannot be told from a rematch."""
+def _espn_event_start(event: dict[str, Any]) -> datetime | None:
+    """The ESPN event's own tz-aware start, or None when it is missing or unparseable."""
     raw = str(event.get("date") or "").strip()
     if not raw:
-        return False
+        return None
     try:
         event_dt = datetime.fromisoformat(raw)
     except ValueError:
-        return False
-    if event_dt.tzinfo is None or start_dt.tzinfo is None:
+        return None
+    return event_dt if event_dt.tzinfo is not None else None
+
+
+def _espn_event_near_start(event: dict[str, Any], start_dt: datetime) -> bool:
+    """True when the ESPN event's own date is within the window of ``start_dt``. Missing or
+    unparseable dates are False: a reversed pairing without a time cannot be told from a rematch."""
+    event_dt = _espn_event_start(event)
+    if event_dt is None or start_dt.tzinfo is None:
         return False
     return abs(event_dt - start_dt) <= _ESPN_REVERSED_MATCH_WINDOW
 
@@ -410,17 +419,28 @@ def record_auto_buy_execution(
     if order_payload.get("is_topup") and not submit_unknown and j_path.exists():
         records = read_auto_buyer_ledger(jsonl_path=j_path)
         matching_idx = None
-        for idx, rec in enumerate(records):
-            if pid and str(rec.get("pick_id")) == pid:
-                matching_idx = idx
-                break
-            if (
-                slug
-                and str(rec.get("market_slug")) == slug
-                and str(rec.get("token_side") or "").lower() == side
-            ):
-                matching_idx = idx
-                break
+        topup_of = str(order_payload.get("topup_of_order_id") or "")
+        if topup_of:
+            # The buyer names the partial row it sized the top-up against. The first row with the
+            # same pick id or contract can be another one (a dead zero-fill leg); with no match the
+            # top-up gets its own row below rather than a guessed merge.
+            matching_idx = next(
+                (idx for idx, rec in enumerate(records) if str(rec.get("order_id") or "") == topup_of), None
+            )
+            if matching_idx is None:
+                logger.warning("Top-up %s: partial row %s not found; recording its own row", oid, topup_of)
+        else:
+            for idx, rec in enumerate(records):
+                if pid and str(rec.get("pick_id")) == pid:
+                    matching_idx = idx
+                    break
+                if (
+                    slug
+                    and str(rec.get("market_slug")) == slug
+                    and str(rec.get("token_side") or "").lower() == side
+                ):
+                    matching_idx = idx
+                    break
 
         if matching_idx is not None:
             rec = records[matching_idx]
@@ -452,6 +472,14 @@ def record_auto_buy_execution(
             rec["fallback_order_id"] = fallback_order_id
             rec["fallback_resting_shares"] = fallback_resting_shares
             rec["fallback_reconciled"] = fallback_reconciled
+            # rec["order_id"] stays the first leg's: reconcile's "fallback id == order id" test means
+            # "replace shares with this order's fill", which would wipe the earlier legs. A top-up
+            # whose own IOC fill is unknown is marked instead, so reconcile restates it on top of
+            # the merged baseline and never cancels it as a resting remainder.
+            if fallback_order_id and str(fallback_order_id) == oid:
+                rec["fallback_is_topup_ioc"] = True
+            else:
+                rec.pop("fallback_is_topup_ioc", None)
             rec["fill_known"] = bool(order_payload.get("fill_known", True))
             # The fallback fields now describe the top-up's own legs.
             for field_name in _EXECUTION_PASSTHROUGH_FIELDS:
@@ -684,6 +712,38 @@ def _default_live_executor(root: Path) -> Any:
     return PolymarketExecutor(audit=AuditLog(root / "audit.jsonl"))
 
 
+def _resting_edge_window(row: dict[str, Any]) -> tuple[float, float | None, bool]:
+    """(min_edge, max_edge, max_is_exclusive) a resting remainder must stay inside.
+
+    A cohort buy records its own window on the row: the global 3.5% floor would keep a live-cohort
+    remainder resting at 3.5-5% edge, below anything the cohort is allowed to buy. Rows without it
+    (legacy whitelist buys) keep the global state window.
+    """
+    cohort_min = row.get("cohort_min_edge")
+    if cohort_min is not None:
+        try:
+            cohort_max = row.get("cohort_max_edge")
+            return float(cohort_min), (float(cohort_max) if cohort_max is not None else None), True
+        except (TypeError, ValueError):
+            pass
+    try:
+        from .auto_executor import load_auto_buyer_state
+
+        st = load_auto_buyer_state()
+        return float(st.get("min_edge", 0.035)), float(st.get("max_edge", 0.20)), False
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError):
+        return 0.035, 0.20, False
+
+
+def _is_resting_fallback_leg(row: dict[str, Any]) -> bool:
+    """Whether ``fallback_order_id`` names a resting GTD remainder (cancellable), rather than an IOC
+    whose fill is unknown: a primary's own id, or a merged top-up's IOC (``fallback_is_topup_ioc``)."""
+    fid = row.get("fallback_order_id")
+    if not fid or str(fid) == str(row.get("order_id") or ""):
+        return False
+    return row.get("fallback_is_topup_ioc") is not True
+
+
 def _cancel_by_id(executor: Any, order_id: str, market_slug: str | None) -> None:
     """Cancel one order by id. Never a cancel-all: the account may hold manual orders."""
     try:
@@ -770,6 +830,8 @@ def reconcile_pending_auto_buyer_fallbacks(
     # restated or voided), but a started or kill-switched fallback is still cancelled by id.
     snapshot_error = ""
     by_id: dict[str, dict[str, Any]] = {}
+    # Ids the exchange could not return this read (a per-id lookup failed): see the abandon rule below.
+    unavailable_ids: set[str] = set()
     try:
         snapshot = live_executor.order_snapshots(order_ids)
     except (OSError, ValueError, KeyError, TypeError, RuntimeError, ExecutionGateError) as exc:
@@ -779,10 +841,12 @@ def reconcile_pending_auto_buyer_fallbacks(
             snapshot_error = f"order snapshots status {snapshot.get('status')!r}"
         else:
             by_id = {str(item.get("order_id")): item for item in snapshot.get("orders", [])}
+            unavailable_ids = {str(o) for o in snapshot.get("unavailable_order_ids") or []}
 
     now = utc_now()
     reconciled_filled = cancelled_expired = still_pending = errors = 0
     cancel_failed: list[str] = []
+    cancel_abandoned: list[str] = []
     changed = False
 
     def _cancel_order(
@@ -886,7 +950,7 @@ def reconcile_pending_auto_buyer_fallbacks(
         if r.get("fallback_reconciled") and r.get("fill_known") is not False:
             continue
         fid = str(fid)
-        true_fallback = r.get("fallback_order_id") != r.get("order_id")
+        true_fallback = _is_resting_fallback_leg(r)
         market_slug = r.get("market_slug")
         try:
             started = parse_utc(str(r.get("event_start_utc") or "")) <= now
@@ -939,17 +1003,7 @@ def reconcile_pending_auto_buyer_fallbacks(
                 current_bid = side_data.get("bid")
                 model_prob = float(r.get("model_probability") or 0.0)
 
-                min_edge = 0.035
-                max_edge = 0.20
-                try:
-                    from .auto_executor import load_auto_buyer_state
-
-                    st = load_auto_buyer_state()
-                    min_edge = float(st.get("min_edge", 0.035))
-                    max_edge = float(st.get("max_edge", 0.20))
-                except (OSError, ValueError, KeyError, TypeError, RuntimeError):
-                    min_edge = 0.035
-                    max_edge = 0.20
+                min_edge, max_edge, max_exclusive = _resting_edge_window(r)
 
                 if m_state != "MARKET_STATE_OPEN":
                     cancel_reason = f"market_state_{m_state}"
@@ -960,7 +1014,9 @@ def reconcile_pending_auto_buyer_fallbacks(
                         if current_edge < min_edge:
                             # Edge lost or turned negative (adverse selection risk)
                             cancel_reason = f"edge_degraded_to_{current_edge:.4f}_below_min_{min_edge:.4f}"
-                        elif max_edge is not None and current_edge > max_edge:
+                        elif max_edge is not None and (
+                            current_edge >= max_edge if max_exclusive else current_edge > max_edge
+                        ):
                             # Edge became anomalous/uncalibrated
                             cancel_reason = f"edge_anomalous_to_{current_edge:.4f}_above_max_{max_edge:.4f}"
                         elif (
@@ -976,11 +1032,34 @@ def reconcile_pending_auto_buyer_fallbacks(
         if not cancel_reason:
             still_pending += 1
             continue
+        if r.get("cancel_abandoned_at_utc"):
+            if fid in unavailable_ids or order is None:
+                # Flagged and alarmed once already; re-sending a cancel the exchange keeps refusing
+                # every 15 minutes changes nothing. The operator resolves the row.
+                still_pending += 1
+                continue
+            # The order is readable again: cancel it normally.
+            r.pop("cancel_abandoned_at_utc", None)
+            changed = True
         if not _cancel_order(fid, market_slug, r, reason=cancel_reason):
             errors += 1
             cancel_failed.append(fid)
             still_pending += 1
+            if fid in unavailable_ids and (r.get("cancel_requested_at_utc") or r.get("cancel_failed_at_utc")):
+                # A second failed cancel of an id the exchange cannot even read: stop re-sending.
+                r["cancel_abandoned_at_utc"] = iso_utc(now)
+                cancel_abandoned.append(fid)
+                logger.error(
+                    "Resting order %s (%s) is missing from the exchange and its cancel keeps failing; "
+                    "no further cancels are sent. Resolve the ledger row by hand.",
+                    fid,
+                    market_slug,
+                )
+            else:
+                r["cancel_failed_at_utc"] = iso_utc(now)
+            changed = True
             continue
+        r.pop("cancel_failed_at_utc", None)
         changed = True
         after = _reread(fid)
         after_state = str((after or {}).get("order_state") or "").upper()
@@ -1023,6 +1102,9 @@ def reconcile_pending_auto_buyer_fallbacks(
     # Only when non-empty: callers and tests pin the four-key dict of an uneventful run.
     if cancel_failed:
         summary["cancel_failed"] = cancel_failed
+    if cancel_abandoned:
+        # Newly flagged this run only, so the cycle raises its alarm once per row.
+        summary["cancel_abandoned"] = cancel_abandoned
     if snapshot_error:
         summary["snapshot_error"] = snapshot_error
     return summary
@@ -1067,7 +1149,10 @@ def cancel_resting_live_fallbacks(
     due: dict[str, str | None] = {}
     for r in read_auto_buyer_ledger(jsonl_path=j_path):
         fid = str(r.get("fallback_order_id") or "")
-        if not fid or r.get("fallback_reconciled") or fid == str(r.get("order_id") or ""):
+        if not fid or r.get("fallback_reconciled") or not _is_resting_fallback_leg(r):
+            continue
+        if r.get("cancel_abandoned_at_utc") and not cancel_all:
+            # The exchange cannot find it and refused the cancel twice (reconcile alarmed).
             continue
         if fid in skip_order_ids or _is_settled_auto_buyer_record(r):
             continue
@@ -2355,6 +2440,7 @@ def settle_auto_buyer_ledger(
                 away_key = _scoreboard_team_key(away, espn_lg.upper())
                 home_key = _scoreboard_team_key(home, espn_lg.upper())
                 candidates: dict[str, tuple[float, float]] = {}
+                undated_candidates: dict[str, tuple[float, float]] = {}
                 reversed_candidates: dict[str, tuple[float, float]] = {}
                 for d_check in (game_day, prev_day, next_day):
                     sb = _get_scoreboard(espn_lg, d_check)
@@ -2377,7 +2463,15 @@ def settle_auto_buyer_ledger(
                         espn_home = _scoreboard_team_key(h_team, espn_lg.upper())
                         event_key = str(ev.get("id") or f"{a_team}:{h_team}")
                         if espn_away == away_key and espn_home == home_key:
-                            candidates[event_key] = (float(a_c["score"]), float(h_c["score"]))
+                            # A series meets in the same orientation on consecutive days, so an
+                            # exact pairing must also be at this row's own tip time: yesterday's
+                            # final must never settle today's game. An undated event keeps the old
+                            # behaviour, but only when no dated match exists.
+                            scores = (float(a_c["score"]), float(h_c["score"]))
+                            if _espn_event_start(ev) is None:
+                                undated_candidates[event_key] = scores
+                            elif _espn_event_near_start(ev, start_dt):
+                                candidates[event_key] = scores
                         elif (
                             espn_away == home_key
                             and espn_home == away_key
@@ -2391,6 +2485,8 @@ def settle_auto_buyer_ledger(
                             # on consecutive days the other meeting is also a reversed pairing, and
                             # a final from yesterday must never settle today's game.
                             reversed_candidates[event_key] = (float(h_c["score"]), float(a_c["score"]))
+                if not candidates:
+                    candidates = undated_candidates
                 if not candidates:
                     candidates = reversed_candidates
                 if len(candidates) == 1:
