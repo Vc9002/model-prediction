@@ -7,20 +7,16 @@ Write-Host "Stopping Model Prediction Dashboard..." -ForegroundColor Cyan
 Disable-ScheduledTask -TaskName 'ModelPredictionDashboard' -ErrorAction SilentlyContinue | Out-Null
 Stop-ScheduledTask -TaskName 'ModelPredictionDashboard' -ErrorAction SilentlyContinue | Out-Null
 
-# 2. Terminate any Python process running dashboard_server.py
-$procs = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'dashboard_server' }
-if ($procs) {
-    $procs | ForEach-Object {
-        Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
-        Write-Host "Terminated dashboard_server process (PID: $($_.ProcessId))" -ForegroundColor Gray
-    }
-}
-
-# 3. Ensure port 8765 is released
-$conn = Get-NetTCPConnection -LocalPort 8765 -ErrorAction SilentlyContinue
-if ($conn) {
-    Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
-    Write-Host "Released port 8765 from PID: $($conn.OwningProcess)" -ForegroundColor Gray
+# 2. Stop the server that listens on 8765 and its launcher chain (python, the venv launcher stub,
+#    powershell, wscript), by PID and parent walk. Matching every command line that merely contains
+#    'dashboard_server' also killed pytest runs of tests/test_dashboard_server.py.
+. (Join-Path $PSScriptRoot 'dashboard_process_chain.ps1')
+$processes = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, Name, CommandLine)
+$listeners = @(Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty OwningProcess -Unique)
+foreach ($id in (Select-DashboardStopTargets -Processes $processes -ListenerPids $listeners)) {
+    Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+    Write-Host "Terminated dashboard process (PID: $id)" -ForegroundColor Gray
 }
 
 Start-Sleep -Seconds 1

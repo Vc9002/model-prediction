@@ -1,15 +1,11 @@
-"""Nightly Auto-Buyer file backups (copy only, dated, 30-day retention) and the dashboard's
-single-instance bind (ops 2026-11-25). Temp dirs only; nothing touches the runtime root."""
+"""Nightly Auto-Buyer file backups (copy only, dated, 30-day retention), ops 2026-11-25.
+Temp dirs only; nothing touches the runtime root."""
 
 from __future__ import annotations
 
 import importlib.util
-import sys
 from datetime import UTC, datetime, timedelta
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-
-import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -104,52 +100,6 @@ def test_retention_never_prunes_the_only_copy(tmp_path):
     old.mkdir(parents=True)
     assert backup.prune_auto_buyer_backups(tmp_path / "backups", 30, datetime(2026, 12, 1, tzinfo=UTC)) == []
     assert old.exists()
-
-
-# ------------------------------------------------------------------ dashboard single instance
-
-
-@pytest.mark.skipif(sys.platform != "win32", reason="SO_REUSEADDR admits a second listener only on Windows")
-def test_second_dashboard_cannot_bind_a_port_a_live_dashboard_holds():
-    import dashboard_server
-
-    first = ThreadingHTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler, bind_and_activate=False)
-    dashboard_server._bind_single_instance(first)
-    port = first.server_address[1]
-    try:
-        second = ThreadingHTTPServer(("127.0.0.1", port), BaseHTTPRequestHandler, bind_and_activate=False)
-        with pytest.raises(OSError):
-            dashboard_server._bind_single_instance(second)
-        # The pre-fix launch path (class-level allow_reuse_address) is refused too.
-        old_style = ThreadingHTTPServer(("127.0.0.1", port), BaseHTTPRequestHandler, bind_and_activate=False)
-        old_style.allow_reuse_address = True
-        with pytest.raises(OSError):
-            old_style.server_bind()
-        old_style.server_close()
-    finally:
-        first.server_close()
-
-
-def test_dashboard_main_exits_quietly_when_the_port_is_taken(monkeypatch, capsys, tmp_path, patch_dash):
-    import dashboard_server
-
-    holder = ThreadingHTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler, bind_and_activate=False)
-    dashboard_server._bind_single_instance(holder)
-    port = holder.server_address[1]
-    monkeypatch.setattr("sys.argv", ["dashboard_server.py", "--port", str(port)])
-    patch_dash("PID_FILE", tmp_path / "server.pid")
-    patch_dash("LOG_FILE", tmp_path / "server.log")
-    patch_dash("_hydrate_jobs", lambda: None)
-    patch_dash("enable_background_priority", lambda: True)
-    started: list[bool] = []
-    monkeypatch.setattr(dashboard_server, "_warm_caches", lambda **_k: started.append(True))
-    try:
-        dashboard_server.main()
-    finally:
-        holder.server_close()
-    assert "busy" in capsys.readouterr().err
-    assert started == []
-    assert not (tmp_path / "server.pid").exists()
 
 
 def test_nightly_main_backs_up_databases_and_auto_buyer_files(monkeypatch, tmp_path):
