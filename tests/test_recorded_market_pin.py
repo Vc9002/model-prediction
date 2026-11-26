@@ -401,3 +401,112 @@ def test_recorded_quote_has_the_same_shape_as_the_name_matched_one(snapshots) ->
         k: v for k, v in by_name.items() if k != "age_seconds"
     }
     assert datetime.now(UTC) - datetime.fromisoformat(pinned["observed_at_utc"]) > timedelta(0)
+
+
+# ------------------------------------------- a captured pin that qualifies for nothing is refused
+
+# Another contract of the same game, same team and line, pregame: what name matching finds when it is
+# (wrongly) asked after the recorded market failed to qualify.
+_ALT = "asc-cbb-cark-jax-2026-11-21-alt-neg-3pt5"
+
+
+def _name_candidate() -> dict:
+    return _spread(_ALT, "UCA", -3.5, 0.44, 0.57)
+
+
+_POST_TIP = "2026-11-21T21:05:00Z"
+
+_UNQUALIFIED_PINS = [
+    pytest.param({"observed_at_utc": _POST_TIP}, id="only-post-tip"),
+    pytest.param({"timestamp_valid": False}, id="timestamp-invalid"),
+    pytest.param({"market_type": "total"}, id="other-market-type"),
+]
+
+
+@pytest.mark.parametrize("override", _UNQUALIFIED_PINS)
+def test_captured_pin_that_nothing_qualifies_is_refused_not_name_matched(snapshots, override) -> None:
+    """Operator decision 2026-11-26: the recorded slug HAS stored snapshots but none is pregame, valid
+    and of the row's market type. That used to fall through to name matching, which quoted the
+    same-teams contract below (a different market than the one the forecast priced)."""
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.97, 0.03, **override), _name_candidate()])
+
+    assert backtests._pick_quote(_row("away", -3.5))["market_slug"] == _ALT  # name matching would find it
+    assert backtests._pick_quote(_pinned("away", -3.5, _NEG, "long")) is None
+
+
+@pytest.mark.parametrize("override", _UNQUALIFIED_PINS)
+def test_refusal_of_a_captured_pin_names_the_slug_and_why(snapshots, override) -> None:
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.97, 0.03, **override), _name_candidate()])
+
+    reason = backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long"))
+
+    assert reason is not None
+    assert _NEG in reason
+    assert "no qualifying pregame snapshot" in reason
+    assert backtests._pick_quote_refusal(_row("away", -3.5)) is None  # an unpinned row is not refused
+
+
+def test_captured_total_pin_that_nothing_qualifies_is_refused_not_name_matched(snapshots) -> None:
+    other = "tsc-cbb-cark-jax-2026-11-21-alt-140pt5"
+    snapshots([_total_snapshot(observed_at_utc=_POST_TIP), _total_snapshot(other)])
+
+    assert (
+        backtests._pick_quote({**_total_row("under", 140.5, "short"), "rationale": "x"})["market_slug"]
+        == other
+    )
+    assert backtests._pick_quote(_total_row("under", 140.5, "short")) is None
+    assert _TOTAL in backtests._pick_quote_refusal(_total_row("under", 140.5, "short"))
+
+
+def test_never_captured_pin_keeps_the_name_matching_fallback_and_has_no_refusal(snapshots) -> None:
+    """The only fallback left: no snapshot of the recorded slug exists at all (a row from before the pin)."""
+    snapshots([_name_candidate()])
+    row = _pinned("away", -3.5, "asc-cbb-cark-jax-2026-11-21-never-neg-3pt5", "long")
+
+    assert backtests._pick_quote(row)["market_slug"] == _ALT
+    assert backtests._pick_quote_refusal(row) is None
+
+
+def test_stale_but_pregame_pin_is_still_quoted_and_marked_not_fresh(snapshots) -> None:
+    """Age is not a qualification test here: the downstream freshness check and the buyer's live refresh
+    handle it, on the pinned slug. Only the absence of any usable pregame snapshot refuses."""
+    snapshots([_spread(_NEG, _UNKNOWN, -3.5, 0.50, 0.51, observed_at_utc="2026-11-21T14:00:00Z")])
+
+    quote = backtests._pick_quote(_pinned("away", -3.5, _NEG, "long"))
+
+    assert quote is not None
+    assert (quote["market_slug"], quote["fresh"]) == (_NEG, False)
+    assert backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long")) is None
+
+
+def test_every_pin_refusal_carries_a_reason(snapshots) -> None:
+    snapshots([_spread(_NEG, _UNKNOWN, 3.5, 0.50, 0.51)])  # recorded market's line contradicts the row
+    assert "does not line up" in backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long"))
+
+    other_game = _spread("asc-cbb-cark-jax-2026-11-21-b-neg-3pt5", "UCA", -3.5, 0.40, 0.61, event_id="999999")
+    snapshots([_spread(_NEG, "UCA", -3.5, 0.50, 0.51), other_game])  # a second game matches by name
+    assert "another contract" in backtests._pick_quote_refusal(_pinned("away", -3.5, _NEG, "long"))
+
+
+def test_decorated_pick_surfaces_the_pin_refusal_as_its_block_reason(monkeypatch) -> None:
+    orders = importlib.import_module("model_prediction.dashboard.orders")
+    monkeypatch.setattr(orders, "_pick_quote", lambda _row: None)
+    monkeypatch.setattr(orders, "_pick_quote_refusal", lambda _row: "recorded market x: refused")
+    row = {
+        **_pinned("away", -3.5, _NEG, "long"),
+        "status": "open",
+        "units": 1.0,
+        "pick_id": "p1",
+        "pick_tag": "qualified",
+    }
+
+    decorated = orders._decorate_pick(row, {}, {}, set())
+
+    assert decorated["quote"] is None
+    assert decorated["quote_refusal_reason"] == "recorded market x: refused"
+    assert (decorated["buy_ready"], decorated["buy_block_reason"]) == (False, "recorded market x: refused")
+
+    monkeypatch.setattr(orders, "_pick_quote_refusal", lambda _row: None)
+    unmapped = orders._decorate_pick(row, {}, {}, set())
+    assert unmapped["quote_refusal_reason"] is None
+    assert unmapped["buy_block_reason"] == "no exact executable Polymarket US market mapping"

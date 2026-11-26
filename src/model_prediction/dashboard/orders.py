@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover
 
 from model_prediction.dashboard.backtests import (
     _pick_quote,
+    _pick_quote_refusal,
 )
 from model_prediction.dashboard.common import (
     _CACHE,
@@ -302,6 +303,9 @@ def _is_manual_order(row: dict) -> bool:
     return tag != PickTag.QUALIFIED.value
 
 
+_NO_MARKET_MAPPING_REASON = "no exact executable Polymarket US market mapping"
+
+
 def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     if row.get("status") != "open":
         return False, "pick is not open"
@@ -314,7 +318,7 @@ def _order_readiness(row: dict, quote: dict | None) -> tuple[bool, str]:
     elif float(row.get("units") or 0) <= 0:
         return False, "qualified pick has no authorized units"
     if quote is None:
-        return False, "no exact executable Polymarket US market mapping"
+        return False, _NO_MARKET_MAPPING_REASON
     if not quote.get("fresh"):
         return False, "market quote is older than 5 minutes; scan prices first"
     if quote.get("market_state") != "MARKET_STATE_OPEN":
@@ -372,7 +376,12 @@ def _decorate_pick(
     # Settled picks can never be executed — skip the expensive snapshot scan.
     settled = str(row.get("status") or "").lower() == "settled"
     quote = None if settled else _pick_quote(row)
+    # A row that recorded its market is refused, never name-matched, when that market does not
+    # qualify; say so instead of the generic "no mapping" so the buyer's skip log can name it.
+    refusal = _pick_quote_refusal(row) if quote is None and not settled else None
     ready, reason = _order_readiness(row, quote)
+    if refusal and reason == _NO_MARKET_MAPPING_REASON:
+        reason = refusal
     order = _latest_order_for_pick(row, quote, orders)
     manual, _ = _manual_research_eligibility(row)
     filled_entry = _filled_entry_for_pick(row, orders, portfolio_history)
@@ -472,6 +481,7 @@ def _decorate_pick(
         "performance_scored": performance_scored,
         "economics_status": economics_status,
         "quote": quote,
+        "quote_refusal_reason": refusal,
         "order": order,
         "filled_entry": filled_entry,
         "position_closed": position_closed,

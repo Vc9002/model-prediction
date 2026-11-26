@@ -3623,6 +3623,7 @@ class AutoPolymarketBuyer:
             # 6. Resolve Verified Polymarket Market & Quote
             # Decorates with verified Polymarket mapping, team resolution, and snapshot
             # If a simulated live_quote_fn is provided (e.g. in test suite), use it
+            quote_refusal: str | None = None
             if self._live_quote_fn is not None:
                 try:
                     mock_quote = self._live_quote_fn(str(row.get("market_slug") or f"slug-{pick_id}"))
@@ -3642,9 +3643,14 @@ class AutoPolymarketBuyer:
             else:
                 decorated = _decorate_pick(row)
                 quote = decorated.get("quote")
+                quote_refusal = decorated.get("quote_refusal_reason")
 
             if quote is None:
                 result.rejected_unmapped_market += 1
+                if quote_refusal:
+                    # A recorded market that does not qualify is refused, never name-matched; the
+                    # skip log names it instead of leaving a bare "unmapped".
+                    skip_log.mark("pinned_market_refused", detail=str(quote_refusal)[:300])
                 continue
 
             # 7. Quote Staleness & Market State Check (with live refresh fallback)

@@ -518,6 +518,24 @@ def _quote_from_snapshot(snapshot: dict, side_name: str, event_start: datetime) 
 
 
 def _pick_quote(row: dict) -> dict | None:
+    """Last valid pregame executable side quote, or None; see _resolve_pick_quote."""
+    return _resolve_pick_quote(row, [])
+
+
+def _pick_quote_refusal(row: dict) -> str | None:
+    """Why a row that recorded its market was refused a quote, or None.
+
+    None also covers every row without a recorded market and every row that does get a quote: the
+    ordinary "no mapping" case carries no reason of its own. Only a recorded market can be refused,
+    so unpinned rows skip the second resolver pass."""
+    if _recorded_market(row) is None:
+        return None
+    refusals: list[str] = []
+    _resolve_pick_quote(row, refusals)
+    return refusals[0] if refusals else None
+
+
+def _resolve_pick_quote(row: dict, refusals: list[str]) -> dict | None:
     """Last valid pregame executable side quote for a moneyline, spread, or
     total pick.
 
@@ -536,10 +554,15 @@ def _pick_quote(row: dict) -> dict | None:
 
     A row that recorded the market and side it was priced against (the NCAAB forecast writes
     ``market_slug=... token_side=...``, 2026-11-25) is quoted on exactly that market and side, or
-    refused when the captured market does not line up with the row (_pinned_side). Name matching
-    below is the fallback when no pregame snapshot of that market qualifies: it was never captured,
-    or every snapshot of it is post-tip, timestamp-invalid or of another market type. In that case
-    the name path may quote a different contract of the same game, as it did before the pin existed.
+    refused when the captured market does not line up with the row (_pinned_side). Once the
+    recorded slug has any stored snapshot (operator decision 2026-11-26) the row is also refused when
+    none of them qualifies (all post-tip, timestamp-invalid or of another market type): name matching
+    could only quote a different contract than the one the forecast priced. Name matching is the
+    fallback only for a recorded slug that was never captured (rows from before the pin existed
+    behave the same way).
+
+    A refusal of a recorded market appends its reason to ``refusals``; callers that only need the
+    quote ignore it.
     """
     market_type = row.get("market_type")
     if market_type not in ("moneyline", "spread", "total", "nrfi"):
@@ -567,6 +590,16 @@ def _pick_quote(row: dict) -> dict | None:
         return None
     recorded = _recorded_market(row) if market_type in ("moneyline", "spread", "total") else None
     pinned = _pinned_snapshot(snapshots, recorded[0], event_start, market_type) if recorded else None
+    if (
+        recorded is not None
+        and pinned is None
+        and any(snapshot.get("market_slug") == recorded[0] for snapshot in snapshots)
+    ):
+        refusals.append(
+            f"recorded market {recorded[0]}: stored snapshots but no qualifying pregame snapshot "
+            f"(post-tip, timestamp-invalid or another market type); not name-matched"
+        )
+        return None
     latest: dict[str, dict] = {}
     for snapshot in snapshots:
         if snapshot.get("timestamp_valid") is False:
@@ -638,7 +671,17 @@ def _pick_quote(row: dict) -> dict | None:
         # doubleheader guard. Another contract matching this row by name means the same teams play
         # twice, and the name path would refuse; so does the pin.
         pinned_side = _pinned_side(row, pinned, recorded[1], market_type)
-        if pinned_side == "refuse" or any(slug != recorded[0] for slug in latest):
+        if pinned_side == "refuse":
+            refusals.append(
+                f"recorded market {recorded[0]} does not line up with the row (event, game, line or "
+                f"side); not name-matched"
+            )
+            return None
+        if any(slug != recorded[0] for slug in latest):
+            refusals.append(
+                f"recorded market {recorded[0]}: another contract also matches the row by name "
+                f"(same teams twice); not guessed"
+            )
             return None
         return _quote_from_snapshot(pinned, pinned_side, event_start)
     if not latest:

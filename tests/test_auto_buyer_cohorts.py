@@ -1701,6 +1701,27 @@ def test_a_gate_refusal_is_a_recorded_reason_not_silence(tmp_path, decorate, mon
     assert record["ask"] == pytest.approx(0.51)
 
 
+def test_a_refused_pinned_market_is_a_named_skip_not_a_crash_or_a_name_match(tmp_path, monkeypatch):
+    """A recorded market that no snapshot qualifies is refused by the quote lookup (quote None plus a
+    reason). The buyer skips that row with the reason in its skip log and carries on with the rest."""
+    reason = "recorded market asc-cbb-x: stored snapshots but no qualifying pregame snapshot"
+
+    def refuse_first(row):
+        if row["pick_id"] == "first":
+            return {**row, "quote": None, "quote_refusal_reason": reason}
+        return _quote_from_row(row)
+
+    monkeypatch.setattr("model_prediction.dashboard.orders._decorate_pick", refuse_first)
+    result = _live_buyer(tmp_path).evaluate_and_execute(_three_rows())
+
+    assert [ticket.pick_id for ticket, _ in FakeExecutor.executed] == ["second", "third"]
+    assert result.rejected_unmapped_market == 1
+    (record,) = result.cohort_skips
+    assert record["pick_id"] == "first"
+    assert record["reasons"] == ["rejected_unmapped_market", "pinned_market_refused"]
+    assert record["detail"] == reason
+
+
 def test_a_live_pass_the_live_switch_skipped_records_why_its_rows_were_not_bought(monkeypatch, tmp_path):
     state = {**_twin_state(), "live_enabled": False}
     _cycle_harness(monkeypatch, tmp_path, state, _twin_rows())
