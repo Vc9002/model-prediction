@@ -74,8 +74,9 @@ DEFAULT_WHITELIST_MODELS: tuple[str, ...] = (
     # its registry evidence_status is historical_only, every NBA moneyline Main row
     # is a PAPER_CALL_MODEL_EVIDENCE_UNVERIFIED paper call, which the decision gate
     # below rejects -- so this entry buys nothing until that flag changes.
-    # nba-total-margin-v9 was removed 2026-11-13 (NBA totals must not reach the
-    # paper ledger; ("nba", "total") is also blocked in DISABLED_AUTO_BUYER_SPORT_MARKETS).
+    # nba-total-margin-v9 was removed 2026-11-13 (NBA totals pulled from this whitelist
+    # path; ("nba", "total") is also blocked in DISABLED_AUTO_BUYER_SPORT_MARKETS). Since
+    # 2026-11-25 paper cohorts may buy NBA totals; live cohorts may not (COHORT_LIVE_BLOCKED_*).
     # nba-spread-margin-v9 stays by operator directive 2026-11-13 ("keep nba
     # spread"), overriding the same-day loss-review pull (2W-7L in its 8-12% edge
     # bucket, calibration slope 0.19, under-dispersed vs the market line). That
