@@ -749,6 +749,16 @@ def _ncaaf_close_anchor_side(snapshot: dict, home_team: str, away_team: str) -> 
     return anchor, None
 
 
+def _alias_team_matches(team_name: str, side_description: str) -> bool:
+    """learned_forward's strict matcher over the shared Polymarket alias table (their "UCA" for
+    Central Arkansas), without polymarket_matching's mascot rule, so "LA Clippers" still does not
+    match "Los Angeles Clippers" outside the NBA."""
+    from ..learned_forward import _team_matches
+    from ..polymarket_matching import normalize_name_tokens
+
+    return _team_matches(normalize_name_tokens(team_name), normalize_name_tokens(side_description))
+
+
 def _closing_probability_for_moneyline_pick(
     data_root,
     sport_dir: str,
@@ -877,13 +887,16 @@ def _closing_probability_for_moneyline_pick(
                 if str(sport_dir).casefold() == "nba":
                     from .forecast import _nba_team_matches as match
                 else:
-                    match = _team_matches
+                    match = _alias_team_matches
                 ref_is_home = match(home_team, ref_team)
                 ref_is_away = match(away_team, ref_team)
-                if ref_is_home:
-                    side = snapshot.get("long") if sel in ("home", "1") else snapshot.get("short")
-                elif ref_is_away:
-                    side = snapshot.get("long") if sel in ("away", "2") else snapshot.get("short")
+                # A market team matching both row teams ("Louisiana" / "Louisiana Monroe") proves
+                # neither side: it used to be read as home.
+                if ref_is_home != ref_is_away:
+                    if ref_is_home:
+                        side = snapshot.get("long") if sel in ("home", "1") else snapshot.get("short")
+                    else:
+                        side = snapshot.get("long") if sel in ("away", "2") else snapshot.get("short")
         if side is not None:
             ask = side.get("ask")
             if ask is not None and 0 < float(ask) < 1:
