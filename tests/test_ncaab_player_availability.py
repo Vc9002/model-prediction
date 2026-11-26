@@ -414,3 +414,91 @@ def test_learned_forward_branch_fails_closed_to_zero_with_the_reason(tmp_path: P
     assert unavailable == (avail.INSUFFICIENT_HISTORY,)
     with pytest.raises(ValueError, match="NO_CALL_NCAAB_AVAILABILITY_UNSUPPORTED"):
         _features("nba", ["ncaab_p1_margin_adjustment"], tmp_path)
+
+
+# ------------------------------------------------------------------------------------- coverage gate
+
+
+def _full_team(team_id: str = "2169") -> tuple[list[dict[str, Any]], str]:
+    team = _team_records(team_id)
+    name = _team_names(team)[team_id]
+    # the gate is tested against complete, clean fixtures: any "missing" below is a box that was never captured
+    assert len(team) >= 7
+    assert all(box.quality is None for box in avail.PlayerBoxIndex(team, NOW, 2027).by_team[name])
+    return team, name
+
+
+def test_missing_early_boxes_is_a_coverage_no_call_not_ok() -> None:
+    team, name = _full_team()
+    # the live tree starts empty and daily captures only yesterday: after three post-deploy games the
+    # season's earlier games have no box, so the "top 7" would be built from three games and a long-term
+    # absentee (only in the missing boxes) would never appear
+    index = avail.PlayerBoxIndex(team[-3:], NOW, 2027)
+    result = avail.team_availability(name, NOW, _history(team), index)
+    assert result.reason == avail.BOX_COVERAGE
+    assert (result.usable_boxes, result.prior_games) == (3, len(team))
+    assert result.avail_top7_prev1 is None and result.detail == f"usable_3_of_{len(team)}_prior_games"
+
+
+def test_a_single_missing_box_is_tolerated_but_two_are_not() -> None:
+    team, name = _full_team()
+    one = avail.team_availability(name, NOW, _history(team), avail.PlayerBoxIndex(team[1:], NOW, 2027))
+    assert one.reason is None and one.usable_boxes == len(team) - 1
+    two = avail.team_availability(name, NOW, _history(team), avail.PlayerBoxIndex(team[2:], NOW, 2027))
+    assert two.reason == avail.BOX_COVERAGE
+
+
+def test_a_low_coverage_ratio_fails_even_with_one_missing_box() -> None:
+    team, name = _full_team()
+    # 3 usable of 4 prior games is one missing box but only 75% coverage
+    history = _history(team[-4:])
+    index = avail.PlayerBoxIndex(team[-3:], NOW, 2027)
+    result = avail.team_availability(name, NOW, history, index)
+    assert (result.usable_boxes, result.prior_games) == (3, 4)
+    assert result.reason == avail.BOX_COVERAGE
+
+
+def test_coverage_numbers_are_logged_in_the_shadow_inputs() -> None:
+    short = avail.TeamAvailability(
+        "A", avail.BOX_COVERAGE, None, None, 3, 7, "e1", "usable_3_of_7_prior_games"
+    )
+    full = avail.TeamAvailability("B", None, 0.9, 0.0, 7, 7, "e2")
+    out = avail.P1Adjustment(None, avail.BOX_COVERAGE, short, full).shadow_inputs()
+    assert out["home_status"] == avail.BOX_COVERAGE and out["away_status"] == "ok"
+    assert (out["home_missing_boxes"], out["away_missing_boxes"]) == (4, 0)
+    assert out["home_box_coverage"] == pytest.approx(3 / 7, abs=1e-4) and out["away_box_coverage"] == 1.0
+
+
+def test_previous_game_still_in_progress_is_stale() -> None:
+    team, name = _full_team()
+    last = _start(team[-1])
+    tip = last + timedelta(days=2)
+    index = avail.PlayerBoxIndex(team, NOW, 2027)
+    assert avail.team_availability(name, tip, _history(team), index).reason is None
+    # a game that tipped after the last final and before this tip, with no final box yet (the 00:30 run)
+    index.in_progress = {name: [last + timedelta(days=1, hours=3)]}
+    stale = avail.team_availability(name, tip, _history(team), index)
+    assert stale.reason == avail.STALE and stale.detail == "previous_game_in_progress"
+    # a game that starts after the tip, or another team's game, is not this team's previous game
+    index.in_progress = {name: [tip + timedelta(hours=1)], "Someone Else": [last + timedelta(days=1)]}
+    assert avail.team_availability(name, tip, _history(team), index).reason is None
+
+
+def test_in_progress_starts_reads_only_live_games_from_a_scoreboard() -> None:
+    def event(state: str, home: str, away: str) -> dict[str, Any]:
+        return {
+            "date": "2026-11-25T23:00Z",
+            "competitions": [
+                {
+                    "status": {"type": {"state": state, "completed": state == "post"}},
+                    "competitors": [
+                        {"homeAway": "home", "team": {"displayName": home}},
+                        {"homeAway": "away", "team": {"displayName": away}},
+                    ],
+                }
+            ],
+        }
+
+    board = {"events": [event("in", "A", "B"), event("pre", "C", "D"), event("post", "E", "F"), {}]}
+    live = avail.in_progress_starts(board)
+    assert set(live) == {"A", "B"} and live["A"] == [parse_utc("2026-11-25T23:00Z")]

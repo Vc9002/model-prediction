@@ -42,6 +42,7 @@ from .commands import (
     cmd_international_baseball_forecast,
     cmd_live_portfolio,
     cmd_models,
+    cmd_ncaab_player_box_backfill,
     cmd_order_status,
     cmd_polymarket_clv,
     cmd_polymarket_ledger_prices,
@@ -196,6 +197,8 @@ def main(argv: list[str] | None = None) -> None:
             output = cmd_international_baseball_backfill(
                 args, config, registry, bans, ledger, audit, data_root
             )
+        elif args.command == "ncaab-player-box-backfill":
+            output = cmd_ncaab_player_box_backfill(args, config, registry, bans, ledger, audit, data_root)
         elif args.command == "validate-international-baseball":
             output = cmd_validate_international_baseball(
                 args, config, registry, bans, ledger, audit, data_root

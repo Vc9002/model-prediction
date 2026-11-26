@@ -12,6 +12,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from .calibration import IdentityCalibrator
 from .college_contract_evidence import build_candidate_evidence, save_candidate_evidence
 from .config import PROJECT_ROOT
@@ -23,7 +25,12 @@ from .eligibility import EligibilityResult
 from .entities import CanonicalTeam
 from .feature_capture import contract_snapshot_json
 from .features.base import FeatureStore
-from .features.ncaab_player_availability import PlayerBoxIndex, ncaab_season_year, p1_margin_adjustment
+from .features.ncaab_player_availability import (
+    PlayerBoxIndex,
+    in_progress_starts,
+    ncaab_season_year,
+    p1_margin_adjustment,
+)
 from .ledger import DuplicatePickError, defer_sqlite_xlsx_exports
 from .models.basketball import UpcomingGame
 from .models.ncaab_spread_v5 import ncaab_spread_v5_model
@@ -406,8 +413,35 @@ def _model_line_divergence(
     return None
 
 
+def _p1_in_progress(board: dict[str, Any] | None, args_date: str | None) -> dict[str, list[datetime]]:
+    """Games being played now: today's scoreboard plus the previous day's (a late tip is live at 00:30).
+
+    The previous-day fetch is best effort: without it only today's live games are seen (the shadow then
+    may call a team "ok" off the game before an unseen live one, which is the pre-fix behaviour).
+    """
+    live = in_progress_starts(board or {})
+    if args_date:
+        # Short timeout and closed after use: this runs inside the forecast, and a shadow-only fetch must not
+        # be able to hold it for the default 30 s (or leak a connection pool every run).
+        client = httpx.Client(timeout=5)
+        try:
+            previous = (date.fromisoformat(args_date) - timedelta(days=1)).isoformat()
+            for name, starts in in_progress_starts(ESPNClient(client).scoreboard("NCAAB", previous)).items():
+                live.setdefault(name, []).extend(starts)
+        except Exception:
+            _logger.warning("NCAAB P1 shadow: previous-day scoreboard unavailable", exc_info=True)
+        finally:
+            client.close()
+    return live
+
+
 def _p1_shadow_fields(
-    decisions: list[dict[str, Any]], history: list[Any], data_root: Any, observed: datetime
+    decisions: list[dict[str, Any]],
+    history: list[Any],
+    data_root: Any,
+    observed: datetime,
+    board: dict[str, Any] | None = None,
+    args_date: str | None = None,
 ) -> dict[int, dict[str, Any]]:
     """Forward-logging-only P1 player-availability fields keyed by id(decision), v7 margins only.
 
@@ -418,6 +452,7 @@ def _p1_shadow_fields(
     indexes: dict[int, PlayerBoxIndex] = {}
     season_history: dict[int, list[Any]] = {}
     by_game: dict[tuple[str, str, str], dict[str, Any]] = {}
+    live: dict[str, list[datetime]] | None = None
     for decision in decisions:
         basis = getattr(decision["prediction"], "feature_basis", None) or {}
         if decision["kind"] == "total" or basis.get("margin_engine") != "v7":
@@ -429,6 +464,9 @@ def _p1_shadow_fields(
                 season = ncaab_season_year(tip)
                 if season not in indexes:
                     indexes[season] = PlayerBoxIndex.load(player_box_root(data_root), observed, season)
+                    if live is None:
+                        live = _p1_in_progress(board, args_date)
+                    indexes[season].in_progress = live
                     # every team scan would otherwise walk all seasons of history
                     season_history[season] = [g for g in history if ncaab_season_year(g.start) == season]
                 p1 = p1_margin_adjustment(key[0], key[1], tip, season_history[season], indexes[season])
@@ -985,7 +1023,7 @@ def forecast_ncaab_sport(
     # Shadow only (P1 player availability, not promoted): computed after every served number above is
     # fixed and merged into the snapshot alone.
     try:
-        p1_shadow = _p1_shadow_fields(decisions, history, data_root, observed)
+        p1_shadow = _p1_shadow_fields(decisions, history, data_root, observed, board, args_date)
     except Exception:
         _logger.warning("NCAAB P1 shadow failed for the slate", exc_info=True)
         p1_shadow = {}

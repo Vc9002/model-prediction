@@ -247,6 +247,17 @@ def parser() -> argparse.ArgumentParser:
     international_backfill.add_argument("--from", dest="from_date", required=True)
     international_backfill.add_argument("--to", dest="to_date")
 
+    ncaab_box_backfill = commands.add_parser(
+        "ncaab-player-box-backfill",
+        help="one-time, idempotent catch-up capture of NCAAB player boxes (the P1 availability shadow input)",
+    )
+    ncaab_box_backfill.add_argument(
+        "--since", required=True, help="first scoreboard date, ISO (e.g. 2026-11-02)"
+    )
+    ncaab_box_backfill.add_argument(
+        "--until", help="last scoreboard date, ISO; defaults to today in US-Eastern time"
+    )
+
     international_validate = commands.add_parser(
         "validate-international-baseball",
         help="select separate tie-aware KBO/NPB Elo baselines and grade locked tests",

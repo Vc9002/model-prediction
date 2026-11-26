@@ -2,18 +2,30 @@
 
 One ESPN summary per final game feeds both records. The player record keeps the research schema
 (``ncaab-player-boxes-v1``, ``scripts/backfill_ncaab_player_boxes.py``) so the research feature builder
-and ``features/ncaab_player_availability.py`` read the live tree unchanged.
+and ``features/ncaab_player_availability.py`` read the live tree. The research builder keys on the
+scoreboard fields the summary does not carry (``neutral``, ``d1_vs_d1``, conference ids), so capture copies
+them from the same scoreboard it already fetched (``_scoreboard_context``); a game missing from that
+scoreboard keeps them ``None``, as the research backfill does for the same case.
+
+Writes are atomic (temp file, fsync, hard link) so a kill never leaves a truncated first-seen record, and
+a record that does not parse is quarantined and re-captured rather than trusted.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import os
+import uuid
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from ..domain import parse_utc, utc_now
+import httpx
+
+from ..domain import eastern_today, parse_utc, utc_now
 from .espn import LEAGUE_PATHS, SITE_API, ESPNClient
 
 REQUIRED_STATS = (
@@ -25,6 +37,10 @@ REQUIRED_STATS = (
 
 PLAYER_BOX_SCHEMA = "ncaab-player-boxes-v1"
 PLAYER_BOX_SUMMARY_URL = f"{SITE_API}/{LEAGUE_PATHS['NCAAB']}/summary"
+# A summary whose player block never parses is refetched this many times, then left alone (daily runs
+# many times a day; without a limit every run would hit ESPN again for the same unparseable game).
+MAX_PLAYER_PARSE_ATTEMPTS = 2
+_logger = logging.getLogger(__name__)
 # ESPN stat key -> output name(s); "made-attempted" keys split into two integers. Same map as the
 # research backfill, whose records the feature definitions were fitted on.
 _SPLIT_KEYS = {
@@ -271,15 +287,108 @@ def parse_player_boxes(game: dict[str, Any], summary: dict[str, Any], observed_a
 
 
 def _write_first_seen(path: Path, record: dict[str, Any]) -> bool:
-    """Write once; False when another writer got there first (first-seen evidence is never rewritten)."""
+    """Write once; False when another writer got there first (first-seen evidence is never rewritten).
+
+    The record is written and fsynced to a temp file in the same directory, then hard-linked to its final
+    name: ``os.link`` fails when the destination exists, which keeps first-seen semantics, and the final
+    name only ever appears complete. Writing in place left a truncated file after a kill that the
+    exists-check then treated as captured forever.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Not ``*.json``: the index loader and the corrupt-file sweep must never see a half-written temp.
+    temp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     try:
-        with path.open("x", encoding="utf-8") as handle:
+        with temp.open("x", encoding="utf-8") as handle:
             json.dump(record, handle, sort_keys=True, allow_nan=False)
             handle.write("\n")
-    except FileExistsError:
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temp, path)
+        except FileExistsError:
+            return False
+        except OSError:
+            # A filesystem without hard links: rename refuses an existing target on Windows; the exists
+            # check covers POSIX, where only a concurrent writer inside this window could be overwritten.
+            if path.exists():
+                return False
+            os.rename(temp, path)
+        return True
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def _usable_record(path: Path) -> bool:
+    """True when ``path`` holds a parseable JSON object; a file that does not parse is quarantined.
+
+    A kill mid-write (before writes were atomic) or disk damage leaves a file the exists-check would
+    count as captured forever. It is renamed aside (``*.corrupt-<stamp>``, kept for the audit, not matched
+    by the loader's ``*.json``) so the caller captures the game again.
+    """
+    if not path.exists():
         return False
-    return True
+    try:
+        if isinstance(json.loads(path.read_text(encoding="utf-8")), dict):
+            return True
+    except OSError:
+        # Unreadable right now (lock, antivirus): not evidence of corruption, so never move it.
+        _logger.warning("NCAAB box record unreadable, left in place: %s", path, exc_info=True)
+        return True
+    except ValueError:
+        pass
+    stamp = utc_now().strftime("%Y%m%dT%H%M%S%fZ")
+    try:
+        path.replace(path.with_name(f"{path.name}.corrupt-{stamp}"))
+    except OSError:
+        _logger.warning("unparseable NCAAB box record could not be quarantined: %s", path, exc_info=True)
+        return True  # never loop on a file we cannot move; the loader skips it either way
+    _logger.warning("quarantined unparseable NCAAB box record %s", path)
+    return False
+
+
+def _parse_failure_marker(player_path: Path) -> Path:
+    return player_path.with_name(f".{player_path.stem}.parse_failed")
+
+
+def _parse_failures(marker: Path) -> int:
+    try:
+        return int(json.loads(marker.read_text(encoding="utf-8"))["attempts"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0
+
+
+def _mark_parse_failure(marker: Path, attempts: int, reason: str) -> None:
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(
+            json.dumps({"attempts": attempts, "reason": reason, "last_attempt_utc": utc_now().isoformat()}),
+            encoding="utf-8",
+        )
+    except OSError:
+        _logger.warning("could not record the NCAAB player parse failure at %s", marker, exc_info=True)
+
+
+def _scoreboard_context(board: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Per event id: the scoreboard-only fields the research player record carries.
+
+    ``ESPNClient.completed_games`` drops them. Same definitions as the research scoreboard
+    (``scripts/ncaab_espn_lines.py::slim_event``, ``backfill_ncaab_player_boxes.py::iter_events``): neutral
+    site, each team's ``conferenceId``, and D1-vs-D1 as both ids present.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for event in (board or {}).get("events") or []:
+        competition = (event.get("competitions") or [{}])[0]
+        teams = {c.get("homeAway"): c.get("team") or {} for c in competition.get("competitors") or []}
+        if "home" not in teams or "away" not in teams:
+            continue
+        home_conf, away_conf = teams["home"].get("conferenceId"), teams["away"].get("conferenceId")
+        out[str(event.get("id"))] = {
+            "neutral": bool(competition.get("neutralSite")),
+            "home_conference_id": home_conf,
+            "away_conference_id": away_conf,
+            "d1_vs_d1": home_conf is not None and away_conf is not None,
+        }
+    return out
 
 
 def capture_completed_boxscores(
@@ -295,6 +404,7 @@ def capture_completed_boxscores(
     espn = client or ESPNClient()
     board = espn.scoreboard("NCAAB", game_date)
     completed = espn.completed_games(board)
+    context = _scoreboard_context(board)
     root = Path(data_root) / "features" / "ncaab" / "boxscores" / game_date
     player_root = player_box_root(data_root) / game_date
     if max_workers < 1:
@@ -304,16 +414,24 @@ def capture_completed_boxscores(
         event_id = str(game["event_id"])
         path = root / f"{event_id}.json"
         player_path = player_root / f"{event_id}.json"
-        team_done, player_done = path.exists(), player_path.exists()
+        marker = _parse_failure_marker(player_path)
+        team_done, player_done = _usable_record(path), _usable_record(player_path)
         if team_done and player_done:
             return event_id, ("existing", None), ("existing", None)
+        if team_done:
+            # Only the player record would trigger this fetch: stop when its parse has failed enough times.
+            failures = _parse_failures(marker)
+            if failures >= MAX_PLAYER_PARSE_ATTEMPTS:
+                return event_id, ("existing", None), ("missing", f"player_parse_failed_{failures}_attempts")
         try:
             observed = utc_now().isoformat()
             summary = espn.summary("NCAAB", event_id)
             # Stamped after the fetch: the record must not claim to be known before it was.
             fetched = utc_now().isoformat()
-        except (KeyError, TypeError, ValueError, OSError) as exc:
-            failed = ("missing", str(exc))
+        except (KeyError, TypeError, ValueError, OSError, httpx.HTTPError) as exc:
+            # HTTPError (429, 5xx, transport) is per game: one bad fetch must not abort the pool and mark
+            # the whole day's capture "error" in daily.
+            failed = ("missing", str(exc) or type(exc).__name__)
             return (
                 event_id,
                 ("existing", None) if team_done else failed,
@@ -331,11 +449,20 @@ def capture_completed_boxscores(
             try:
                 # Written even when ESPN lists no players, as the research backfill does: "fetched,
                 # no usable box" (the feature's BOX_QUALITY) must stay distinct from "never fetched".
-                player_record = parse_player_boxes({**game, "game_date": game_date}, summary, fetched)
-                if _write_first_seen(player_path, player_record):
-                    player_outcome = ("captured", None)
-            except (KeyError, TypeError, ValueError, OSError) as exc:
-                player_outcome = ("missing", str(exc))
+                player_record = parse_player_boxes(
+                    {**game, **context.get(event_id, {}), "game_date": game_date}, summary, fetched
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                reason = str(exc) or type(exc).__name__
+                player_outcome = ("missing", reason)
+                _mark_parse_failure(marker, _parse_failures(marker) + 1, reason)
+            else:
+                try:
+                    if _write_first_seen(player_path, player_record):
+                        player_outcome = ("captured", None)
+                        marker.unlink(missing_ok=True)
+                except OSError as exc:
+                    player_outcome = ("missing", str(exc))
         return event_id, team_outcome, player_outcome
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
@@ -357,4 +484,64 @@ def capture_completed_boxscores(
         **team,
         "path": str(root),
         "player_boxes": {**tally(2), "path": str(player_root)},
+    }
+
+
+def backfill_player_boxes(
+    data_root: str | Path,
+    since: str,
+    until: str | None = None,
+    client: ESPNClient | None = None,
+    max_workers: int = 4,
+) -> dict[str, Any]:
+    """Capture every final from ``since`` through ``until`` (default: today, Eastern) once per date.
+
+    The one-time catch-up for the dates before the live capture existed (daily only ever captures the
+    previous day). Idempotent: each date goes through ``capture_completed_boxscores``, so existing records
+    are not refetched or rewritten and a rerun only fills gaps. Records are stamped with the observation
+    time of the fetch, never backdated, so a backfilled game is invisible to any decision made before it.
+    A date that fails is reported and the walk continues.
+    """
+    first = date.fromisoformat(since)
+    last = date.fromisoformat(until) if until else eastern_today()
+    if first > last:
+        raise ValueError("since_after_until")
+    days: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    day = first
+    while day <= last:
+        iso = day.isoformat()
+        # One client per date unless the caller supplies one: ESPNClient caches every summary it fetches,
+        # which across a month of finals is hundreds of MB.
+        espn = client or ESPNClient()
+        try:
+            result = capture_completed_boxscores(data_root, iso, espn, max_workers)
+            players = result["player_boxes"]
+            days.append(
+                {
+                    "date": iso,
+                    "completed": result["completed"],
+                    "captured": result["captured"],
+                    "existing": result["existing"],
+                    "missing": result["missing"],
+                    "player_boxes_captured": players["captured"],
+                    "player_boxes_existing": players["existing"],
+                    "player_boxes_missing": players["missing"],
+                }
+            )
+        except (KeyError, TypeError, ValueError, OSError, httpx.HTTPError) as exc:
+            _logger.warning("NCAAB player-box backfill failed for %s", iso, exc_info=True)
+            errors.append({"date": iso, "reason": str(exc) or type(exc).__name__})
+        finally:
+            if client is None:
+                espn.client.close()
+        day += timedelta(days=1)
+    return {
+        "since": first.isoformat(),
+        "until": last.isoformat(),
+        "days": days,
+        "captured": sum(d["captured"] for d in days),
+        "player_boxes_captured": sum(d["player_boxes_captured"] for d in days),
+        "player_boxes_missing": sum(len(d["player_boxes_missing"]) for d in days),
+        "errors": errors,
     }

@@ -1142,6 +1142,14 @@ def cmd_international_baseball_backfill(args, config, registry, bans, ledger, au
     return output
 
 
+def cmd_ncaab_player_box_backfill(args, config, registry, bans, ledger, audit, data_root) -> dict:
+    # data_root is the one main() derives for the daily job, so the records land where the forecast's
+    # PlayerBoxIndex.load looks (<data_root>/features/ncaab/player_boxes).
+    from ..data_sources.ncaab_boxscores import backfill_player_boxes
+
+    return backfill_player_boxes(data_root, args.since, args.until)
+
+
 def cmd_validate_international_baseball(args, config, registry, bans, ledger, audit, data_root) -> dict:
     output = validate_all_international_baseball_baselines(
         data_root,

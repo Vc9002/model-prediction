@@ -1056,3 +1056,64 @@ def test_ncaab_rows_record_the_market_and_side_the_buyer_then_uses(tmp_path, mon
     assert quote is not None
     assert (quote["market_slug"], quote["side"], quote["ask"]) == ("fixture-ml", "long", 0.56)
     assert backtests._pick_quote({**row, "rationale": "fixture"}) is None
+
+
+def _live_board(state, home, away, start="2026-11-25T23:00Z"):
+    return {
+        "events": [
+            {
+                "date": start,
+                "competitions": [
+                    {
+                        "status": {"type": {"state": state}},
+                        "competitors": [
+                            {"homeAway": "home", "team": {"displayName": home}},
+                            {"homeAway": "away", "team": {"displayName": away}},
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def test_p1_in_progress_merges_today_and_the_previous_day_and_survives_a_fetch_failure(monkeypatch):
+    from model_prediction.college_basketball_forward import _p1_in_progress
+
+    seen = []
+
+    def previous_day(self, league, day):
+        seen.append((league, day))
+        return _live_board("in", "C", "D", "2026-11-25T03:00Z")
+
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ESPNClient.scoreboard", previous_day)
+    live = _p1_in_progress(_live_board("in", "A", "B"), "2026-11-26")
+    assert seen == [("NCAAB", "2026-11-25")] and set(live) == {"A", "B", "C", "D"}
+
+    def broken(self, league, day):
+        raise RuntimeError("espn down")
+
+    monkeypatch.setattr("model_prediction.college_basketball_forward.ESPNClient.scoreboard", broken)
+    assert set(_p1_in_progress(_live_board("in", "A", "B"), "2026-11-26")) == {"A", "B"}
+    assert _p1_in_progress(None, None) == {}
+
+
+def test_p1_shadow_hands_the_live_games_to_the_box_index(tmp_path, monkeypatch):
+    from model_prediction.features import ncaab_player_availability as avail
+
+    live = {"Some Team": ["a live tip"]}
+    calls = []
+    monkeypatch.setattr(
+        "model_prediction.college_basketball_forward._p1_in_progress",
+        lambda board, day: calls.append((board, day)) or live,
+    )
+    side = avail.TeamAvailability("Home", None, 0.2, 0.8, 5, 5, "prev")
+    seen = []
+
+    def spy(home, away, tip, history, index):
+        seen.append(index.in_progress)
+        return avail.P1Adjustment(1.0, None, side, side)
+
+    _p1_shadow_run(tmp_path / "live", monkeypatch, shadow=spy)
+    assert len(calls) == 1 and calls[0][1]  # the slate's scoreboard and date reach the helper, once
+    assert seen and all(index_live is live for index_live in seen)

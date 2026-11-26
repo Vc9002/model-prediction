@@ -26,8 +26,18 @@ Fail closed, per team (the matchup adjustment is None when either side fails):
   (no player list, points or minutes that do not add up, a player with minutes but no id, the opponent's
   list copied onto this side, or a team name that matches neither side);
 - ``NO_CALL_AVAILABILITY_STALE``: the previous game is final but its box is not captured yet, and it is
-  still inside the capture window (the daily job captures yesterday's games, so a fix is expected);
-- ``NO_CALL_AVAILABILITY_PREV_GAME_BOX_MISSING``: the previous game is past the capture window with no box.
+  still inside the capture window (the daily job captures yesterday's games, so a fix is expected); or a
+  game that tipped after the last final is still in progress (``PlayerBoxIndex.in_progress``, fed from the
+  scoreboard), so the last final is not really the previous game;
+- ``NO_CALL_AVAILABILITY_PREV_GAME_BOX_MISSING``: the previous game is past the capture window with no box;
+- ``NO_CALL_AVAILABILITY_BOX_COVERAGE``: the usable boxes cover clearly fewer than the team's prior
+  same-season games: more than ``MAX_MISSING_BOXES`` (1) prior games without a usable box, or fewer than
+  ``MIN_BOX_COVERAGE`` (80%) of them with one. A prior game with no usable box is silently absent from the
+  rotation and from the absence streaks, so a tree that starts empty at deploy would report "ok" from
+  three post-deploy games and never show a long-term absentee. One miss is tolerated (a single ESPN
+  failure or a box that fails the quality gate is routine and moves a seven-man rotation little); two
+  are not, because they are what a missing early season looks like. The tree must be backfilled over
+  the season (``cli ncaab-player-box-backfill``) before this stops firing.
 
 Inert in serving: ``learned_forward._compute_features`` computes it only for an artifact whose
 ``feature_names`` lists a name in ``FEATURE_NAMES`` (none does), and ``college_basketball_forward`` records
@@ -68,11 +78,16 @@ LONG_ABSENCE_GAMES = 3
 MINUTES_TOLERANCE = 5  # team minutes may differ from 200 (+25 per OT) by rounding; more means a broken box
 # Days back (Eastern) the daily job still captures: it fetches yesterday's finals on every run.
 CAPTURE_WINDOW_DAYS = 1
+# Coverage gate: a team fails closed when more than this many prior games lack a usable box, or when under
+# this share of them have one (the ratio only bites on a 3-4 game history; the count bites everywhere).
+MAX_MISSING_BOXES = 1
+MIN_BOX_COVERAGE = 0.8
 
 INSUFFICIENT_HISTORY = "NO_CALL_AVAILABILITY_INSUFFICIENT_HISTORY"
 PREV_GAME_BOX_MISSING = "NO_CALL_AVAILABILITY_PREV_GAME_BOX_MISSING"
 BOX_QUALITY = "NO_CALL_AVAILABILITY_BOX_QUALITY"
 STALE = "NO_CALL_AVAILABILITY_STALE"
+BOX_COVERAGE = "NO_CALL_AVAILABILITY_BOX_COVERAGE"
 
 
 def ncaab_season_year(start: datetime) -> int:
@@ -130,6 +145,9 @@ class PlayerBoxIndex:
         self.season_year = season_year
         self.by_event: dict[str, dict[str, TeamBox]] = {}
         self.by_team: dict[str, list[TeamBox]] = defaultdict(list)
+        # team name -> tip times of its games in progress right now (``in_progress_starts``); empty means
+        # unknown, which can only make the "previous game" look older, so the caller sets it when it can.
+        self.in_progress: dict[str, list[datetime]] = {}
         for record in records:
             self.add(record)
 
@@ -176,6 +194,25 @@ class PlayerBoxIndex:
                     except (OSError, ValueError, KeyError, TypeError, AttributeError):
                         continue
         return index
+
+
+def in_progress_starts(board: dict[str, Any]) -> dict[str, list[datetime]]:
+    """Team display name -> tip times of its in-progress games on an ESPN scoreboard.
+
+    Only state "in": a postponed or canceled game is not final either, but it is not a game that just
+    finished and will produce a box, so it must not hold the previous-game check open.
+    """
+    out: dict[str, list[datetime]] = defaultdict(list)
+    for event in (board or {}).get("events") or []:
+        competition = (event.get("competitions") or [{}])[0]
+        if (competition.get("status") or {}).get("type", {}).get("state") != "in" or not event.get("date"):
+            continue
+        start = parse_utc(str(event["date"]))
+        for side in competition.get("competitors") or []:
+            name = (side.get("team") or {}).get("displayName")
+            if name:
+                out[str(name)].append(start)
+    return dict(out)
 
 
 @dataclass(frozen=True)
@@ -229,6 +266,11 @@ def team_availability(
 
     if len(usable) < MIN_BOX_GAMES:
         return fail(INSUFFICIENT_HISTORY)
+    last_final = starts[scheduled[-1]]
+    if any(last_final < live < tip for live in index.in_progress.get(team, ())):
+        # The latest final is not the previous game: a later one is still being played, and its box (and
+        # the players who sat in it) is not knowable yet.
+        return fail(STALE, "previous_game_in_progress")
     prev_sides = boxes[scheduled[-1]]
     if prev_sides is None:
         prev_day = starts[scheduled[-1]].astimezone(EASTERN).date()
@@ -248,6 +290,9 @@ def team_availability(
     top_total = sum(m for _, m in top)
     if top_total <= 0:
         return fail(INSUFFICIENT_HISTORY)
+    missing = len(scheduled) - len(usable)
+    if missing > MAX_MISSING_BOXES or len(usable) / len(scheduled) < MIN_BOX_COVERAGE:
+        return fail(BOX_COVERAGE, f"usable_{len(usable)}_of_{len(scheduled)}_prior_games")
     streaks = {}
     for athlete, _ in top:
         streak = 0
@@ -285,6 +330,10 @@ class P1Adjustment:
             out[f"{side}_top7_out3plus_share"] = team.top7_minutes_share_out_3plus
             out[f"{side}_usable_boxes"] = team.usable_boxes
             out[f"{side}_prior_games"] = team.prior_games
+            out[f"{side}_missing_boxes"] = team.prior_games - team.usable_boxes
+            out[f"{side}_box_coverage"] = (
+                round(team.usable_boxes / team.prior_games, 4) if team.prior_games else None
+            )
             out[f"{side}_prev_event_id"] = team.prev_event_id
             out[f"{side}_detail"] = team.detail
         return out
