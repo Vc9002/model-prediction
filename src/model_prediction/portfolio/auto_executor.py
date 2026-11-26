@@ -2762,12 +2762,40 @@ def run_auto_buyer_cycle(
         *(res.alarms if should_execute else []),
         *cohort_passes.get("live", {}).get("alarms", []),
     ]
+    # The cycle held its state snapshot for minutes; only the keys it owns are written, onto a
+    # fresh read, so an operator's change in that window (a hand-set `enabled: false`) wins.
+    owned: dict[str, Any] = {"last_run": run_summary}
+    if forecast_date:
+        owned["last_daily_date"] = forecast_date
+    try:
+        _update_auto_buyer_state(owned)
+    except AutoBuyerStateUnreadableError as exc:
+        logger.error("Auto-buyer state file not saved (left as found): %s", exc)
+        live_alarms.append(_alarm("state_file_unreadable", pick_id="", market_slug="", detail=str(exc)))
     # The ONCE is this cycle's own marker on the ledger row, never the reconcile summary: the daily job
     # and cli settle run the same reconcile, stamp the row first and discard the list, and a settlement
     # failure used to overwrite the summary. The summary keys stay in the run summary for visibility.
+    # After the state save: markers are persisted only once nothing between here and the raise can fail
+    # for another reason, so a crash earlier (a state write error other than an unreadable file) leaves
+    # the rows unmarked and the next cycle alarms them. Never before the other live alarms are collected.
     from .auto_buyer_ledger import claim_unalarmed_ledger_flags
 
-    ledger_alarms = claim_unalarmed_ledger_flags(DATA)
+    try:
+        ledger_alarms = claim_unalarmed_ledger_flags(DATA)
+    except (OSError, ValueError, OverflowError) as exc:  # ValueError covers UnicodeDecodeError
+        # A sharing violation during another process's replace, say. No marker was written, so nothing is
+        # lost and the next run retries; this run says so loudly instead of dying before its other alarms.
+        logger.error("Ledger alarm flags could not be read: %s", exc)
+        ledger_alarms = {}
+        live_alarms.append(
+            _alarm(
+                "ledger_alarm_flags_unreadable",
+                pick_id="",
+                market_slug="",
+                detail=f"the live ledger could not be read for stuck-order flags ({type(exc).__name__}: "
+                f"{str(exc)[:200]}); unreadable-fill and abandoned-cancel alarms are retried next run",
+            )
+        )
     for order_id in ledger_alarms.get("cancel_abandoned") or []:
         live_alarms.append(
             _alarm(
@@ -2792,16 +2820,6 @@ def run_auto_buyer_cycle(
                 order_ids=[order_id],
             )
         )
-    # The cycle held its state snapshot for minutes; only the keys it owns are written, onto a
-    # fresh read, so an operator's change in that window (a hand-set `enabled: false`) wins.
-    owned: dict[str, Any] = {"last_run": run_summary}
-    if forecast_date:
-        owned["last_daily_date"] = forecast_date
-    try:
-        _update_auto_buyer_state(owned)
-    except AutoBuyerStateUnreadableError as exc:
-        logger.error("Auto-buyer state file not saved (left as found): %s", exc)
-        live_alarms.append(_alarm("state_file_unreadable", pick_id="", market_slug="", detail=str(exc)))
     # Raised only after state and history are saved, so the alarm is on record whichever caller
     # catches it (the worker marks the run failed; daily step 12 logs it and still reconciles).
     if live_alarms:

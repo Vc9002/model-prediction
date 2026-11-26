@@ -995,6 +995,70 @@ def test_an_alarm_whose_marker_cannot_be_persisted_still_fires_and_repeats(cycle
         assert _alarm_kinds(raised) == ["fallback_fill_unreadable"]
 
 
+def test_an_unreadable_ledger_during_the_claim_does_not_lose_the_other_alarms_or_the_state_save(
+    cycle, monkeypatch
+):
+    """A sharing violation while another process replaces the ledger raised out of the claim before the state
+    save and before the alarm raise: the cycle's other alarms surfaced as a bare OSError and last_run was never
+    saved. Now it is one more alarm, loud, with no marker written (the next run retries)."""
+    state = {
+        k: v for k, v in LIVE_STATE.items() if k != "max_game_stake_usd"
+    }  # a cycle alarm: live_caps_invalid
+    _write_state(cycle, state)
+    j_path = cycle["state_file"].parent.parent / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row() | {"fill_unreadable_at_utc": iso_utc(utc_now())}])
+
+    def _sharing_violation(*_a: Any, **_k: Any) -> dict[str, list[str]]:
+        raise PermissionError(
+            13, "The process cannot access the file because it is being used by another process"
+        )
+
+    monkeypatch.setattr(auto_buyer_ledger, "claim_unalarmed_ledger_flags", _sharing_violation)
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+        auto_executor.run_auto_buyer_cycle()
+    assert set(_alarm_kinds(raised)) == {"live_caps_invalid", "ledger_alarm_flags_unreadable"}
+    flags = next(a for a in raised.value.alarms if a["alarm"] == "ledger_alarm_flags_unreadable")
+    assert "PermissionError" in flags["detail"]
+    assert "last_run" in json.loads(cycle["state_file"].read_text(encoding="utf-8"))  # the state was saved
+    assert "fill_unreadable_alarmed_at_utc" not in _ledger(j_path)[0]  # nothing was marked
+
+
+def test_a_unicode_error_reading_the_ledger_for_flags_is_the_same_loud_alarm(cycle, monkeypatch):
+    _write_state(cycle, {**LIVE_STATE, "enabled": False})
+
+    def _bad_bytes(*_a: Any, **_k: Any) -> dict[str, list[str]]:
+        raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+    monkeypatch.setattr(auto_buyer_ledger, "claim_unalarmed_ledger_flags", _bad_bytes)
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+        auto_executor.run_auto_buyer_cycle()
+    assert _alarm_kinds(raised) == ["ledger_alarm_flags_unreadable"]
+
+
+def test_a_state_save_that_crashes_after_a_flagged_row_exists_does_not_lose_its_alarm(cycle, monkeypatch):
+    """The claim persists its markers only after the state save, so a generic failure there leaves the row
+    unmarked and the next cycle still alarms (markers written first made that alarm vanish)."""
+    monkeypatch.setattr(auto_executor, "_live_book_has_pending_orders", lambda _p: True)
+    _write_state(cycle, {**LIVE_STATE, "enabled": False})
+    j_path = cycle["state_file"].parent.parent / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row() | {"fill_unreadable_at_utc": iso_utc(utc_now())}])
+    real_update = auto_executor._update_auto_buyer_state
+
+    def _crash(_owned: dict[str, Any]) -> None:
+        raise RuntimeError("state write blew up")
+
+    monkeypatch.setattr(auto_executor, "_update_auto_buyer_state", _crash)
+    with pytest.raises(RuntimeError, match="state write blew up"):
+        auto_executor.run_auto_buyer_cycle()
+    assert "fill_unreadable_alarmed_at_utc" not in _ledger(j_path)[0]
+    monkeypatch.setattr(auto_executor, "_update_auto_buyer_state", real_update)
+    with pytest.raises(auto_executor.LiveAutoBuyerAlarm) as raised:
+        auto_executor.run_auto_buyer_cycle()
+    assert _alarm_kinds(raised) == ["fallback_fill_unreadable"]
+    assert _ledger(j_path)[0]["fill_unreadable_alarmed_at_utc"]  # marked before the raise
+    auto_executor.run_auto_buyer_cycle()  # and quiet after
+
+
 # ---------------------------------------------------------------- 3. daily loss stop
 
 
