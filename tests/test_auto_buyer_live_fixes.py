@@ -1208,21 +1208,11 @@ def test_a_live_off_cycle_never_writes_the_live_switch_back(cycle):
     assert json.loads(path.read_text(encoding="utf-8"))["live_enabled"] is False
 
 
-def test_live_off_buys_paper_rows_and_sends_no_live_order(tmp_path, monkeypatch, buyer_env):
-    # The real buyer end to end (no stubbed evaluate): a live-cohort pick and a paper-cohort pick on
-    # the slate, live switch off. The paper pick is recorded, nothing reaches the executor.
+def _real_cycle_env(tmp_path, monkeypatch, state: dict[str, Any], picks: list[dict[str, Any]]) -> Path:
+    """run_auto_buyer_cycle with the real buyer (no stubbed evaluate) on a slate of ``picks``."""
     state_file = tmp_path / "state" / "auto_buyer_state.json"
     state_file.parent.mkdir(parents=True)
-    state_file.write_text(
-        json.dumps(
-            {
-                **LIVE_STATE,
-                "live_enabled": False,
-                "cohorts": [*LIVE_STATE["cohorts"], PAPER_TOTAL_COHORT],
-            }
-        ),
-        encoding="utf-8",
-    )
+    state_file.write_text(json.dumps(state), encoding="utf-8")
     monkeypatch.setattr(auto_executor, "AUTO_BUYER_STATE_FILE", state_file)
     monkeypatch.setattr(auto_executor, "DATA", tmp_path)
     monkeypatch.setattr(auto_executor, "PAPER_AUTO_BUYER_DATA_ROOT", tmp_path / "paper_auto_buyer")
@@ -1230,11 +1220,19 @@ def test_live_off_buys_paper_rows_and_sends_no_live_order(tmp_path, monkeypatch,
     monkeypatch.setattr(auto_executor, "_capture_missing_active_snapshot_slates", lambda *a, **k: [])
     monkeypatch.setattr(auto_buyer_ledger, "reconcile_pending_auto_buyer_fallbacks", lambda **_k: {})
     monkeypatch.setattr(auto_buyer_ledger, "settle_auto_buyer_ledger", lambda *_a, **_k: {})
+    monkeypatch.setattr(auto_executor, "_read_cohort_candidate_picks", lambda: [dict(p) for p in picks])
+    return state_file
+
+
+def test_live_off_buys_paper_rows_and_sends_no_live_order(tmp_path, monkeypatch, buyer_env):
+    # The real buyer end to end (no stubbed evaluate): a live-cohort pick and a paper-cohort pick on
+    # the slate, live switch off. The paper pick is recorded, nothing reaches the executor.
     picks = [
         _pick(SPREAD_V7, pick_id="live-pick", event="gl1", model_probability=0.57, ask=0.50),
         _pick(TOTAL_V6, pick_id="paper-pick", event="gp1", market="total", model_probability=0.57, ask=0.50),
     ]
-    monkeypatch.setattr(auto_executor, "_read_cohort_candidate_picks", lambda: [dict(p) for p in picks])
+    both = {**LIVE_STATE, "cohorts": [*LIVE_STATE["cohorts"], PAPER_TOTAL_COHORT]}
+    state_file = _real_cycle_env(tmp_path, monkeypatch, {**both, "live_enabled": False}, picks)
     auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
     assert _BuyExecutor.executed == []
     assert not (tmp_path / "auto_buyer_ledger.jsonl").exists()
@@ -1242,11 +1240,42 @@ def test_live_off_buys_paper_rows_and_sends_no_live_order(tmp_path, monkeypatch,
     assert [r["pick_id"] for r in paper_rows] == ["paper-pick"]
 
     # The same slate with live on is what the harness is for: the live pick reaches the executor.
-    state_file.write_text(
-        json.dumps({**LIVE_STATE, "cohorts": [*LIVE_STATE["cohorts"], PAPER_TOTAL_COHORT]}), encoding="utf-8"
-    )
+    state_file.write_text(json.dumps(both), encoding="utf-8")
     auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
     assert len(_BuyExecutor.executed) == 1 and "gl1" in _BuyExecutor.executed[0][0].market_slug
+
+
+def test_paper_twin_of_a_live_cohort_keeps_buying_paper_while_live_is_off(tmp_path, monkeypatch, buyer_env):
+    # A twin copies the live cohort's window so the two books compare pick for pick. Live off must
+    # skip only the live pass: the twin still buys the very pick the live book would have bought.
+    twin = {**LIVE_STATE["cohorts"][0], "mode": "paper", "paper_twin": True}
+    twinned = {**LIVE_STATE, "cohorts": [*LIVE_STATE["cohorts"], twin]}
+    picks = [_pick(SPREAD_V7, pick_id="twin-pick", event="gt1", model_probability=0.57, ask=0.50)]
+    state_file = _real_cycle_env(tmp_path, monkeypatch, {**twinned, "live_enabled": False}, picks)
+    summary = auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert summary["cohort_passes"]["live"]["mode"] == "LIVE_DISABLED"
+    assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_TRADING"
+    assert _BuyExecutor.executed == []
+    assert not (tmp_path / "auto_buyer_ledger.jsonl").exists()
+    assert [r["pick_id"] for r in _ledger(tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl")] == [
+        "twin-pick"
+    ]
+    # With live on the same pick is bought by BOTH books, which is what a twin is for.
+    state_file.write_text(json.dumps(twinned), encoding="utf-8")
+    auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert len(_BuyExecutor.executed) == 1
+    assert (tmp_path / "auto_buyer_ledger.jsonl").exists()
+
+
+def test_master_off_stops_the_paper_twin_too(tmp_path, monkeypatch, buyer_env):
+    twin = {**LIVE_STATE["cohorts"][0], "mode": "paper", "paper_twin": True}
+    state = {**LIVE_STATE, "enabled": False, "live_enabled": True, "cohorts": [*LIVE_STATE["cohorts"], twin]}
+    picks = [_pick(SPREAD_V7, pick_id="twin-pick", event="gt2", model_probability=0.57, ask=0.50)]
+    _real_cycle_env(tmp_path, monkeypatch, state, picks)
+    summary = auto_executor.run_auto_buyer_cycle(forecast_date="2026-11-25")
+    assert summary["cohort_passes"]["paper"]["mode"] == "PAPER_DISABLED"
+    assert _BuyExecutor.executed == []
+    assert not (tmp_path / "paper_auto_buyer" / "auto_buyer_ledger.jsonl").exists()
 
 
 def test_toggle_live_off_saves_then_cancels_resting_orders_by_id(cycle, monkeypatch, tmp_path):
