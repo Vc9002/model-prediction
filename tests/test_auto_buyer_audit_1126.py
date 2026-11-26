@@ -468,12 +468,12 @@ def test_closing_probability_lookup_tolerates_an_out_of_range_start(tmp_path):
         )
 
 
-def _settle_rows(tmp_path: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _settle_rows(tmp_path: Path, rows: list[dict[str, Any]], espn: Any = None) -> dict[str, Any]:
     from model_prediction.portfolio.auto_buyer_ledger import settle_auto_buyer_ledger
 
     j_path = tmp_path / "auto_buyer_ledger.jsonl"
     j_path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
-    return settle_auto_buyer_ledger(data_root=tmp_path, espn=MagicMock())
+    return settle_auto_buyer_ledger(data_root=tmp_path, espn=espn if espn is not None else MagicMock())
 
 
 def _open_ncaab_row(**fields: Any) -> dict[str, Any]:
@@ -523,8 +523,11 @@ def test_settle_skips_tennis_reverification_when_the_start_is_unreadable(tmp_pat
         settled_at_utc="2026-11-08T22:00:00Z",
         event_start_utc=bad_start,
     )
-    out = _settle_rows(tmp_path, [row])
+    espn = MagicMock()
+    out = _settle_rows(tmp_path, [row], espn=espn)
     assert out["corrected"] == 0
+    # The re-verification must be skipped, not merely fail to change the row.
+    espn.scoreboard.assert_not_called()
     kept = _first_ledger_row(tmp_path)
     assert kept["status"] == "settled" and kept["result"] == "win"
 
@@ -562,6 +565,23 @@ def test_overnight_age_extension_treats_an_out_of_range_stamp_as_no_extension(mo
     assert auto_executor._OvernightAgeExtension([pick]).allows(pick) is False
     runs[:] = [{"started_at_utc": "2026-11-26T12:00:00Z", "status": "ok"}]
     assert auto_executor._OvernightAgeExtension([pick]).allows(pick) is False
+    # Control: the same history extends a readable row, so the two Falses above are the stamp's doing.
+    readable = {**pick, "created_at_utc": "2026-11-26T13:00:00Z"}
+    assert auto_executor._OvernightAgeExtension([readable]).allows(readable) is True
+
+
+def test_an_open_sibling_with_an_unreadable_created_at_blocks_the_slots_extension(monkeypatch):
+    """The unreadable sibling may be the newest row of its slot, so the readable one cannot be shown to
+    be the freshest pick; the extension is a relaxation and fails closed."""
+    runs = [{"started_at_utc": "2026-11-26T12:00:00Z", "status": "ok"}]
+    monkeypatch.setattr(auto_executor, "_read_daily_run_history", lambda: runs)
+    slot = {"status": "open", "model_id": "m", "event_id": "e", "market_type": "spread"}
+    readable = {**slot, "pick_id": "a", "created_at_utc": "2026-11-26T13:00:00Z"}
+    broken = {**slot, "pick_id": "b", "created_at_utc": _OVERFLOW_START}
+    assert auto_executor._OvernightAgeExtension([readable]).allows(readable) is True
+    assert auto_executor._OvernightAgeExtension([readable, broken]).allows(readable) is False
+    other_slot = {**readable, "event_id": "other"}
+    assert auto_executor._OvernightAgeExtension([other_slot, broken]).allows(other_slot) is True
 
 
 def test_quarantine_sorts_past_a_row_with_an_out_of_range_settlement_stamp(tmp_path):
@@ -579,7 +599,31 @@ def test_quarantine_sorts_past_a_row_with_an_out_of_range_settlement_stamp(tmp_p
     rows.append(settled(_OVERFLOW_START))
     rows.append(settled("2026-11-26T09:00:00Z"))
     _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", rows)
-    assert "m" in auto_executor._get_quarantined_underperforming_models(tmp_path)
+    info = auto_executor._get_quarantined_underperforming_models(tmp_path)["m"]
+    # All 16 rows, the unreadable-stamp one included, are in the sample.
+    assert info["sample"] == 16 and info["pnl_usd"] == -160.0
+
+
+def test_quarantine_keeps_an_unreadable_stamp_row_in_the_recent_sample(tmp_path):
+    """A row with an unreadable settlement stamp sorted OLDEST, so it was the first one dropped from the
+    recent-30 window and a losing row could vanish from the ROI the quarantine reads. It sorts newest."""
+
+    def settled(stamp: str, pnl: float) -> dict[str, Any]:
+        return {
+            "model_id": "m",
+            "status": "settled",
+            "result": "win" if pnl > 0 else "loss",
+            "cost_usd": 10.0,
+            "pnl_usd": pnl,
+            "settled_at_utc": stamp,
+        }
+
+    rows = [settled(f"2026-11-{day:02d}T12:00:00Z", 10.0) for day in range(1, 26)]
+    rows += [settled(f"2026-11-26T{hour:02d}:00:00Z", 10.0) for hour in range(5)]
+    rows.append(settled(_OVERFLOW_START, -10_000.0))
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", rows)
+    info = auto_executor._get_quarantined_underperforming_models(tmp_path)["m"]
+    assert info["sample"] == 30 and info["pnl_usd"] == 290.0 - 10_000.0
 
 
 @pytest.mark.usefixtures("decorate")
@@ -638,13 +682,20 @@ def test_precycle_overflow_in_paper_settlement_does_not_end_the_cycle(monkeypatc
 
     _cycle_harness(monkeypatch, tmp_path, _state([_entry(mode="paper")], enabled=True), _mixed_rows())
 
+    settle_calls: list[Any] = []
+
     def _settle(data_root=None, **_kwargs):
         if data_root is not None:
+            settle_calls.append(data_root)
             raise OverflowError("date value out of range")
         return {}
 
     monkeypatch.setattr(auto_buyer_ledger, "settle_auto_buyer_ledger", _settle)
-    auto_executor.run_auto_buyer_cycle()  # warns and carries on
+    summary = auto_executor.run_auto_buyer_cycle()  # warns and carries on
+    assert settle_calls, "the paper settlement never ran, so the overflow was not exercised"
+    assert (
+        summary["cohort_passes"]["paper"]["orders_count"] >= 1
+    )  # the pass after the failed settle still ran
 
 
 def test_cli_settle_survives_an_overflow_in_the_auto_buyer_settlement(monkeypatch, tmp_path):
@@ -664,3 +715,143 @@ def test_cli_settle_survives_an_overflow_in_the_auto_buyer_settlement(monkeypatc
     monkeypatch.setattr(auto_buyer_ledger, "settle_auto_buyer_ledger", _boom)
     out = settle_cli._settle_auto_buyer_books(tmp_path)
     assert out == {"auto_buyer_fallback_reconciliation": {}}
+
+
+# ----------------------------------------------------------------------------- B6 (non-finite dollars)
+# A NaN pnl or cost made min(nan, 0.0) / `nan + cost > cap` False, which switched the loss stop or the
+# spend cap off for the day; garbage text skipped a loss row or raised out of the totals. All of them now
+# count at a cap, in the direction that can only trip a stop earlier.
+
+_NON_FINITE = [
+    pytest.param(float("nan"), id="nan"),
+    pytest.param(float("inf"), id="inf"),
+    pytest.param(float("-inf"), id="-inf"),
+    pytest.param("abc", id="garbage-text"),
+    pytest.param(10**400, id="overflowing-int"),
+    pytest.param({"v": 1}, id="dict"),
+]
+
+
+def _settled_today(pnl: Any, **extra: Any) -> dict[str, Any]:
+    return _today_row(
+        pick_id="bad-pnl",
+        executed_at_utc="",
+        cost_usd=0.0,
+        result="loss",
+        pnl_usd=pnl,
+        event_start_utc=iso_utc(utc_now()),
+        settled_at_utc=iso_utc(utc_now()),
+        **extra,
+    )
+
+
+@pytest.mark.parametrize("bad", _NON_FINITE)
+@pytest.mark.parametrize("live_book", [True, False])
+def test_a_non_finite_pnl_on_a_settled_row_counts_as_a_loss_at_the_cap(tmp_path, bad, live_book):
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_settled_today(bad)])
+    named: list[str] = []
+    _spend, pnl = _REAL_TODAY_TOTALS(
+        tmp_path, live_book=live_book, unreadable_loss_usd=25.0, unreadable_rows=named
+    )
+    assert pnl == -25.0
+    assert named == ["bad-pnl (pnl_usd)"]
+    # No cap known (a display caller): refuse outright rather than guess a number.
+    assert _REAL_TODAY_TOTALS(tmp_path, live_book=live_book)[1] == float("-inf")
+
+
+def test_a_readable_pnl_beside_an_unreadable_one_still_sums_exactly(tmp_path):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [_settled_today(float("nan")), {**_settled_today(-7.0), "pick_id": "ok-loss"}],
+    )
+    assert _REAL_TODAY_TOTALS(tmp_path, live_book=True, unreadable_loss_usd=25.0)[1] == -32.0
+    assert _REAL_TODAY_TOTALS(tmp_path, live_book=False, unreadable_loss_usd=25.0)[1] == -32.0
+
+
+@pytest.mark.parametrize("bad", _NON_FINITE)
+def test_a_non_finite_cost_on_todays_row_counts_as_spend_at_the_daily_cap(tmp_path, bad):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl", [_today_row(pick_id="bad-cost", status="open", cost_usd=bad)]
+    )
+    named: list[str] = []
+    spend, _pnl = _REAL_TODAY_TOTALS(
+        tmp_path, live_book=True, unreadable_spend_usd=500.0, unreadable_rows=named
+    )
+    assert spend == 500.0
+    assert named == ["bad-cost (cost_usd)"]
+    assert _REAL_TODAY_TOTALS(tmp_path, live_book=True)[0] == float("inf")
+
+
+def test_an_absent_or_zero_amount_is_still_the_zero_it_always_was(tmp_path):
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [
+            _today_row(pick_id="a", status="open", cost_usd=None),
+            _today_row(pick_id="b", status="open", cost_usd=""),
+            {**_settled_today(None), "pick_id": "c"},
+            {**_settled_today(""), "pick_id": "d"},
+        ],
+    )
+    named: list[str] = []
+    assert _REAL_TODAY_TOTALS(tmp_path, live_book=True, unreadable_rows=named) == (0.0, 0.0)
+    assert named == []
+
+
+@pytest.mark.usefixtures("decorate")
+@pytest.mark.parametrize("bad", [float("nan"), "abc", 10**400])
+def test_a_buy_is_refused_when_a_settled_loss_has_no_readable_pnl_and_the_row_is_named(
+    monkeypatch, tmp_path, bad
+):
+    """The loss stop must not switch off for the day on a NaN: the row counts at the per-game cap and
+    the breaker's skip record names it, so Telegram does not show a bare rejected_daily_loss_breaker."""
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    _write_ledger(tmp_path / "auto_buyer_ledger.jsonl", [_settled_today(bad)])
+    row = _row(SPREAD_V7, pick_id="in", event="g1", edge="0.07", model_probability=0.58, ask=0.51)
+    result = _live_buyer(tmp_path, max_daily_loss_usd=20.0).evaluate_and_execute([row])
+    assert FakeExecutor.executed == []
+    assert result.rejected_daily_loss_breaker == 1
+    (record,) = result.cohort_skips
+    assert record["reason"] == "rejected_daily_loss_breaker"
+    assert "bad-pnl (pnl_usd)" in record["detail"]
+
+
+@pytest.mark.usefixtures("decorate")
+@pytest.mark.parametrize("bad", [float("nan"), "abc", 10**400])
+def test_a_buy_is_refused_when_a_row_of_today_has_no_readable_cost_and_the_row_is_named(
+    monkeypatch, tmp_path, bad
+):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl", [_today_row(pick_id="bad-cost", status="open", cost_usd=bad)]
+    )
+    row = _row(SPREAD_V7, pick_id="in", event="g1", edge="0.07", model_probability=0.58, ask=0.51)
+    result = _live_buyer(tmp_path).evaluate_and_execute([row])
+    assert FakeExecutor.executed == []
+    assert result.rejected_budget == 1
+    (record,) = result.cohort_skips
+    assert "bad-cost (cost_usd)" in record["detail"]
+
+
+@pytest.mark.usefixtures("decorate")
+def test_a_readable_ledger_still_buys_and_names_nothing(monkeypatch, tmp_path):
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", _REAL_TODAY_TOTALS)
+    _write_ledger(
+        tmp_path / "auto_buyer_ledger.jsonl",
+        [_today_row(pick_id="fine", status="open", cost_usd=10.0), _settled_today(-3.0)],
+    )
+    row = _row(SPREAD_V7, pick_id="in", event="g1", edge="0.07", model_probability=0.58, ask=0.51)
+    result = _live_buyer(tmp_path, max_daily_loss_usd=20.0).evaluate_and_execute([row])
+    assert [t.pick_id for t, _ in FakeExecutor.executed] == ["in"]
+    assert result.rejected_daily_loss_breaker == 0 and result.rejected_budget == 0
+
+
+@pytest.mark.usefixtures("decorate")
+def test_a_non_finite_total_from_any_source_trips_the_breaker_and_the_budget_check(monkeypatch, tmp_path):
+    """Defence in depth: the comparisons themselves must not read NaN as 'within the limit'."""
+    row = _row(SPREAD_V7, pick_id="in", event="g1", edge="0.07", model_probability=0.58, ask=0.51)
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", lambda *_a, **_k: (0.0, float("nan")))
+    result = _live_buyer(tmp_path, max_daily_loss_usd=50.0).evaluate_and_execute([row])
+    assert FakeExecutor.executed == [] and result.rejected_daily_loss_breaker == 1
+    monkeypatch.setattr(auto_executor, "_today_auto_buyer_totals", lambda *_a, **_k: (float("nan"), 0.0))
+    result = _live_buyer(tmp_path).evaluate_and_execute([row])
+    assert FakeExecutor.executed == [] and result.rejected_budget == 1

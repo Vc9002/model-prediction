@@ -227,7 +227,7 @@ def _row_selected_team(pick_row: dict[str, str]) -> str | None:
 def _row_line(pick_row: dict[str, str]) -> float:
     try:
         return float(pick_row.get("line") or "")
-    except ValueError as error:
+    except (TypeError, ValueError, OverflowError) as error:
         raise ExecutionGateError("REFUSED: pick row has no valid line to verify against.") from error
 
 
@@ -1271,17 +1271,17 @@ class PolymarketExecutor:
                 # doubling the position if the IOC then filled. Unknown here means poll.
                 return None
             raw = order.get("cumQuantity")
-            if raw is None:
+            if raw is None or (isinstance(raw, str) and not raw.strip()):
                 value = None
             else:
                 try:
                     value = float(raw)
-                except OverflowError:
-                    # Present but unreadable is not absent: a cancelled order with an unknown fill must
-                    # not read as a known zero (that rests a full-size fallback over a possible fill).
+                except (TypeError, ValueError, OverflowError):
+                    # Present but unreadable (an overflowing int, the string 'abc', a dict or list) is not
+                    # absent: a cancelled order with an unknown fill must not read as a known zero (that
+                    # rests a full-size fallback over a possible fill, and the missed fill is never
+                    # restated). Only None or a blank string means the field is genuinely absent.
                     return requested if state == "ORDER_STATE_FILLED" else None
-                except (TypeError, ValueError):
-                    value = None
             if value is None:
                 if state == "ORDER_STATE_FILLED":
                     return requested

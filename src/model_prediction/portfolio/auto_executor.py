@@ -1132,6 +1132,9 @@ class _OvernightAgeExtension:
         self._loaded = False
         self._runs: list[tuple[datetime, str]] | None = None
         self._newest_by_slot: dict[tuple[str, str, str], datetime] = {}
+        # Slots holding an open row whose created_at_utc cannot be read. Such a row may be the newest of
+        # its slot, so no sibling of it may take the extension (the extension is a relaxation).
+        self._unreadable_slots: set[tuple[str, str, str]] = set()
 
     @staticmethod
     def _slot(row: dict[str, Any]) -> tuple[str, str, str]:
@@ -1154,6 +1157,7 @@ class _OvernightAgeExtension:
             try:
                 created = parse_utc(str(pick.get("created_at_utc") or ""))
             except (TypeError, ValueError, OverflowError):
+                self._unreadable_slots.add(self._slot(pick))
                 continue
             slot = self._slot(pick)
             if slot not in self._newest_by_slot or created > self._newest_by_slot[slot]:
@@ -1169,6 +1173,8 @@ class _OvernightAgeExtension:
             return False
         # An empty or truncated history cannot show what ran after the pick.
         if not self._runs or not any(started <= created for started, _status in self._runs):
+            return False
+        if self._slot(row) in self._unreadable_slots:
             return False
         if self._newest_by_slot.get(self._slot(row), created) > created:
             return False
@@ -1389,15 +1395,52 @@ def _live_book_has_pending_orders(ledger_path: Path) -> bool:
     )
 
 
-def _warn_unreadable_row_counted(row: dict[str, Any], field: str, counted_toward: str) -> None:
-    """Name the row whose unreadable timestamp is being counted, so a tightened cap is traceable to
-    its cause instead of surfacing only as a bare budget or loss-breaker refusal."""
+def _warn_unreadable_row_counted(
+    row: dict[str, Any], field: str, counted_toward: str, named: list[str] | None = None
+) -> None:
+    """Name the row whose unreadable field is being counted, so a tightened cap is traceable to
+    its cause instead of surfacing only as a bare budget or loss-breaker refusal. ``named`` also
+    collects ``pick_id (field)`` for the caller's skip-log detail."""
     logger.warning(
-        "live-book row %s has an unreadable %s; counting it toward today's %s",
+        "ledger row %s has an unreadable %s; counting it toward today's %s",
         row.get("pick_id"),
         field,
         counted_toward,
     )
+    if named is not None:
+        named.append(f"{row.get('pick_id')} ({field})")
+
+
+def _readable_money(raw: Any) -> float | None:
+    """A ledger dollar amount: an absent or falsy value is the 0.0 it always was, ``None`` means the
+    value is present but not a finite number (garbage text, a dict, an int too big for a float, NaN or
+    inf), which no cap may read as zero."""
+    if not raw:
+        return 0.0
+    try:
+        value = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _row_filled_cost(row: dict[str, Any], fee_in_caps: bool, unreadable_usd: float) -> float:
+    """The row's filled cost for the per-game cap: ``cost_usd`` (plus its fee on the live book).
+
+    A ``cost_usd`` that is present but not a finite number counts as ``unreadable_usd`` (the per-game
+    cap), so the game reads as full: NaN made the row's exposure ``nan > 0`` False and dropped the game
+    from the cap, and garbage text or an overflowing int raised out of the whole pass. Readable values
+    are the sum they always were.
+    """
+    cost = _readable_money(row.get("cost_usd"))
+    if cost is None:
+        logger.warning(
+            "ledger row %s has an unreadable cost_usd; counting it as %.2f toward its game's cap",
+            row.get("pick_id"),
+            unreadable_usd,
+        )
+        return unreadable_usd
+    return cost + (row_fee_usd(row) if fee_in_caps else 0.0)
 
 
 def _today_auto_buyer_totals(
@@ -1405,6 +1448,9 @@ def _today_auto_buyer_totals(
     *,
     live_book: bool = True,
     row_scope: Callable[[dict[str, Any]], bool] | None = None,
+    unreadable_spend_usd: float = math.inf,
+    unreadable_loss_usd: float = math.inf,
+    unreadable_rows: list[str] | None = None,
 ) -> tuple[float, float]:
     """Today's (ET calendar day) executed spend and the P&L the daily loss stop compares.
 
@@ -1422,7 +1468,19 @@ def _today_auto_buyer_totals(
     readable start counts toward the loss when its settlement stamp is present but unreadable, whether
     the start is blank or corrupt. A blank or missing spend stamp still counts for nothing, and the paper
     book never counts either, so a legacy row can't pin it. Each counted row is named in a warning.
+
+    A dollar amount that is present but not a finite number (garbage text, NaN, inf, an overflowing
+    int) fails closed in the direction that can only trip a stop EARLIER, on either book: a counted
+    row's ``cost_usd`` adds ``unreadable_spend_usd`` to spend (callers pass the daily cap, so the cap
+    reads as used up and no buy fits) and a settled row's ``pnl_usd`` adds a loss of
+    ``unreadable_loss_usd`` (callers pass the per-game cap, the most one game can lose). NaN used to
+    poison the sum so ``nan <= -limit`` and ``nan + cost > cap`` were both False and the stop or cap
+    silently switched off; garbage text used to skip the row (loss) or raise out of the totals (spend).
+    Both default to infinity (refuse) for display callers that know no cap. ``unreadable_rows``, when
+    given, collects ``pick_id (field)`` for every row counted for an unreadable field.
     """
+    spend_if_unreadable = unreadable_spend_usd if unreadable_spend_usd >= 0 else math.inf
+    loss_if_unreadable = unreadable_loss_usd if unreadable_loss_usd >= 0 else math.inf
     from model_prediction.portfolio.auto_buyer_ledger import (
         is_manual_auto_buyer_record,
         read_auto_buyer_ledger,
@@ -1453,9 +1511,14 @@ def _today_auto_buyer_totals(
         spend_unreadable = live_book and _unreadable(row.get("executed_at_utc"))
         if executed_on == today or spend_unreadable:
             if spend_unreadable:
-                _warn_unreadable_row_counted(row, "executed_at_utc", "daily spend")
-            fee = row_fee_usd(row) if live_book else 0.0
-            spend += float(row.get("cost_usd") or 0.0) + fee + _pending_exposure_cost(row, with_fee=live_book)
+                _warn_unreadable_row_counted(row, "executed_at_utc", "daily spend", unreadable_rows)
+            cost = _readable_money(row.get("cost_usd"))
+            if cost is None:
+                _warn_unreadable_row_counted(row, "cost_usd", "daily spend", unreadable_rows)
+                spend += spend_if_unreadable
+            else:
+                fee = row_fee_usd(row) if live_book else 0.0
+                spend += cost + fee + _pending_exposure_cost(row, with_fee=live_book)
 
         result = str(row.get("result") or "").lower()
         if not row.get("settled_at_utc") or result not in ("win", "loss", "push"):
@@ -1467,10 +1530,11 @@ def _today_auto_buyer_totals(
         if settled_on != today and not undatable:
             continue
         if undatable:
-            _warn_unreadable_row_counted(row, "settled_at_utc", "daily loss stop")
-        try:
-            pnl = float(row.get("pnl_usd") or 0.0)
-        except (TypeError, ValueError):
+            _warn_unreadable_row_counted(row, "settled_at_utc", "daily loss stop", unreadable_rows)
+        pnl = _readable_money(row.get("pnl_usd"))
+        if pnl is None:
+            _warn_unreadable_row_counted(row, "pnl_usd", "daily loss stop", unreadable_rows)
+            realized_pnl -= loss_if_unreadable
             continue
         # Any negative row counts, not only result "loss": a fair-value push or a manual-sell exit
         # can realize a loss too.
@@ -2720,7 +2784,10 @@ def _get_quarantined_underperforming_models(
             try:
                 return parse_utc(str(row.get("settled_at_utc") or "")).timestamp()
             except (TypeError, ValueError, OverflowError):
-                return float("-inf")
+                # An unreadable stamp sorts NEWEST, so the row stays in the recent-30 sample instead of
+                # being the first dropped: a corrupt stamp must not hide a bad (or good) result from the
+                # ROI the quarantine reads. Same fail-toward-counting rule as the loss stop's totals.
+                return float("inf")
 
         rows.sort(key=settled_at_timestamp)
         recent = rows[-30:] if len(rows) > 30 else rows
@@ -3037,7 +3104,7 @@ class AutoPolymarketBuyer:
                     # IOC was cancelled can still have its fallback resting on the book.
                     game = _game_key(r)
                     pending_cost = _pending_exposure_cost(r, with_fee=fee_in_caps)
-                    filled_cost_r = float(r.get("cost_usd") or 0.0) + (row_fee_usd(r) if fee_in_caps else 0.0)
+                    filled_cost_r = _row_filled_cost(r, fee_in_caps, self.config.max_game_stake_usd)
                     if game and filled_cost_r + pending_cost > 0:
                         by_pick = game_exposure.setdefault(game, {})
                         pick_key = str(r.get("pick_id") or r.get("order_id") or "")
@@ -3091,9 +3158,7 @@ class AutoPolymarketBuyer:
                         and not fallback_unknown
                         and shares_cnt > 0
                     ):
-                        filled_cost = float(r.get("cost_usd") or 0.0) + (
-                            row_fee_usd(r) if fee_in_caps else 0.0
-                        )
+                        filled_cost = _row_filled_cost(r, fee_in_caps, self.config.max_game_stake_usd)
                         p_info = {
                             "pick_id": pid,
                             "market_slug": slug,
@@ -3396,23 +3461,40 @@ class AutoPolymarketBuyer:
             else self.data_root
         )
         scope = self.config.ledger_scope
+        # Rows counted for an unreadable field are named in the breaker's skip detail and the budget
+        # rejection's note, so a tightened cap is traceable to its row, not a bare rejected_* reason.
+        unreadable_rows: list[str] = []
         today_spend_usd, today_realized_pnl_usd = _today_auto_buyer_totals(
             totals_root,
             live_book=totals_root != self.paper_data_root,
+            unreadable_spend_usd=self.config.max_daily_spend_usd,
+            unreadable_loss_usd=self.config.max_game_stake_usd,
+            unreadable_rows=unreadable_rows,
             **({"row_scope": scope.owns} if scope is not None else {}),
+        )
+        unreadable_detail = (
+            f"ledger rows counted for an unreadable field: {', '.join(unreadable_rows[:10])}"
+            if unreadable_rows
+            else None
         )
 
         # Drawdown circuit breaker: once today's realized loss (gross on the live book) crosses
         # the configured threshold, stop considering new buys for the rest of the calendar day.
         # Reconciliation/settlement of already-open positions happens separately in
         # run_auto_buyer_cycle, before this method is called, so it is unaffected.
-        if self.config.max_daily_loss_usd is not None and today_realized_pnl_usd <= -abs(
-            self.config.max_daily_loss_usd
+        # A non-finite total can never prove the day is within its stop (NaN <= -limit is False), so it
+        # trips the breaker like a breached one; the totals no longer produce one, this keeps it that way.
+        if self.config.max_daily_loss_usd is not None and (
+            not math.isfinite(today_realized_pnl_usd)
+            or today_realized_pnl_usd <= -abs(self.config.max_daily_loss_usd)
         ):
             result.total_evaluated = len(picks)
             result.rejected_daily_loss_breaker = len(picks)
             skip_log.reject_all(
-                picks, lambda row: _match_cohort(row, self.config), "rejected_daily_loss_breaker"
+                picks,
+                lambda row: _match_cohort(row, self.config),
+                "rejected_daily_loss_breaker",
+                detail=unreadable_detail,
             )
             skip_log.finish(result)
             return result
@@ -4022,9 +4104,14 @@ class AutoPolymarketBuyer:
                 fee_usd = modeled_taker_fee_usd(shares, limit_price)
             all_in_cost = round(actual_cost + fee_usd, 4) if fee_in_caps else actual_cost
 
-            # Daily budget check
-            if committed_spend + all_in_cost > self.config.max_daily_spend_usd:
+            # Daily budget check. A non-finite sum cannot prove the order fits (NaN > cap is False, which
+            # would switch the cap off), so it refuses like an over-cap one.
+            if not math.isfinite(committed_spend + all_in_cost) or (
+                committed_spend + all_in_cost > self.config.max_daily_spend_usd
+            ):
                 result.rejected_budget += 1
+                if unreadable_detail:
+                    skip_log.note(detail=unreadable_detail)
                 continue
             if game and game_other_spend + own_filled + all_in_cost > self.config.max_game_stake_usd + 0.10:
                 result.rejected_budget += 1

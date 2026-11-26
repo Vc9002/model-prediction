@@ -733,6 +733,70 @@ def test_an_overflowing_cum_quantity_on_a_cancelled_ioc_is_unknown_and_rests_no_
     assert "order_executed" in _audit_types(tmp_path)
 
 
+@pytest.mark.parametrize("bad", ["abc", {"value": 4}, [4]], ids=["garbage-string", "dict", "list"])
+@pytest.mark.parametrize("state", ["ORDER_STATE_CANCELED", "ORDER_STATE_EXPIRED", "ORDER_STATE_REJECTED"])
+def test_a_garbage_cum_quantity_on_a_cancelled_ioc_is_unknown_like_an_overflowing_one(
+    tmp_path, exchange, state, bad
+):
+    """Only None or a blank string means cumQuantity is absent. A string 'abc', a dict or a list is PRESENT
+    but unreadable, exactly like an overflowing int: read as absent it was a KNOWN zero fill, so a
+    full-size GTD fallback rested over a possible fill that the ledger would then never restate."""
+    start = _start()
+
+    def primary(body):
+        status, order = exchange.default_post(body)
+        exchange.readback_overrides[order["id"]] = {"state": state, "cumQuantity": bad}
+        return status, {**order, "state": state, "cumQuantity": bad}
+
+    exchange.post_script = [primary]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start), _pick_row(start), execute_flag=True, user_command=True
+    )
+    assert len(exchange.order_posts()) == 1  # no GTD fallback leg
+    assert result["fill_known"] is False
+    assert result["fallback_status"] == "unknown_fill"
+    assert result["fallback_order_id"] == result["order_id"]
+
+
+@pytest.mark.parametrize("bad", ["abc", {"value": 4}, [4]], ids=["garbage-string", "dict", "list"])
+def test_a_garbage_cum_quantity_on_a_filled_order_means_the_requested_quantity(tmp_path, exchange, bad):
+    start = _start()
+
+    def primary(body):
+        status, order = exchange.default_post(body)
+        exchange.readback_overrides[order["id"]] = {"state": "ORDER_STATE_FILLED", "cumQuantity": bad}
+        return status, {**order, "state": "ORDER_STATE_FILLED", "cumQuantity": bad}
+
+    exchange.post_script = [primary]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start, ioc_fallback_resting=False, resting_expires_at_utc=None),
+        _pick_row(start),
+        execute_flag=True,
+        user_command=True,
+    )
+    assert result["filled_size_shares"] == 10.0 and result["fill_known"] is True
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_a_blank_cum_quantity_on_a_cancelled_ioc_is_still_a_known_zero(tmp_path, exchange, blank):
+    """The absent spellings keep their meaning: a cancelled IOC that reports no quantity filled nothing."""
+    start = _start()
+
+    def primary(body):
+        status, order = exchange.default_post(body)
+        exchange.readback_overrides[order["id"]] = {"state": "ORDER_STATE_CANCELED", "cumQuantity": blank}
+        return status, {**order, "state": "ORDER_STATE_CANCELED", "cumQuantity": blank}
+
+    exchange.post_script = [primary]
+    result = _executor(tmp_path, _snapshot(start)).execute(
+        _ticket(start, ioc_fallback_resting=False, resting_expires_at_utc=None),
+        _pick_row(start),
+        execute_flag=True,
+        user_command=True,
+    )
+    assert result["filled_size_shares"] == 0.0 and result["fill_known"] is True
+
+
 def test_an_overflowing_leaves_quantity_counts_as_working_and_does_not_crash(tmp_path, exchange):
     """_ioc_fill_is_final and _reports_working_quantity are a pair: both float() the same
     leavesQuantity, so fixing one leaves the other raising after the POST. An overflowing value cannot
@@ -2131,3 +2195,13 @@ def test_topup_merge_without_a_fallback_status_does_not_re_hold_a_resolved_row(t
     assert merged["fallback_order_id"] is None
     assert merged["fallback_status"] == "submit_unknown"  # stale, kept by the passthrough
     assert not auto_buyer_ledger.is_fallback_submit_unknown(merged)
+
+
+@pytest.mark.parametrize(
+    "line", [10**400, {"v": 1}, [1], "abc"], ids=["overflowing-int", "dict", "list", "text"]
+)
+def test_a_pick_row_line_that_cannot_be_read_is_a_gate_refusal_not_a_raw_error(line):
+    """float() of a 400-digit int raises OverflowError and of a dict raises TypeError; only ValueError was
+    caught, so these escaped the gate as raw exceptions instead of an ExecutionGateError refusal."""
+    with pytest.raises(pe.ExecutionGateError, match="no valid line"):
+        pe._row_line({"line": line})

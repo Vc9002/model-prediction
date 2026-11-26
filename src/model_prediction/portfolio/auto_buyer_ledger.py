@@ -900,6 +900,27 @@ def _is_resting_fallback_leg(row: dict[str, Any]) -> bool:
     return row.get("fallback_is_topup_ioc") is not True
 
 
+def _snapshot_cum_quantity(order: dict[str, Any]) -> float | None:
+    """The order read-back's filled quantity, ``None`` when it is present but unreadable.
+
+    Only a missing field or a blank string is the readable zero it always was. A present value that
+    does not parse (the string 'abc', a dict or list, an int too big for a float) or is not finite is
+    an UNKNOWN fill: read as zero it voided a terminal row that may hold shares, and an overflowing one
+    raised out of the reconcile loop before the ledger write, losing every pass. Mirrors
+    ``fill_quantity`` in polymarket_execute, whose submit-time read must agree with this one.
+    """
+    raw = order.get("cum_quantity")
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return 0.0
+    try:
+        value = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(value):
+        return None
+    return max(0.0, value)
+
+
 def _cancel_by_id(
     executor: Any,
     order_id: str,
@@ -1045,13 +1066,9 @@ def reconcile_pending_auto_buyer_fallbacks(
             return None
         return next((o for o in after.get("orders", []) if str(o.get("order_id")) == order_id), None)
 
-    def _restate(row: dict[str, Any], order: dict[str, Any]) -> tuple[float, float, float]:
-        """Fold the order's cum_quantity into the row; returns (fallback_filled, new_shares, primary)."""
+    def _restate(row: dict[str, Any], fallback_filled: float) -> tuple[float, float, float]:
+        """Fold a readable fill count into the row; returns (fallback_filled, new_shares, primary)."""
         nonlocal changed
-        try:
-            fallback_filled = max(0.0, float(order.get("cum_quantity") or 0.0))
-        except (TypeError, ValueError):
-            fallback_filled = 0.0
         # If resting fallback was placed with capped resting shares
         if row.get("fallback_resting_shares") is not None and row.get("fallback_order_id") != row.get(
             "order_id"
@@ -1147,10 +1164,28 @@ def reconcile_pending_auto_buyer_fallbacks(
         fallback_filled = new_shares = primary_shares = 0.0
         if order is not None:
             state = str(order.get("order_state") or "").upper()
-            # A fill count from a live read only ever grows, so restating it is safe; closing the row
-            # is not (see the post-cancel re-read below).
-            fallback_filled, new_shares, primary_shares = _restate(r, order)
-            if state in _TERMINAL_ORDER_STATES:
+            live_filled = _snapshot_cum_quantity(order)
+            if live_filled is None:
+                # Present but unreadable cumQuantity: the fill is UNKNOWN, never a known zero. Nothing is
+                # restated and the row is never closed or voided on it. A terminal order has nothing left
+                # to cancel, so the row waits for a readable read (alarmed every pass through the error
+                # count); a live one still falls through, because a cancel does not need the fill count.
+                logger.warning(
+                    "Order %s (%s) reports an unreadable cumQuantity %r; its fill is unknown, so the row "
+                    "is left unreconciled.",
+                    fid,
+                    r.get("pick_id"),
+                    order.get("cum_quantity"),
+                )
+                errors += 1
+                if state in _TERMINAL_ORDER_STATES:
+                    still_pending += 1
+                    continue
+            else:
+                # A fill count from a live read only ever grows, so restating it is safe; closing the
+                # row is not (see the post-cancel re-read below).
+                fallback_filled, new_shares, primary_shares = _restate(r, live_filled)
+            if live_filled is not None and state in _TERMINAL_ORDER_STATES:
                 _close(r, state, new_shares, primary_shares)
                 if fallback_filled > 0:
                     reconciled_filled += 1
@@ -1254,7 +1289,22 @@ def reconcile_pending_auto_buyer_fallbacks(
             r["cancel_requested_at_utc"] = iso_utc(now)
             still_pending += 1
             continue
-        fallback_filled, new_shares, primary_shares = _restate(r, after)
+        after_filled = _snapshot_cum_quantity(after)
+        if after_filled is None:
+            # Terminal, but the fill count cannot be read: closing would void a row that may hold
+            # shares. Same as an unconfirmed cancel: pending, read again next pass.
+            logger.warning(
+                "Order %s (%s) is terminal after its cancel but reports an unreadable cumQuantity %r; "
+                "the row stays pending.",
+                fid,
+                r.get("pick_id"),
+                after.get("cum_quantity") if after else None,
+            )
+            r["cancel_requested_at_utc"] = iso_utc(now)
+            errors += 1
+            still_pending += 1
+            continue
+        fallback_filled, new_shares, primary_shares = _restate(r, after_filled)
         _close(r, after_state, new_shares, primary_shares)
         if fallback_filled > 0:
             reconciled_filled += 1

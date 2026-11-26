@@ -1470,3 +1470,90 @@ def test_topup_merge_resets_the_earlier_legs_fallback_fills(tmp_path):
     )
     assert merged["fallback_order_id"] == "gtd-new"
     assert auto_executor._pending_exposure_cost(merged) == pytest.approx(6.0 * 0.5)
+
+
+# ---------------------------------------------------- B6: an unreadable cumQuantity is not a known zero
+
+
+def _unknown_fill_row(**extra: Any) -> dict[str, Any]:
+    """An IOC whose fill the submit could not observe: fallback_order_id is its own order id."""
+    return _fallback_row(
+        "uk", order_id="uk", order_ids=["uk"], fill_known=False, order_state="ORDER_STATE_NEW", **extra
+    )
+
+
+_UNREADABLE_CUM = [
+    pytest.param("abc", id="garbage-string"),
+    pytest.param(10**400, id="overflowing-int"),
+    pytest.param({"value": 4}, id="dict"),
+    pytest.param([4], id="list"),
+    pytest.param(float("nan"), id="nan"),
+    pytest.param(float("inf"), id="inf"),
+]
+
+
+@pytest.mark.parametrize("cum", _UNREADABLE_CUM)
+def test_reconcile_keeps_an_unknown_fill_row_when_the_terminal_read_has_an_unreadable_fill(tmp_path, cum):
+    """A garbage cumQuantity read as a known ZERO fill: _close voided the row (a position that may exist
+    went untracked), and an overflowing one raised OverflowError out of the row loop before the ledger
+    write, so every reconcile pass was lost and settlement never ran. It is an unknown fill: the row stays
+    as it was, is counted pending and as an error, and the pass finishes."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    other = _fallback_row("ok", primary_shares=2.0)
+    _write_ledger(j_path, [_unknown_fill_row(), other])
+    before = _ledger(j_path)[0]
+    exchange = _Exchange({"uk": ("ORDER_STATE_CANCELED", cum), "ok": ("ORDER_STATE_FILLED", 10.0)})
+    summary = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    row, other_row = _ledger(j_path)
+    assert row == before
+    assert row["fill_known"] is False and row["status"] == "open" and row["result"] == "open"
+    assert exchange.cancelled == []
+    assert summary["errors"] == 1 and summary["still_pending"] == 1
+    # The pass was not lost: the readable row beside it was still restated and closed.
+    assert other_row["fallback_reconciled"] is True and other_row["shares"] == 12.0
+
+
+@pytest.mark.parametrize("cum", ["", None])
+def test_reconcile_still_reads_an_absent_cum_quantity_as_zero(tmp_path, cum):
+    """Only a PRESENT unreadable value is unknown: None and a blank string stay a readable zero, so a
+    cancelled order that reports nothing still voids exactly as before."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_unknown_fill_row()])
+    summary = reconcile_pending_auto_buyer_fallbacks(
+        data_root=tmp_path, executor=_Exchange({"uk": ("ORDER_STATE_CANCELED", cum)})
+    )
+    row = _ledger(j_path)[0]
+    assert row["result"] == "void" and row["status"] == "settled" and row["fill_known"] is True
+    assert summary["cancelled_expired"] == 1 and summary["errors"] == 0
+
+
+def test_reconcile_still_cancels_a_started_resting_fallback_whose_live_fill_is_unreadable(tmp_path):
+    """The cancel does not depend on the fill count, so an unreadable live read must not leave the
+    remainder resting past the tip-off; it only skips the restate. The post-cancel terminal read closes."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(primary_shares=2.0)])
+    exchange = _Exchange(
+        {"gtd-1": ("ORDER_STATE_NEW", 10**400)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", 3.0)}
+    )
+    summary = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert exchange.cancelled == ["gtd-1"]
+    row = _ledger(j_path)[0]
+    assert row["shares"] == 5.0 and row["fallback_reconciled"] is True
+    assert summary["reconciled_filled"] == 1 and summary["errors"] == 1
+
+
+@pytest.mark.parametrize("cum", ["abc", 10**400])
+def test_post_cancel_reread_with_an_unreadable_fill_keeps_the_row_pending(tmp_path, cum):
+    """The cancel went out but the terminal read cannot say what filled: closing it would void a row
+    that may hold shares. It stays pending (cancel_requested_at_utc), exactly like a non-terminal re-read."""
+    j_path = tmp_path / "auto_buyer_ledger.jsonl"
+    _write_ledger(j_path, [_fallback_row(primary_shares=2.0)])
+    exchange = _Exchange(
+        {"gtd-1": ("ORDER_STATE_NEW", 0.0)}, after_cancel={"gtd-1": ("ORDER_STATE_CANCELED", cum)}
+    )
+    summary = reconcile_pending_auto_buyer_fallbacks(data_root=tmp_path, executor=exchange)
+    assert exchange.cancelled == ["gtd-1"]
+    row = _ledger(j_path)[0]
+    assert row["fallback_reconciled"] is False and row["result"] == "open" and row["shares"] == 2.0
+    assert row["cancel_requested_at_utc"]
+    assert summary["still_pending"] == 1 and summary["errors"] == 1
